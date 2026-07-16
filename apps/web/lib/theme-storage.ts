@@ -2,12 +2,13 @@
  * Theme preference storage.
  *
  * Anonymous sessions: next-themes persists to localStorage (key `divan-theme`).
- *
- * Story 1.4 extension point — when an authenticated session exists, replace the
- * storage adapter to read/write per-account preference (e.g. keyed by user id).
- * Do not invent auth/DB theme columns here.
+ * Authenticated sessions: per-account key `divan-theme:<accountId>`.
  */
 export const THEME_STORAGE_KEY = "divan-theme";
+
+export function accountThemeStorageKey(accountId: string): string {
+  return `${THEME_STORAGE_KEY}:${accountId}`;
+}
 
 export type ThemePreferenceStorage = {
   getItem: (key: string) => string | null;
@@ -28,13 +29,38 @@ export function createAnonymousThemeStorage(): ThemePreferenceStorage {
   };
 }
 
+/** Per-account localStorage adapter keyed by account id. */
+export function createAccountThemeStorage(
+  accountId: string,
+): ThemePreferenceStorage {
+  const scopedKey = accountThemeStorageKey(accountId);
+  return {
+    getItem: (key) => {
+      if (typeof window === "undefined") return null;
+      if (key === THEME_STORAGE_KEY || key === scopedKey) {
+        return window.localStorage.getItem(scopedKey);
+      }
+      return window.localStorage.getItem(key);
+    },
+    setItem: (key, value) => {
+      if (typeof window === "undefined") return;
+      if (key === THEME_STORAGE_KEY || key === scopedKey) {
+        window.localStorage.setItem(scopedKey, value);
+        return;
+      }
+      window.localStorage.setItem(key, value);
+    },
+  };
+}
+
 /**
- * Story 1.4: swap this factory to bind storage to the signed-in account id.
- * Example shape (do not implement yet):
- *   createAccountThemeStorage(userId: string): ThemePreferenceStorage
+ * Resolve theme storage for anonymous or signed-in account.
  */
-export function resolveThemeStorage(accountId?: string | null): ThemePreferenceStorage {
-  void accountId;
-  // Authenticated per-account persistence lands in Story 1.4.
+export function resolveThemeStorage(
+  accountId?: string | null,
+): ThemePreferenceStorage {
+  if (accountId) {
+    return createAccountThemeStorage(accountId);
+  }
   return createAnonymousThemeStorage();
 }

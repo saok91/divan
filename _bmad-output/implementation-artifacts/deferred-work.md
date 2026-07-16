@@ -8,3 +8,9 @@
 - Fixed `#banner-stack` has no reserved height/offset for main — when Story 1.7 fills banners, content will be obscured unless offset is added then
 - UserMenu lacks full APG menu keyboard pattern (roving tabindex, focus move into menu, Tab trap) — carried from Story 1.2; address with Story 1.7 a11y floor or auth menu work in 1.4
 - Sidebar active state uses exact `pathname === "/"` for dashboard — nested role landings (1.5) will need a prefix/segment strategy
+
+## Deferred from: code review of 1-4-seeded-accounts-coarse-role-auth-dev-bootstrap.md (2026-07-16)
+
+- `PROVIDER_UNAVAILABLE` login UI mapping — LDAP outage copy deferred to Story 1.8; current generic credentials message is intentional for 1.4
+- Timing side-channel on unknown username (no dummy bcrypt) — acceptable for epic-1 bootstrap; harden later if threat model requires
+- `AuthAttempt` without retention policy / FK — thin FR42 substrate; full audit envelope lands in Epic 2

@@ -9,15 +9,20 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
+    "seed": "tsx src/run-seed.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",
     "@divan/db": "workspace:*",
     "@divan/event-store": "workspace:*",
-    "@divan/temporal-engine": "workspace:*"
+    "@divan/temporal-engine": "workspace:*",
+    "bcryptjs": "^3.0.3"
   }
 }

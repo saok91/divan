@@ -11,6 +11,8 @@
     "build": "pnpm db:generate && pnpm --filter @divan/web build",
     "lint": "pnpm --filter @divan/web lint && eslint .",
     "db:generate": "pnpm --filter @divan/db generate",
+    "db:migrate": "pnpm --filter @divan/db migrate",
+    "db:seed": "pnpm --filter @divan/identity-access seed",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres"

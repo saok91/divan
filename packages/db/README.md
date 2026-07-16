@@ -24,6 +24,19 @@ Copy root `.env.example` to `.env`, then:
 
 ```bash
 pnpm db:generate
+pnpm db:migrate
 ```
 
-Connectivity helper: `checkDatabaseConnectivity(process.env.DATABASE_URL!)` — returns `false` on failure; no domain tables required in Story 1.1.
+### Dev seed (identity-access owned)
+
+Seed logic lives in `@divan/identity-access`. From repo root:
+
+```bash
+ALLOW_DEV_SEED=true pnpm db:seed
+```
+
+Guards: refuses `NODE_ENV=production` and requires `ALLOW_DEV_SEED=true`.
+
+Creates exactly five internal accounts (one human ↔ one account ↔ one MVP coarse role). Credentials are documented in the root README for local/dev/CI only.
+
+Connectivity helper: `checkDatabaseConnectivity(process.env.DATABASE_URL!)` — returns `false` on failure.

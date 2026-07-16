@@ -42,6 +42,31 @@ pnpm db:logs   # follow Postgres logs
 pnpm db:down   # stop Compose service (volume kept)
 ```
 
+### Migrate + seed (dev/CI only)
+
+```bash
+pnpm db:generate
+pnpm db:migrate
+# PowerShell
+$env:ALLOW_DEV_SEED="true"; pnpm db:seed
+# bash
+ALLOW_DEV_SEED=true pnpm db:seed
+```
+
+Seed **refuses** to run when `NODE_ENV=production` or `ALLOW_DEV_SEED` is not exactly `true`.
+
+#### Dev-only seeded accounts
+
+| Username | Coarse role | Password |
+| --- | --- | --- |
+| `hr.operator` | `hr_operator` | `DivanDev1!` |
+| `hr.admin` | `hr_admin` | `DivanDev1!` |
+| `manager` | `manager` | `DivanDev1!` |
+| `audit.reviewer` | `audit_reviewer` | `DivanDev1!` |
+| `sys.admin` | `system_admin` | `DivanDev1!` |
+
+Never ship these credentials to production. Inactive fail-closed testing: use `setAccountStatus(username, "inactive")` from `@divan/identity-access`.
+
 ### App
 
 ```bash
@@ -49,6 +74,9 @@ pnpm db:generate
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — Persian RTL shell placeholder.
+Open [http://localhost:3000](http://localhost:3000) — unauthenticated visitors redirect to `/login`.
+
+Required env (see `.env.example`): `AUTH_SECRET`, `IDENTITY_PROVIDER=seeded`, session timeout hooks.
+Copy auth-related vars into `apps/web/.env` as well (Next.js loads env from the app package directory).
 
 See `packages/db/README.md` for database details.

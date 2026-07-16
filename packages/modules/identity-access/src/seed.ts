@@ -1,0 +1,129 @@
+import type { PrismaClient } from "@divan/db";
+import bcrypt from "bcryptjs";
+
+import type { CoarseRole } from "./types";
+
+/** Shared local/dev/CI password — documented in README; never for production. */
+export const DEV_SEED_PASSWORD = "DivanDev1!";
+
+export type SeedAccountSpec = {
+  username: string;
+  coarseRole: CoarseRole;
+  displayName: string;
+};
+
+export const SEED_ACCOUNTS: readonly SeedAccountSpec[] = [
+  {
+    username: "hr.operator",
+    coarseRole: "hr_operator",
+    displayName: "کارشناس منابع انسانی",
+  },
+  {
+    username: "hr.admin",
+    coarseRole: "hr_admin",
+    displayName: "ادمین منابع انسانی",
+  },
+  {
+    username: "manager",
+    coarseRole: "manager",
+    displayName: "مدیر",
+  },
+  {
+    username: "audit.reviewer",
+    coarseRole: "audit_reviewer",
+    displayName: "بازبین ممیزی",
+  },
+  {
+    username: "sys.admin",
+    coarseRole: "system_admin",
+    displayName: "ادمین سیستم",
+  },
+] as const;
+
+export class SeedGuardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SeedGuardError";
+  }
+}
+
+/**
+ * Refuse seed unless explicitly allowed and not production.
+ * Prefer both NODE_ENV !== production AND ALLOW_DEV_SEED=true.
+ */
+export function assertSeedAllowed(
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (env.NODE_ENV === "production") {
+    throw new SeedGuardError(
+      "Dev seed refuses to run when NODE_ENV=production",
+    );
+  }
+  if (env.ALLOW_DEV_SEED !== "true") {
+    throw new SeedGuardError(
+      "Dev seed requires ALLOW_DEV_SEED=true (local/dev/CI only)",
+    );
+  }
+}
+
+/**
+ * Upsert exactly five seeded accounts — one per MVP coarse role,
+ * each linked to exactly one human identity (no shared accounts).
+ * Module-owned; invoked from packages/db seed script.
+ * Preserves account status on update so inactive fail-closed tests survive re-seed.
+ */
+export async function seedDevAccounts(db: PrismaClient): Promise<{
+  createdOrUpdated: number;
+}> {
+  assertSeedAllowed();
+
+  const passwordHash = await bcrypt.hash(DEV_SEED_PASSWORD, 10);
+
+  return db.$transaction(async (tx) => {
+    let createdOrUpdated = 0;
+
+    for (const spec of SEED_ACCOUNTS) {
+      const existing = await tx.internalAccount.findUnique({
+        where: { username: spec.username },
+        include: { humanIdentity: true },
+      });
+
+      if (existing) {
+        await tx.internalAccount.update({
+          where: { id: existing.id },
+          data: {
+            passwordHash,
+            coarseRole: spec.coarseRole,
+            humanIdentity: {
+              update: { displayName: spec.displayName },
+            },
+          },
+        });
+      } else {
+        await tx.humanIdentity.create({
+          data: {
+            displayName: spec.displayName,
+            account: {
+              create: {
+                username: spec.username,
+                passwordHash,
+                status: "active",
+                coarseRole: spec.coarseRole,
+              },
+            },
+          },
+        });
+      }
+      createdOrUpdated += 1;
+    }
+
+    const count = await tx.internalAccount.count();
+    if (count !== SEED_ACCOUNTS.length) {
+      throw new SeedGuardError(
+        `Expected exactly ${SEED_ACCOUNTS.length} seeded accounts, found ${count}. Remove extra accounts before re-seeding.`,
+      );
+    }
+
+    return { createdOrUpdated };
+  });
+}

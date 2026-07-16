@@ -1,3 +1,4 @@
+import { AccountThemeSync } from "@/components/account-theme-sync";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SkipLink } from "@/components/skip-link";
 import { UserMenu } from "@/components/user-menu";
@@ -5,6 +6,10 @@ import { ViewportGateFocusGuard } from "@/components/viewport-gate-focus-guard";
 
 type AppShellProps = {
   children: React.ReactNode;
+  /** Signed-in identity label for the user menu. */
+  userLabel: string;
+  /** Account id for per-account theme storage. */
+  accountId: string;
   /** Slot for Story 1.7 banners (stale above break-glass). */
   bannerSlot?: React.ReactNode;
 };
@@ -13,7 +18,12 @@ type AppShellProps = {
  * Fixed navy chrome: skip link → header → banner stack → sidebar + main.
  * Full shell only at ≥1280×720; smaller viewports get a Persian gate message.
  */
-export function AppShell({ children, bannerSlot }: AppShellProps) {
+export function AppShell({
+  children,
+  userLabel,
+  accountId,
+  bannerSlot,
+}: AppShellProps) {
   return (
     <>
       <div
@@ -32,6 +42,7 @@ export function AppShell({ children, bannerSlot }: AppShellProps) {
       <ViewportGateFocusGuard />
 
       <div className="app-shell-root">
+        <AccountThemeSync accountId={accountId} />
         <SkipLink />
 
         <header className="fixed inset-x-0 top-0 z-40 flex h-chrome-height items-center gap-4 bg-chrome px-4 text-chrome-foreground">
@@ -46,7 +57,11 @@ export function AppShell({ children, bannerSlot }: AppShellProps) {
             </span>
           </div>
 
-          <UserMenu className="shrink-0" />
+          <UserMenu
+            className="shrink-0"
+            userLabel={userLabel}
+            accountId={accountId}
+          />
         </header>
 
         <div

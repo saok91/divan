@@ -1,4 +1,5 @@
-// Prisma schema — projections only. No domain models in Story 1.1.
+// Prisma schema — identity projections only (Story 1.4).
+// No Person / Employment / HR domain tables.
 // Kernel event-store tables will use raw SQL under packages/db/sql/.
 
 generator client {
@@ -7,4 +8,53 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+/// MVP coarse roles — machine codes only (Story 1.4 / 1.5 consumers).
+enum CoarseRole {
+  hr_operator
+  hr_admin
+  manager
+  audit_reviewer
+  system_admin
+}
+
+enum AccountStatus {
+  active
+  inactive
+}
+
+/// Internal human identity projection — not an HR Person record.
+model HumanIdentity {
+  id          String   @id @default(cuid())
+  displayName String
+  createdAt   DateTime @default(now())
+
+  account InternalAccount?
+}
+
+/// One internal account per human; one coarse role per account.
+model InternalAccount {
+  id               String        @id @default(cuid())
+  username         String        @unique
+  passwordHash     String
+  status           AccountStatus @default(active)
+  coarseRole       CoarseRole
+  humanIdentityId  String        @unique
+  humanIdentity    HumanIdentity @relation(fields: [humanIdentityId], references: [id])
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+/// FR42 attribution substrate — success and failure attempts.
+model AuthAttempt {
+  id               String   @id @default(cuid())
+  correlationId    String
+  accountId        String?
+  usernameAttempted String?
+  outcome          String
+  occurredAt       DateTime @default(now())
+
+  @@index([correlationId])
+  @@index([occurredAt])
 }

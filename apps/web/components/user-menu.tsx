@@ -1,15 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { logoutAction } from "@/lib/logout-action";
 import { cn } from "@/lib/utils";
 
+type UserMenuProps = {
+  className?: string;
+  userLabel: string;
+  accountId: string;
+};
+
 /**
- * Shell chrome user menu — theme toggle only until Story 1.4 auth.
+ * Shell chrome user menu — identity label, theme toggle, logout.
  */
-export function UserMenu({ className }: { className?: string }) {
+export function UserMenu({ className, userLabel, accountId }: UserMenuProps) {
   const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -43,11 +51,18 @@ export function UserMenu({ className }: { className?: string }) {
     }
   }
 
+  function onLogout() {
+    startTransition(async () => {
+      await logoutAction();
+    });
+  }
+
   return (
     <div
       ref={rootRef}
       className={cn("relative", className)}
       onBlur={onBlur}
+      data-account-id={accountId}
     >
       <button
         ref={triggerRef}
@@ -57,7 +72,7 @@ export function UserMenu({ className }: { className?: string }) {
         aria-haspopup="menu"
         onClick={() => setOpen((value) => !value)}
       >
-        حساب کاربری
+        {userLabel}
       </button>
       {open ? (
         <div
@@ -66,6 +81,17 @@ export function UserMenu({ className }: { className?: string }) {
         >
           <div role="none" className="px-1 py-1">
             <ThemeToggle role="menuitem" />
+          </div>
+          <div role="none" className="border-t border-white/10 px-1 py-1">
+            <button
+              type="button"
+              role="menuitem"
+              disabled={pending}
+              className="flex w-full items-center rounded-md px-2 py-1.5 text-start text-body-medium text-chrome-foreground hover:bg-sidebar-active-background disabled:opacity-50"
+              onClick={onLogout}
+            >
+              خروج
+            </button>
           </div>
         </div>
       ) : null}

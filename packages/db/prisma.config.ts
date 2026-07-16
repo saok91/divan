@@ -8,6 +8,9 @@ loadEnv({ path: path.join(rootDir, ".env") });
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
   datasource: {
     // process.env (not env()) so `prisma generate` works without a live DB
     url: process.env.DATABASE_URL,
