@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-17T02:55:00+03:30
+# last_updated: 2026-07-17T03:00:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-17T03:15:00+03:30
+last_updated: 2026-07-17T03:00:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -59,7 +59,7 @@ development_status:
   1-8-ldap-authentication-internal-account-link-infra-gated: done
   epic-1-retrospective: done
 
-  epic-2: in-progress
+  epic-2: done
   2-1-audit-envelope-default-deny-authorization-substrate: done
   2-2-sensitive-categories-separate-export-permission: done
   2-3-access-administration-ui-apis: done
@@ -67,7 +67,7 @@ development_status:
   2-5-break-glass-privileged-access: done
   2-6-temporal-cross-boundary-authorization: done
   2-7-inference-resistant-bulk-retrieval-controls: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-stable-person-identity: backlog
@@ -164,4 +164,37 @@ action_items:
     action: "Align story-file Status with sprint-status when marking done"
     owner: "Amelia"
     status: open
-    note: "Encoded as Task 7 DoD reminder in 2.1 story"
+    note: "Encoded as Task 7 DoD reminder in 2.1 story; reaffirmed in Epic 2 retro — close when verified on Story 3.1"
+  - epic: 2
+    action: "Mark epic-2 done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-2-retro-2026-07-17.md + sprint-status epic-2/epic-2-retrospective"
+  - epic: 2
+    action: "Enforce story-file Status ↔ sprint-status alignment on every done transition (close Epic 1 item 8)"
+    owner: "Amelia"
+    status: open
+  - epic: 2
+    action: "Encode Epic 3↔4 no temporary CRUD mutation sequencing into Story 3.1 create-story / Dev Notes"
+    owner: "Amelia + John"
+    status: open
+  - epic: 2
+    action: "Plan PopulationPort replacement with projection-backed population in Epic 3/4 story notes"
+    owner: "Winston + Amelia"
+    status: open
+  - epic: 2
+    action: "Keep AR-ACCESS / AR-DATA / AR-REPORTING / AR-IDENTITY numbers fail-closed; do not invent in Epic 3"
+    owner: "Mary + John"
+    status: open
+  - epic: 2
+    action: "Document InferenceBulkPort process-local window + race risk for ops; retain fail-closed default"
+    owner: "Winston"
+    status: open
+  - epic: 2
+    action: "Carry sticky breakGlassOverride + permission-set fingerprint gaps as explicit Epic 3+ authz UX debt"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 2
+    action: "Keep artifact/export reauth consumer contract mandatory for Stories 6.5 / 7.x"
+    owner: "Paige + Winston"
+    status: open
