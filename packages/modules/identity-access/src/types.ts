@@ -31,7 +31,8 @@ export type SessionContext = {
   humanIdentityId: string;
   /**
    * Coarse Organizational Scope hooks for AD-5 / audit-envelope.
-   * Empty until Story 2.3 access administration; never invent LDAP group→scope.
+   * Hydrated from AccountOrganizationalScope bindings (Story 2.3).
+   * Never invent LDAP group→scope sync.
    */
   organizationalScopeIds: string[];
 };

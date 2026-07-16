@@ -10,7 +10,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "seed": "tsx src/run-seed.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "selfcheck:access-admin": "tsx src/access-admin.selfcheck.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",

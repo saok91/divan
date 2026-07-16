@@ -4,7 +4,7 @@
 
 ## Deferred from: code review of 1-3-app-shell-chrome-sidebar-skip-link.md (2026-07-16)
 
-- Viewport gate vs browser zoom ? **resolved in Story 1.7**: JS gate (`shouldActivateViewportGate`) uses outer/screen metrics so 200% zoom on ?1280×720 displays keeps the shell; genuine small windows still gate
+- Viewport gate vs browser zoom ? **resolved in Story 1.7**: JS gate (`shouldActivateViewportGate`) uses outer/screen metrics so 200% zoom on ?1280?720 displays keeps the shell; genuine small windows still gate
 - Fixed `#banner-stack` has no reserved height/offset for main ? **resolved in Story 1.7**: ResizeObserver publishes `--banner-stack-height`; main padding offsets chrome + stack
 - UserMenu lacks full APG menu keyboard pattern (roving tabindex, focus move into menu, Tab trap) ? **resolved in Story 1.7**: Arrow/Home/End roving, open focuses first item, Escape returns to trigger, Tab closes (minimal APG)
 - Sidebar active state uses exact `pathname === "/"` for dashboard ? nested role landings (1.5) will need a prefix/segment strategy ? **done in Story 1.5** (prefix/segment active matching)
@@ -62,7 +62,7 @@
 
 ### Still open (do not invent)
 
-- **AR-ACCESS** ? production permission × category × action × scope matrix, toxic combinations, bulk thresholds
+- **AR-ACCESS** ? production permission ? category ? action ? scope matrix, toxic combinations, bulk thresholds
 - **AR-AUDIT** ? final access-event schema richness, hash-chain / separate audit DB, investigation UX (Epic 7)
 - **AR-IDENTITY** ? topology, MFA, group?coarse-role sync, directory account-state codes, STARTTLS
 - Full Auth.js server-side session revoke / LDAP continuous revalidation (DB re-check on governed entry ships in 2.1)
@@ -87,3 +87,20 @@
 ## Deferred from: code review of 2-2-sensitive-categories-separate-export-permission.md (2026-07-16)
 
 - `governed.selfcheck` only asserts export deny on an injected envelope; omit projection, explicit export-allow path, and real `getCategories: loadCategoryRegistry` tRPC wiring remain uncovered ? same thin-demo selfcheck pattern as 2.1; deepen when Vitest/CI or a later access-governance story expands web selfchecks
+
+## Deferred from: Story 2.3 access administration UI & APIs (2026-07-16)
+
+- **AR-ACCESS** still pending ? production field?action?scope matrix, full toxic-combination catalog, bulk thresholds; Story 2.3 ships fail-closed toxic hooks + governed CRUD only
+- Entitlement request?approval?expiry?recertification lifecycle ? Story 2.4 (preview approve path only blocks toxic combinations)
+- Break-glass grant UI / elevation ? Story 2.5 (permission administration must remain deniable under break-glass by default)
+- LDAP/AD group ? coarse role or Organizational Scope sync ? still forbidden until AR-IDENTITY; Admin may only view/clear/relink `externalDirectoryId`
+- Full audit investigation UI for access evidence ? Story 7.1 (events append to event-store; reviewable via query)
+- FR42 migration plan from Story 2.1 remains intact ? no new Prisma audit tables; `actor_account_id` widened to TEXT so cuid account ids attribute correctly
+
+## Deferred from: code review of 2-3-access-administration-ui-apis.md (2026-07-16)
+
+- `/access` RSC skips fresh `getSessionContext` ? inactive JWT may still render the Admin shell; governed tRPC paths already fail closed via freshness (same Auth.js JWT pattern deferred since Epic 1)
+- Concurrent `assignAccountAccessRoles` / `updateAccountLink` are last-writer-wins without optimistic concurrency ? acceptable for single-admin MVP; revisit if multi-admin contention becomes real
+- `governedProcedure` `decisionId ?? correlationId` fallback ? pre-existing 2.1 substrate; not reachable after successful `authorizeOrThrow`
+- Minimal UI first-item role/scope assign ? MVP acceptable; APIs already support full id lists; richer multi-select/clear UX later
+- PermissionSet.permissions free-string catalog ? defer allowlist until AR-ACCESS freezes production permission codes; empty sets still rejected

@@ -31,6 +31,9 @@ export const operationalCopy = {
   inactiveAccount: "این حساب غیرفعال است.",
   invalidCredentials: "نام کاربری یا رمز عبور نادرست است.",
 
+  /** Access admin empty entitlements (Story 2.3 AC #4 — exact). */
+  emptyEntitlements: "تخصیص دسترسی‌ای ثبت نشده.",
+
   breakGlassActive: "دسترسی اضطراری فعال است.",
   breakGlassExpired: "دسترسی اضطراری پایان یافت.",
   breakGlassDismiss: "بستن",

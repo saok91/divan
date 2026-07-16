@@ -119,6 +119,12 @@ export const DEV_DEMO_CATEGORIES: CategoryRegistry = freezeRegistry([
     sensitivity: "sensitive",
     requiresSeparateExport: true,
   },
+  {
+    id: "identity.access_admin",
+    enabled: true,
+    sensitivity: "ordinary",
+    requiresSeparateExport: false,
+  },
 ]);
 
 /**

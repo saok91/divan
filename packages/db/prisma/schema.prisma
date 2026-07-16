@@ -47,6 +47,66 @@ model InternalAccount {
   humanIdentity       HumanIdentity @relation(fields: [humanIdentityId], references: [id])
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
+
+  /// Explicit entitlement bindings (Story 2.3) — coarseRole remains nav-only.
+  organizationalScopes AccountOrganizationalScope[]
+  accessRoles          AccountAccessRole[]
+}
+
+/// Organizational Scope projection — Admin-managed; not LDAP group sync.
+model OrganizationalScope {
+  id        String   @id @default(cuid())
+  labelFa   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts AccountOrganizationalScope[]
+}
+
+/// Explicit envelope permission codes only — never implies coarse-role allows.
+model PermissionSet {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  /// Envelope permission codes (e.g. access.administration).
+  permissions String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles AccessRole[]
+}
+
+/// Entitlement role — must reference exactly one PermissionSet (AC #2).
+model AccessRole {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  labelFa         String
+  permissionSetId String
+  permissionSet   PermissionSet @relation(fields: [permissionSetId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  accounts AccountAccessRole[]
+}
+
+model AccountOrganizationalScope {
+  accountId             String
+  organizationalScopeId String
+  account               InternalAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  organizationalScope   OrganizationalScope @relation(fields: [organizationalScopeId], references: [id], onDelete: Cascade)
+
+  @@id([accountId, organizationalScopeId])
+  @@index([organizationalScopeId])
+}
+
+model AccountAccessRole {
+  accountId    String
+  accessRoleId String
+  account      InternalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accessRole   AccessRole      @relation(fields: [accessRoleId], references: [id], onDelete: Cascade)
+
+  @@id([accountId, accessRoleId])
+  @@index([accessRoleId])
 }
 
 /// FR42 attribution substrate — success and failure attempts.

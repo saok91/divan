@@ -124,8 +124,9 @@ export const governedProcedure = protectedProcedure.use(
     }
 
     const correlationId = randomUUID();
+    let decisionId: string | undefined;
     try {
-      await getEnvelope().authorizeOrThrow({
+      const authorized = await getEnvelope().authorizeOrThrow({
         context: toEnvelopeAuthzContext(fresh),
         permission: meta.permission.trim(),
         dataCategory: meta.dataCategory.trim(),
@@ -135,6 +136,7 @@ export const governedProcedure = protectedProcedure.use(
         correlationId,
         sensitive: meta.sensitive !== false,
       });
+      decisionId = authorized.decisionId;
     } catch (err) {
       if (err instanceof AuthorizationError) {
         console.error(
@@ -155,6 +157,8 @@ export const governedProcedure = protectedProcedure.use(
     return next({
       ctx: {
         session: fresh,
+        correlationId,
+        decisionId: decisionId ?? correlationId,
       },
     });
   },

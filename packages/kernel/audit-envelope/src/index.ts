@@ -51,6 +51,11 @@ export type AuthorizeInput = {
    * Append failure fails the operation (FR-51 direction).
    */
   sensitive?: boolean;
+  /**
+   * Optional non-sensitive detail for the access event (e.g. before/after
+   * snapshots). Never include HR field values or passwords.
+   */
+  payload?: Record<string, unknown>;
 };
 
 export type AuthorizeResult = {
@@ -121,6 +126,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       dataCategory: "demo.sensitive_hr",
       action: "export",
       organizationalScope: "org:selfcheck",
+    },
+    // Story 2.3 — access administration (coarse role is never an allow key)
+    {
+      permission: "access.administration",
+      dataCategory: "identity.access_admin",
+      action: "read",
+      organizationalScope: "org:any",
+    },
+    {
+      permission: "access.administration",
+      dataCategory: "identity.access_admin",
+      action: "write",
+      organizationalScope: "org:any",
     },
   ],
 };
@@ -384,6 +402,7 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
               decision === "deny"
                 ? "default_deny_or_no_matching_rule"
                 : "explicit_allow_rule",
+            payload: input.payload,
           });
           return id;
         });

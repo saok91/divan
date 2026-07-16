@@ -10,6 +10,7 @@ import {
   verifyDirectoryCredentials,
 } from "./ldap-client";
 import { linkOrCreateInternalAccount } from "./ldap-link";
+import { loadOrganizationalScopeIdsForAccount } from "./access-admin";
 import {
   AuthenticationError,
   type AuthAttemptOutcome,
@@ -183,6 +184,11 @@ async function authenticateLdap(
     outcome: "success",
   });
 
+  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
+    linked.accountId,
+    db,
+  );
+
   return {
     correlationId,
     accountId: linked.accountId,
@@ -190,7 +196,7 @@ async function authenticateLdap(
     displayName: linked.displayName,
     coarseRole: linked.coarseRole,
     humanIdentityId: linked.humanIdentityId,
-    organizationalScopeIds: [],
+    organizationalScopeIds,
   };
 }
 
@@ -270,6 +276,11 @@ async function authenticateSeeded(
     outcome: "success",
   });
 
+  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
+    account.id,
+    db,
+  );
+
   return {
     correlationId,
     accountId: account.id,
@@ -277,7 +288,7 @@ async function authenticateSeeded(
     displayName: account.humanIdentity.displayName,
     coarseRole: account.coarseRole as CoarseRole,
     humanIdentityId: account.humanIdentityId,
-    organizationalScopeIds: [],
+    organizationalScopeIds,
   };
 }
 
@@ -300,14 +311,18 @@ export async function getSessionContext(
   });
   if (!account || account.status !== "active") return null;
 
+  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
+    account.id,
+    db,
+  );
+
   return {
     accountId: account.id,
     username: account.username,
     displayName: account.humanIdentity.displayName,
     coarseRole: account.coarseRole as CoarseRole,
     humanIdentityId: account.humanIdentityId,
-    // MVP: empty until Story 2.3 access administration
-    organizationalScopeIds: [],
+    organizationalScopeIds,
   };
 }
 

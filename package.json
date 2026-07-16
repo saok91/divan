@@ -18,7 +18,8 @@
     "db:logs": "docker compose logs -f postgres",
     "db:sql:apply": "pnpm --filter @divan/db sql:apply",
     "selfcheck:audit-envelope": "pnpm --filter @divan/audit-envelope selfcheck",
-    "selfcheck:governed": "pnpm --filter @divan/web selfcheck:governed"
+    "selfcheck:governed": "pnpm --filter @divan/web selfcheck:governed",
+    "selfcheck:access-admin": "pnpm --filter @divan/identity-access selfcheck:access-admin"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

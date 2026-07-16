@@ -45,7 +45,7 @@ export async function appendAccessEvent(
        id, event_class, correlation_id, actor_account_id, occurred_at,
        operation, scope, result, reason, entity_type, entity_id, payload
      ) VALUES (
-       $1::uuid, 'access', $2::uuid, $3::uuid, $4,
+       $1::uuid, 'access', $2::uuid, $3, $4,
        $5, $6::jsonb, $7, $8, $9, $10, $11::jsonb
      )`,
     [

@@ -14,6 +14,7 @@ import {
   publicProcedure,
   protectedProcedure,
 } from "./trpc";
+import { accessAdminRouter } from "./access-admin";
 
 /**
  * `me` is session-only identity (not sensitive HR content) — deliberately
@@ -36,6 +37,8 @@ export const appRouter = createTRPCRouter({
     coarseRole: ctx.session.coarseRole,
     organizationalScopeIds: ctx.session.organizationalScopeIds,
   })),
+
+  accessAdmin: accessAdminRouter,
 
   /**
    * Demo governed read — controlled allow via DEV_DEMO_POLICY fixture.

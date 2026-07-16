@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@divan/db";
 import bcrypt from "bcryptjs";
 
+import { seedAccessAdministrationFixtures } from "./access-admin";
 import { getIdentityProvider } from "./config";
 import type { CoarseRole } from "./types";
 
@@ -133,6 +134,8 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
         `Expected exactly ${SEED_ACCOUNTS.length} seeded accounts, found ${count}. Remove extra accounts before re-seeding.`,
       );
     }
+
+    await seedAccessAdministrationFixtures(tx as unknown as PrismaClient);
 
     return { createdOrUpdated };
   });
