@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* next-themes class strategy (Tailwind v4) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* shadcn content-canvas tokens (light) */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* DESIGN.md brand — light */
+  --primary: #006fff;
+  --primary-foreground: #ffffff;
+  --accent: #fdb913;
+  --accent-foreground: #1a1208;
+  --chrome: #051061;
+  --chrome-foreground: #ffffff;
+  --muted-brand: #808184;
+  --sidebar-active-background: rgba(255, 255, 255, 0.12);
+
+  /* Spacing + radius (DESIGN.md) */
+  --chrome-height: 56px;
+  --sidebar-width: 240px;
+  --table-row-compact: 40px;
+  --table-row-comfortable: 48px;
+  --form-section-gap: 24px;
+  --radius: 6px;
+}
+
+.dark {
+  /* shadcn content-canvas tokens (dark) */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  /* DESIGN.md brand — dark (chrome stays navy; never white/light sidebar) */
+  --primary: #4d9fff;
+  --primary-foreground: #ffffff;
+  --accent: #fbc470;
+  --accent-foreground: #1a1208;
+  --chrome: #030825;
+  --chrome-foreground: #f1f3f5;
+  --muted-brand: #9e9ea0;
+  --sidebar-active-background: rgba(255, 255, 255, 0.08);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chrome: var(--chrome);
+  --color-chrome-foreground: var(--chrome-foreground);
+  --color-muted-brand: var(--muted-brand);
+  --color-sidebar-active-background: var(--sidebar-active-background);
+
+  --font-sans: var(--font-yekan-bakh), "Yekan Bakh Fa-En", Tahoma, Arial,
+    sans-serif;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --spacing-chrome-height: var(--chrome-height);
+  --spacing-sidebar-width: var(--sidebar-width);
+  --spacing-table-row-compact: var(--table-row-compact);
+  --spacing-table-row-comfortable: var(--table-row-comfortable);
+  --spacing-form-section-gap: var(--form-section-gap);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.6;
+  }
+}
+
+@layer utilities {
+  .text-heading {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .text-heading-sm {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .text-body {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.6;
+  }
+
+  .text-body-medium {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.6;
+  }
+
+  .text-caption {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .text-tabular {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .focus-ring-chrome {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus-visible:ring-offset-chrome;
+  }
+}
