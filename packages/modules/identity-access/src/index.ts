@@ -15,11 +15,14 @@ export {
   type CoarseRole,
   type AccountStatus,
   type SessionContext,
+  type CoarseAuthzContext,
   type AuthAttemptOutcome,
   type AuthenticationErrorCode,
   type IdentityProvider,
   type SessionTimeoutConfig,
 } from "./types";
+
+export { toEnvelopeAuthzContext } from "./authz-context";
 
 export {
   getIdentityProvider,

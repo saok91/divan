@@ -47,6 +47,7 @@ pnpm db:down   # stop Compose service (volume kept)
 ```bash
 pnpm db:generate
 pnpm db:migrate
+pnpm db:sql:apply   # kernel raw SQL (event-store) — see packages/db/sql/README.md
 # PowerShell
 $env:ALLOW_DEV_SEED="true"; pnpm db:seed
 # bash
@@ -54,6 +55,16 @@ ALLOW_DEV_SEED=true pnpm db:seed
 ```
 
 Seed **refuses** to run when `NODE_ENV=production` or `ALLOW_DEV_SEED` is not exactly `true`.
+
+#### Kernel SQL (audit envelope / event-store)
+
+After Prisma migrate, apply append-only `kernel_events` via:
+
+```bash
+pnpm db:sql:apply
+```
+
+Selfcheck (wired): `pnpm selfcheck:audit-envelope`, `pnpm selfcheck:governed` (freshness + governed path). Other Epic-1 selfchecks remain manual (`tsx`).
 
 #### Dev-only seeded accounts
 

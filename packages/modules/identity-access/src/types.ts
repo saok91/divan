@@ -23,9 +23,27 @@ export type SessionContext = {
   accountId: string;
   username: string;
   displayName: string;
+  /**
+   * Coarse role is navigation context only — not HR content entitlement.
+   * Governed paths must revalidate this from DB (not JWT alone).
+   */
   coarseRole: CoarseRole;
-  /** Coarse role is navigation context only — not HR content entitlement. */
   humanIdentityId: string;
+  /**
+   * Coarse Organizational Scope hooks for AD-5 / audit-envelope.
+   * Empty until Story 2.3 access administration; never invent LDAP group→scope.
+   */
+  organizationalScopeIds: string[];
+};
+
+/**
+ * Coarse authz context published to the audit-envelope (AD-5).
+ * Fine-grained category checks stay in `@divan/audit-envelope`.
+ */
+export type CoarseAuthzContext = {
+  accountId: string;
+  coarseRole: CoarseRole;
+  organizationalScopeIds: string[];
 };
 
 export type AuthAttemptOutcome =

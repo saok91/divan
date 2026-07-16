@@ -13,6 +13,7 @@
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "db:execute": "prisma db execute --stdin",
+    "sql:apply": "node ./sql/apply.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

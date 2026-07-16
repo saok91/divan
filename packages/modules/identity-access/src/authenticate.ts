@@ -190,6 +190,7 @@ async function authenticateLdap(
     displayName: linked.displayName,
     coarseRole: linked.coarseRole,
     humanIdentityId: linked.humanIdentityId,
+    organizationalScopeIds: [],
   };
 }
 
@@ -276,12 +277,18 @@ async function authenticateSeeded(
     displayName: account.humanIdentity.displayName,
     coarseRole: account.coarseRole as CoarseRole,
     humanIdentityId: account.humanIdentityId,
+    organizationalScopeIds: [],
   };
 }
 
 /**
- * Load session context by account id (for JWT refresh / getSession hooks).
+ * Load session context by account id (JWT refresh / governed-path revalidation).
  * Returns null when account missing or inactive (fail-closed).
+ *
+ * Authz freshness policy (Story 2.1): DB is source of truth for `coarseRole` and
+ * status. Governed paths must call this and use the returned context — never
+ * authorize solely from a stale JWT claim. If JWT role ≠ DB role, prefer DB
+ * (caller replaces session with this result). Full Auth.js revoke remains deferred.
  */
 export async function getSessionContext(
   accountId: string,
@@ -299,6 +306,8 @@ export async function getSessionContext(
     displayName: account.humanIdentity.displayName,
     coarseRole: account.coarseRole as CoarseRole,
     humanIdentityId: account.humanIdentityId,
+    // MVP: empty until Story 2.3 access administration
+    organizationalScopeIds: [],
   };
 }
 

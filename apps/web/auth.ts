@@ -55,6 +55,7 @@ const nextAuth = NextAuth({
             username: result.username,
             coarseRole: result.coarseRole,
             humanIdentityId: result.humanIdentityId,
+            organizationalScopeIds: result.organizationalScopeIds,
             correlationId: result.correlationId,
           };
         } catch (err) {
@@ -85,6 +86,7 @@ const nextAuth = NextAuth({
         token.coarseRole = user.coarseRole;
         token.humanIdentityId = user.humanIdentityId;
         token.displayName = user.name ?? user.username;
+        token.organizationalScopeIds = user.organizationalScopeIds ?? [];
         token.lastActivityAt = now;
         token.absoluteExp = now + timeouts.absoluteTimeoutSeconds;
         return token;
@@ -116,6 +118,7 @@ const nextAuth = NextAuth({
       token.coarseRole = ctx.coarseRole;
       token.humanIdentityId = ctx.humanIdentityId;
       token.displayName = ctx.displayName;
+      token.organizationalScopeIds = ctx.organizationalScopeIds;
       token.lastActivityAt = now;
       return token;
     },
@@ -130,6 +133,11 @@ const nextAuth = NextAuth({
         username: token.username as string,
         coarseRole: token.coarseRole as CoarseRole,
         humanIdentityId: token.humanIdentityId as string,
+        organizationalScopeIds: Array.isArray(token.organizationalScopeIds)
+          ? token.organizationalScopeIds.filter(
+              (x): x is string => typeof x === "string",
+            )
+          : [],
         name: (token.displayName as string) ?? session.user?.name,
       };
       return session;

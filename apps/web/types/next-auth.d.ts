@@ -7,6 +7,8 @@ declare module "next-auth" {
     username: string;
     coarseRole: CoarseRole;
     humanIdentityId: string;
+    /** Coarse org scope hooks — empty until Story 2.3. */
+    organizationalScopeIds?: string[];
     correlationId?: string;
   }
 
@@ -17,6 +19,7 @@ declare module "next-auth" {
       username: string;
       coarseRole: CoarseRole;
       humanIdentityId: string;
+      organizationalScopeIds?: string[];
     };
   }
 }
@@ -28,6 +31,7 @@ declare module "next-auth/jwt" {
     coarseRole?: CoarseRole;
     humanIdentityId?: string;
     displayName?: string;
+    organizationalScopeIds?: string[];
     lastActivityAt?: number;
     absoluteExp?: number;
   }

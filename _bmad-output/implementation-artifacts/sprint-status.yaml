@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-16T21:00:00+03:30
+# last_updated: 2026-07-16T21:45:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,14 +41,14 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-16T21:00:00+03:30
+last_updated: 2026-07-16T21:45:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1-initialize-modular-monolith-monorepo: done
   1-2-brand-tokens-typography-theme-toggle: done
   1-3-app-shell-chrome-sidebar-skip-link: done
@@ -57,10 +57,10 @@ development_status:
   1-6-command-palette-jalali-date-picker-persian-digits: done
   1-7-accessibility-floor-banner-behavior-operational-copy: done
   1-8-ldap-authentication-internal-account-link-infra-gated: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
-  epic-2: backlog
-  2-1-audit-envelope-default-deny-authorization-substrate: backlog
+  epic-2: in-progress
+  2-1-audit-envelope-default-deny-authorization-substrate: done
   2-2-sensitive-categories-separate-export-permission: backlog
   2-3-access-administration-ui-apis: backlog
   2-4-entitlement-lifecycle-grant-expiry-revocation-recertification: backlog
@@ -124,3 +124,43 @@ development_status:
   7-7-launch-artifact-change-control-hooks: backlog
   7-8-authoritative-evaluation-snapshot-integrity: backlog
   epic-7-retrospective: optional
+
+action_items:
+  - epic: 1
+    action: "Mark epic-1 done in sprint-status (all stories + retro complete)"
+    owner: "AtA / Amelia"
+    status: done
+  - epic: 1
+    action: "Encode layout≠RSC gate lesson into Story 2.1 create-story / Dev Notes"
+    owner: "Amelia"
+    status: done
+    resolved_in: "2-1-audit-envelope-default-deny-authorization-substrate.md (AC #7, Task 5, Layout≠RSC notes)"
+  - epic: 1
+    action: "Design audit-envelope default-deny to revalidate authorization context (not UI-only / not stale JWT alone)"
+    owner: "Winston + Amelia"
+    status: done
+    resolved_in: "2-1 story AC #6, Task 3–4, Authz freshness section"
+  - epic: 1
+    action: "Plan AuthAttempt and AccessDenial migration into envelope access events"
+    owner: "Winston"
+    status: done
+    resolved_in: "2-1 story FR42 migration plan sketch + Task 5 (refine on implement)"
+  - epic: 1
+    action: "Add a11y/focus DoD checklist snippet for create-story on interactive surfaces"
+    owner: "Sally + Amelia"
+    status: open
+  - epic: 1
+    action: "Wire one identity/web selfcheck into a package script; document manual remainder"
+    owner: "Amelia"
+    status: done
+    resolved_in: "2.1 — root selfcheck:audit-envelope + @divan/event-store/@divan/web selfcheck scripts; others remain manual tsx"
+  - epic: 1
+    action: "Keep AR-IDENTITY open items listed; no silent group→role assumption in Epic 2"
+    owner: "Mary + John"
+    status: done
+    resolved_in: "2-1 Gate + non-goals (AR-IDENTITY open; no group→role invent)"
+  - epic: 1
+    action: "Align story-file Status with sprint-status when marking done"
+    owner: "Amelia"
+    status: open
+    note: "Encoded as Task 7 DoD reminder in 2.1 story"

@@ -15,6 +15,8 @@ export async function createContext(): Promise<TrpcContext> {
     displayName: session.user.name ?? session.user.username,
     coarseRole: session.user.coarseRole,
     humanIdentityId: session.user.humanIdentityId,
+    // Scope hooks empty until Story 2.3; governed paths revalidate via DB.
+    organizationalScopeIds: session.user.organizationalScopeIds ?? [],
   };
 
   return { session: mapped };

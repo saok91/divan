@@ -47,3 +47,30 @@
 
 - Break-glass grant with `active: true` and `expiresAt: null` is treated as forever-live (`isGrantLive`) — UI contract allows it; real grant lifecycle / required expiry belongs in Story 2.5
 - Viewport gate using `window.screen` can mis-classify windows on a small secondary display when the primary screen reports large metrics — browser display-API limitation; revisit if multi-monitor support becomes an MVP requirement
+
+## Deferred from: Story 2.1 audit-envelope / event-store (2026-07-16)
+
+### FR42 thin tables → `event_class=access` migration plan
+
+| Source (Epic 1) | Target | Interim (2.1+) | Later |
+| --- | --- | --- | --- |
+| `AuthAttempt` (login) | `kernel_events` / `event_class=access` (`operation≈auth.authenticate`) | **Keep** writing `AuthAttempt` on login; do **not** add a second login-audit table | Backfill / dual-write cutover under AR-AUDIT; Epic 7 investigation UI reads event-store |
+| `AccessDenial` (deep-link / path) | `event_class=access` (`operation≈nav.path_denied` or envelope deny) | New **governed** denials go through envelope + event-store only; path-gate may keep `AccessDenial` until a thin adapter writes access events | Stop `AccessDenial` inserts once adapter lands; retain table read-only or drop after backfill |
+| New governed R/W decisions | Envelope + `@divan/event-store` only | **Mandatory** — never Prisma parallel audit | — |
+
+**Hard rules:** no new Prisma “audit-ish” tables in Epic 2; expand event-store via `packages/db/sql/` when AR-AUDIT adds columns. Historical backfill of `AuthAttempt` / `AccessDenial` is **not** required in 2.1 code — plan + stop sprawl is mandatory.
+
+### Still open (do not invent)
+
+- **AR-ACCESS** — production permission × category × action × scope matrix, toxic combinations, bulk thresholds
+- **AR-AUDIT** — final access-event schema richness, hash-chain / separate audit DB, investigation UX (Epic 7)
+- **AR-IDENTITY** — topology, MFA, group→coarse-role sync, directory account-state codes, STARTTLS
+- Full Auth.js server-side session revoke / LDAP continuous revalidation (DB re-check on governed entry ships in 2.1)
+- Vitest/CI for all selfchecks — only `selfcheck:audit-envelope` (and package scripts) wired; navigation/ldap/jalali/persian/a11y remain manual `tsx`
+
+## Deferred from: code review of 2-1-audit-envelope-default-deny-authorization-substrate.md (2026-07-16)
+
+- DB-level append-only hardening (`REVOKE UPDATE, DELETE` on `kernel_events`) — story marks nice-to-have when app role is not superuser; left commented in `001_kernel_events.sql`
+- `packages/db/sql/apply.mjs` has no `kernel_schema_migrations` version table — safe while files are `IF NOT EXISTS`; add before non-idempotent alters
+- Process-wide governed envelope `pg.Pool` (no shutdown / sticky first `DATABASE_URL`) — acceptable for long-lived Next server; revisit for serverless/multi-URL
+- `governed.selfcheck` mutates seeded `sys.admin` with best-effort `finally` restore — local/dev only; do not run concurrent against a shared DB

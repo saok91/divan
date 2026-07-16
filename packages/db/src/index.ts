@@ -2,17 +2,27 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
+export type { Pool, PoolClient } from "pg";
+
+/**
+ * Shared `pg.Pool` for kernel raw-SQL paths (event-store) and Prisma adapter.
+ * Callers own lifecycle — call `pool.end()` when shutting down.
+ */
+export function createPgPool(connectionString: string): pg.Pool {
+  const trimmed = connectionString.trim();
+  if (!trimmed) {
+    throw new Error("DATABASE_URL / connectionString is required");
+  }
+  return new pg.Pool({ connectionString: trimmed });
+}
+
 /**
  * Create a Prisma client with the Prisma 7 driver adapter.
  * Callers must supply DATABASE_URL (local Postgres 17.10+).
  * Pool lifecycle is owned by the returned client — call `$disconnect()` when done.
  */
 export function createPrismaClient(connectionString: string): PrismaClient {
-  const trimmed = connectionString.trim();
-  if (!trimmed) {
-    throw new Error("DATABASE_URL / connectionString is required");
-  }
-  const pool = new pg.Pool({ connectionString: trimmed });
+  const pool = createPgPool(connectionString);
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }
@@ -29,7 +39,7 @@ export async function checkDatabaseConnectivity(
     return false;
   }
 
-  const pool = new pg.Pool({ connectionString: trimmed });
+  const pool = createPgPool(trimmed);
   const adapter = new PrismaPg(pool);
   const client = new PrismaClient({ adapter });
 
