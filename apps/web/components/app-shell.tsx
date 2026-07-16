@@ -1,5 +1,8 @@
 import { AccountThemeSync } from "@/components/account-theme-sync";
-import { AppSidebar } from "@/components/app-sidebar";
+import {
+  AppSidebar,
+  type SidebarNavItem,
+} from "@/components/app-sidebar";
 import { SkipLink } from "@/components/skip-link";
 import { UserMenu } from "@/components/user-menu";
 import { ViewportGateFocusGuard } from "@/components/viewport-gate-focus-guard";
@@ -10,6 +13,8 @@ type AppShellProps = {
   userLabel: string;
   /** Account id for per-account theme storage. */
   accountId: string;
+  /** Role-filtered nav items from identity-access (server-resolved). */
+  navItems: readonly SidebarNavItem[];
   /** Slot for Story 1.7 banners (stale above break-glass). */
   bannerSlot?: React.ReactNode;
 };
@@ -22,6 +27,7 @@ export function AppShell({
   children,
   userLabel,
   accountId,
+  navItems,
   bannerSlot,
 }: AppShellProps) {
   return (
@@ -72,7 +78,7 @@ export function AppShell({
           {bannerSlot}
         </div>
 
-        <AppSidebar />
+        <AppSidebar navItems={navItems} />
 
         <div className="ps-sidebar-width pt-chrome-height">
           <main

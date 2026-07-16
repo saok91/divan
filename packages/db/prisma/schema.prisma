@@ -58,3 +58,18 @@ model AuthAttempt {
   @@index([correlationId])
   @@index([occurredAt])
 }
+
+/// FR42 attribution substrate — deep-link / route denials (Story 1.5).
+/// Thin identity schema only — not the Epic 2 audit-envelope kernel.
+model AccessDenial {
+  id            String   @id @default(cuid())
+  correlationId String
+  accountId     String
+  coarseRole    String
+  path          String
+  outcome       String   @default("denied")
+  occurredAt    DateTime @default(now())
+
+  @@index([correlationId])
+  @@index([occurredAt])
+}

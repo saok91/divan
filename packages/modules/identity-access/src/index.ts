@@ -1,6 +1,9 @@
 /**
  * @divan/identity-access — authentication + coarse role context (AD-5).
  * Seeded provider for local/dev/CI; LDAP lands in Story 1.8.
+ *
+ * Coarse nav visibility is not HR content entitlement (System Admin has no
+ * routine HR data even when عملیات is their only nav item).
  */
 
 export {
@@ -26,11 +29,27 @@ export {
 export {
   authenticate,
   getSessionContext,
+  getActiveCoarseRoleByUsername,
   signOut,
   setAccountStatus,
   type AuthenticateInput,
   type AuthenticateResult,
 } from "./authenticate";
+
+export {
+  NAV_CATALOG,
+  getRoleLandingPath,
+  getNavItemsForRole,
+  canAccessPath,
+  resolvePostLoginPath,
+  type NavItem,
+} from "./navigation";
+
+export {
+  recordAccessDenial,
+  type RecordAccessDenialInput,
+  type RecordAccessDenialResult,
+} from "./access-denial";
 
 export {
   seedDevAccounts,

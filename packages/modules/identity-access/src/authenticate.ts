@@ -147,6 +147,22 @@ export async function getSessionContext(
 }
 
 /**
+ * Active coarse role by username — for post-login landing after Auth.js
+ * signIn (same-request auth() often cannot read the new session cookie yet).
+ */
+export async function getActiveCoarseRoleByUsername(
+  username: string,
+  db: PrismaClient = getIdentityDb(),
+): Promise<CoarseRole | null> {
+  const account = await db.internalAccount.findUnique({
+    where: { username: username.trim() },
+    select: { coarseRole: true, status: true },
+  });
+  if (!account || account.status !== "active") return null;
+  return account.coarseRole as CoarseRole;
+}
+
+/**
  * Session clear for JWT is owned by Auth.js in apps/web.
  * Module hook reserved for future server-side revoke / LDAP logout (Story 1.8).
  */

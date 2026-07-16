@@ -74,7 +74,7 @@ pnpm db:generate
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — unauthenticated visitors redirect to `/login`.
+Open [http://localhost:3000](http://localhost:3000) — unauthenticated visitors redirect to `/login`. After login, each coarse role lands on its first surface (`/personnel`, `/dashboard`, `/audit`, or `/operations`); see Story 1.5 nav matrix.
 
 Required env (see `.env.example`): `AUTH_SECRET`, `IDENTITY_PROVIDER=seeded`, session timeout hooks.
 Copy auth-related vars into `apps/web/.env` as well (Next.js loads env from the app package directory).
