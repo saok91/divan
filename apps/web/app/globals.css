@@ -159,4 +159,55 @@
   .focus-ring-chrome {
     @apply outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus-visible:ring-offset-chrome;
   }
+
+  /* Skip link: in a11y tree, visually hidden until focused (never display:none) */
+  .skip-link {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .skip-link:focus,
+  .skip-link:focus-visible {
+    position: fixed;
+    inset-inline-start: 1rem;
+    top: 1rem;
+    z-index: 100;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.5rem 1rem;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    border-radius: var(--radius);
+    background-color: var(--chrome);
+    color: var(--chrome-foreground);
+  }
+
+  /* Minimum viewport: full shell by default; gate only when too small */
+  .min-viewport-gate {
+    display: none;
+  }
+
+  .app-shell-root {
+    display: block;
+    min-height: 100vh;
+  }
+
+  @media (max-width: 1279px), (max-height: 719px) {
+    .min-viewport-gate {
+      display: flex;
+    }
+
+    .app-shell-root {
+      display: none;
+    }
+  }
 }

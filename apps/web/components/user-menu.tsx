@@ -6,10 +6,9 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 /**
- * Temporary user-menu stub until Story 1.3 app-shell chrome.
- * Hosts the theme toggle; sits in the navy chrome strip.
+ * Shell chrome user menu — theme toggle only until Story 1.4 auth.
  */
-export function UserMenuStub({ className }: { className?: string }) {
+export function UserMenu({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -20,6 +19,7 @@ export function UserMenuStub({ className }: { className?: string }) {
     function onPointerDown(event: PointerEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
         setOpen(false);
+        triggerRef.current?.focus();
       }
     }
 
