@@ -11,7 +11,7 @@
 
 ## Deferred from: code review of 1-4-seeded-accounts-coarse-role-auth-dev-bootstrap.md (2026-07-16)
 
-- `PROVIDER_UNAVAILABLE` login UI mapping — LDAP outage copy deferred to Story 1.8; current generic credentials message is intentional for 1.4
+- `PROVIDER_UNAVAILABLE` login UI mapping — **resolved in Story 1.8**: `login-form` maps to `operationalCopy.ldapUnavailable`
 - Timing side-channel on unknown username (no dummy bcrypt) — acceptable for epic-1 bootstrap; harden later if threat model requires
 - `AuthAttempt` without retention policy / FK — thin FR42 substrate; full audit envelope lands in Epic 2
 
@@ -19,11 +19,26 @@
 
 - Layout-only path gate still executes forbidden `page.tsx` RSC children — acceptable for Epic-1 empty shells; when pages add data loaders, assert access in the page (or shared page wrapper) before fetching — layout `{children}` swap alone does not stop page execution
 - AccessDenial write amplification / no `accountId` index or retention — thin FR42 substrate; rate limits and audit envelope belong in Epic 2
-- JWT `coarseRole` remains until session refresh after DB demote/deactivate — same Auth.js JWT pattern as 1.4; revisit with session revoke / LDAP logout (1.8+)
+- JWT `coarseRole` remains until session refresh after DB demote/deactivate — same Auth.js JWT pattern as 1.4; **server-side revoke / LDAP logout hook still deferred** (Story 1.8 left `signOut` module no-op; revisit in Epic 2 / ops)
 - `isRedirectError` import from `next/dist/client/components/redirect-error` — pre-existing 1.4; replace when Next exposes a stable public helper
 - `navigation.selfcheck.ts` not wired into package scripts/CI — acceptable until Vitest/CI story lands; run manually via `tsx`
 - Dual role source at login (JWT from `authenticate` vs `getActiveCoarseRoleByUsername` for landing) — required because same-request `auth()` cannot read the new cookie; rare mid-login role change only
 
+## Deferred from: Story 1.8 LDAP authentication (2026-07-16)
+
+- Formal AR-IDENTITY still open: topology, MFA/conditional access, concurrent-session/lockout numbers, emergency account, AD/LDAP group→coarse role sync — do not claim frozen
+- Module `signOut` server-side session revoke (JWT stale role after demote) — deferred beyond 1.8; Auth.js JWT clear remains apps/web
+- `ldap-auth.selfcheck.ts` not wired into package scripts/CI — same pattern as navigation selfcheck; run manually via `tsx`
+
+## Deferred from: code review of 1-8-ldap-authentication-internal-account-link-infra-gated.md (2026-07-16)
+
+- STARTTLS not supported for plain `ldap://` — wait for Infra/AR-IDENTITY approved topology (prefer LDAPS; do not invent StartTLS until required)
+- Directory account disabled/locked/expired only evaluated at login — JWT refresh uses DB `getSessionContext` only; AD revalidation / continuous auth out of Epic-1 scope
+- Non-49 LDAP bind result codes (e.g. password expired / unwillingToPerform) currently fall through to `PROVIDER_UNAVAILABLE` — map precisely once AR-IDENTITY freezes directory account-state codes
+- Module `signOut` / JWT stale role after demote — already deferred (reaffirmed in code review)
+- `ldap-auth.selfcheck` deeper coverage + CI wiring — already deferred until Vitest/CI story
+- Invalid `LDAP_CREATE_MAPPING_JSON` keeps entire LDAP config unavailable (fail-closed) — intentional; do not silently treat as empty map
+- Default `LDAP_LOGIN_ATTRIBUTE=uid` / `LDAP_DISPLAY_NAME_ATTRIBUTE=cn` when unset — keep common placeholders; Infra overrides via env
 ## Deferred from: code review of 1-6-command-palette-jalali-date-picker-persian-digits.md (2026-07-16)
 
 - Jalali/persian selfcheck scripts not wired into package.json/CI — same pattern as Story 1.5 navigation selfcheck; run manually via `tsx` until Vitest/CI story lands

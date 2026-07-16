@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@divan/db";
 import bcrypt from "bcryptjs";
 
+import { getIdentityProvider } from "./config";
 import type { CoarseRole } from "./types";
 
 /** Shared local/dev/CI password — documented in README; never for production. */
@@ -64,6 +65,12 @@ export function assertSeedAllowed(
       "Dev seed requires ALLOW_DEV_SEED=true (local/dev/CI only)",
     );
   }
+  // LDAP mode must not gain a routine seeded login bypass via seed rows.
+  if (getIdentityProvider(env) === "ldap") {
+    throw new SeedGuardError(
+      "Dev seed refuses when IDENTITY_PROVIDER=ldap — use directory accounts only",
+    );
+  }
 }
 
 /**
@@ -89,10 +96,13 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
       });
 
       if (existing) {
+        // Reclaim LDAP-linked seed usernames: clear directory link and restore
+        // local hash so seeded provider cannot keep a dual-path row.
         await tx.internalAccount.update({
           where: { id: existing.id },
           data: {
             passwordHash,
+            externalDirectoryId: null,
             coarseRole: spec.coarseRole,
             humanIdentity: {
               update: { displayName: spec.displayName },

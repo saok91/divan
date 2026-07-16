@@ -32,7 +32,11 @@ export type AuthAttemptOutcome =
   | "success"
   | "failure_unknown"
   | "failure_wrong_password"
-  | "failure_inactive";
+  | "failure_inactive"
+  | "failure_provider_unavailable"
+  | "failure_directory_blocked"
+  | "failure_unmapped"
+  | "failure_link_conflict";
 
 export type AuthenticationErrorCode =
   | "INVALID_CREDENTIALS"

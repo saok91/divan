@@ -4,7 +4,12 @@ import type { PrismaClient } from "@divan/db";
 import bcrypt from "bcryptjs";
 
 import { getIdentityDb } from "./db";
-import { getIdentityProvider } from "./config";
+import { getIdentityProvider, getLdapConfig } from "./config";
+import {
+  MSG_LDAP_UNAVAILABLE,
+  verifyDirectoryCredentials,
+} from "./ldap-client";
+import { linkOrCreateInternalAccount } from "./ldap-link";
 import {
   AuthenticationError,
   type AuthAttemptOutcome,
@@ -14,7 +19,8 @@ import {
 
 const MSG_INVALID = "نام کاربری یا رمز عبور نادرست است.";
 const MSG_INACTIVE = "این حساب غیرفعال است.";
-const MSG_PROVIDER =
+/** Operator-facing when IDENTITY_PROVIDER is unknown/mis-set (not LDAP directory outage). */
+const MSG_PROVIDER_SEEDED =
   "ارائه‌دهنده هویت پیکربندی‌شده در دسترس نیست. برای ورود seeded از IDENTITY_PROVIDER=seeded استفاده کنید.";
 
 export type AuthenticateInput = {
@@ -29,9 +35,10 @@ export type AuthenticateResult = SessionContext & {
 };
 
 /**
- * Verify username/password against seeded internal accounts.
- * Fail-closed: unknown / wrong / inactive — no privilege elevation.
- * Seeded path is refused when NODE_ENV=production (AC #4).
+ * Verify credentials against the active identity provider.
+ * - seeded: bcrypt against InternalAccount (refused when NODE_ENV=production)
+ * - ldap: directory verify + link/create; never store LDAP password
+ * - null / misconfigured ldap → PROVIDER_UNAVAILABLE (never fall back to seeded)
  */
 export async function authenticate(
   input: AuthenticateInput,
@@ -39,24 +46,158 @@ export async function authenticate(
 ): Promise<AuthenticateResult> {
   const correlationId = input.correlationId?.trim() || randomUUID();
   const username = input.username.trim();
+  const password = input.password;
 
   const provider = getIdentityProvider();
-  if (
-    provider !== "seeded" ||
-    process.env.NODE_ENV === "production"
-  ) {
+
+  if (provider === null) {
     await recordAttempt(db, {
       correlationId,
       accountId: null,
       usernameAttempted: username,
-      outcome: "failure_unknown",
+      outcome: "failure_provider_unavailable",
     });
     throw new AuthenticationError(
       "PROVIDER_UNAVAILABLE",
-      MSG_PROVIDER,
+      MSG_LDAP_UNAVAILABLE,
       correlationId,
     );
   }
+
+  if (provider === "ldap") {
+    return authenticateLdap({ username, password, correlationId }, db);
+  }
+
+  // provider === "seeded"
+  if (process.env.NODE_ENV === "production") {
+    await recordAttempt(db, {
+      correlationId,
+      accountId: null,
+      usernameAttempted: username,
+      outcome: "failure_provider_unavailable",
+    });
+    throw new AuthenticationError(
+      "PROVIDER_UNAVAILABLE",
+      MSG_PROVIDER_SEEDED,
+      correlationId,
+    );
+  }
+
+  return authenticateSeeded({ username, password, correlationId }, db);
+}
+
+async function authenticateLdap(
+  input: { username: string; password: string; correlationId: string },
+  db: PrismaClient,
+): Promise<AuthenticateResult> {
+  const { username, password, correlationId } = input;
+  const config = getLdapConfig();
+
+  if (!config) {
+    await recordAttempt(db, {
+      correlationId,
+      accountId: null,
+      usernameAttempted: username,
+      outcome: "failure_provider_unavailable",
+    });
+    throw new AuthenticationError(
+      "PROVIDER_UNAVAILABLE",
+      MSG_LDAP_UNAVAILABLE,
+      correlationId,
+    );
+  }
+
+  const directory = await verifyDirectoryCredentials(username, password, config);
+
+  if (directory.kind !== "ok") {
+    if (directory.kind === "unavailable") {
+      await recordAttempt(db, {
+        correlationId,
+        accountId: null,
+        usernameAttempted: username,
+        outcome: "failure_provider_unavailable",
+      });
+      throw new AuthenticationError(
+        "PROVIDER_UNAVAILABLE",
+        MSG_LDAP_UNAVAILABLE,
+        correlationId,
+      );
+    }
+
+    // account_blocked | invalid_credentials — fail closed; no user enumeration.
+    await recordAttempt(db, {
+      correlationId,
+      accountId: null,
+      usernameAttempted: username,
+      outcome:
+        directory.kind === "account_blocked"
+          ? "failure_directory_blocked"
+          : "failure_wrong_password",
+    });
+    throw new AuthenticationError(
+      "INVALID_CREDENTIALS",
+      MSG_INVALID,
+      correlationId,
+    );
+  }
+
+  const linked = await linkOrCreateInternalAccount(db, directory, config);
+
+  if (linked.kind !== "ok") {
+    if (linked.kind === "inactive") {
+      await recordAttempt(db, {
+        correlationId,
+        accountId: null,
+        usernameAttempted: username,
+        outcome: "failure_inactive",
+      });
+      throw new AuthenticationError(
+        "INACTIVE_ACCOUNT",
+        MSG_INACTIVE,
+        correlationId,
+      );
+    }
+
+    await recordAttempt(db, {
+      correlationId,
+      accountId: null,
+      usernameAttempted: username,
+      outcome:
+        linked.kind === "unmapped"
+          ? "failure_unmapped"
+          : linked.kind === "conflict"
+            ? "failure_link_conflict"
+            : "failure_unknown",
+    });
+    throw new AuthenticationError(
+      "INVALID_CREDENTIALS",
+      MSG_INVALID,
+      correlationId,
+    );
+  }
+
+  await recordAttempt(db, {
+    correlationId,
+    accountId: linked.accountId,
+    usernameAttempted: username,
+    outcome: "success",
+  });
+
+  return {
+    correlationId,
+    accountId: linked.accountId,
+    username: linked.username,
+    displayName: linked.displayName,
+    coarseRole: linked.coarseRole,
+    humanIdentityId: linked.humanIdentityId,
+  };
+}
+
+async function authenticateSeeded(
+  input: { username: string; password: string; correlationId: string },
+  db: PrismaClient,
+): Promise<AuthenticateResult> {
+  const { username, password, correlationId } = input;
 
   const account = await db.internalAccount.findUnique({
     where: { username },
@@ -91,7 +232,22 @@ export async function authenticate(
     );
   }
 
-  const passwordOk = await bcrypt.compare(input.password, account.passwordHash);
+  if (!account.passwordHash) {
+    // LDAP-linked or hash-less row cannot authenticate via seeded path.
+    await recordAttempt(db, {
+      correlationId,
+      accountId: account.id,
+      usernameAttempted: username,
+      outcome: "failure_wrong_password",
+    });
+    throw new AuthenticationError(
+      "INVALID_CREDENTIALS",
+      MSG_INVALID,
+      correlationId,
+    );
+  }
+
+  const passwordOk = await bcrypt.compare(password, account.passwordHash);
   if (!passwordOk) {
     await recordAttempt(db, {
       correlationId,
@@ -164,10 +320,10 @@ export async function getActiveCoarseRoleByUsername(
 
 /**
  * Session clear for JWT is owned by Auth.js in apps/web.
- * Module hook reserved for future server-side revoke / LDAP logout (Story 1.8).
+ * Server-side revoke / JWT stale-role after demote deferred (see deferred-work.md).
  */
 export async function signOut(_accountId?: string): Promise<void> {
-  // no-op for seeded JWT sessions
+  // no-op — Auth.js JWT clear is apps/web; module revoke hook deferred
 }
 
 /**

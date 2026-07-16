@@ -10,7 +10,7 @@ export const operationalCopy = {
     "به این مسیر دسترسی ندارید. می‌توانید به صفحهٔ شروع نقش خود بازگردید.",
   accessDeniedReturn: "بازگشت به صفحهٔ شروع",
 
-  /** Prep for Story 1.8 LDAP outage — catalog only until wired. */
+  /** LDAP / identity-provider outage — wired by Story 1.8 login UI. */
   ldapUnavailable: "اتصال به سامانه هویت برقرار نیست.",
 
   /** Empty search (palette / personnel stub). */

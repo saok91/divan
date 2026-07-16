@@ -35,15 +35,18 @@ model HumanIdentity {
 
 /// One internal account per human; one coarse role per account.
 model InternalAccount {
-  id               String        @id @default(cuid())
-  username         String        @unique
-  passwordHash     String
-  status           AccountStatus @default(active)
-  coarseRole       CoarseRole
-  humanIdentityId  String        @unique
-  humanIdentity    HumanIdentity @relation(fields: [humanIdentityId], references: [id])
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                  String        @id @default(cuid())
+  username            String        @unique
+  /// Seeded accounts keep a hash; LDAP-linked accounts must persist null (never store directory passwords).
+  passwordHash        String?
+  /// Immutable directory identifier (Infra-approved attribute). Null for seeded-only rows.
+  externalDirectoryId String?       @unique
+  status              AccountStatus @default(active)
+  coarseRole          CoarseRole
+  humanIdentityId     String        @unique
+  humanIdentity       HumanIdentity @relation(fields: [humanIdentityId], references: [id])
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 }
 
 /// FR42 attribution substrate — success and failure attempts.

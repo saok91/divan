@@ -1,6 +1,6 @@
 /**
  * @divan/identity-access — authentication + coarse role context (AD-5).
- * Seeded provider for local/dev/CI; LDAP lands in Story 1.8.
+ * Seeded provider for local/dev/CI; LDAP behind IDENTITY_PROVIDER=ldap (Infra-gated).
  *
  * Coarse nav visibility is not HR content entitlement (System Admin has no
  * routine HR data even when عملیات is their only nav item).
@@ -24,7 +24,11 @@ export {
 export {
   getIdentityProvider,
   getSessionTimeoutConfig,
+  getLdapConfig,
+  type LdapConfig,
 } from "./config";
+
+export { MSG_LDAP_UNAVAILABLE } from "./ldap-client";
 
 export {
   authenticate,

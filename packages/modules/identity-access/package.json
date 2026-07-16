@@ -23,6 +23,7 @@
     "@divan/db": "workspace:*",
     "@divan/event-store": "workspace:*",
     "@divan/temporal-engine": "workspace:*",
-    "bcryptjs": "^3.0.3"
+    "bcryptjs": "^3.0.3",
+    "ldapts": "^9.0.0"
   }
 }

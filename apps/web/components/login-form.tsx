@@ -11,6 +11,9 @@ function mapAuthError(code: string | undefined): string {
   if (code === "INACTIVE_ACCOUNT") {
     return operationalCopy.inactiveAccount;
   }
+  if (code === "PROVIDER_UNAVAILABLE") {
+    return operationalCopy.ldapUnavailable;
+  }
   return operationalCopy.invalidCredentials;
 }
 

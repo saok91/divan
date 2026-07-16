@@ -31,7 +31,7 @@ const nextAuth = NextAuth({
   providers: [
     Credentials({
       id: "credentials",
-      name: "Seeded",
+      name: "Divan",
       credentials: {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
