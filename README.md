@@ -74,7 +74,7 @@ pnpm db:generate
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — unauthenticated visitors redirect to `/login`. After login, each coarse role lands on its first surface (`/personnel`, `/dashboard`, `/audit`, or `/operations`); see Story 1.5 nav matrix. Command palette: `Ctrl+K` / `Cmd+K`, or `/` when focus is not in a text field. Jalali date-picker demo: `/personnel`.
+Open [http://localhost:3000](http://localhost:3000) — unauthenticated visitors redirect to `/login`. After login, each coarse role lands on its first surface (`/personnel`, `/dashboard`, `/audit`, or `/operations`); see Story 1.5 nav matrix. Command palette: `Ctrl+K` / `Cmd+K`, or `/` when focus is not in a text field. Jalali date-picker + platform banner smoke toggles (stale / break-glass / gold CTA): `/personnel`. At 200% zoom on a ≥1280×720 display the shell stays usable; resize the window below that floor to see the viewport gate.
 
 Required env (see `.env.example`): `AUTH_SECRET`, `IDENTITY_PROVIDER=seeded`, session timeout hooks.
 Copy auth-related vars into `apps/web/.env` as well (Next.js loads env from the app package directory).

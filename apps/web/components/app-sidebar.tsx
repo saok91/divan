@@ -24,7 +24,11 @@ export function AppSidebar({ navItems }: AppSidebarProps) {
 
   return (
     <aside
-      className="fixed inset-y-0 inset-inline-start-0 z-30 flex w-sidebar-width flex-col bg-chrome pt-chrome-height text-chrome-foreground"
+      className="fixed inset-y-0 inset-inline-start-0 z-30 flex w-sidebar-width flex-col bg-chrome text-chrome-foreground"
+      style={{
+        paddingTop:
+          "calc(var(--chrome-height) + var(--banner-stack-height, 0px))",
+      }}
       aria-label="ناوبری اصلی"
     >
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">

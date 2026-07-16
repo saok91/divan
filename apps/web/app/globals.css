@@ -20,8 +20,9 @@
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
 
-  /* DESIGN.md brand — light */
-  --primary: #006fff;
+  /* DESIGN.md brand — light
+   * primary nudged #006FFF → #006DFF so secondary (#FFF on primary) ≥ 4.5:1 */
+  --primary: #006dff;
   --primary-foreground: #ffffff;
   --accent: #fdb913;
   --accent-foreground: #1a1208;
@@ -30,8 +31,17 @@
   --muted-brand: #808184;
   --sidebar-active-background: rgba(255, 255, 255, 0.12);
 
+  /* Banner tokens — DESIGN.md {stale-banner} / {break-glass-banner} */
+  --stale-banner-background: #fff3bf;
+  --stale-banner-foreground: #862e00;
+  --stale-banner-border: #fdb913;
+  --break-glass-banner-background: #e7f5ff;
+  --break-glass-banner-foreground: #1864ab;
+  --break-glass-banner-border: #006fff;
+
   /* Spacing + radius (DESIGN.md) */
   --chrome-height: 56px;
+  --banner-stack-height: 0px;
   --sidebar-width: 240px;
   --table-row-compact: 40px;
   --table-row-comfortable: 48px;
@@ -56,8 +66,9 @@
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
 
-  /* DESIGN.md brand — dark (chrome stays navy; never white/light sidebar) */
-  --primary: #4d9fff;
+  /* DESIGN.md brand — dark (chrome stays navy; never white/light sidebar)
+   * primary nudged #4D9FFF → #1E6FE0 so secondary (#FFF on primary) ≥ 4.5:1 */
+  --primary: #1e6fe0;
   --primary-foreground: #ffffff;
   --accent: #fbc470;
   --accent-foreground: #1a1208;
@@ -65,6 +76,13 @@
   --chrome-foreground: #f1f3f5;
   --muted-brand: #9e9ea0;
   --sidebar-active-background: rgba(255, 255, 255, 0.08);
+
+  --stale-banner-background: #3d3200;
+  --stale-banner-foreground: #ffe066;
+  --stale-banner-border: #fbc470;
+  --break-glass-banner-background: #1a3a5c;
+  --break-glass-banner-foreground: #a5d8ff;
+  --break-glass-banner-border: #4d9fff;
 }
 
 @theme inline {
@@ -90,6 +108,12 @@
   --color-chrome-foreground: var(--chrome-foreground);
   --color-muted-brand: var(--muted-brand);
   --color-sidebar-active-background: var(--sidebar-active-background);
+  --color-stale-banner-background: var(--stale-banner-background);
+  --color-stale-banner-foreground: var(--stale-banner-foreground);
+  --color-stale-banner-border: var(--stale-banner-border);
+  --color-break-glass-banner-background: var(--break-glass-banner-background);
+  --color-break-glass-banner-foreground: var(--break-glass-banner-foreground);
+  --color-break-glass-banner-border: var(--break-glass-banner-border);
 
   --font-sans: var(--font-yekan-bakh), "Yekan Bakh Fa-En", Tahoma, Arial,
     sans-serif;
@@ -99,6 +123,7 @@
   --radius-lg: 8px;
 
   --spacing-chrome-height: var(--chrome-height);
+  --spacing-banner-stack-height: var(--banner-stack-height);
   --spacing-sidebar-width: var(--sidebar-width);
   --spacing-table-row-compact: var(--table-row-compact);
   --spacing-table-row-comfortable: var(--table-row-comfortable);
@@ -191,7 +216,10 @@
     color: var(--chrome-foreground);
   }
 
-  /* Minimum viewport: full shell by default; gate only when too small */
+  /* Minimum viewport: JS gate sets data-viewport-gate on <html>
+   * so 200% zoom on ≥1280×720 displays does not falsely hide the shell.
+   * Pre-JS / no-JS fallback uses thresholds below half of 1280×720 so
+   * 200% zoom on the reference display (≈640×360) does not false-trigger. */
   .min-viewport-gate {
     display: none;
   }
@@ -201,13 +229,79 @@
     min-height: 100vh;
   }
 
-  @media (max-width: 1279px), (max-height: 719px) {
-    .min-viewport-gate {
+  html[data-viewport-gate="active"] .min-viewport-gate {
+    display: flex;
+  }
+
+  html[data-viewport-gate="active"] .app-shell-root {
+    display: none;
+  }
+
+  @media (max-width: 639px), (max-height: 359px) {
+    html:not([data-viewport-gate]) .min-viewport-gate {
       display: flex;
     }
 
-    .app-shell-root {
+    html:not([data-viewport-gate]) .app-shell-root {
       display: none;
+    }
+  }
+
+  /* Skeleton shimmer + toast slide — disabled under reduced motion */
+  @keyframes divan-skeleton-shimmer {
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+
+  @keyframes divan-toast-slide-in {
+    from {
+      transform: translateY(0.5rem);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .animate-skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 35%),
+      transparent
+    );
+    animation: divan-skeleton-shimmer 1.2s infinite;
+  }
+
+  .animate-toast-slide {
+    animation: divan-toast-slide-in 0.2s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-skeleton-shimmer::after {
+      animation: none;
+      display: none;
+    }
+
+    .animate-toast-slide {
+      animation: none;
+    }
+
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
     }
   }
 }

@@ -4,9 +4,11 @@ import {
   type SidebarNavItem,
 } from "@/components/app-sidebar";
 import { CommandPaletteHost } from "@/components/command-palette";
+import { RouteAnnouncer } from "@/components/route-announcer";
 import { SkipLink } from "@/components/skip-link";
 import { UserMenu } from "@/components/user-menu";
 import { ViewportGateFocusGuard } from "@/components/viewport-gate-focus-guard";
+import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 
 type AppShellProps = {
@@ -23,7 +25,8 @@ type AppShellProps = {
 
 /**
  * Fixed navy chrome: skip link → header → banner stack → sidebar + main.
- * Full shell only at ≥1280×720; smaller viewports get a Persian gate message.
+ * Full shell only at ≥1280×720; smaller windows get a Persian gate message.
+ * Zoom on a large display does not falsely trigger the gate (JS controller).
  */
 export function AppShell({
   children,
@@ -32,6 +35,9 @@ export function AppShell({
   navItems,
   bannerSlot,
 }: AppShellProps) {
+  const sizeLabel = `${toPersianDigits("1280")}×${toPersianDigits("720")}`;
+  const gateBody = operationalCopy.viewportGateBody.replace("{size}", sizeLabel);
+
   return (
     <>
       <div
@@ -40,13 +46,7 @@ export function AppShell({
         tabIndex={-1}
       >
         <p className="text-heading">دیوان</p>
-        <p className="mt-3 max-w-md text-body text-muted-foreground">
-          برای استفاده از دیوان، حداقل وضوح صفحهٔ نمایش{" "}
-          <span className="text-tabular text-foreground">
-            {toPersianDigits("1280")}×{toPersianDigits("720")}
-          </span>{" "}
-          لازم است. لطفاً پنجره را بزرگ‌تر کنید یا از نمایشگر دسکتاپ استفاده کنید.
-        </p>
+        <p className="mt-3 max-w-md text-body text-muted-foreground">{gateBody}</p>
       </div>
 
       <ViewportGateFocusGuard />
@@ -54,6 +54,7 @@ export function AppShell({
       <div className="app-shell-root">
         <AccountThemeSync accountId={accountId} />
         <SkipLink />
+        <RouteAnnouncer />
 
         <header className="fixed inset-x-0 top-0 z-40 flex h-chrome-height items-center gap-4 bg-chrome px-4 text-chrome-foreground">
           <p className="shrink-0 text-heading-sm">دیوان</p>
@@ -79,11 +80,17 @@ export function AppShell({
 
         <AppSidebar navItems={navItems} />
 
-        <div className="ps-sidebar-width pt-chrome-height">
+        <div
+          className="ps-sidebar-width"
+          style={{
+            paddingTop:
+              "calc(var(--chrome-height) + var(--banner-stack-height, 0px))",
+          }}
+        >
           <main
             id="main-content"
             tabIndex={-1}
-            className="min-h-[calc(100vh-var(--chrome-height))] outline-none"
+            className="min-h-[calc(100vh-var(--chrome-height)-var(--banner-stack-height,0px))] outline-none"
           >
             {children}
           </main>

@@ -4,13 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { operationalCopy } from "@/lib/operational-copy";
 import { loginAction } from "@/lib/login-action";
 
 function mapAuthError(code: string | undefined): string {
   if (code === "INACTIVE_ACCOUNT") {
-    return "این حساب غیرفعال است.";
+    return operationalCopy.inactiveAccount;
   }
-  return "نام کاربری یا رمز عبور نادرست است.";
+  return operationalCopy.invalidCredentials;
 }
 
 export function LoginForm() {
@@ -41,7 +42,7 @@ export function LoginForm() {
       <header className="space-y-2 text-center">
         <h1 className="text-heading">دیوان</h1>
         <p className="text-body text-muted-foreground">
-          برای ادامه وارد حساب کاربری شوید.
+          {operationalCopy.loginPrompt}
         </p>
       </header>
 

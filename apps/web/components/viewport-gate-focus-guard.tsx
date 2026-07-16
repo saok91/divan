@@ -2,24 +2,57 @@
 
 import { useEffect } from "react";
 
-const VIEWPORT_GATE_MQ = "(max-width: 1279px), (max-height: 719px)";
+import { shouldActivateViewportGate } from "@/lib/viewport-gate";
 
 /**
- * When the CSS viewport gate hides `.app-shell-root`, move focus out of the
- * display:none subtree so keyboard users are not stranded.
+ * JS viewport gate + focus rescue when shell is hidden.
+ * Replaces CSS-only max-width/height media that false-triggered at 200% zoom.
  */
 export function ViewportGateFocusGuard() {
   useEffect(() => {
-    const mql = window.matchMedia(VIEWPORT_GATE_MQ);
-
-    function rescueFocus() {
-      if (!mql.matches) return;
-      const shell = document.querySelector(".app-shell-root");
-      const active = document.activeElement;
-      if (!(shell instanceof HTMLElement) || !(active instanceof Node)) return;
-      if (!shell.contains(active)) return;
+    function applyGate() {
+      const active = shouldActivateViewportGate({
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        outerWidth: window.outerWidth,
+        outerHeight: window.outerHeight,
+        screen: {
+          width: window.screen.width,
+          height: window.screen.height,
+          availWidth: window.screen.availWidth,
+          availHeight: window.screen.availHeight,
+        },
+      });
 
       const gate = document.querySelector(".min-viewport-gate");
+      const focused = document.activeElement;
+
+      document.documentElement.dataset.viewportGate = active
+        ? "active"
+        : "ok";
+
+      if (!active) {
+        if (
+          gate instanceof HTMLElement &&
+          focused instanceof Node &&
+          gate.contains(focused)
+        ) {
+          const main = document.querySelector("#main-content");
+          if (main instanceof HTMLElement) {
+            main.focus();
+          } else if (document.body instanceof HTMLElement) {
+            document.body.focus();
+          }
+        }
+        return;
+      }
+
+      const shell = document.querySelector(".app-shell-root");
+      if (!(shell instanceof HTMLElement) || !(focused instanceof Node)) {
+        return;
+      }
+      if (!shell.contains(focused)) return;
+
       if (gate instanceof HTMLElement) {
         gate.focus();
         return;
@@ -29,9 +62,12 @@ export function ViewportGateFocusGuard() {
       }
     }
 
-    rescueFocus();
-    mql.addEventListener("change", rescueFocus);
-    return () => mql.removeEventListener("change", rescueFocus);
+    applyGate();
+    window.addEventListener("resize", applyGate);
+    return () => {
+      window.removeEventListener("resize", applyGate);
+      delete document.documentElement.dataset.viewportGate;
+    };
   }, []);
 
   return null;

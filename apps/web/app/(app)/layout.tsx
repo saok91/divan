@@ -8,6 +8,8 @@ import {
 
 import { auth } from "@/auth";
 import { AppShell } from "@/components/app-shell";
+import { BannerStack } from "@/components/banner-stack";
+import { PlatformStatusProvider } from "@/components/platform-status-provider";
 import { resolveAppPathAccess } from "@/lib/resolve-app-path-access";
 
 /**
@@ -44,12 +46,15 @@ export default async function AppLayout({
   }));
 
   return (
-    <AppShell
-      userLabel={session.user.name ?? session.user.username}
-      accountId={accountId}
-      navItems={navItems}
-    >
-      {access.kind === "allow" ? children : access.ui}
-    </AppShell>
+    <PlatformStatusProvider>
+      <AppShell
+        userLabel={session.user.name ?? session.user.username}
+        accountId={accountId}
+        navItems={navItems}
+        bannerSlot={<BannerStack />}
+      >
+        {access.kind === "allow" ? children : access.ui}
+      </AppShell>
+    </PlatformStatusProvider>
   );
 }
