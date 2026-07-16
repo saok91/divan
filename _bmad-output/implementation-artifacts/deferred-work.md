@@ -23,3 +23,7 @@
 - `isRedirectError` import from `next/dist/client/components/redirect-error` — pre-existing 1.4; replace when Next exposes a stable public helper
 - `navigation.selfcheck.ts` not wired into package scripts/CI — acceptable until Vitest/CI story lands; run manually via `tsx`
 - Dual role source at login (JWT from `authenticate` vs `getActiveCoarseRoleByUsername` for landing) — required because same-request `auth()` cannot read the new cookie; rare mid-login role change only
+
+## Deferred from: code review of 1-6-command-palette-jalali-date-picker-persian-digits.md (2026-07-16)
+
+- Jalali/persian selfcheck scripts not wired into package.json/CI — same pattern as Story 1.5 navigation selfcheck; run manually via `tsx` until Vitest/CI story lands

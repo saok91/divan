@@ -54,7 +54,7 @@ development_status:
   1-3-app-shell-chrome-sidebar-skip-link: done
   1-4-seeded-accounts-coarse-role-auth-dev-bootstrap: done
   1-5-role-landings-permission-filtered-navigation: done
-  1-6-command-palette-jalali-date-picker-persian-digits: backlog
+  1-6-command-palette-jalali-date-picker-persian-digits: done
   1-7-accessibility-floor-banner-behavior-operational-copy: backlog
   1-8-ldap-authentication-internal-account-link-infra-gated: backlog
   epic-1-retrospective: optional
