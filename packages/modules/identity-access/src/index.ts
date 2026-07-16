@@ -4,12 +4,18 @@
  *
  * Coarse nav visibility is not HR content entitlement (System Admin has no
  * routine HR data even when عملیات is their only nav item).
+ *
+ * Story 2.6: OrganizationalScope.code aligns policy tokens (org:selfcheck) with
+ * membership; PopulationPort fixtures prove FR-47 until Epic 3/4 projections.
+ * Mid-session authz change uses authzBindingFingerprint (JWT login snapshot).
  */
 
 export {
   COARSE_ROLES,
   COARSE_ROLE_LABELS_FA,
   AuthenticationError,
+  AuthzChangedError,
+  computeAuthzBindingFingerprint,
   DEV_DEFAULT_IDLE_TIMEOUT_SECONDS,
   DEV_DEFAULT_ABSOLUTE_TIMEOUT_SECONDS,
   type CoarseRole,
@@ -100,6 +106,8 @@ export {
   updateAccountLink,
   setAccountActiveStatus,
   loadOrganizationalScopeIdsForAccount,
+  loadOrganizationalScopesForAccount,
+  loadAccessRoleIdsForAccount,
   seedAccessAdministrationFixtures,
   type AccessAdminActor,
   type MutateResult,
@@ -176,5 +184,25 @@ export {
   type ActiveBreakGlassSummary,
   type RequestBreakGlassInput,
 } from "./break-glass";
+
+export {
+  DEMO_POPULATION_FIXTURES,
+  intersectPopulation,
+  drillDownPopulation,
+  currentAsOfDate,
+  getPopulationFixtureRegistry,
+  setPopulationFixtureRegistryForTests,
+  setPopulationPortEnabledForTests,
+  upsertCrossTimeGrantFixture,
+  removeCrossTimeGrantFixture,
+  type RetrievalChannel,
+  type PopulationPortInput,
+  type PopulationPortResult,
+  type PopulationFixtureRegistry,
+  type PopulationSubject,
+  type ManagementRelationship,
+  type CrossTimeGrantFixture,
+  type PopulationFact,
+} from "./population-authz";
 
 export { getIdentityDb, setIdentityDb } from "./db";

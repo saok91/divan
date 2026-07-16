@@ -12,8 +12,12 @@ import {
   AccessAdminError,
   assertActorHasBreakGlassPrivilegedRead,
   assertBreakGlassElevationLimits,
+  currentAsOfDate,
+  drillDownPopulation,
+  intersectPopulation,
 } from "@divan/identity-access";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import {
   createTRPCRouter,
@@ -27,7 +31,7 @@ import { accessAdminRouter } from "./access-admin";
  * `me` is session-only identity (not sensitive HR content) — deliberately
  * NOT routed through the audit-envelope. It must not become a backdoor for
  * category data; returns only accountId / username / displayName / coarseRole /
- * organizationalScopeIds / breakGlass summary.
+ * organizationalScopeIds / authz fingerprint / breakGlass summary.
  *
  * Privileged HR-content elevation uses break-glass binding (Story 2.5).
  */
@@ -42,6 +46,13 @@ export const appRouter = createTRPCRouter({
     displayName: ctx.session.displayName,
     coarseRole: ctx.session.coarseRole,
     organizationalScopeIds: ctx.session.organizationalScopeIds,
+    organizationalScopeCodes: ctx.session.organizationalScopeCodes,
+    authzBindingFingerprint: ctx.session.authzBindingFingerprint,
+    priorAuthzBindingFingerprint: ctx.priorAuthzBindingFingerprint,
+    authzChanged:
+      Boolean(ctx.priorAuthzBindingFingerprint?.trim()) &&
+      ctx.priorAuthzBindingFingerprint !==
+        ctx.session.authzBindingFingerprint,
     breakGlass: ctx.session.breakGlass,
   })),
 
@@ -51,6 +62,7 @@ export const appRouter = createTRPCRouter({
    * Demo governed read — controlled allow via DEV_DEMO_POLICY fixture.
    * Proves envelope + access event on allow. Coarse role labels do not grant.
    * `devOnly`: production returns NOT_FOUND before envelope (no audit noise).
+   * Requires org:selfcheck membership (Story 2.6).
    */
   demoGovernedRead: governedProcedure
     .meta({
@@ -71,7 +83,7 @@ export const appRouter = createTRPCRouter({
   /**
    * Privileged demo HR read under break-glass elevation (Story 2.5).
    * Envelope allow + PermissionSet binding from active break-glass activate.
-   * Without binding → deny. Export / access-admin stay separately gated.
+   * Story 2.6: still runs population intersection — no out-of-scope bypass.
    */
   demoBreakGlassPrivilegedHrRead: governedProcedure
     .meta({
@@ -83,7 +95,14 @@ export const appRouter = createTRPCRouter({
       sensitive: true,
       devOnly: true,
     })
-    .query(async ({ ctx }) => {
+    .input(
+      z
+        .object({
+          objectIds: z.array(z.string()).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
       try {
         await assertActorHasBreakGlassPrivilegedRead(ctx.session.accountId);
       } catch (err) {
@@ -95,12 +114,162 @@ export const appRouter = createTRPCRouter({
         }
         throw err;
       }
+
+      const pop = intersectPopulation({
+        actorAccountId: ctx.session.accountId,
+        actorScopeCodes: ctx.session.organizationalScopeCodes,
+        asOfDate: currentAsOfDate(),
+        channel: "profile",
+        objectIds: input?.objectIds,
+        dataCategory: DEMO_SENSITIVE_HR_READ_TUPLE.dataCategory,
+      });
+      if (!pop.ok) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "دسترسی ندارید.",
+        });
+      }
+
       return {
         ok: true as const,
         fixture: "break_glass_privileged_hr_read" as const,
         incidentId: ctx.session.breakGlass.incidentId,
         grantId: ctx.session.breakGlass.grantId,
+        authorizedSubjectIds: pop.subjectIds,
         // No HR field values — purpose/incident correlation only (FR-51).
+      };
+    }),
+
+  /**
+   * Demo scoped retrieval — intersection-only aggregate (Story 2.6 / FR-47).
+   * Out-of-scope ids omitted (not masked as 0).
+   * Client temporal fields honored only via allowClientTemporal (synced with envelope).
+   */
+  demoScopedRetrieval: governedProcedure
+    .meta({
+      permission: "demo.retrieval.read",
+      dataCategory: "demo.non_hr",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+      operation: "demo.retrieval.scoped",
+      sensitive: true,
+      devOnly: true,
+      allowClientTemporal: true,
+    })
+    .input(
+      z
+        .object({
+          channel: z
+            .enum([
+              "profile",
+              "timeline",
+              "search",
+              "count",
+              "dashboard",
+              "report",
+              "export",
+              "audit",
+            ])
+            .default("search"),
+          asOfDate: z.string().optional(),
+          evaluationMode: z.enum(["current", "as_of"]).optional(),
+          objectIds: z.array(z.string()).optional(),
+          /** Clamped to session membership — cannot invent out-of-membership codes. */
+          actorScopeCodesOverride: z.array(z.string()).optional(),
+          unreconciled: z.boolean().optional(),
+        })
+        .optional(),
+    )
+    .query(({ ctx, input }) => {
+      const held = ctx.session.organizationalScopeCodes;
+      const requested = input?.actorScopeCodesOverride;
+      const codes = requested?.length
+        ? requested.filter((c) => held.includes(c))
+        : held;
+      // Population as-of must match envelope evaluation (no split-brain).
+      const asOf =
+        ctx.evaluationMode === "as_of" && ctx.asOfDate
+          ? ctx.asOfDate
+          : currentAsOfDate();
+      const pop = intersectPopulation({
+        actorAccountId: ctx.session.accountId,
+        actorScopeCodes: codes,
+        asOfDate: asOf,
+        channel: input?.channel ?? "search",
+        objectIds: input?.objectIds,
+        dataCategory: "demo.non_hr",
+        unreconciled: input?.unreconciled === true ? true : undefined,
+      });
+      if (!pop.ok) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "دسترسی ندارید.",
+        });
+      }
+      return {
+        ok: true as const,
+        subjectIds: pop.subjectIds,
+        factKeys: pop.factKeys,
+        volume: pop.subjectIds.length,
+        resultSemantics: ctx.resultSemantics,
+        evaluationMode: ctx.evaluationMode,
+        asOfDate: asOf,
+      };
+    }),
+
+  /**
+   * Drill-down from aggregate — same authorized set (recomputed identically).
+   * Widening beyond parent set → deny (fail closed).
+   */
+  demoRetrievalDrillDown: governedProcedure
+    .meta({
+      permission: "demo.retrieval.read",
+      dataCategory: "demo.non_hr",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+      operation: "demo.retrieval.drill_down",
+      sensitive: true,
+      devOnly: true,
+    })
+    .input(
+      z.object({
+        objectId: z.string().min(1),
+        actorScopeCodesOverride: z.array(z.string()).optional(),
+      }),
+    )
+    .query(({ ctx, input }) => {
+      const held = ctx.session.organizationalScopeCodes;
+      const requested = input.actorScopeCodesOverride;
+      const codes = requested?.length
+        ? requested.filter((c) => held.includes(c))
+        : held;
+      const parent = {
+        actorAccountId: ctx.session.accountId,
+        actorScopeCodes: codes,
+        asOfDate: currentAsOfDate(),
+        channel: "search" as const,
+        dataCategory: "demo.non_hr",
+      };
+      const parentResult = intersectPopulation(parent);
+      const child = drillDownPopulation(parent, input.objectId);
+      if (!parentResult.ok || !child.ok) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "دسترسی ندارید.",
+        });
+      }
+      const widened = child.subjectIds.some(
+        (id) => !parentResult.subjectIds.includes(id),
+      );
+      if (widened) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "دسترسی ندارید.",
+        });
+      }
+      return {
+        parentSubjectIds: parentResult.subjectIds,
+        childSubjectIds: child.subjectIds,
       };
     }),
 

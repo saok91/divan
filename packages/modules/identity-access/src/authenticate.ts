@@ -10,9 +10,13 @@ import {
   verifyDirectoryCredentials,
 } from "./ldap-client";
 import { linkOrCreateInternalAccount } from "./ldap-link";
-import { loadOrganizationalScopeIdsForAccount } from "./access-admin";
+import {
+  loadAccessRoleIdsForAccount,
+  loadOrganizationalScopesForAccount,
+} from "./access-admin";
 import {
   AuthenticationError,
+  computeAuthzBindingFingerprint,
   type AuthAttemptOutcome,
   type CoarseRole,
   type SessionContext,
@@ -34,6 +38,34 @@ export type AuthenticateInput = {
 export type AuthenticateResult = SessionContext & {
   correlationId: string;
 };
+
+async function hydrateSessionBindings(
+  accountId: string,
+  coarseRole: CoarseRole,
+  db: PrismaClient,
+): Promise<{
+  organizationalScopeIds: string[];
+  organizationalScopeCodes: string[];
+  accessRoleIds: string[];
+  authzBindingFingerprint: string;
+  breakGlass: SessionContext["breakGlass"];
+}> {
+  const scopes = await loadOrganizationalScopesForAccount(accountId, db);
+  const accessRoleIds = await loadAccessRoleIdsForAccount(accountId, db);
+  const breakGlass = await loadBreakGlassSessionField(accountId, db);
+  return {
+    organizationalScopeIds: scopes.ids,
+    organizationalScopeCodes: scopes.codes,
+    accessRoleIds,
+    authzBindingFingerprint: computeAuthzBindingFingerprint({
+      coarseRole,
+      organizationalScopeIds: scopes.ids,
+      organizationalScopeCodes: scopes.codes,
+      accessRoleIds,
+    }),
+    breakGlass,
+  };
+}
 
 async function loadBreakGlassSessionField(
   accountId: string,
@@ -206,11 +238,11 @@ async function authenticateLdap(
     outcome: "success",
   });
 
-  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
+  const bindings = await hydrateSessionBindings(
     linked.accountId,
+    linked.coarseRole,
     db,
   );
-  const breakGlass = await loadBreakGlassSessionField(linked.accountId, db);
 
   return {
     correlationId,
@@ -219,8 +251,7 @@ async function authenticateLdap(
     displayName: linked.displayName,
     coarseRole: linked.coarseRole,
     humanIdentityId: linked.humanIdentityId,
-    organizationalScopeIds,
-    breakGlass,
+    ...bindings,
   };
 }
 
@@ -300,21 +331,17 @@ async function authenticateSeeded(
     outcome: "success",
   });
 
-  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
-    account.id,
-    db,
-  );
-  const breakGlass = await loadBreakGlassSessionField(account.id, db);
+  const coarseRole = account.coarseRole as CoarseRole;
+  const bindings = await hydrateSessionBindings(account.id, coarseRole, db);
 
   return {
     correlationId,
     accountId: account.id,
     username: account.username,
     displayName: account.humanIdentity.displayName,
-    coarseRole: account.coarseRole as CoarseRole,
+    coarseRole,
     humanIdentityId: account.humanIdentityId,
-    organizationalScopeIds,
-    breakGlass,
+    ...bindings,
   };
 }
 
@@ -343,21 +370,16 @@ export async function getSessionContext(
   );
   await applyProtectedEntryFailSafes(account.id, new Date(), db);
 
-  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
-    account.id,
-    db,
-  );
-
-  const breakGlass = await loadBreakGlassSessionField(account.id, db);
+  const coarseRole = account.coarseRole as CoarseRole;
+  const bindings = await hydrateSessionBindings(account.id, coarseRole, db);
 
   return {
     accountId: account.id,
     username: account.username,
     displayName: account.humanIdentity.displayName,
-    coarseRole: account.coarseRole as CoarseRole,
+    coarseRole,
     humanIdentityId: account.humanIdentityId,
-    organizationalScopeIds,
-    breakGlass,
+    ...bindings,
   };
 }
 

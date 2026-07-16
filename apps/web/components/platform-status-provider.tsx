@@ -20,6 +20,16 @@ export type PlatformStatus = {
   /** Sample pending-until clock for operational copy (HH:mm, Latin digits ok). */
   stalePendingUntil: string;
   breakGlass: BreakGlassGrant;
+  /**
+   * Mid-session authz change (Story 2.6) — distinct from stale-banner (FR-45).
+   */
+  authzChanged: boolean;
+  /**
+   * Demo draft stand-in for Epic 4 Draft forms — proves save/discard + block finalize.
+   */
+  demoDraftOpen: boolean;
+  /** After Save Draft CTA — stand-in persisted flag (Epic 4 seam). */
+  demoDraftSaved: boolean;
 };
 
 type PlatformStatusContextValue = PlatformStatus & {
@@ -27,10 +37,16 @@ type PlatformStatusContextValue = PlatformStatus & {
   setBlockingStale: (value: boolean) => void;
   setStalePendingUntil: (value: string) => void;
   setBreakGlass: (value: BreakGlassGrant) => void;
-  /** True while blocking stale / recalc pending — Epic 4–6 gold CTA gate. */
+  setAuthzChanged: (value: boolean) => void;
+  clearAuthzChanged: () => void;
+  setDemoDraftOpen: (value: boolean) => void;
+  setDemoDraftSaved: (value: boolean) => void;
+  /** True while blocking stale / recalc / authz-change — gold CTA gate. */
   isGoldCtaBlocked: boolean;
   /** Break-glass grant still within expiry window (requires finite future expiresAt). */
   isBreakGlassLive: boolean;
+  /** Finalize blocked while authz-changed modal is active (Story 2.6). */
+  isFinalizeBlockedByAuthzChange: boolean;
 };
 
 const PlatformStatusContext =
@@ -41,6 +57,9 @@ const DEFAULT_STATUS: PlatformStatus = {
   blockingStale: false,
   stalePendingUntil: "09:14",
   breakGlass: { active: false, expiresAt: null },
+  authzChanged: false,
+  demoDraftOpen: false,
+  demoDraftSaved: false,
 };
 
 /**
@@ -83,37 +102,53 @@ export function PlatformStatusProvider({
   const [stalePendingUntil, setStalePendingUntil] = React.useState(
     initial?.stalePendingUntil ?? DEFAULT_STATUS.stalePendingUntil,
   );
-  const [breakGlass, setBreakGlass] = React.useState<BreakGlassGrant>(() =>
-    toBreakGlassGrant(initial?.breakGlass),
+  const [breakGlassOverride, setBreakGlassOverride] =
+    React.useState<BreakGlassGrant | null>(null);
+  const [authzChangedAcked, setAuthzChangedAcked] = React.useState(false);
+  const [demoDraftOpen, setDemoDraftOpen] = React.useState(
+    initial?.demoDraftOpen ?? false,
+  );
+  const [demoDraftSaved, setDemoDraftSaved] = React.useState(
+    initial?.demoDraftSaved ?? false,
   );
   const [nowMs, setNowMs] = React.useState(() => Date.now());
 
-  // Keep banner in sync when layout RSC re-hydrates (e.g. router.refresh).
-  React.useEffect(() => {
-    if (!initial?.breakGlass) return;
-    setBreakGlass(toBreakGlassGrant(initial.breakGlass));
-  }, [
-    initial?.breakGlass?.active,
-    initial?.breakGlass?.expiresAt,
-    initial?.breakGlass?.grantId,
-    initial?.breakGlass?.incidentId,
-  ]);
+  const initialAuthzChanged = initial?.authzChanged ?? false;
 
-  // Mid-session sync: poll fresh session breakGlass (activate/revoke without remount).
+  // Mid-session sync: poll fresh session (breakGlass + authzChanged).
   const meQuery = api.me.useQuery(undefined, {
-    refetchInterval: breakGlass.active ? 10_000 : 30_000,
+    refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
+
+  const breakGlass = toBreakGlassGrant(
+    breakGlassOverride ??
+      meQuery.data?.breakGlass ??
+      initial?.breakGlass ??
+      DEFAULT_STATUS.breakGlass,
+  );
+
+  // Prefer live me once loaded; do not sticky-OR SSR forever.
+  const authzChangedFromServer =
+    meQuery.data !== undefined
+      ? meQuery.data.authzChanged === true
+      : initialAuthzChanged;
+
+  // Re-open modal only on a rising edge (false→true), not while stale me is true after ack.
+  const prevServerChangedRef = React.useRef(authzChangedFromServer);
   React.useEffect(() => {
-    const next = meQuery.data?.breakGlass;
-    if (!next) return;
-    setBreakGlass(toBreakGlassGrant(next));
-  }, [meQuery.data?.breakGlass]);
+    if (authzChangedFromServer && !prevServerChangedRef.current) {
+      setAuthzChangedAcked(false);
+    }
+    prevServerChangedRef.current = authzChangedFromServer;
+  }, [authzChangedFromServer]);
+
+  const authzChanged = authzChangedFromServer && !authzChangedAcked;
 
   React.useEffect(() => {
     if (!breakGlass.active || !breakGlass.expiresAt) return;
-    const expires = Date.parse(breakGlass.expiresAt);
-    if (Number.isNaN(expires)) return;
+    const expires = DateParseSafe(breakGlass.expiresAt);
+    if (expires === null) return;
 
     function refreshNow() {
       setNowMs(Date.now());
@@ -129,7 +164,25 @@ export function PlatformStatusProvider({
   }, [breakGlass.active, breakGlass.expiresAt]);
 
   const isBreakGlassLive = isGrantLive(breakGlass, nowMs);
-  const isGoldCtaBlocked = blockingStale || recalculationPending;
+  const isFinalizeBlockedByAuthzChange = authzChanged;
+  const isGoldCtaBlocked =
+    blockingStale || recalculationPending || isFinalizeBlockedByAuthzChange;
+
+  const setBreakGlass = React.useCallback((value: BreakGlassGrant) => {
+    setBreakGlassOverride(toBreakGlassGrant(value));
+  }, []);
+
+  const setAuthzChanged = React.useCallback((value: boolean) => {
+    if (value) {
+      setAuthzChangedAcked(false);
+    } else {
+      setAuthzChangedAcked(true);
+    }
+  }, []);
+
+  const clearAuthzChanged = React.useCallback(() => {
+    setAuthzChangedAcked(true);
+  }, []);
 
   const value = React.useMemo<PlatformStatusContextValue>(
     () => ({
@@ -137,20 +190,35 @@ export function PlatformStatusProvider({
       blockingStale,
       stalePendingUntil,
       breakGlass,
+      authzChanged,
+      demoDraftOpen,
+      demoDraftSaved,
       setRecalculationPending,
       setBlockingStale,
       setStalePendingUntil,
       setBreakGlass,
+      setAuthzChanged,
+      clearAuthzChanged,
+      setDemoDraftOpen,
+      setDemoDraftSaved,
       isGoldCtaBlocked,
       isBreakGlassLive,
+      isFinalizeBlockedByAuthzChange,
     }),
     [
       recalculationPending,
       blockingStale,
       stalePendingUntil,
       breakGlass,
+      authzChanged,
+      demoDraftOpen,
+      demoDraftSaved,
+      setBreakGlass,
+      setAuthzChanged,
+      clearAuthzChanged,
       isGoldCtaBlocked,
       isBreakGlassLive,
+      isFinalizeBlockedByAuthzChange,
     ],
   );
 
@@ -159,6 +227,11 @@ export function PlatformStatusProvider({
       {children}
     </PlatformStatusContext.Provider>
   );
+}
+
+function DateParseSafe(iso: string): number | null {
+  const expires = Date.parse(iso);
+  return Number.isNaN(expires) ? null : expires;
 }
 
 export function usePlatformStatus(): PlatformStatusContextValue {
@@ -171,7 +244,7 @@ export function usePlatformStatus(): PlatformStatusContextValue {
   return ctx;
 }
 
-/** Hook for Epic 4–6 gold CTAs — true while blocking stale/recalc. */
+/** Hook for Epic 4–6 gold CTAs — true while blocking stale/recalc OR authz change. */
 export function useStaleBlocking(): {
   isGoldCtaBlocked: boolean;
   blockingStale: boolean;
@@ -179,5 +252,9 @@ export function useStaleBlocking(): {
 } {
   const { isGoldCtaBlocked, blockingStale, recalculationPending } =
     usePlatformStatus();
-  return { isGoldCtaBlocked, blockingStale, recalculationPending };
+  return {
+    isGoldCtaBlocked,
+    blockingStale,
+    recalculationPending,
+  };
 }

@@ -60,8 +60,11 @@ model InternalAccount {
 }
 
 /// Organizational Scope projection — Admin-managed; not LDAP group sync.
+/// `code` aligns demo/policy tokens (e.g. org:selfcheck) with membership (Story 2.6).
 model OrganizationalScope {
   id        String   @id @default(cuid())
+  /// Stable policy/demo alias — unique when set; AR-ACCESS owns production codes.
+  code      String?  @unique
   labelFa   String
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -97,7 +100,7 @@ model AccessRole {
   grants   EntitlementGrant[]
 }
 
-/// Grant class — sensitive/global/bulk/mass/break_glass require independent approval (FR-46).
+/// Grant class — sensitive/global/bulk/mass/break_glass/cross_time require independent approval (FR-46/47).
 enum EntitlementGrantKind {
   sensitive
   global
@@ -107,6 +110,8 @@ enum EntitlementGrantKind {
   role_create
   scope_create
   break_glass
+  /// Bounded pre/post relationship history — not management-derived default (Story 2.6).
+  cross_time_scope
 }
 
 /// Post-use review for break-glass (Story 2.5). Non-break-glass stays not_required.

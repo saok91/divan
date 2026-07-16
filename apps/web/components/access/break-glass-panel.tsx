@@ -152,15 +152,6 @@ export function BreakGlassPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h2 className="text-title-medium text-foreground">
-          {operationalCopy.breakGlassRequestTitle}
-        </h2>
-        <p className="text-body-medium text-muted-foreground">
-          {operationalCopy.breakGlassRequestHint}
-        </p>
-      </header>
-
       {actionError ? (
         <StatusMessage kind="error">{actionError}</StatusMessage>
       ) : null}

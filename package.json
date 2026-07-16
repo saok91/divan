@@ -21,7 +21,8 @@
     "selfcheck:governed": "pnpm --filter @divan/web selfcheck:governed",
     "selfcheck:access-admin": "pnpm --filter @divan/identity-access selfcheck:access-admin",
     "selfcheck:entitlement-lifecycle": "pnpm --filter @divan/identity-access selfcheck:entitlement-lifecycle",
-    "selfcheck:break-glass": "pnpm --filter @divan/identity-access selfcheck:break-glass"
+    "selfcheck:break-glass": "pnpm --filter @divan/identity-access selfcheck:break-glass",
+    "selfcheck:temporal-authz": "pnpm --filter @divan/identity-access selfcheck:temporal-authz"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

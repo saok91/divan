@@ -20,8 +20,15 @@ export const operationalCopy = {
   viewportGateBody:
     "برای استفاده از دیوان، حداقل وضوح صفحهٔ نمایش {size} لازم است. لطفاً پنجره را بزرگ‌تر کنید یا از نمایشگر دسکتاپ استفاده کنید.",
 
-  /** Scope revoked — catalog until Epic 2 surfaces exist. */
+  /** Scope revoked — EXPERIENCE exact (Story 2.6 mid-session modal). */
   scopeRevoked: "دسترسی شما تغییر کرد.",
+  /** Demo draft stand-in (Epic 4 Draft forms do not exist yet). */
+  authzChangedSaveDraft: "ذخیره پیش‌نویس",
+  authzChangedDiscard: "دور انداختن",
+  authzChangedAcknowledge: "متوجه شدم",
+  authzChangedDraftHint:
+    "پیش‌نویس ذخیره‌نشده دارید. قبل از ادامه ذخیره یا دور بیندازید. نهایی‌سازی مسدود است.",
+  authzChangedFinalizeBlocked: "نهایی‌سازی تا تأیید تغییر دسترسی ممکن نیست.",
 
   /** Unsaved form — catalog until Epic 4 surfaces exist. */
   unsavedForm:

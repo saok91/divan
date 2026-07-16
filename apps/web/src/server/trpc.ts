@@ -7,10 +7,12 @@ import {
   loadCategoryRegistry,
   loadPolicyRegistry,
   type AuditEnvelope,
+  type EvaluationMode,
 } from "@divan/audit-envelope";
 import { createPgPool, type Pool } from "@divan/db";
 import {
   AccessAdminError,
+  AuthzChangedError,
   assertBreakGlassElevationLimits,
   getSessionContext,
   toEnvelopeAuthzContext,
@@ -23,6 +25,8 @@ import { operationalCopy } from "@/lib/operational-copy";
 
 export type TrpcContext = {
   session: SessionContext | null;
+  /** Login-time fingerprint from JWT — null when anonymous. */
+  priorAuthzBindingFingerprint: string | null;
 };
 
 /**
@@ -42,6 +46,13 @@ export type GovernedProcedureMeta = {
    * before envelope authorize (no access-event noise).
    */
   devOnly?: boolean;
+  /** Default current. as_of requires input.asOfDate date-only. */
+  evaluationMode?: EvaluationMode;
+  /**
+   * When true, client may supply evaluationMode/asOfDate on input.
+   * Default false — raw client temporal fields are ignored (Story 2.6 review).
+   */
+  allowClientTemporal?: boolean;
 };
 
 const t = initTRPC
@@ -49,6 +60,22 @@ const t = initTRPC
   .meta<Partial<GovernedProcedureMeta>>()
   .create({
     transformer: superjson,
+    errorFormatter({ shape, error }) {
+      const cause = error.cause;
+      const authzChanged =
+        cause instanceof AuthzChangedError ||
+        (typeof cause === "object" &&
+          cause !== null &&
+          "code" in cause &&
+          (cause as { code: unknown }).code === "AUTHZ_CHANGED");
+      return {
+        ...shape,
+        data: {
+          ...shape.data,
+          divanCode: authzChanged ? ("AUTHZ_CHANGED" as const) : undefined,
+        },
+      };
+    },
   });
 
 export const createTRPCRouter = t.router;
@@ -64,6 +91,7 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   return next({
     ctx: {
       session: ctx.session,
+      priorAuthzBindingFingerprint: ctx.priorAuthzBindingFingerprint,
     },
   });
 });
@@ -94,12 +122,21 @@ export function setGovernedEnvelopeForTests(next: AuditEnvelope | null): void {
   envelope = next;
 }
 
+function throwAuthzChanged(): never {
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: operationalCopy.scopeRevoked,
+    cause: new AuthzChangedError(operationalCopy.scopeRevoked),
+  });
+}
+
 /**
- * Logged-in → DB revalidate authz context → audit-envelope authorize → handler.
+ * Logged-in → DB revalidate authz context → mid-session binding check →
+ * audit-envelope authorize → handler.
  * Coarse JWT claims alone never authorize governed data.
  */
 export const governedProcedure = protectedProcedure.use(
-  async ({ ctx, next, meta }) => {
+  async ({ ctx, next, meta, getRawInput }) => {
     if (meta?.devOnly && process.env.NODE_ENV === "production") {
       throw new TRPCError({ code: "NOT_FOUND" });
     }
@@ -125,8 +162,43 @@ export const governedProcedure = protectedProcedure.use(
       });
     }
 
+    // Story 2.6 AC #4: binding change vs login-time snapshot → AUTHZ_CHANGED.
+    // Empty prior is legacy/unhydrated — jwt callback hydrates; do not loop the modal.
+    const prior = ctx.priorAuthzBindingFingerprint?.trim() ?? "";
+    if (prior && prior !== fresh.authzBindingFingerprint) {
+      throwAuthzChanged();
+    }
+
+    const rawInput = (await getRawInput()) as
+      | { asOfDate?: unknown; evaluationMode?: EvaluationMode }
+      | undefined;
+
+    // Only honor client temporal fields when meta explicitly allows it.
+    const allowClientTemporal = meta.allowClientTemporal === true;
+    const evaluationMode: EvaluationMode =
+      meta.evaluationMode ??
+      (allowClientTemporal &&
+      (rawInput?.evaluationMode === "current" ||
+        rawInput?.evaluationMode === "as_of")
+        ? rawInput.evaluationMode
+        : undefined) ??
+      "current";
+
+    let asOfDate: string | undefined;
+    if (evaluationMode === "as_of") {
+      const rawAsOf = allowClientTemporal ? rawInput?.asOfDate : undefined;
+      if (typeof rawAsOf !== "string" && rawAsOf != null) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: MSG_ACCESS_DENIED_FA,
+        });
+      }
+      asOfDate = typeof rawAsOf === "string" ? rawAsOf : undefined;
+    }
+
     const correlationId = randomUUID();
     let decisionId: string | undefined;
+    let resultSemantics: "effective" | "planned" | undefined;
     try {
       const authorized = await getEnvelope().authorizeOrThrow({
         context: toEnvelopeAuthzContext(fresh),
@@ -137,8 +209,11 @@ export const governedProcedure = protectedProcedure.use(
         operation: meta.operation.trim(),
         correlationId,
         sensitive: meta.sensitive !== false,
+        evaluationMode,
+        asOfDate,
       });
       decisionId = authorized.decisionId;
+      resultSemantics = authorized.resultSemantics;
     } catch (err) {
       if (err instanceof AuthorizationError) {
         console.error(
@@ -147,6 +222,7 @@ export const governedProcedure = protectedProcedure.use(
           "correlationId=",
           err.correlationId,
           err.decisionId ? `decisionId=${err.decisionId}` : "",
+          err.denyReason ? `denyReason=${err.denyReason}` : "",
         );
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -174,8 +250,12 @@ export const governedProcedure = protectedProcedure.use(
     return next({
       ctx: {
         session: fresh,
+        priorAuthzBindingFingerprint: ctx.priorAuthzBindingFingerprint,
         correlationId,
         decisionId: decisionId ?? correlationId,
+        resultSemantics: resultSemantics ?? "effective",
+        evaluationMode,
+        asOfDate: asOfDate ?? null,
       },
     });
   },

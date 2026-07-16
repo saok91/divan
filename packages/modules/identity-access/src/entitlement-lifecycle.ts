@@ -92,6 +92,7 @@ const DEFAULT_APPROVAL_KINDS: readonly GrantKind[] = Object.freeze([
   "role_create",
   "scope_create",
   "break_glass",
+  "cross_time_scope",
 ]);
 
 let lifecycleHooks: EntitlementLifecycleHooks = {
@@ -150,6 +151,17 @@ export type GrantCreatePayload = {
   appliedRoleBinding?: boolean;
   /** Set on activate: true when this grant created the scope join (withdraw only then). */
   appliedScopeBinding?: boolean;
+  /**
+   * cross_time_scope (Story 2.6): category for bounded pre/post history.
+   * Management-derived default MUST NOT silently widen without this grant.
+   */
+  category?: string;
+  /** Date-only inclusive start (YYYY-MM-DD). */
+  validFrom?: string;
+  /** Date-only exclusive end (YYYY-MM-DD). */
+  validTo?: string;
+  /** Optional subject/population hint — no HR field values. */
+  targetPopulationHint?: string;
 };
 
 export type RequestGrantInput = {
@@ -425,6 +437,31 @@ export async function requestGrant(
         "برای ایجاد محدوده، برچسب الزامی است.",
       );
     }
+  } else if (input.kind === "cross_time_scope") {
+    const p = input.createPayload;
+    const purpose = input.purpose?.trim() || p?.targetPopulationHint?.trim();
+    if (
+      !purpose ||
+      !p?.category?.trim() ||
+      !p.validFrom?.trim() ||
+      !p.validTo?.trim()
+    ) {
+      throw new AccessAdminError(
+        "VALIDATION",
+        "برای دسترسی فرازمانی، هدف، دسته، و بازهٔ تاریخ الزامی است.",
+        "cross_time_scope_payload_required",
+      );
+    }
+    const { parseDateOnly } = await import("@divan/temporal-engine");
+    const from = parseDateOnly(p.validFrom);
+    const to = parseDateOnly(p.validTo);
+    if (!from.ok || !to.ok || from.value >= to.value) {
+      throw new AccessAdminError(
+        "VALIDATION",
+        "بازهٔ تاریخ فرازمانی نامعتبر است.",
+        "cross_time_scope_interval_invalid",
+      );
+    }
   } else if (
     input.kind !== "standard" &&
     !input.accessRoleId &&
@@ -499,8 +536,12 @@ export async function requestGrant(
           ? (input.incidentId ?? "").trim() || null
           : null,
       purpose:
-        input.kind === "break_glass"
-          ? (input.purpose ?? "").trim() || null
+        input.kind === "break_glass" || input.kind === "cross_time_scope"
+          ? (
+              input.purpose ??
+              input.createPayload?.targetPopulationHint ??
+              ""
+            ).trim() || null
           : null,
       postUseReviewStatus:
         input.kind === "break_glass" ? "pending" : "not_required",
@@ -716,6 +757,11 @@ async function withdrawGrantBindings(
   grant: EntitlementGrant,
   db: PrismaClient,
 ): Promise<void> {
+  if (grant.kind === "cross_time_scope") {
+    const { removeCrossTimeGrantFixture } = await import("./population-authz");
+    removeCrossTimeGrantFixture(grant.id);
+  }
+
   const payload = parseCreatePayload(grant.createPayload);
   // Break-glass always withdraws its elevation role (review decision: force withdraw).
   // Other kinds: only remove joins this grant applied. Legacy (flags unset) keep
@@ -856,7 +902,9 @@ export async function activateGrant(
   const expectedStatus = grant.status;
   const payload = parseCreatePayload(grant.createPayload);
   const catalogOnly =
-    grant.kind === "role_create" || grant.kind === "scope_create";
+    grant.kind === "role_create" ||
+    grant.kind === "scope_create" ||
+    grant.kind === "cross_time_scope";
 
   const updated = await db.$transaction(async (tx) => {
     let accessRoleId = grant.accessRoleId;
@@ -987,6 +1035,31 @@ export async function activateGrant(
 
     return tx.entitlementGrant.findUniqueOrThrow({ where: { id: grant.id } });
   });
+
+  if (updated.kind === "cross_time_scope") {
+    const { upsertCrossTimeGrantFixture } = await import("./population-authz");
+    const activatedPayload = parseCreatePayload(updated.createPayload);
+    const purpose = updated.purpose?.trim() || "cross_time_scope";
+    const category = activatedPayload?.category?.trim() ?? "";
+    const validFrom = activatedPayload?.validFrom?.trim() ?? "";
+    const validTo = activatedPayload?.validTo?.trim() ?? "";
+    const subjectIds = (activatedPayload?.targetPopulationHint ?? "")
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (category && validFrom && validTo && subjectIds.length > 0) {
+      upsertCrossTimeGrantFixture({
+        grantId: updated.id,
+        accountId: updated.subjectAccountId,
+        purpose,
+        category,
+        validFrom,
+        validToExclusive: validTo,
+        subjectIds,
+        active: true,
+      });
+    }
+  }
 
   return {
     entity: toGrantView(updated),
@@ -1378,6 +1451,7 @@ export async function applyProtectedEntryFailSafes(
  * Reauthorize hook for future queued work / artifact retrieval (Stories 6.x / 7.x).
  * Consumers MUST call this before serving queued/export artifacts.
  * Fail-closed: returns false when account inactive or no longer has the binding.
+ * Story 2.6: optional asOfDate + population check against fixture PopulationPort.
  */
 export async function reauthorizeForQueuedOrArtifactWork(
   input: {
@@ -1386,6 +1460,22 @@ export async function reauthorizeForQueuedOrArtifactWork(
     requiredAccessRoleId?: string;
     /** Optional scope that must still be effectively bound. */
     requiredOrganizationalScopeId?: string;
+    /** Optional date-only as-of for population check. */
+    asOfDate?: string;
+    /** Optional population channel (default audit). */
+    populationChannel?:
+      | "profile"
+      | "timeline"
+      | "search"
+      | "count"
+      | "dashboard"
+      | "report"
+      | "export"
+      | "audit";
+    /** Optional subject ids to verify against intersection. */
+    objectIds?: string[];
+    /** Actor scope codes for population port (required when objectIds set). */
+    actorScopeCodes?: string[];
   },
   db: PrismaClient = getIdentityDb(),
 ): Promise<{ allowed: boolean; reason: string }> {
@@ -1424,6 +1514,49 @@ export async function reauthorizeForQueuedOrArtifactWork(
     });
     if (!scope) {
       return { allowed: false, reason: "scope_binding_missing" };
+    }
+  }
+
+  if (input.asOfDate !== undefined || input.objectIds?.length) {
+    const { parseDateOnly } = await import("@divan/temporal-engine");
+    const {
+      currentAsOfDate,
+      intersectPopulation,
+    } = await import("./population-authz");
+
+    const asOf =
+      input.asOfDate !== undefined
+        ? parseDateOnly(input.asOfDate)
+        : { ok: true as const, value: currentAsOfDate() };
+    if (!asOf.ok) {
+      return { allowed: false, reason: asOf.reason };
+    }
+
+    const codes =
+      input.actorScopeCodes ??
+      (
+        await import("./access-admin").then((m) =>
+          m.loadOrganizationalScopesForAccount(input.accountId, db),
+        )
+      ).codes;
+
+    const pop = intersectPopulation({
+      actorAccountId: input.accountId,
+      actorScopeCodes: codes,
+      asOfDate: asOf.value,
+      channel: input.populationChannel ?? "audit",
+      objectIds: input.objectIds,
+    });
+    if (!pop.ok) {
+      return { allowed: false, reason: pop.reason };
+    }
+    if (input.objectIds?.length) {
+      const missing = input.objectIds.filter(
+        (id) => !pop.subjectIds.includes(id),
+      );
+      if (missing.length) {
+        return { allowed: false, reason: "population_intersection_empty" };
+      }
     }
   }
 

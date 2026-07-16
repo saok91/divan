@@ -4,6 +4,10 @@ import {
   appendAccessEvent,
   withTransaction,
 } from "@divan/event-store";
+import {
+  isFutureAsOf,
+  parseDateOnly,
+} from "@divan/temporal-engine";
 import type { Pool } from "pg";
 
 import {
@@ -29,11 +33,19 @@ export {
  */
 export const MSG_ACCESS_DENIED_FA = "دسترسی ندارید.";
 
+export type EvaluationMode = "current" | "as_of";
+
 export type CoarseAuthzContext = {
   accountId: string;
   /** Navigation context only — never an implicit allow for sensitive categories. */
   coarseRole: string;
+  /** Prisma OrganizationalScope ids the actor holds (active). */
   organizationalScopeIds: string[];
+  /**
+   * Stable scope codes/aliases (e.g. org:selfcheck) matching policy tokens.
+   * Story 2.6: one identity space for demos — codes seed-aligned with policy.
+   */
+  organizationalScopeCodes?: string[];
 };
 
 export type AuthorizeAction = "read" | "write" | "export" | string;
@@ -56,10 +68,21 @@ export type AuthorizeInput = {
    * snapshots). Never include HR field values or passwords.
    */
   payload?: Record<string, unknown>;
+  /**
+   * Evaluation time semantics (Story 2.6 / FR-47). Default `current`.
+   * `as_of` requires a valid date-only `asOfDate` (Asia/Tehran calendar day).
+   */
+  evaluationMode?: EvaluationMode;
+  /** Date-only YYYY-MM-DD when evaluationMode is as_of. Timestamps → deny. */
+  asOfDate?: string;
 };
 
 export type AuthorizeResult = {
   decisionId: string;
+  /** Future as-of demos are planned, not Effective (AR-TEMPORAL). */
+  resultSemantics?: "effective" | "planned";
+  evaluationMode: EvaluationMode;
+  asOfDate: string | null;
 };
 
 export type PolicyRule = {
@@ -84,12 +107,15 @@ export class AuthorizationError extends Error {
   readonly messageFa: string;
   readonly correlationId: string;
   readonly decisionId: string | null;
+  /** Internal deny reason for access-event payload (never shown to user). */
+  readonly denyReason: string | null;
 
   constructor(
     code: AuthorizationErrorCode,
     messageFa: string,
     correlationId: string,
     decisionId: string | null = null,
+    denyReason: string | null = null,
   ) {
     super(code);
     this.name = "AuthorizationError";
@@ -97,6 +123,7 @@ export class AuthorizationError extends Error {
     this.messageFa = messageFa;
     this.correlationId = correlationId;
     this.decisionId = decisionId;
+    this.denyReason = denyReason;
   }
 }
 
@@ -106,6 +133,10 @@ export class AuthorizationError extends Error {
  *
  * Read ≠ export: `demo.sensitive_hr.read` allows read only; export on the same
  * (or related) tuple denies unless an explicit `action: "export"` rule exists.
+ *
+ * Scope tokens (`org:selfcheck`) must match OrganizationalScope.code bindings
+ * (Story 2.6 membership). `org:any` is for access.administration only — actor
+ * must still hold at least one active scope (no unbounded HR retrieval).
  */
 export const DEV_DEMO_POLICY: PolicyRegistry = {
   rules: [
@@ -125,6 +156,12 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       permission: "demo.sensitive_hr.export",
       dataCategory: "demo.sensitive_hr",
       action: "export",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "demo.retrieval.read",
+      dataCategory: "demo.non_hr",
+      action: "read",
       organizationalScope: "org:selfcheck",
     },
     // Story 2.3 — access administration (coarse role is never an allow key)
@@ -268,8 +305,80 @@ function evaluatePolicyExact(
 }
 
 /**
+ * Actor must hold the request scope (Story 2.6).
+ * - `org:any`: access-admin wildcard — requires ≥1 active membership (not unbounded HR).
+ * - otherwise: match by scope code alias OR by cuid id.
+ */
+export function actorHoldsOrganizationalScope(
+  context: CoarseAuthzContext,
+  requestScope: string,
+): boolean {
+  const scope = requestScope.trim();
+  if (!scope) return false;
+
+  const ids = context.organizationalScopeIds ?? [];
+  const codes = context.organizationalScopeCodes ?? [];
+
+  if (scope === "org:any") {
+    return ids.length > 0;
+  }
+
+  if (codes.includes(scope)) return true;
+  if (ids.includes(scope)) return true;
+  return false;
+}
+
+export type EvaluationTimeResult =
+  | {
+      ok: true;
+      evaluationMode: EvaluationMode;
+      asOfDate: string | null;
+      resultSemantics: "effective" | "planned";
+    }
+  | { ok: false; reason: string };
+
+/**
+ * Resolve evaluation mode / as-of. Invalid or ambiguous as-of → fail-closed.
+ */
+export function resolveEvaluationTime(input: {
+  evaluationMode?: EvaluationMode;
+  asOfDate?: string;
+  now?: Date;
+}): EvaluationTimeResult {
+  const mode: EvaluationMode = input.evaluationMode ?? "current";
+  const now = input.now ?? new Date();
+
+  if (mode === "current") {
+    if (input.asOfDate !== undefined && input.asOfDate.trim() !== "") {
+      // Explicit asOf with current mode is ambiguous → deny
+      return { ok: false, reason: "as_of_ambiguous_with_current" };
+    }
+    return {
+      ok: true,
+      evaluationMode: "current",
+      asOfDate: null,
+      resultSemantics: "effective",
+    };
+  }
+
+  const parsed = parseDateOnly(input.asOfDate);
+  if (!parsed.ok) {
+    return { ok: false, reason: parsed.reason };
+  }
+
+  const planned = isFutureAsOf(parsed.value, now);
+  return {
+    ok: true,
+    evaluationMode: "as_of",
+    asOfDate: parsed.value,
+    resultSemantics: planned ? "planned" : "effective",
+  };
+}
+
+/**
  * Full authorization eval: category registry gate **first**, then policy.
  * Disabled/unknown category → deny even if a rogue policy rule mentions it.
+ * Does **not** check membership — use {@link evaluateAuthorizationWithMembership}.
  */
 export function evaluateAuthorization(
   policy: PolicyRegistry,
@@ -285,6 +394,28 @@ export function evaluateAuthorization(
     return "deny";
   }
   return evaluatePolicyExact(policy, request);
+}
+
+/**
+ * Policy + membership. Prefer this for Story 2.6+ paths.
+ */
+export function evaluateAuthorizationWithMembership(
+  policy: PolicyRegistry,
+  categories: CategoryRegistry,
+  request: {
+    permission: string;
+    dataCategory: string;
+    action: string;
+    organizationalScope: string;
+  },
+  context: CoarseAuthzContext,
+): "allow" | "deny" {
+  if (evaluateAuthorization(policy, categories, request) === "deny") {
+    return "deny";
+  }
+  return actorHoldsOrganizationalScope(context, request.organizationalScope)
+    ? "allow"
+    : "deny";
 }
 
 /**
@@ -339,7 +470,8 @@ export type AuditEnvelope = {
 
 /**
  * Default-deny authorize API. Coarse role is context only — never an allow key.
- * Category registry gates before policy. Sensitive decisions append
+ * Category registry gates before policy. Membership is mandatory (Story 2.6).
+ * Evaluation time / as-of validated fail-closed. Sensitive decisions append
  * `event_class=access` atomically with the outcome.
  */
 export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
@@ -349,25 +481,59 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
     async authorizeOrThrow(input: AuthorizeInput): Promise<AuthorizeResult> {
       const sensitive = input.sensitive !== false;
 
-      let decision: "allow" | "deny";
+      const time = resolveEvaluationTime({
+        evaluationMode: input.evaluationMode,
+        asOfDate: input.asOfDate,
+      });
+
+      let decision: "allow" | "deny" = "deny";
+      let denyReason: string | null = null;
+
       try {
-        decision = evaluateAuthorization(
-          deps.getPolicy(),
-          getCategories(),
-          {
-            permission: input.permission,
-            dataCategory: input.dataCategory,
-            action: input.action,
-            organizationalScope: input.organizationalScope,
-          },
-        );
+        if (!time.ok) {
+          decision = "deny";
+          denyReason = time.reason;
+        } else {
+          const policyDecision = evaluateAuthorization(
+            deps.getPolicy(),
+            getCategories(),
+            {
+              permission: input.permission,
+              dataCategory: input.dataCategory,
+              action: input.action,
+              organizationalScope: input.organizationalScope,
+            },
+          );
+          if (policyDecision === "deny") {
+            decision = "deny";
+            denyReason = "default_deny_or_no_matching_rule";
+          } else if (
+            !actorHoldsOrganizationalScope(
+              input.context,
+              input.organizationalScope,
+            )
+          ) {
+            decision = "deny";
+            denyReason = "scope_membership_missing";
+          } else {
+            decision = "allow";
+          }
+        }
       } catch {
         throw new AuthorizationError(
           "FORBIDDEN",
           MSG_ACCESS_DENIED_FA,
           input.correlationId,
+          null,
+          "authz_dependency_failed",
         );
       }
+
+      const evaluationMode: EvaluationMode = time.ok
+        ? time.evaluationMode
+        : (input.evaluationMode ?? "current");
+      const asOfDate = time.ok ? time.asOfDate : null;
+      const resultSemantics = time.ok ? time.resultSemantics : "effective";
 
       const scope = {
         permission: input.permission,
@@ -376,6 +542,19 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
         organizationalScope: input.organizationalScope,
         actorCoarseRole: input.context.coarseRole,
         actorOrganizationalScopeIds: input.context.organizationalScopeIds,
+        actorOrganizationalScopeCodes:
+          input.context.organizationalScopeCodes ?? [],
+        evaluationMode,
+        asOfDate,
+        resultSemantics,
+      };
+
+      const eventPayload = {
+        ...input.payload,
+        ...(denyReason ? { denyReason } : {}),
+        evaluationMode,
+        asOfDate,
+        resultSemantics,
       };
 
       if (!sensitive) {
@@ -384,9 +563,16 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
             "FORBIDDEN",
             MSG_ACCESS_DENIED_FA,
             input.correlationId,
+            null,
+            denyReason,
           );
         }
-        return { decisionId: input.correlationId };
+        return {
+          decisionId: input.correlationId,
+          evaluationMode,
+          asOfDate,
+          resultSemantics,
+        };
       }
 
       let decisionId: string;
@@ -400,9 +586,9 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
             result: decision,
             reason:
               decision === "deny"
-                ? "default_deny_or_no_matching_rule"
+                ? (denyReason ?? "default_deny_or_no_matching_rule")
                 : "explicit_allow_rule",
-            payload: input.payload,
+            payload: eventPayload,
           });
           return id;
         });
@@ -412,6 +598,8 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
           "AUDIT_APPEND_FAILED",
           MSG_ACCESS_DENIED_FA,
           input.correlationId,
+          null,
+          "audit_append_failed",
         );
       }
 
@@ -421,10 +609,16 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
           MSG_ACCESS_DENIED_FA,
           input.correlationId,
           decisionId,
+          denyReason,
         );
       }
 
-      return { decisionId };
+      return {
+        decisionId,
+        evaluationMode,
+        asOfDate,
+        resultSemantics,
+      };
     },
   };
 }

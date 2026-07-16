@@ -1027,14 +1027,44 @@ export async function loadOrganizationalScopeIdsForAccount(
   accountId: string,
   db: PrismaClient = getIdentityDb(),
 ): Promise<string[]> {
+  const scopes = await loadOrganizationalScopesForAccount(accountId, db);
+  return scopes.ids;
+}
+
+/**
+ * Active scope membership with codes for policy/membership identity space (Story 2.6).
+ * Chosen approach: OrganizationalScope.code stores policy tokens (e.g. org:selfcheck).
+ */
+export async function loadOrganizationalScopesForAccount(
+  accountId: string,
+  db: PrismaClient = getIdentityDb(),
+): Promise<{ ids: string[]; codes: string[] }> {
   const rows = await db.accountOrganizationalScope.findMany({
     where: {
       accountId,
       organizationalScope: { active: true },
     },
-    select: { organizationalScopeId: true },
+    select: {
+      organizationalScopeId: true,
+      organizationalScope: { select: { code: true } },
+    },
   });
-  return rows.map((r) => r.organizationalScopeId);
+  const ids = rows.map((r) => r.organizationalScopeId);
+  const codes = rows
+    .map((r) => r.organizationalScope.code)
+    .filter((c): c is string => typeof c === "string" && c.length > 0);
+  return { ids, codes };
+}
+
+export async function loadAccessRoleIdsForAccount(
+  accountId: string,
+  db: PrismaClient = getIdentityDb(),
+): Promise<string[]> {
+  const rows = await db.accountAccessRole.findMany({
+    where: { accountId },
+    select: { accessRoleId: true },
+  });
+  return rows.map((r) => r.accessRoleId);
 }
 
 function normalizePermissionCodes(codes: string[]): string[] {
@@ -1050,6 +1080,8 @@ function normalizePermissionCodes(codes: string[]): string[] {
 /** Seed fixture ids — stable for local/dev selfcheck. */
 export const SEED_ACCESS_ADMIN = {
   scopeLabelFa: "محدودهٔ نمونه",
+  /** Policy/demo token — one identity space with DEV_DEMO_POLICY (Story 2.6). */
+  scopeCode: "org:selfcheck",
   permissionSetName: "access-administration",
   roleCode: "access_admin",
   roleLabelFa: "مدیر دسترسی",
@@ -1058,6 +1090,7 @@ export const SEED_ACCESS_ADMIN = {
 /**
  * Ensure minimal access-admin fixtures and bind hr.admin.
  * Idempotent; does not grant sensitive/export categories.
+ * Sets OrganizationalScope.code = org:selfcheck for membership demos.
  */
 export async function seedAccessAdministrationFixtures(
   db: PrismaClient,
@@ -1074,14 +1107,25 @@ export async function seedAccessAdministrationFixtures(
   });
 
   let scope = await db.organizationalScope.findFirst({
-    where: { labelFa: SEED_ACCESS_ADMIN.scopeLabelFa },
+    where: {
+      OR: [
+        { code: SEED_ACCESS_ADMIN.scopeCode },
+        { labelFa: SEED_ACCESS_ADMIN.scopeLabelFa },
+      ],
+    },
   });
   if (!scope) {
     scope = await db.organizationalScope.create({
       data: {
         labelFa: SEED_ACCESS_ADMIN.scopeLabelFa,
+        code: SEED_ACCESS_ADMIN.scopeCode,
         active: true,
       },
+    });
+  } else if (scope.code !== SEED_ACCESS_ADMIN.scopeCode) {
+    scope = await db.organizationalScope.update({
+      where: { id: scope.id },
+      data: { code: SEED_ACCESS_ADMIN.scopeCode },
     });
   }
 
@@ -1130,4 +1174,24 @@ export async function seedAccessAdministrationFixtures(
     },
     update: {},
   });
+
+  // Bind hr.operator for retrieval demos (membership-enforced org:selfcheck).
+  const hrOperator = await db.internalAccount.findUnique({
+    where: { username: "hr.operator" },
+  });
+  if (hrOperator) {
+    await db.accountOrganizationalScope.upsert({
+      where: {
+        accountId_organizationalScopeId: {
+          accountId: hrOperator.id,
+          organizationalScopeId: scope.id,
+        },
+      },
+      create: {
+        accountId: hrOperator.id,
+        organizationalScopeId: scope.id,
+      },
+      update: {},
+    });
+  }
 }

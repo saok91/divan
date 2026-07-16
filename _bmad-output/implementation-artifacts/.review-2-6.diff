@@ -1,0 +1,2976 @@
+﻿diff --git a/_bmad-output/implementation-artifacts/deferred-work.md b/_bmad-output/implementation-artifacts/deferred-work.md
+index 596aec2..bb850e9 100644
+--- a/_bmad-output/implementation-artifacts/deferred-work.md
++++ b/_bmad-output/implementation-artifacts/deferred-work.md
+@@ -108,9 +108,9 @@
+ ## Deferred from: Story 2.4 entitlement lifecycle (2026-07-16)
+ 
+ - ~~**Break-glass** incident-bound grants + banner + post-use review ? Story 2.5~~ **done in Story 2.5**
+-- **Temporal / as-of / cross-boundary** retrieval authz ? Story 2.6
++- ~~**Temporal / as-of / cross-boundary** retrieval authz ? Story 2.6~~ **done in Story 2.6** (control plane: PopulationPort fixtures, membership, as-of, cross_time_scope, mid-session modal; Epic 3/4 replace fixture port with real projections)
+ - **Inference / bulk / small-cohort** thresholds ? Story 2.7
+-- **Artifact / export reauth consumers** must call `reauthorizeForQueuedOrArtifactWork` ? Stories 6.5 / 7.x (hook shipped; no full artifact lifecycle here)
++- **Artifact / export reauth consumers** must call `reauthorizeForQueuedOrArtifactWork` ? Stories 6.5 / 7.x (hook shipped + asOf/population optional; no full artifact lifecycle here)
+ - **Optional background expiry/recert worker** (pg-boss) ? MVP uses lazy fail-safe on `getSessionContext` / governed entry; cron not required
+ - **AR-ACCESS** production matrix values (approval kinds, recert SLA, revocation objective milliseconds) still pending ? demo hooks are configurable + fail-closed
+ - Dual-admin UX for independent approve in single-seed environments ? selfcheck temporarily binds `access_admin` to a second account; production needs ?2 access admins
+@@ -119,7 +119,7 @@
+ 
+ - **AR-ACCESS** exact break-glass policy / max-duration SLA / production elevation matrix ? launch artifacts; demo hooks only
+ - **Emergency LDAP/local break-glass account** vaulting, FIDO, dual-custody ? AR-IDENTITY (open)
+-- **Temporal / as-of** must still bound break-glass retrievals ? Story 2.6
++- ~~**Temporal / as-of** must still bound break-glass retrievals ? Story 2.6~~ **done in Story 2.6** (privileged demo read runs PopulationPort intersection)
+ - **Inference / bulk** must not be bypassed by break-glass channels ? Story 2.7
+ - **Full export artifact panel** / exceptional export UX ? Story 6.5
+ - **Audit investigation UI** / ?no self-review of sensitive activity? surface ? Story 7.1 (evidence + toxic review API shipped here)
+@@ -127,6 +127,14 @@
+ - **Paging / SIEM / credential rotation** runbooks ? ops / infra-security
+ - ~~Access admin grant expiry/`datetime-local` Gregorian inputs~~ **resolved 2026-07-17**: break-glass + entitlement grant forms use `JalaliDateTimePicker` (FR44 / Story 1.6); storage remains ISO Gregorian
+ 
++## Deferred from: Story 2.6 temporal & cross-boundary authorization (2026-07-17)
++
++- **Epic 3/4** replace fixture `PopulationPort` with Person / Assignment / OrgUnit projection-backed population
++- **Full personnel search / profile / dashboard / report catalogue** consume intersection API ? Epic 5
++- **Inference / bulk / small-cohort** thresholds ? Story 2.7
++- **Artifact reauth consumers** with as-of/population ? Stories 6.5 / 7.x
++- **AR-ACCESS** production field╫action╫scope╫time matrix values
++- **AR-TEMPORAL** full freeze beyond partial (Asia/Tehran date-only / exclusive ends / future?Effective labeling already hooked)
+ ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
+ 
+ - Empty `assignAccountAccessRoles` / `assignAccountScopes` (full wipe) bypasses the new mass-assign lifecycle gate ? pre-existing Story 2.3 full-replace semantics; only `length > 1` was gated in 2.4
+diff --git a/_bmad-output/implementation-artifacts/sprint-status.yaml b/_bmad-output/implementation-artifacts/sprint-status.yaml
+index 7b61c9d..4ed6a4c 100644
+--- a/_bmad-output/implementation-artifacts/sprint-status.yaml
++++ b/_bmad-output/implementation-artifacts/sprint-status.yaml
+@@ -1,5 +1,5 @@
+ # generated: 2026-07-16
+-# last_updated: 2026-07-17T01:25:00+03:30
++# last_updated: 2026-07-17T02:25:00+03:30
+ # project: divan
+ # project_key: NOKEY
+ # tracking_system: file-system
+@@ -41,7 +41,7 @@
+ # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+ 
+ generated: 2026-07-16
+-last_updated: 2026-07-17T01:30:00+03:30
++last_updated: 2026-07-17T02:25:00+03:30
+ project: divan
+ project_key: NOKEY
+ tracking_system: file-system
+@@ -65,7 +65,7 @@ development_status:
+   2-3-access-administration-ui-apis: done
+   2-4-entitlement-lifecycle-grant-expiry-revocation-recertification: done
+   2-5-break-glass-privileged-access: done
+-  2-6-temporal-cross-boundary-authorization: backlog
++  2-6-temporal-cross-boundary-authorization: review
+   2-7-inference-resistant-bulk-retrieval-controls: backlog
+   epic-2-retrospective: optional
+ 
+diff --git a/apps/web/app/(app)/layout.tsx b/apps/web/app/(app)/layout.tsx
+index 1be45bf..e895247 100644
+--- a/apps/web/app/(app)/layout.tsx
++++ b/apps/web/app/(app)/layout.tsx
+@@ -9,6 +9,7 @@ import {
+ 
+ import { auth } from "@/auth";
+ import { AppShell } from "@/components/app-shell";
++import { AuthzChangedModal } from "@/components/authz-changed-modal";
+ import { BannerStack } from "@/components/banner-stack";
+ import { PlatformStatusProvider } from "@/components/platform-status-provider";
+ import { resolveAppPathAccess } from "@/lib/resolve-app-path-access";
+@@ -18,6 +19,7 @@ import { TRPCReactProvider } from "@/lib/trpc/client";
+  * Authenticated desktop shell. Login lives outside this `(app)` group.
+  * Server-side session gate + coarse path denial (proxy stays cookie-only).
+  * Break-glass banner hydrates from real grants (Story 2.5).
++ * Mid-session authz modal is separate from stale-banner (Story 2.6).
+  */
+ export default async function AppLayout({
+   children,
+@@ -56,6 +58,14 @@ export default async function AppLayout({
+     grantId: null,
+   };
+ 
++  const priorFp = session.user.authzBindingFingerprint?.trim() || "";
++  const authzChanged =
++    Boolean(priorFp) &&
++    Boolean(fresh?.authzBindingFingerprint) &&
++    priorFp !== fresh!.authzBindingFingerprint;
++
++  const landingPath = getRoleLandingPath(coarseRole);
++
+   return (
+     <TRPCReactProvider>
+       <PlatformStatusProvider
+@@ -66,6 +76,9 @@ export default async function AppLayout({
+             incidentId: breakGlass.incidentId,
+             grantId: breakGlass.grantId,
+           },
++          authzChanged,
++          // Demo draft stand-in open when authz just changed (Epic 4 seam).
++          demoDraftOpen: authzChanged,
+         }}
+       >
+         <AppShell
+@@ -76,6 +89,7 @@ export default async function AppLayout({
+         >
+           {access.kind === "allow" ? children : access.ui}
+         </AppShell>
++        <AuthzChangedModal landingPath={landingPath} />
+       </PlatformStatusProvider>
+     </TRPCReactProvider>
+   );
+diff --git a/apps/web/auth.ts b/apps/web/auth.ts
+index dad6f32..663cc52 100644
+--- a/apps/web/auth.ts
++++ b/apps/web/auth.ts
+@@ -56,6 +56,7 @@ const nextAuth = NextAuth({
+             coarseRole: result.coarseRole,
+             humanIdentityId: result.humanIdentityId,
+             organizationalScopeIds: result.organizationalScopeIds,
++            authzBindingFingerprint: result.authzBindingFingerprint,
+             correlationId: result.correlationId,
+           };
+         } catch (err) {
+@@ -76,7 +77,7 @@ const nextAuth = NextAuth({
+     signIn: "/login",
+   },
+   callbacks: {
+-    async jwt({ token, user }) {
++    async jwt({ token, user, trigger }) {
+       const now = Math.floor(Date.now() / 1000);
+       const timeouts = getSessionTimeoutConfig();
+ 
+@@ -87,11 +88,27 @@ const nextAuth = NextAuth({
+         token.humanIdentityId = user.humanIdentityId;
+         token.displayName = user.name ?? user.username;
+         token.organizationalScopeIds = user.organizationalScopeIds ?? [];
++        // Login-time snapshot ΓÇö do NOT overwrite on refresh (Story 2.6 mid-session).
++        token.authzBindingFingerprint = user.authzBindingFingerprint ?? "";
+         token.lastActivityAt = now;
+         token.absoluteExp = now + timeouts.absoluteTimeoutSeconds;
+         return token;
+       }
+ 
++      // Explicit session.update() after mid-session authz ack ΓÇö refresh fingerprint.
++      if (trigger === "update" && typeof token.accountId === "string") {
++        const ctx = await getSessionContext(token.accountId);
++        if (!ctx) return null;
++        token.username = ctx.username;
++        token.coarseRole = ctx.coarseRole;
++        token.humanIdentityId = ctx.humanIdentityId;
++        token.displayName = ctx.displayName;
++        token.organizationalScopeIds = ctx.organizationalScopeIds;
++        token.authzBindingFingerprint = ctx.authzBindingFingerprint;
++        token.lastActivityAt = now;
++        return token;
++      }
++
+       // Malformed/legacy tokens without timeout hooks ΓåÆ fail closed.
+       if (
+         typeof token.absoluteExp !== "number" ||
+@@ -119,6 +136,7 @@ const nextAuth = NextAuth({
+       token.humanIdentityId = ctx.humanIdentityId;
+       token.displayName = ctx.displayName;
+       token.organizationalScopeIds = ctx.organizationalScopeIds;
++      // Keep login-time authzBindingFingerprint for mid-session change detect.
+       token.lastActivityAt = now;
+       return token;
+     },
+@@ -138,6 +156,10 @@ const nextAuth = NextAuth({
+               (x): x is string => typeof x === "string",
+             )
+           : [],
++        authzBindingFingerprint:
++          typeof token.authzBindingFingerprint === "string"
++            ? token.authzBindingFingerprint
++            : "",
+         name: (token.displayName as string) ?? session.user?.name,
+       };
+       return session;
+diff --git a/apps/web/components/platform-status-provider.tsx b/apps/web/components/platform-status-provider.tsx
+index c9c793c..d762bde 100644
+--- a/apps/web/components/platform-status-provider.tsx
++++ b/apps/web/components/platform-status-provider.tsx
+@@ -20,6 +20,14 @@ export type PlatformStatus = {
+   /** Sample pending-until clock for operational copy (HH:mm, Latin digits ok). */
+   stalePendingUntil: string;
+   breakGlass: BreakGlassGrant;
++  /**
++   * Mid-session authz change (Story 2.6) ΓÇö distinct from stale-banner (FR-45).
++   */
++  authzChanged: boolean;
++  /**
++   * Demo draft stand-in for Epic 4 Draft forms ΓÇö proves save/discard + block finalize.
++   */
++  demoDraftOpen: boolean;
+ };
+ 
+ type PlatformStatusContextValue = PlatformStatus & {
+@@ -27,10 +35,15 @@ type PlatformStatusContextValue = PlatformStatus & {
+   setBlockingStale: (value: boolean) => void;
+   setStalePendingUntil: (value: string) => void;
+   setBreakGlass: (value: BreakGlassGrant) => void;
++  setAuthzChanged: (value: boolean) => void;
++  clearAuthzChanged: () => void;
++  setDemoDraftOpen: (value: boolean) => void;
+   /** True while blocking stale / recalc pending ΓÇö Epic 4ΓÇô6 gold CTA gate. */
+   isGoldCtaBlocked: boolean;
+   /** Break-glass grant still within expiry window (requires finite future expiresAt). */
+   isBreakGlassLive: boolean;
++  /** Finalize blocked while authz-changed modal is active (Story 2.6). */
++  isFinalizeBlockedByAuthzChange: boolean;
+ };
+ 
+ const PlatformStatusContext =
+@@ -41,6 +54,8 @@ const DEFAULT_STATUS: PlatformStatus = {
+   blockingStale: false,
+   stalePendingUntil: "09:14",
+   breakGlass: { active: false, expiresAt: null },
++  authzChanged: false,
++  demoDraftOpen: false,
+ };
+ 
+ /**
+@@ -83,37 +98,37 @@ export function PlatformStatusProvider({
+   const [stalePendingUntil, setStalePendingUntil] = React.useState(
+     initial?.stalePendingUntil ?? DEFAULT_STATUS.stalePendingUntil,
+   );
+-  const [breakGlass, setBreakGlass] = React.useState<BreakGlassGrant>(() =>
+-    toBreakGlassGrant(initial?.breakGlass),
++  const [breakGlassOverride, setBreakGlassOverride] =
++    React.useState<BreakGlassGrant | null>(null);
++  const [authzChangedAcked, setAuthzChangedAcked] = React.useState(false);
++  const [demoDraftOpen, setDemoDraftOpen] = React.useState(
++    initial?.demoDraftOpen ?? false,
+   );
+   const [nowMs, setNowMs] = React.useState(() => Date.now());
+ 
+-  // Keep banner in sync when layout RSC re-hydrates (e.g. router.refresh).
+-  React.useEffect(() => {
+-    if (!initial?.breakGlass) return;
+-    setBreakGlass(toBreakGlassGrant(initial.breakGlass));
+-  }, [
+-    initial?.breakGlass?.active,
+-    initial?.breakGlass?.expiresAt,
+-    initial?.breakGlass?.grantId,
+-    initial?.breakGlass?.incidentId,
+-  ]);
+-
+-  // Mid-session sync: poll fresh session breakGlass (activate/revoke without remount).
++  const initialAuthzChanged = initial?.authzChanged ?? false;
++
++  // Mid-session sync: poll fresh session (breakGlass + authzChanged).
+   const meQuery = api.me.useQuery(undefined, {
+-    refetchInterval: breakGlass.active ? 10_000 : 30_000,
++    refetchInterval: 15_000,
+     refetchOnWindowFocus: true,
+   });
+-  React.useEffect(() => {
+-    const next = meQuery.data?.breakGlass;
+-    if (!next) return;
+-    setBreakGlass(toBreakGlassGrant(next));
+-  }, [meQuery.data?.breakGlass]);
++
++  const breakGlass = toBreakGlassGrant(
++    breakGlassOverride ??
++      meQuery.data?.breakGlass ??
++      initial?.breakGlass ??
++      DEFAULT_STATUS.breakGlass,
++  );
++
++  const authzChangedFromServer =
++    meQuery.data?.authzChanged === true || initialAuthzChanged;
++  const authzChanged = authzChangedFromServer && !authzChangedAcked;
+ 
+   React.useEffect(() => {
+     if (!breakGlass.active || !breakGlass.expiresAt) return;
+-    const expires = Date.parse(breakGlass.expiresAt);
+-    if (Number.isNaN(expires)) return;
++    const expires = DateParseSafe(breakGlass.expiresAt);
++    if (expires === null) return;
+ 
+     function refreshNow() {
+       setNowMs(Date.now());
+@@ -130,6 +145,23 @@ export function PlatformStatusProvider({
+ 
+   const isBreakGlassLive = isGrantLive(breakGlass, nowMs);
+   const isGoldCtaBlocked = blockingStale || recalculationPending;
++  const isFinalizeBlockedByAuthzChange = authzChanged;
++
++  const setBreakGlass = React.useCallback((value: BreakGlassGrant) => {
++    setBreakGlassOverride(toBreakGlassGrant(value));
++  }, []);
++
++  const setAuthzChanged = React.useCallback((value: boolean) => {
++    if (value) {
++      setAuthzChangedAcked(false);
++    } else {
++      setAuthzChangedAcked(true);
++    }
++  }, []);
++
++  const clearAuthzChanged = React.useCallback(() => {
++    setAuthzChangedAcked(true);
++  }, []);
+ 
+   const value = React.useMemo<PlatformStatusContextValue>(
+     () => ({
+@@ -137,20 +169,32 @@ export function PlatformStatusProvider({
+       blockingStale,
+       stalePendingUntil,
+       breakGlass,
++      authzChanged,
++      demoDraftOpen,
+       setRecalculationPending,
+       setBlockingStale,
+       setStalePendingUntil,
+       setBreakGlass,
++      setAuthzChanged,
++      clearAuthzChanged,
++      setDemoDraftOpen,
+       isGoldCtaBlocked,
+       isBreakGlassLive,
++      isFinalizeBlockedByAuthzChange,
+     }),
+     [
+       recalculationPending,
+       blockingStale,
+       stalePendingUntil,
+       breakGlass,
++      authzChanged,
++      demoDraftOpen,
++      setBreakGlass,
++      setAuthzChanged,
++      clearAuthzChanged,
+       isGoldCtaBlocked,
+       isBreakGlassLive,
++      isFinalizeBlockedByAuthzChange,
+     ],
+   );
+ 
+@@ -161,6 +205,11 @@ export function PlatformStatusProvider({
+   );
+ }
+ 
++function DateParseSafe(iso: string): number | null {
++  const expires = Date.parse(iso);
++  return Number.isNaN(expires) ? null : expires;
++}
++
+ export function usePlatformStatus(): PlatformStatusContextValue {
+   const ctx = React.useContext(PlatformStatusContext);
+   if (!ctx) {
+@@ -171,13 +220,21 @@ export function usePlatformStatus(): PlatformStatusContextValue {
+   return ctx;
+ }
+ 
+-/** Hook for Epic 4ΓÇô6 gold CTAs ΓÇö true while blocking stale/recalc. */
++/** Hook for Epic 4ΓÇô6 gold CTAs ΓÇö true while blocking stale/recalc OR authz change. */
+ export function useStaleBlocking(): {
+   isGoldCtaBlocked: boolean;
+   blockingStale: boolean;
+   recalculationPending: boolean;
+ } {
+-  const { isGoldCtaBlocked, blockingStale, recalculationPending } =
+-    usePlatformStatus();
+-  return { isGoldCtaBlocked, blockingStale, recalculationPending };
++  const {
++    isGoldCtaBlocked,
++    blockingStale,
++    recalculationPending,
++    isFinalizeBlockedByAuthzChange,
++  } = usePlatformStatus();
++  return {
++    isGoldCtaBlocked: isGoldCtaBlocked || isFinalizeBlockedByAuthzChange,
++    blockingStale,
++    recalculationPending,
++  };
+ }
+diff --git a/apps/web/lib/operational-copy.ts b/apps/web/lib/operational-copy.ts
+index 739c64e..4007091 100644
+--- a/apps/web/lib/operational-copy.ts
++++ b/apps/web/lib/operational-copy.ts
+@@ -20,8 +20,15 @@ export const operationalCopy = {
+   viewportGateBody:
+     "╪¿╪▒╪º█î ╪º╪│╪¬┘ü╪º╪»┘ç ╪º╪▓ ╪»█î┘ê╪º┘å╪î ╪¡╪»╪º┘é┘ä ┘ê╪╢┘ê╪¡ ╪╡┘ü╪¡┘ç┘ö ┘å┘à╪º█î╪┤ {size} ┘ä╪º╪▓┘à ╪º╪│╪¬. ┘ä╪╖┘ü╪º┘ï ┘╛┘å╪¼╪▒┘ç ╪▒╪º ╪¿╪▓╪▒┌»ΓÇî╪¬╪▒ ┌⌐┘å█î╪» █î╪º ╪º╪▓ ┘å┘à╪º█î╪┤┌»╪▒ ╪»╪│┌⌐╪¬╪º┘╛ ╪º╪│╪¬┘ü╪º╪»┘ç ┌⌐┘å█î╪».",
+ 
+-  /** Scope revoked ΓÇö catalog until Epic 2 surfaces exist. */
++  /** Scope revoked ΓÇö EXPERIENCE exact (Story 2.6 mid-session modal). */
+   scopeRevoked: "╪»╪│╪¬╪▒╪│█î ╪┤┘à╪º ╪¬╪║█î█î╪▒ ┌⌐╪▒╪».",
++  /** Demo draft stand-in (Epic 4 Draft forms do not exist yet). */
++  authzChangedSaveDraft: "╪░╪«█î╪▒┘ç ┘╛█î╪┤ΓÇî┘å┘ê█î╪│",
++  authzChangedDiscard: "╪»┘ê╪▒ ╪º┘å╪»╪º╪«╪¬┘å",
++  authzChangedAcknowledge: "┘à╪¬┘ê╪¼┘ç ╪┤╪»┘à",
++  authzChangedDraftHint:
++    "┘╛█î╪┤ΓÇî┘å┘ê█î╪│ ╪░╪«█î╪▒┘çΓÇî┘å╪┤╪»┘ç ╪»╪º╪▒█î╪». ┘é╪¿┘ä ╪º╪▓ ╪º╪»╪º┘à┘ç ╪░╪«█î╪▒┘ç █î╪º ╪»┘ê╪▒ ╪¿█î┘å╪»╪º╪▓█î╪». ┘å┘ç╪º█î█îΓÇî╪│╪º╪▓█î ┘à╪│╪»┘ê╪» ╪º╪│╪¬.",
++  authzChangedFinalizeBlocked: "┘å┘ç╪º█î█îΓÇî╪│╪º╪▓█î ╪¬╪º ╪¬╪ú█î█î╪» ╪¬╪║█î█î╪▒ ╪»╪│╪¬╪▒╪│█î ┘à┘à┌⌐┘å ┘å█î╪│╪¬.",
+ 
+   /** Unsaved form ΓÇö catalog until Epic 4 surfaces exist. */
+   unsavedForm:
+diff --git a/apps/web/lib/trpc/client.tsx b/apps/web/lib/trpc/client.tsx
+index 4206ddf..6b5be20 100644
+--- a/apps/web/lib/trpc/client.tsx
++++ b/apps/web/lib/trpc/client.tsx
+@@ -3,6 +3,7 @@
+ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { httpBatchLink } from "@trpc/client";
+ import { createTRPCReact } from "@trpc/react-query";
++import { SessionProvider } from "next-auth/react";
+ import { useState, type ReactNode } from "react";
+ import superjson from "superjson";
+ 
+@@ -42,8 +43,12 @@ export function TRPCReactProvider({ children }: { children: ReactNode }) {
+   );
+ 
+   return (
+-    <api.Provider client={trpcClient} queryClient={queryClient}>
+-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+-    </api.Provider>
++    <SessionProvider>
++      <api.Provider client={trpcClient} queryClient={queryClient}>
++        <QueryClientProvider client={queryClient}>
++          {children}
++        </QueryClientProvider>
++      </api.Provider>
++    </SessionProvider>
+   );
+ }
+diff --git a/apps/web/src/server/context.ts b/apps/web/src/server/context.ts
+index bd8b7be..ab3ba2f 100644
+--- a/apps/web/src/server/context.ts
++++ b/apps/web/src/server/context.ts
+@@ -7,17 +7,22 @@ import type { TrpcContext } from "./trpc";
+ /**
+  * tRPC context ΓÇö JWT proves login; DB session is authz source of truth.
+  * Break-glass summary is hydrated from active grants (Story 2.5).
++ * Login-time authz fingerprint is preserved for mid-session change (Story 2.6).
+  */
+ export async function createContext(): Promise<TrpcContext> {
+   const session = await auth();
+   if (!session?.user?.accountId || !session.user.coarseRole) {
+-    return { session: null };
++    return { session: null, priorAuthzBindingFingerprint: null };
+   }
+ 
+   const fresh = await getSessionContext(session.user.accountId);
+   if (!fresh) {
+-    return { session: null };
++    return { session: null, priorAuthzBindingFingerprint: null };
+   }
+ 
+-  return { session: fresh };
++  return {
++    session: fresh,
++    priorAuthzBindingFingerprint:
++      session.user.authzBindingFingerprint?.trim() || null,
++  };
+ }
+diff --git a/apps/web/src/server/root.ts b/apps/web/src/server/root.ts
+index 13809ff..b46e057 100644
+--- a/apps/web/src/server/root.ts
++++ b/apps/web/src/server/root.ts
+@@ -12,8 +12,12 @@ import {
+   AccessAdminError,
+   assertActorHasBreakGlassPrivilegedRead,
+   assertBreakGlassElevationLimits,
++  currentAsOfDate,
++  drillDownPopulation,
++  intersectPopulation,
+ } from "@divan/identity-access";
+ import { TRPCError } from "@trpc/server";
++import { z } from "zod";
+ 
+ import {
+   createTRPCRouter,
+@@ -27,7 +31,7 @@ import { accessAdminRouter } from "./access-admin";
+  * `me` is session-only identity (not sensitive HR content) ΓÇö deliberately
+  * NOT routed through the audit-envelope. It must not become a backdoor for
+  * category data; returns only accountId / username / displayName / coarseRole /
+- * organizationalScopeIds / breakGlass summary.
++ * organizationalScopeIds / authz fingerprint / breakGlass summary.
+  *
+  * Privileged HR-content elevation uses break-glass binding (Story 2.5).
+  */
+@@ -42,6 +46,13 @@ export const appRouter = createTRPCRouter({
+     displayName: ctx.session.displayName,
+     coarseRole: ctx.session.coarseRole,
+     organizationalScopeIds: ctx.session.organizationalScopeIds,
++    organizationalScopeCodes: ctx.session.organizationalScopeCodes,
++    authzBindingFingerprint: ctx.session.authzBindingFingerprint,
++    priorAuthzBindingFingerprint: ctx.priorAuthzBindingFingerprint,
++    authzChanged:
++      Boolean(ctx.priorAuthzBindingFingerprint) &&
++      ctx.priorAuthzBindingFingerprint !==
++        ctx.session.authzBindingFingerprint,
+     breakGlass: ctx.session.breakGlass,
+   })),
+ 
+@@ -51,6 +62,7 @@ export const appRouter = createTRPCRouter({
+    * Demo governed read ΓÇö controlled allow via DEV_DEMO_POLICY fixture.
+    * Proves envelope + access event on allow. Coarse role labels do not grant.
+    * `devOnly`: production returns NOT_FOUND before envelope (no audit noise).
++   * Requires org:selfcheck membership (Story 2.6).
+    */
+   demoGovernedRead: governedProcedure
+     .meta({
+@@ -71,7 +83,7 @@ export const appRouter = createTRPCRouter({
+   /**
+    * Privileged demo HR read under break-glass elevation (Story 2.5).
+    * Envelope allow + PermissionSet binding from active break-glass activate.
+-   * Without binding ΓåÆ deny. Export / access-admin stay separately gated.
++   * Story 2.6: still runs population intersection ΓÇö no out-of-scope bypass.
+    */
+   demoBreakGlassPrivilegedHrRead: governedProcedure
+     .meta({
+@@ -83,7 +95,14 @@ export const appRouter = createTRPCRouter({
+       sensitive: true,
+       devOnly: true,
+     })
+-    .query(async ({ ctx }) => {
++    .input(
++      z
++        .object({
++          objectIds: z.array(z.string()).optional(),
++        })
++        .optional(),
++    )
++    .query(async ({ ctx, input }) => {
+       try {
+         await assertActorHasBreakGlassPrivilegedRead(ctx.session.accountId);
+       } catch (err) {
+@@ -95,15 +114,143 @@ export const appRouter = createTRPCRouter({
+         }
+         throw err;
+       }
++
++      const pop = intersectPopulation({
++        actorAccountId: ctx.session.accountId,
++        actorScopeCodes: ctx.session.organizationalScopeCodes,
++        asOfDate: currentAsOfDate(),
++        channel: "profile",
++        objectIds: input?.objectIds,
++      });
++      if (!pop.ok) {
++        throw new TRPCError({
++          code: "FORBIDDEN",
++          message: "╪»╪│╪¬╪▒╪│█î ┘å╪»╪º╪▒█î╪».",
++        });
++      }
++
+       return {
+         ok: true as const,
+         fixture: "break_glass_privileged_hr_read" as const,
+         incidentId: ctx.session.breakGlass.incidentId,
+         grantId: ctx.session.breakGlass.grantId,
++        authorizedSubjectIds: pop.subjectIds,
+         // No HR field values ΓÇö purpose/incident correlation only (FR-51).
+       };
+     }),
+ 
++  /**
++   * Demo scoped retrieval ΓÇö intersection-only aggregate (Story 2.6 / FR-47).
++   * Out-of-scope ids omitted (not masked as 0).
++   */
++  demoScopedRetrieval: governedProcedure
++    .meta({
++      permission: "demo.retrieval.read",
++      dataCategory: "demo.non_hr",
++      action: "read",
++      organizationalScope: "org:selfcheck",
++      operation: "demo.retrieval.scoped",
++      sensitive: true,
++      devOnly: true,
++    })
++    .input(
++      z
++        .object({
++          channel: z
++            .enum([
++              "profile",
++              "timeline",
++              "search",
++              "count",
++              "dashboard",
++              "report",
++              "export",
++              "audit",
++            ])
++            .default("search"),
++          asOfDate: z.string().optional(),
++          evaluationMode: z.enum(["current", "as_of"]).optional(),
++          objectIds: z.array(z.string()).optional(),
++          actorScopeCodesOverride: z.array(z.string()).optional(),
++          unreconciled: z.boolean().optional(),
++        })
++        .optional(),
++    )
++    .query(({ ctx, input }) => {
++      const codes =
++        input?.actorScopeCodesOverride ??
++        ctx.session.organizationalScopeCodes;
++      const asOf = input?.asOfDate ?? currentAsOfDate();
++      const pop = intersectPopulation({
++        actorAccountId: ctx.session.accountId,
++        actorScopeCodes: codes,
++        asOfDate: asOf,
++        channel: input?.channel ?? "search",
++        objectIds: input?.objectIds,
++        unreconciled: input?.unreconciled,
++      });
++      if (!pop.ok) {
++        throw new TRPCError({
++          code: "FORBIDDEN",
++          message: "╪»╪│╪¬╪▒╪│█î ┘å╪»╪º╪▒█î╪».",
++        });
++      }
++      return {
++        ok: true as const,
++        subjectIds: pop.subjectIds,
++        factKeys: pop.factKeys,
++        volume: pop.subjectIds.length,
++        resultSemantics: ctx.resultSemantics,
++        evaluationMode: ctx.evaluationMode,
++        asOfDate: asOf,
++      };
++    }),
++
++  /**
++   * Drill-down from aggregate ΓÇö same authorized set (recomputed identically).
++   */
++  demoRetrievalDrillDown: governedProcedure
++    .meta({
++      permission: "demo.retrieval.read",
++      dataCategory: "demo.non_hr",
++      action: "read",
++      organizationalScope: "org:selfcheck",
++      operation: "demo.retrieval.drill_down",
++      sensitive: true,
++      devOnly: true,
++    })
++    .input(
++      z.object({
++        objectId: z.string().min(1),
++        actorScopeCodesOverride: z.array(z.string()).optional(),
++      }),
++    )
++    .query(({ ctx, input }) => {
++      const parent = {
++        actorAccountId: ctx.session.accountId,
++        actorScopeCodes:
++          input.actorScopeCodesOverride ??
++          ctx.session.organizationalScopeCodes,
++        asOfDate: currentAsOfDate(),
++        channel: "search" as const,
++      };
++      const parentResult = intersectPopulation(parent);
++      const child = drillDownPopulation(parent, input.objectId);
++      if (!parentResult.ok || !child.ok) {
++        throw new TRPCError({
++          code: "FORBIDDEN",
++          message: "╪»╪│╪¬╪▒╪│█î ┘å╪»╪º╪▒█î╪».",
++        });
++      }
++      return {
++        parentSubjectIds: parentResult.subjectIds,
++        childSubjectIds: child.subjectIds,
++        widened: child.subjectIds.some(
++          (id) => !parentResult.subjectIds.includes(id),
++        ),
++      };
++    }),
++
+   /**
+    * Demo sensitive fixture ΓÇö no policy rule. system_admin / manager / any
+    * coarse label must deny; proves UI/role label Γëá entitlement.
+diff --git a/apps/web/src/server/trpc.ts b/apps/web/src/server/trpc.ts
+index 3a0383b..23ef89c 100644
+--- a/apps/web/src/server/trpc.ts
++++ b/apps/web/src/server/trpc.ts
+@@ -7,10 +7,12 @@ import {
+   loadCategoryRegistry,
+   loadPolicyRegistry,
+   type AuditEnvelope,
++  type EvaluationMode,
+ } from "@divan/audit-envelope";
+ import { createPgPool, type Pool } from "@divan/db";
+ import {
+   AccessAdminError,
++  AuthzChangedError,
+   assertBreakGlassElevationLimits,
+   getSessionContext,
+   toEnvelopeAuthzContext,
+@@ -23,6 +25,8 @@ import { operationalCopy } from "@/lib/operational-copy";
+ 
+ export type TrpcContext = {
+   session: SessionContext | null;
++  /** Login-time fingerprint from JWT ΓÇö null when anonymous. */
++  priorAuthzBindingFingerprint: string | null;
+ };
+ 
+ /**
+@@ -42,6 +46,8 @@ export type GovernedProcedureMeta = {
+    * before envelope authorize (no access-event noise).
+    */
+   devOnly?: boolean;
++  /** Default current. as_of requires input.asOfDate date-only. */
++  evaluationMode?: EvaluationMode;
+ };
+ 
+ const t = initTRPC
+@@ -64,6 +70,7 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+   return next({
+     ctx: {
+       session: ctx.session,
++      priorAuthzBindingFingerprint: ctx.priorAuthzBindingFingerprint,
+     },
+   });
+ });
+@@ -95,11 +102,12 @@ export function setGovernedEnvelopeForTests(next: AuditEnvelope | null): void {
+ }
+ 
+ /**
+- * Logged-in ΓåÆ DB revalidate authz context ΓåÆ audit-envelope authorize ΓåÆ handler.
++ * Logged-in ΓåÆ DB revalidate authz context ΓåÆ mid-session binding check ΓåÆ
++ * audit-envelope authorize ΓåÆ handler.
+  * Coarse JWT claims alone never authorize governed data.
+  */
+ export const governedProcedure = protectedProcedure.use(
+-  async ({ ctx, next, meta }) => {
++  async ({ ctx, next, meta, getRawInput }) => {
+     if (meta?.devOnly && process.env.NODE_ENV === "production") {
+       throw new TRPCError({ code: "NOT_FOUND" });
+     }
+@@ -125,8 +133,31 @@ export const governedProcedure = protectedProcedure.use(
+       });
+     }
+ 
++    // Story 2.6 AC #4: binding change vs login-time snapshot ΓåÆ AUTHZ_CHANGED.
++    const prior = ctx.priorAuthzBindingFingerprint;
++    if (
++      prior &&
++      prior.length > 0 &&
++      prior !== fresh.authzBindingFingerprint
++    ) {
++      throw new TRPCError({
++        code: "FORBIDDEN",
++        message: operationalCopy.scopeRevoked,
++        cause: new AuthzChangedError(operationalCopy.scopeRevoked),
++      });
++    }
++
++    const rawInput = (await getRawInput()) as
++      | { asOfDate?: string; evaluationMode?: EvaluationMode }
++      | undefined;
++    const evaluationMode: EvaluationMode =
++      meta.evaluationMode ?? rawInput?.evaluationMode ?? "current";
++    const asOfDate =
++      evaluationMode === "as_of" ? rawInput?.asOfDate : undefined;
++
+     const correlationId = randomUUID();
+     let decisionId: string | undefined;
++    let resultSemantics: "effective" | "planned" | undefined;
+     try {
+       const authorized = await getEnvelope().authorizeOrThrow({
+         context: toEnvelopeAuthzContext(fresh),
+@@ -137,8 +168,11 @@ export const governedProcedure = protectedProcedure.use(
+         operation: meta.operation.trim(),
+         correlationId,
+         sensitive: meta.sensitive !== false,
++        evaluationMode,
++        asOfDate,
+       });
+       decisionId = authorized.decisionId;
++      resultSemantics = authorized.resultSemantics;
+     } catch (err) {
+       if (err instanceof AuthorizationError) {
+         console.error(
+@@ -147,6 +181,7 @@ export const governedProcedure = protectedProcedure.use(
+           "correlationId=",
+           err.correlationId,
+           err.decisionId ? `decisionId=${err.decisionId}` : "",
++          err.denyReason ? `denyReason=${err.denyReason}` : "",
+         );
+         throw new TRPCError({
+           code: "FORBIDDEN",
+@@ -174,8 +209,12 @@ export const governedProcedure = protectedProcedure.use(
+     return next({
+       ctx: {
+         session: fresh,
++        priorAuthzBindingFingerprint: ctx.priorAuthzBindingFingerprint,
+         correlationId,
+         decisionId: decisionId ?? correlationId,
++        resultSemantics: resultSemantics ?? "effective",
++        evaluationMode,
++        asOfDate: asOfDate ?? null,
+       },
+     });
+   },
+diff --git a/apps/web/types/next-auth.d.ts b/apps/web/types/next-auth.d.ts
+index cd0a790..3ad8103 100644
+--- a/apps/web/types/next-auth.d.ts
++++ b/apps/web/types/next-auth.d.ts
+@@ -9,6 +9,8 @@ declare module "next-auth" {
+     humanIdentityId: string;
+     /** Coarse org scope hooks ΓÇö empty until Story 2.3. */
+     organizationalScopeIds?: string[];
++    /** Login-time authz fingerprint ΓÇö mid-session change detect (Story 2.6). */
++    authzBindingFingerprint?: string;
+     correlationId?: string;
+   }
+ 
+@@ -20,6 +22,7 @@ declare module "next-auth" {
+       coarseRole: CoarseRole;
+       humanIdentityId: string;
+       organizationalScopeIds?: string[];
++      authzBindingFingerprint?: string;
+     };
+   }
+ }
+@@ -32,6 +35,8 @@ declare module "next-auth/jwt" {
+     humanIdentityId?: string;
+     displayName?: string;
+     organizationalScopeIds?: string[];
++    /** Frozen at login ΓÇö compared to fresh DB fingerprint on governed entry. */
++    authzBindingFingerprint?: string;
+     lastActivityAt?: number;
+     absoluteExp?: number;
+   }
+diff --git a/package.json b/package.json
+index 17b7f1e..2c26610 100644
+--- a/package.json
++++ b/package.json
+@@ -21,7 +21,8 @@
+     "selfcheck:governed": "pnpm --filter @divan/web selfcheck:governed",
+     "selfcheck:access-admin": "pnpm --filter @divan/identity-access selfcheck:access-admin",
+     "selfcheck:entitlement-lifecycle": "pnpm --filter @divan/identity-access selfcheck:entitlement-lifecycle",
+-    "selfcheck:break-glass": "pnpm --filter @divan/identity-access selfcheck:break-glass"
++    "selfcheck:break-glass": "pnpm --filter @divan/identity-access selfcheck:break-glass",
++    "selfcheck:temporal-authz": "pnpm --filter @divan/identity-access selfcheck:temporal-authz"
+   },
+   "devDependencies": {
+     "@eslint/js": "^9.31.0",
+diff --git a/packages/db/prisma/schema.prisma b/packages/db/prisma/schema.prisma
+index 4c123e5..7c2863d 100644
+--- a/packages/db/prisma/schema.prisma
++++ b/packages/db/prisma/schema.prisma
+@@ -60,8 +60,11 @@ model InternalAccount {
+ }
+ 
+ /// Organizational Scope projection ΓÇö Admin-managed; not LDAP group sync.
++/// `code` aligns demo/policy tokens (e.g. org:selfcheck) with membership (Story 2.6).
+ model OrganizationalScope {
+   id        String   @id @default(cuid())
++  /// Stable policy/demo alias ΓÇö unique when set; AR-ACCESS owns production codes.
++  code      String?  @unique
+   labelFa   String
+   active    Boolean  @default(true)
+   createdAt DateTime @default(now())
+@@ -97,7 +100,7 @@ model AccessRole {
+   grants   EntitlementGrant[]
+ }
+ 
+-/// Grant class ΓÇö sensitive/global/bulk/mass/break_glass require independent approval (FR-46).
++/// Grant class ΓÇö sensitive/global/bulk/mass/break_glass/cross_time require independent approval (FR-46/47).
+ enum EntitlementGrantKind {
+   sensitive
+   global
+@@ -107,6 +110,8 @@ enum EntitlementGrantKind {
+   role_create
+   scope_create
+   break_glass
++  /// Bounded pre/post relationship history ΓÇö not management-derived default (Story 2.6).
++  cross_time_scope
+ }
+ 
+ /// Post-use review for break-glass (Story 2.5). Non-break-glass stays not_required.
+diff --git a/packages/kernel/audit-envelope/package.json b/packages/kernel/audit-envelope/package.json
+index d2033c5..b85f0ef 100644
+--- a/packages/kernel/audit-envelope/package.json
++++ b/packages/kernel/audit-envelope/package.json
+@@ -14,6 +14,7 @@
+   },
+   "dependencies": {
+     "@divan/event-store": "workspace:*",
++    "@divan/temporal-engine": "workspace:*",
+     "pg": "^8.16.3"
+   },
+   "devDependencies": {
+diff --git a/packages/kernel/audit-envelope/src/audit-envelope.selfcheck.ts b/packages/kernel/audit-envelope/src/audit-envelope.selfcheck.ts
+index 343bea6..57755ae 100644
+--- a/packages/kernel/audit-envelope/src/audit-envelope.selfcheck.ts
++++ b/packages/kernel/audit-envelope/src/audit-envelope.selfcheck.ts
+@@ -307,7 +307,8 @@ async function main() {
+       context: {
+         accountId: randomUUID(), // synthetic ΓÇö FK not enforced on kernel_events
+         coarseRole: "system_admin",
+-        organizationalScopeIds: [],
++        organizationalScopeIds: ["scope:demo"],
++        organizationalScopeCodes: ["org:selfcheck"],
+       },
+       permission: "demo.selfcheck.read",
+       dataCategory: "demo.non_hr",
+@@ -394,13 +395,14 @@ async function main() {
+     );
+     assert.equal(exportDenyRows.rows[0]?.result, "deny");
+ 
+-    // Explicit export allow + access event
++    // Explicit export allow + access event (membership required ΓÇö Story 2.6)
+     const exportAllowCorr = randomUUID();
+     const exportAllowed = await envelope.authorizeOrThrow({
+       context: {
+         accountId: randomUUID(),
+         coarseRole: "hr_operator",
+-        organizationalScopeIds: [],
++        organizationalScopeIds: ["scope:demo"],
++        organizationalScopeCodes: ["org:selfcheck"],
+       },
+       ...DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE,
+       correlationId: exportAllowCorr,
+@@ -413,6 +415,58 @@ async function main() {
+     );
+     assert.equal(exportAllowRows.rows[0]?.result, "allow");
+ 
++    // Policy allow but no membership ΓåÆ deny (Story 2.6)
++    await assert.rejects(
++      () =>
++        envelope.authorizeOrThrow({
++          context: {
++            accountId: randomUUID(),
++            coarseRole: "hr_operator",
++            organizationalScopeIds: [],
++            organizationalScopeCodes: [],
++          },
++          permission: "demo.selfcheck.read",
++          dataCategory: "demo.non_hr",
++          action: "read",
++          organizationalScope: "org:selfcheck",
++          operation: "demo.selfcheck.no_membership",
++          correlationId: randomUUID(),
++          sensitive: true,
++        }),
++      (err: unknown) => {
++        assert.ok(err instanceof AuthorizationError);
++        assert.equal(err.denyReason, "scope_membership_missing");
++        return true;
++      },
++    );
++
++    // Ambiguous as-of ΓåÆ fail closed
++    await assert.rejects(
++      () =>
++        envelope.authorizeOrThrow({
++          context: {
++            accountId: randomUUID(),
++            coarseRole: "hr_operator",
++            organizationalScopeIds: ["scope:demo"],
++            organizationalScopeCodes: ["org:selfcheck"],
++          },
++          permission: "demo.selfcheck.read",
++          dataCategory: "demo.non_hr",
++          action: "read",
++          organizationalScope: "org:selfcheck",
++          operation: "demo.selfcheck.ambiguous_asof",
++          correlationId: randomUUID(),
++          sensitive: true,
++          evaluationMode: "as_of",
++          asOfDate: "2024-01-01T12:00:00Z",
++        }),
++      (err: unknown) => {
++        assert.ok(err instanceof AuthorizationError);
++        assert.ok(err.denyReason?.includes("as_of"));
++        return true;
++      },
++    );
++
+     // Disabled compensation category deny via envelope even with rogue policy
+     const disabledEnv = createAuditEnvelope({
+       pool,
+@@ -450,7 +504,8 @@ async function main() {
+           context: {
+             accountId: randomUUID(),
+             coarseRole: "system_admin",
+-            organizationalScopeIds: [],
++            organizationalScopeIds: ["scope:demo"],
++            organizationalScopeCodes: ["org:selfcheck"],
+           },
+           permission: "demo.selfcheck.read",
+           dataCategory: "demo.non_hr",
+diff --git a/packages/kernel/audit-envelope/src/index.ts b/packages/kernel/audit-envelope/src/index.ts
+index a8b8bb3..1bdea82 100644
+--- a/packages/kernel/audit-envelope/src/index.ts
++++ b/packages/kernel/audit-envelope/src/index.ts
+@@ -4,6 +4,10 @@ import {
+   appendAccessEvent,
+   withTransaction,
+ } from "@divan/event-store";
++import {
++  isFutureAsOf,
++  parseDateOnly,
++} from "@divan/temporal-engine";
+ import type { Pool } from "pg";
+ 
+ import {
+@@ -29,11 +33,19 @@ export {
+  */
+ export const MSG_ACCESS_DENIED_FA = "╪»╪│╪¬╪▒╪│█î ┘å╪»╪º╪▒█î╪».";
+ 
++export type EvaluationMode = "current" | "as_of";
++
+ export type CoarseAuthzContext = {
+   accountId: string;
+   /** Navigation context only ΓÇö never an implicit allow for sensitive categories. */
+   coarseRole: string;
++  /** Prisma OrganizationalScope ids the actor holds (active). */
+   organizationalScopeIds: string[];
++  /**
++   * Stable scope codes/aliases (e.g. org:selfcheck) matching policy tokens.
++   * Story 2.6: one identity space for demos ΓÇö codes seed-aligned with policy.
++   */
++  organizationalScopeCodes?: string[];
+ };
+ 
+ export type AuthorizeAction = "read" | "write" | "export" | string;
+@@ -56,10 +68,21 @@ export type AuthorizeInput = {
+    * snapshots). Never include HR field values or passwords.
+    */
+   payload?: Record<string, unknown>;
++  /**
++   * Evaluation time semantics (Story 2.6 / FR-47). Default `current`.
++   * `as_of` requires a valid date-only `asOfDate` (Asia/Tehran calendar day).
++   */
++  evaluationMode?: EvaluationMode;
++  /** Date-only YYYY-MM-DD when evaluationMode is as_of. Timestamps ΓåÆ deny. */
++  asOfDate?: string;
+ };
+ 
+ export type AuthorizeResult = {
+   decisionId: string;
++  /** Future as-of demos are planned, not Effective (AR-TEMPORAL). */
++  resultSemantics?: "effective" | "planned";
++  evaluationMode: EvaluationMode;
++  asOfDate: string | null;
+ };
+ 
+ export type PolicyRule = {
+@@ -84,12 +107,15 @@ export class AuthorizationError extends Error {
+   readonly messageFa: string;
+   readonly correlationId: string;
+   readonly decisionId: string | null;
++  /** Internal deny reason for access-event payload (never shown to user). */
++  readonly denyReason: string | null;
+ 
+   constructor(
+     code: AuthorizationErrorCode,
+     messageFa: string,
+     correlationId: string,
+     decisionId: string | null = null,
++    denyReason: string | null = null,
+   ) {
+     super(code);
+     this.name = "AuthorizationError";
+@@ -97,6 +123,7 @@ export class AuthorizationError extends Error {
+     this.messageFa = messageFa;
+     this.correlationId = correlationId;
+     this.decisionId = decisionId;
++    this.denyReason = denyReason;
+   }
+ }
+ 
+@@ -106,6 +133,10 @@ export class AuthorizationError extends Error {
+  *
+  * Read Γëá export: `demo.sensitive_hr.read` allows read only; export on the same
+  * (or related) tuple denies unless an explicit `action: "export"` rule exists.
++ *
++ * Scope tokens (`org:selfcheck`) must match OrganizationalScope.code bindings
++ * (Story 2.6 membership). `org:any` is for access.administration only ΓÇö actor
++ * must still hold at least one active scope (no unbounded HR retrieval).
+  */
+ export const DEV_DEMO_POLICY: PolicyRegistry = {
+   rules: [
+@@ -127,6 +158,12 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
+       action: "export",
+       organizationalScope: "org:selfcheck",
+     },
++    {
++      permission: "demo.retrieval.read",
++      dataCategory: "demo.non_hr",
++      action: "read",
++      organizationalScope: "org:selfcheck",
++    },
+     // Story 2.3 ΓÇö access administration (coarse role is never an allow key)
+     {
+       permission: "access.administration",
+@@ -267,9 +304,81 @@ function evaluatePolicyExact(
+   return hit ? "allow" : "deny";
+ }
+ 
++/**
++ * Actor must hold the request scope (Story 2.6).
++ * - `org:any`: access-admin wildcard ΓÇö requires ΓëÑ1 active membership (not unbounded HR).
++ * - otherwise: match by scope code alias OR by cuid id.
++ */
++export function actorHoldsOrganizationalScope(
++  context: CoarseAuthzContext,
++  requestScope: string,
++): boolean {
++  const scope = requestScope.trim();
++  if (!scope) return false;
++
++  const ids = context.organizationalScopeIds ?? [];
++  const codes = context.organizationalScopeCodes ?? [];
++
++  if (scope === "org:any") {
++    return ids.length > 0;
++  }
++
++  if (codes.includes(scope)) return true;
++  if (ids.includes(scope)) return true;
++  return false;
++}
++
++export type EvaluationTimeResult =
++  | {
++      ok: true;
++      evaluationMode: EvaluationMode;
++      asOfDate: string | null;
++      resultSemantics: "effective" | "planned";
++    }
++  | { ok: false; reason: string };
++
++/**
++ * Resolve evaluation mode / as-of. Invalid or ambiguous as-of ΓåÆ fail-closed.
++ */
++export function resolveEvaluationTime(input: {
++  evaluationMode?: EvaluationMode;
++  asOfDate?: string;
++  now?: Date;
++}): EvaluationTimeResult {
++  const mode: EvaluationMode = input.evaluationMode ?? "current";
++  const now = input.now ?? new Date();
++
++  if (mode === "current") {
++    if (input.asOfDate !== undefined && input.asOfDate.trim() !== "") {
++      // Explicit asOf with current mode is ambiguous ΓåÆ deny
++      return { ok: false, reason: "as_of_ambiguous_with_current" };
++    }
++    return {
++      ok: true,
++      evaluationMode: "current",
++      asOfDate: null,
++      resultSemantics: "effective",
++    };
++  }
++
++  const parsed = parseDateOnly(input.asOfDate);
++  if (!parsed.ok) {
++    return { ok: false, reason: parsed.reason };
++  }
++
++  const planned = isFutureAsOf(parsed.value, now);
++  return {
++    ok: true,
++    evaluationMode: "as_of",
++    asOfDate: parsed.value,
++    resultSemantics: planned ? "planned" : "effective",
++  };
++}
++
+ /**
+  * Full authorization eval: category registry gate **first**, then policy.
+  * Disabled/unknown category ΓåÆ deny even if a rogue policy rule mentions it.
++ * Does **not** check membership ΓÇö use {@link evaluateAuthorizationWithMembership}.
+  */
+ export function evaluateAuthorization(
+   policy: PolicyRegistry,
+@@ -287,6 +396,28 @@ export function evaluateAuthorization(
+   return evaluatePolicyExact(policy, request);
+ }
+ 
++/**
++ * Policy + membership. Prefer this for Story 2.6+ paths.
++ */
++export function evaluateAuthorizationWithMembership(
++  policy: PolicyRegistry,
++  categories: CategoryRegistry,
++  request: {
++    permission: string;
++    dataCategory: string;
++    action: string;
++    organizationalScope: string;
++  },
++  context: CoarseAuthzContext,
++): "allow" | "deny" {
++  if (evaluateAuthorization(policy, categories, request) === "deny") {
++    return "deny";
++  }
++  return actorHoldsOrganizationalScope(context, request.organizationalScope)
++    ? "allow"
++    : "deny";
++}
++
+ /**
+  * Project a row so unauthorized / disabled category keys are **absent**
+  * (not masked as `0`, `null`, `"ΓÇö"`, or redacted placeholders).
+@@ -339,7 +470,8 @@ export type AuditEnvelope = {
+ 
+ /**
+  * Default-deny authorize API. Coarse role is context only ΓÇö never an allow key.
+- * Category registry gates before policy. Sensitive decisions append
++ * Category registry gates before policy. Membership is mandatory (Story 2.6).
++ * Evaluation time / as-of validated fail-closed. Sensitive decisions append
+  * `event_class=access` atomically with the outcome.
+  */
+ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
+@@ -349,26 +481,60 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
+     async authorizeOrThrow(input: AuthorizeInput): Promise<AuthorizeResult> {
+       const sensitive = input.sensitive !== false;
+ 
+-      let decision: "allow" | "deny";
++      const time = resolveEvaluationTime({
++        evaluationMode: input.evaluationMode,
++        asOfDate: input.asOfDate,
++      });
++
++      let decision: "allow" | "deny" = "deny";
++      let denyReason: string | null = null;
++
+       try {
+-        decision = evaluateAuthorization(
+-          deps.getPolicy(),
+-          getCategories(),
+-          {
+-            permission: input.permission,
+-            dataCategory: input.dataCategory,
+-            action: input.action,
+-            organizationalScope: input.organizationalScope,
+-          },
+-        );
++        if (!time.ok) {
++          decision = "deny";
++          denyReason = time.reason;
++        } else {
++          const policyDecision = evaluateAuthorization(
++            deps.getPolicy(),
++            getCategories(),
++            {
++              permission: input.permission,
++              dataCategory: input.dataCategory,
++              action: input.action,
++              organizationalScope: input.organizationalScope,
++            },
++          );
++          if (policyDecision === "deny") {
++            decision = "deny";
++            denyReason = "default_deny_or_no_matching_rule";
++          } else if (
++            !actorHoldsOrganizationalScope(
++              input.context,
++              input.organizationalScope,
++            )
++          ) {
++            decision = "deny";
++            denyReason = "scope_membership_missing";
++          } else {
++            decision = "allow";
++          }
++        }
+       } catch {
+         throw new AuthorizationError(
+           "FORBIDDEN",
+           MSG_ACCESS_DENIED_FA,
+           input.correlationId,
++          null,
++          "authz_dependency_failed",
+         );
+       }
+ 
++      const evaluationMode: EvaluationMode = time.ok
++        ? time.evaluationMode
++        : (input.evaluationMode ?? "current");
++      const asOfDate = time.ok ? time.asOfDate : null;
++      const resultSemantics = time.ok ? time.resultSemantics : "effective";
++
+       const scope = {
+         permission: input.permission,
+         dataCategory: input.dataCategory,
+@@ -376,6 +542,19 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
+         organizationalScope: input.organizationalScope,
+         actorCoarseRole: input.context.coarseRole,
+         actorOrganizationalScopeIds: input.context.organizationalScopeIds,
++        actorOrganizationalScopeCodes:
++          input.context.organizationalScopeCodes ?? [],
++        evaluationMode,
++        asOfDate,
++        resultSemantics,
++      };
++
++      const eventPayload = {
++        ...input.payload,
++        ...(denyReason ? { denyReason } : {}),
++        evaluationMode,
++        asOfDate,
++        resultSemantics,
+       };
+ 
+       if (!sensitive) {
+@@ -384,9 +563,16 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
+             "FORBIDDEN",
+             MSG_ACCESS_DENIED_FA,
+             input.correlationId,
++            null,
++            denyReason,
+           );
+         }
+-        return { decisionId: input.correlationId };
++        return {
++          decisionId: input.correlationId,
++          evaluationMode,
++          asOfDate,
++          resultSemantics,
++        };
+       }
+ 
+       let decisionId: string;
+@@ -400,9 +586,9 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
+             result: decision,
+             reason:
+               decision === "deny"
+-                ? "default_deny_or_no_matching_rule"
++                ? (denyReason ?? "default_deny_or_no_matching_rule")
+                 : "explicit_allow_rule",
+-            payload: input.payload,
++            payload: eventPayload,
+           });
+           return id;
+         });
+@@ -412,6 +598,8 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
+           "AUDIT_APPEND_FAILED",
+           MSG_ACCESS_DENIED_FA,
+           input.correlationId,
++          null,
++          "audit_append_failed",
+         );
+       }
+ 
+@@ -421,10 +609,16 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
+           MSG_ACCESS_DENIED_FA,
+           input.correlationId,
+           decisionId,
++          denyReason,
+         );
+       }
+ 
+-      return { decisionId };
++      return {
++        decisionId,
++        evaluationMode,
++        asOfDate,
++        resultSemantics,
++      };
+     },
+   };
+ }
+diff --git a/packages/kernel/temporal-engine/src/index.ts b/packages/kernel/temporal-engine/src/index.ts
+index e25782c..7cc5843 100644
+--- a/packages/kernel/temporal-engine/src/index.ts
++++ b/packages/kernel/temporal-engine/src/index.ts
+@@ -1,2 +1,13 @@
+-/** Stub package ΓÇö no domain logic in Story 1.1. */
+-export {};
++/**
++ * @divan/temporal-engine ΓÇö pure temporal helpers only (Story 2.6).
++ * Projection rebuild / event ordering engine remains Epic 4.
++ */
++
++export {
++  TEHRAN_TZ,
++  parseDateOnly,
++  todayDateOnlyTehran,
++  isFutureAsOf,
++  dateOnlyInInterval,
++  intervalsOverlap,
++} from "./date-only";
+diff --git a/packages/modules/identity-access/package.json b/packages/modules/identity-access/package.json
+index efad65b..afc94f9 100644
+--- a/packages/modules/identity-access/package.json
++++ b/packages/modules/identity-access/package.json
+@@ -13,7 +13,8 @@
+     "typecheck": "tsc --noEmit -p tsconfig.json",
+     "selfcheck:access-admin": "tsx src/access-admin.selfcheck.ts",
+     "selfcheck:entitlement-lifecycle": "tsx src/entitlement-lifecycle.selfcheck.ts",
+-    "selfcheck:break-glass": "tsx src/break-glass.selfcheck.ts"
++    "selfcheck:break-glass": "tsx src/break-glass.selfcheck.ts",
++    "selfcheck:temporal-authz": "tsx src/temporal-cross-boundary.selfcheck.ts"
+   },
+   "devDependencies": {
+     "@types/bcryptjs": "^3.0.0",
+diff --git a/packages/modules/identity-access/src/access-admin.ts b/packages/modules/identity-access/src/access-admin.ts
+index 29d8777..09cc532 100644
+--- a/packages/modules/identity-access/src/access-admin.ts
++++ b/packages/modules/identity-access/src/access-admin.ts
+@@ -1027,14 +1027,44 @@ export async function loadOrganizationalScopeIdsForAccount(
+   accountId: string,
+   db: PrismaClient = getIdentityDb(),
+ ): Promise<string[]> {
++  const scopes = await loadOrganizationalScopesForAccount(accountId, db);
++  return scopes.ids;
++}
++
++/**
++ * Active scope membership with codes for policy/membership identity space (Story 2.6).
++ * Chosen approach: OrganizationalScope.code stores policy tokens (e.g. org:selfcheck).
++ */
++export async function loadOrganizationalScopesForAccount(
++  accountId: string,
++  db: PrismaClient = getIdentityDb(),
++): Promise<{ ids: string[]; codes: string[] }> {
+   const rows = await db.accountOrganizationalScope.findMany({
+     where: {
+       accountId,
+       organizationalScope: { active: true },
+     },
+-    select: { organizationalScopeId: true },
++    select: {
++      organizationalScopeId: true,
++      organizationalScope: { select: { code: true } },
++    },
+   });
+-  return rows.map((r) => r.organizationalScopeId);
++  const ids = rows.map((r) => r.organizationalScopeId);
++  const codes = rows
++    .map((r) => r.organizationalScope.code)
++    .filter((c): c is string => typeof c === "string" && c.length > 0);
++  return { ids, codes };
++}
++
++export async function loadAccessRoleIdsForAccount(
++  accountId: string,
++  db: PrismaClient = getIdentityDb(),
++): Promise<string[]> {
++  const rows = await db.accountAccessRole.findMany({
++    where: { accountId },
++    select: { accessRoleId: true },
++  });
++  return rows.map((r) => r.accessRoleId);
+ }
+ 
+ function normalizePermissionCodes(codes: string[]): string[] {
+@@ -1050,6 +1080,8 @@ function normalizePermissionCodes(codes: string[]): string[] {
+ /** Seed fixture ids ΓÇö stable for local/dev selfcheck. */
+ export const SEED_ACCESS_ADMIN = {
+   scopeLabelFa: "┘à╪¡╪»┘ê╪»┘ç┘ö ┘å┘à┘ê┘å┘ç",
++  /** Policy/demo token ΓÇö one identity space with DEV_DEMO_POLICY (Story 2.6). */
++  scopeCode: "org:selfcheck",
+   permissionSetName: "access-administration",
+   roleCode: "access_admin",
+   roleLabelFa: "┘à╪»█î╪▒ ╪»╪│╪¬╪▒╪│█î",
+@@ -1058,6 +1090,7 @@ export const SEED_ACCESS_ADMIN = {
+ /**
+  * Ensure minimal access-admin fixtures and bind hr.admin.
+  * Idempotent; does not grant sensitive/export categories.
++ * Sets OrganizationalScope.code = org:selfcheck for membership demos.
+  */
+ export async function seedAccessAdministrationFixtures(
+   db: PrismaClient,
+@@ -1074,15 +1107,26 @@ export async function seedAccessAdministrationFixtures(
+   });
+ 
+   let scope = await db.organizationalScope.findFirst({
+-    where: { labelFa: SEED_ACCESS_ADMIN.scopeLabelFa },
++    where: {
++      OR: [
++        { code: SEED_ACCESS_ADMIN.scopeCode },
++        { labelFa: SEED_ACCESS_ADMIN.scopeLabelFa },
++      ],
++    },
+   });
+   if (!scope) {
+     scope = await db.organizationalScope.create({
+       data: {
+         labelFa: SEED_ACCESS_ADMIN.scopeLabelFa,
++        code: SEED_ACCESS_ADMIN.scopeCode,
+         active: true,
+       },
+     });
++  } else if (scope.code !== SEED_ACCESS_ADMIN.scopeCode) {
++    scope = await db.organizationalScope.update({
++      where: { id: scope.id },
++      data: { code: SEED_ACCESS_ADMIN.scopeCode },
++    });
+   }
+ 
+   const role = await db.accessRole.upsert({
+@@ -1130,4 +1174,24 @@ export async function seedAccessAdministrationFixtures(
+     },
+     update: {},
+   });
++
++  // Bind hr.operator for retrieval demos (membership-enforced org:selfcheck).
++  const hrOperator = await db.internalAccount.findUnique({
++    where: { username: "hr.operator" },
++  });
++  if (hrOperator) {
++    await db.accountOrganizationalScope.upsert({
++      where: {
++        accountId_organizationalScopeId: {
++          accountId: hrOperator.id,
++          organizationalScopeId: scope.id,
++        },
++      },
++      create: {
++        accountId: hrOperator.id,
++        organizationalScopeId: scope.id,
++      },
++      update: {},
++    });
++  }
+ }
+diff --git a/packages/modules/identity-access/src/authenticate.ts b/packages/modules/identity-access/src/authenticate.ts
+index 0b746d6..5e0787d 100644
+--- a/packages/modules/identity-access/src/authenticate.ts
++++ b/packages/modules/identity-access/src/authenticate.ts
+@@ -10,9 +10,13 @@ import {
+   verifyDirectoryCredentials,
+ } from "./ldap-client";
+ import { linkOrCreateInternalAccount } from "./ldap-link";
+-import { loadOrganizationalScopeIdsForAccount } from "./access-admin";
++import {
++  loadAccessRoleIdsForAccount,
++  loadOrganizationalScopesForAccount,
++} from "./access-admin";
+ import {
+   AuthenticationError,
++  computeAuthzBindingFingerprint,
+   type AuthAttemptOutcome,
+   type CoarseRole,
+   type SessionContext,
+@@ -35,6 +39,33 @@ export type AuthenticateResult = SessionContext & {
+   correlationId: string;
+ };
+ 
++async function hydrateSessionBindings(
++  accountId: string,
++  coarseRole: CoarseRole,
++  db: PrismaClient,
++): Promise<{
++  organizationalScopeIds: string[];
++  organizationalScopeCodes: string[];
++  accessRoleIds: string[];
++  authzBindingFingerprint: string;
++  breakGlass: SessionContext["breakGlass"];
++}> {
++  const scopes = await loadOrganizationalScopesForAccount(accountId, db);
++  const accessRoleIds = await loadAccessRoleIdsForAccount(accountId, db);
++  const breakGlass = await loadBreakGlassSessionField(accountId, db);
++  return {
++    organizationalScopeIds: scopes.ids,
++    organizationalScopeCodes: scopes.codes,
++    accessRoleIds,
++    authzBindingFingerprint: computeAuthzBindingFingerprint({
++      coarseRole,
++      organizationalScopeIds: scopes.ids,
++      accessRoleIds,
++    }),
++    breakGlass,
++  };
++}
++
+ async function loadBreakGlassSessionField(
+   accountId: string,
+   db: PrismaClient,
+@@ -206,11 +237,11 @@ async function authenticateLdap(
+     outcome: "success",
+   });
+ 
+-  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
++  const bindings = await hydrateSessionBindings(
+     linked.accountId,
++    linked.coarseRole,
+     db,
+   );
+-  const breakGlass = await loadBreakGlassSessionField(linked.accountId, db);
+ 
+   return {
+     correlationId,
+@@ -219,8 +250,7 @@ async function authenticateLdap(
+     displayName: linked.displayName,
+     coarseRole: linked.coarseRole,
+     humanIdentityId: linked.humanIdentityId,
+-    organizationalScopeIds,
+-    breakGlass,
++    ...bindings,
+   };
+ }
+ 
+@@ -300,21 +330,17 @@ async function authenticateSeeded(
+     outcome: "success",
+   });
+ 
+-  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
+-    account.id,
+-    db,
+-  );
+-  const breakGlass = await loadBreakGlassSessionField(account.id, db);
++  const coarseRole = account.coarseRole as CoarseRole;
++  const bindings = await hydrateSessionBindings(account.id, coarseRole, db);
+ 
+   return {
+     correlationId,
+     accountId: account.id,
+     username: account.username,
+     displayName: account.humanIdentity.displayName,
+-    coarseRole: account.coarseRole as CoarseRole,
++    coarseRole,
+     humanIdentityId: account.humanIdentityId,
+-    organizationalScopeIds,
+-    breakGlass,
++    ...bindings,
+   };
+ }
+ 
+@@ -343,21 +369,16 @@ export async function getSessionContext(
+   );
+   await applyProtectedEntryFailSafes(account.id, new Date(), db);
+ 
+-  const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
+-    account.id,
+-    db,
+-  );
+-
+-  const breakGlass = await loadBreakGlassSessionField(account.id, db);
++  const coarseRole = account.coarseRole as CoarseRole;
++  const bindings = await hydrateSessionBindings(account.id, coarseRole, db);
+ 
+   return {
+     accountId: account.id,
+     username: account.username,
+     displayName: account.humanIdentity.displayName,
+-    coarseRole: account.coarseRole as CoarseRole,
++    coarseRole,
+     humanIdentityId: account.humanIdentityId,
+-    organizationalScopeIds,
+-    breakGlass,
++    ...bindings,
+   };
+ }
+ 
+diff --git a/packages/modules/identity-access/src/authz-context.ts b/packages/modules/identity-access/src/authz-context.ts
+index 5672aa3..a2cf543 100644
+--- a/packages/modules/identity-access/src/authz-context.ts
++++ b/packages/modules/identity-access/src/authz-context.ts
+@@ -3,6 +3,7 @@ import type { CoarseAuthzContext, SessionContext } from "./types";
+ /**
+  * Map session ΓåÆ coarse authz context for `@divan/audit-envelope`.
+  * Fine-grained permission ├ù category ├ù action ├ù scope stays in the envelope.
++ * Scope codes align policy tokens with membership (Story 2.6).
+  */
+ export function toEnvelopeAuthzContext(
+   session: SessionContext,
+@@ -11,5 +12,6 @@ export function toEnvelopeAuthzContext(
+     accountId: session.accountId,
+     coarseRole: session.coarseRole,
+     organizationalScopeIds: session.organizationalScopeIds,
++    organizationalScopeCodes: session.organizationalScopeCodes,
+   };
+ }
+diff --git a/packages/modules/identity-access/src/entitlement-lifecycle.ts b/packages/modules/identity-access/src/entitlement-lifecycle.ts
+index 31b9c59..1bef45b 100644
+--- a/packages/modules/identity-access/src/entitlement-lifecycle.ts
++++ b/packages/modules/identity-access/src/entitlement-lifecycle.ts
+@@ -92,6 +92,7 @@ const DEFAULT_APPROVAL_KINDS: readonly GrantKind[] = Object.freeze([
+   "role_create",
+   "scope_create",
+   "break_glass",
++  "cross_time_scope",
+ ]);
+ 
+ let lifecycleHooks: EntitlementLifecycleHooks = {
+@@ -150,6 +151,17 @@ export type GrantCreatePayload = {
+   appliedRoleBinding?: boolean;
+   /** Set on activate: true when this grant created the scope join (withdraw only then). */
+   appliedScopeBinding?: boolean;
++  /**
++   * cross_time_scope (Story 2.6): category for bounded pre/post history.
++   * Management-derived default MUST NOT silently widen without this grant.
++   */
++  category?: string;
++  /** Date-only inclusive start (YYYY-MM-DD). */
++  validFrom?: string;
++  /** Date-only exclusive end (YYYY-MM-DD). */
++  validTo?: string;
++  /** Optional subject/population hint ΓÇö no HR field values. */
++  targetPopulationHint?: string;
+ };
+ 
+ export type RequestGrantInput = {
+@@ -425,6 +437,31 @@ export async function requestGrant(
+         "╪¿╪▒╪º█î ╪º█î╪¼╪º╪» ┘à╪¡╪»┘ê╪»┘ç╪î ╪¿╪▒┌å╪│╪¿ ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬.",
+       );
+     }
++  } else if (input.kind === "cross_time_scope") {
++    const p = input.createPayload;
++    const purpose = input.purpose?.trim() || p?.targetPopulationHint?.trim();
++    if (
++      !purpose ||
++      !p?.category?.trim() ||
++      !p.validFrom?.trim() ||
++      !p.validTo?.trim()
++    ) {
++      throw new AccessAdminError(
++        "VALIDATION",
++        "╪¿╪▒╪º█î ╪»╪│╪¬╪▒╪│█î ┘ü╪▒╪º╪▓┘à╪º┘å█î╪î ┘ç╪»┘ü╪î ╪»╪│╪¬┘ç╪î ┘ê ╪¿╪º╪▓┘ç┘ö ╪¬╪º╪▒█î╪« ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬.",
++        "cross_time_scope_payload_required",
++      );
++    }
++    const { parseDateOnly } = await import("@divan/temporal-engine");
++    const from = parseDateOnly(p.validFrom);
++    const to = parseDateOnly(p.validTo);
++    if (!from.ok || !to.ok || from.value >= to.value) {
++      throw new AccessAdminError(
++        "VALIDATION",
++        "╪¿╪º╪▓┘ç┘ö ╪¬╪º╪▒█î╪« ┘ü╪▒╪º╪▓┘à╪º┘å█î ┘å╪º┘à╪╣╪¬╪¿╪▒ ╪º╪│╪¬.",
++        "cross_time_scope_interval_invalid",
++      );
++    }
+   } else if (
+     input.kind !== "standard" &&
+     !input.accessRoleId &&
+@@ -499,8 +536,12 @@ export async function requestGrant(
+           ? (input.incidentId ?? "").trim() || null
+           : null,
+       purpose:
+-        input.kind === "break_glass"
+-          ? (input.purpose ?? "").trim() || null
++        input.kind === "break_glass" || input.kind === "cross_time_scope"
++          ? (
++              input.purpose ??
++              input.createPayload?.targetPopulationHint ??
++              ""
++            ).trim() || null
+           : null,
+       postUseReviewStatus:
+         input.kind === "break_glass" ? "pending" : "not_required",
+@@ -856,7 +897,9 @@ export async function activateGrant(
+   const expectedStatus = grant.status;
+   const payload = parseCreatePayload(grant.createPayload);
+   const catalogOnly =
+-    grant.kind === "role_create" || grant.kind === "scope_create";
++    grant.kind === "role_create" ||
++    grant.kind === "scope_create" ||
++    grant.kind === "cross_time_scope";
+ 
+   const updated = await db.$transaction(async (tx) => {
+     let accessRoleId = grant.accessRoleId;
+@@ -1378,6 +1421,7 @@ export async function applyProtectedEntryFailSafes(
+  * Reauthorize hook for future queued work / artifact retrieval (Stories 6.x / 7.x).
+  * Consumers MUST call this before serving queued/export artifacts.
+  * Fail-closed: returns false when account inactive or no longer has the binding.
++ * Story 2.6: optional asOfDate + population check against fixture PopulationPort.
+  */
+ export async function reauthorizeForQueuedOrArtifactWork(
+   input: {
+@@ -1386,6 +1430,22 @@ export async function reauthorizeForQueuedOrArtifactWork(
+     requiredAccessRoleId?: string;
+     /** Optional scope that must still be effectively bound. */
+     requiredOrganizationalScopeId?: string;
++    /** Optional date-only as-of for population check. */
++    asOfDate?: string;
++    /** Optional population channel (default audit). */
++    populationChannel?:
++      | "profile"
++      | "timeline"
++      | "search"
++      | "count"
++      | "dashboard"
++      | "report"
++      | "export"
++      | "audit";
++    /** Optional subject ids to verify against intersection. */
++    objectIds?: string[];
++    /** Actor scope codes for population port (required when objectIds set). */
++    actorScopeCodes?: string[];
+   },
+   db: PrismaClient = getIdentityDb(),
+ ): Promise<{ allowed: boolean; reason: string }> {
+@@ -1427,5 +1487,48 @@ export async function reauthorizeForQueuedOrArtifactWork(
+     }
+   }
+ 
++  if (input.asOfDate !== undefined || input.objectIds?.length) {
++    const { parseDateOnly } = await import("@divan/temporal-engine");
++    const {
++      currentAsOfDate,
++      intersectPopulation,
++    } = await import("./population-authz");
++
++    const asOf =
++      input.asOfDate !== undefined
++        ? parseDateOnly(input.asOfDate)
++        : { ok: true as const, value: currentAsOfDate() };
++    if (!asOf.ok) {
++      return { allowed: false, reason: asOf.reason };
++    }
++
++    const codes =
++      input.actorScopeCodes ??
++      (
++        await import("./access-admin").then((m) =>
++          m.loadOrganizationalScopesForAccount(input.accountId, db),
++        )
++      ).codes;
++
++    const pop = intersectPopulation({
++      actorAccountId: input.accountId,
++      actorScopeCodes: codes,
++      asOfDate: asOf.value,
++      channel: input.populationChannel ?? "audit",
++      objectIds: input.objectIds,
++    });
++    if (!pop.ok) {
++      return { allowed: false, reason: pop.reason };
++    }
++    if (input.objectIds?.length) {
++      const missing = input.objectIds.filter(
++        (id) => !pop.subjectIds.includes(id),
++      );
++      if (missing.length) {
++        return { allowed: false, reason: "population_intersection_empty" };
++      }
++    }
++  }
++
+   return { allowed: true, reason: "reauthorized" };
+ }
+diff --git a/packages/modules/identity-access/src/index.ts b/packages/modules/identity-access/src/index.ts
+index 1b86084..60a09dd 100644
+--- a/packages/modules/identity-access/src/index.ts
++++ b/packages/modules/identity-access/src/index.ts
+@@ -4,12 +4,18 @@
+  *
+  * Coarse nav visibility is not HR content entitlement (System Admin has no
+  * routine HR data even when ╪╣┘à┘ä█î╪º╪¬ is their only nav item).
++ *
++ * Story 2.6: OrganizationalScope.code aligns policy tokens (org:selfcheck) with
++ * membership; PopulationPort fixtures prove FR-47 until Epic 3/4 projections.
++ * Mid-session authz change uses authzBindingFingerprint (JWT login snapshot).
+  */
+ 
+ export {
+   COARSE_ROLES,
+   COARSE_ROLE_LABELS_FA,
+   AuthenticationError,
++  AuthzChangedError,
++  computeAuthzBindingFingerprint,
+   DEV_DEFAULT_IDLE_TIMEOUT_SECONDS,
+   DEV_DEFAULT_ABSOLUTE_TIMEOUT_SECONDS,
+   type CoarseRole,
+@@ -100,6 +106,8 @@ export {
+   updateAccountLink,
+   setAccountActiveStatus,
+   loadOrganizationalScopeIdsForAccount,
++  loadOrganizationalScopesForAccount,
++  loadAccessRoleIdsForAccount,
+   seedAccessAdministrationFixtures,
+   type AccessAdminActor,
+   type MutateResult,
+@@ -177,4 +185,22 @@ export {
+   type RequestBreakGlassInput,
+ } from "./break-glass";
+ 
++export {
++  DEMO_POPULATION_FIXTURES,
++  intersectPopulation,
++  drillDownPopulation,
++  currentAsOfDate,
++  getPopulationFixtureRegistry,
++  setPopulationFixtureRegistryForTests,
++  setPopulationPortEnabledForTests,
++  type RetrievalChannel,
++  type PopulationPortInput,
++  type PopulationPortResult,
++  type PopulationFixtureRegistry,
++  type PopulationSubject,
++  type ManagementRelationship,
++  type CrossTimeGrantFixture,
++  type PopulationFact,
++} from "./population-authz";
++
+ export { getIdentityDb, setIdentityDb } from "./db";
+diff --git a/packages/modules/identity-access/src/types.ts b/packages/modules/identity-access/src/types.ts
+index 28ae507..aaf6bba 100644
+--- a/packages/modules/identity-access/src/types.ts
++++ b/packages/modules/identity-access/src/types.ts
+@@ -35,6 +35,18 @@ export type SessionContext = {
+    * Never invent LDAP groupΓåÆscope sync.
+    */
+   organizationalScopeIds: string[];
++  /**
++   * Stable scope codes matching policy tokens (Story 2.6).
++   * Seed aligns `OrganizationalScope.code` with `org:selfcheck` etc.
++   */
++  organizationalScopeCodes: string[];
++  /** Access role binding ids ΓÇö part of mid-session authz fingerprint. */
++  accessRoleIds: string[];
++  /**
++   * Fingerprint of role/scope/coarse bindings at session load.
++   * Compared to JWT login-time snapshot for mid-session AUTHZ_CHANGED (FR-47).
++   */
++  authzBindingFingerprint: string;
+   /**
+    * Active break-glass summary for banner hydration (Story 2.5).
+    * When active, `expiresAt` is always a finite future ISO timestamp.
+@@ -55,6 +67,7 @@ export type CoarseAuthzContext = {
+   accountId: string;
+   coarseRole: CoarseRole;
+   organizationalScopeIds: string[];
++  organizationalScopeCodes: string[];
+ };
+ 
+ export type AuthAttemptOutcome =
+@@ -93,6 +106,21 @@ export class AuthenticationError extends Error {
+   }
+ }
+ 
++/**
++ * Mid-session binding change (Story 2.6 AC #4).
++ * Mapped to ┬½╪»╪│╪¬╪▒╪│█î ╪┤┘à╪º ╪¬╪║█î█î╪▒ ┌⌐╪▒╪».┬╗ ΓÇö not the generic access-denied copy.
++ */
++export class AuthzChangedError extends Error {
++  readonly code = "AUTHZ_CHANGED" as const;
++  readonly messageFa: string;
++
++  constructor(messageFa = "╪»╪│╪¬╪▒╪│█î ╪┤┘à╪º ╪¬╪║█î█î╪▒ ┌⌐╪▒╪».") {
++    super("AUTHZ_CHANGED");
++    this.name = "AuthzChangedError";
++    this.messageFa = messageFa;
++  }
++}
++
+ export type IdentityProvider = "seeded" | "ldap";
+ 
+ export type SessionTimeoutConfig = {
+@@ -105,3 +133,17 @@ export type SessionTimeoutConfig = {
+ /** Sensible local/dev defaults only ΓÇö not production AR-IDENTITY numbers. */
+ export const DEV_DEFAULT_IDLE_TIMEOUT_SECONDS = 8 * 60 * 60; // 8h
+ export const DEV_DEFAULT_ABSOLUTE_TIMEOUT_SECONDS = 24 * 60 * 60; // 24h
++
++/**
++ * Stable fingerprint for mid-session authz change detection.
++ * Sort ids so order-of-load does not false-positive.
++ */
++export function computeAuthzBindingFingerprint(input: {
++  coarseRole: string;
++  organizationalScopeIds: readonly string[];
++  accessRoleIds: readonly string[];
++}): string {
++  const scopes = [...input.organizationalScopeIds].sort().join(",");
++  const roles = [...input.accessRoleIds].sort().join(",");
++  return `${input.coarseRole}|s:${scopes}|r:${roles}`;
++}
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index d182c3a..3c0fc96 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -160,6 +160,9 @@ importers:
+       '@divan/event-store':
+         specifier: workspace:*
+         version: link:../event-store
++      '@divan/temporal-engine':
++        specifier: workspace:*
++        version: link:../temporal-engine
+       pg:
+         specifier: ^8.16.3
+         version: 8.22.0
+
+
+diff --git a/apps/web/components/authz-changed-modal.tsx b/apps/web/components/authz-changed-modal.tsx
+new file mode 100644
+index 0000000..9106e3b
+--- /dev/null
++++ b/apps/web/components/authz-changed-modal.tsx
+@@ -0,0 +1,123 @@
++"use client";
++
++import * as React from "react";
++import { useRouter } from "next/navigation";
++import { useSession } from "next-auth/react";
++
++import { Button } from "@/components/ui/button";
++import {
++  Dialog,
++  DialogContent,
++  DialogDescription,
++  DialogFooter,
++  DialogHeader,
++  DialogTitle,
++} from "@/components/ui/dialog";
++import { operationalCopy } from "@/lib/operational-copy";
++import { usePlatformStatus } from "@/components/platform-status-provider";
++
++/**
++ * Mid-session authz change modal (Story 2.6 AC #4 / EXPERIENCE).
++ * Exact title: ┬½╪»╪│╪¬╪▒╪│█î ╪┤┘à╪º ╪¬╪║█î█î╪▒ ┌⌐╪▒╪».┬╗
++ * Required acknowledgement ΓÇö Esc does not dismiss (blocking).
++ * Demo draft stand-in for Epic 4 Draft forms.
++ */
++export function AuthzChangedModal({
++  landingPath,
++}: {
++  /** Role safe landing after ack. */
++  landingPath: string;
++}) {
++  const router = useRouter();
++  const { update } = useSession();
++  const {
++    authzChanged,
++    clearAuthzChanged,
++    demoDraftOpen,
++    setDemoDraftOpen,
++    isFinalizeBlockedByAuthzChange,
++  } = usePlatformStatus();
++
++  const open = authzChanged;
++  const titleId = "authz-changed-title";
++  const descId = "authz-changed-desc";
++
++  async function acknowledgeAndRedirect() {
++    setDemoDraftOpen(false);
++    clearAuthzChanged();
++    // Refresh JWT fingerprint to current bindings, then safe landing.
++    await update();
++    router.replace(landingPath);
++    router.refresh();
++  }
++
++  return (
++    <Dialog open={open} modal>
++      <DialogContent
++        showCloseButton={false}
++        aria-labelledby={titleId}
++        aria-describedby={descId}
++        onEscapeKeyDown={(e) => e.preventDefault()}
++        onPointerDownOutside={(e) => e.preventDefault()}
++        onInteractOutside={(e) => e.preventDefault()}
++        className="sm:max-w-md"
++      >
++        <DialogHeader>
++          <DialogTitle id={titleId}>{operationalCopy.scopeRevoked}</DialogTitle>
++          <DialogDescription id={descId} className="sr-only">
++            {operationalCopy.scopeRevoked}
++          </DialogDescription>
++        </DialogHeader>
++
++        <div
++          role="status"
++          aria-live="assertive"
++          className="text-sm text-foreground"
++        >
++          {demoDraftOpen
++            ? operationalCopy.authzChangedDraftHint
++            : operationalCopy.authzChangedFinalizeBlocked}
++        </div>
++
++        {isFinalizeBlockedByAuthzChange ? (
++          <p className="text-sm text-muted-foreground">
++            {operationalCopy.authzChangedFinalizeBlocked}
++          </p>
++        ) : null}
++
++        <DialogFooter className="gap-2 sm:justify-start">
++          {demoDraftOpen ? (
++            <>
++              <Button
++                type="button"
++                variant="secondary"
++                onClick={() => {
++                  void acknowledgeAndRedirect();
++                }}
++              >
++                {operationalCopy.authzChangedSaveDraft}
++              </Button>
++              <Button
++                type="button"
++                variant="outline"
++                onClick={() => {
++                  void acknowledgeAndRedirect();
++                }}
++              >
++                {operationalCopy.authzChangedDiscard}
++              </Button>
++            </>
++          ) : (
++            <Button
++              type="button"
++              variant="primary"
++              onClick={() => void acknowledgeAndRedirect()}
++            >
++              {operationalCopy.authzChangedAcknowledge}
++            </Button>
++          )}
++        </DialogFooter>
++      </DialogContent>
++    </Dialog>
++  );
++}
+
+
+diff --git a/packages/db/prisma/migrations/20260717020000_cross_time_scope_authz/migration.sql b/packages/db/prisma/migrations/20260717020000_cross_time_scope_authz/migration.sql
+new file mode 100644
+index 0000000..4bede72
+--- /dev/null
++++ b/packages/db/prisma/migrations/20260717020000_cross_time_scope_authz/migration.sql
+@@ -0,0 +1,10 @@
++-- Story 2.6: scope code alias + cross_time_scope grant kind
++
++-- AlterEnum
++ALTER TYPE "EntitlementGrantKind" ADD VALUE 'cross_time_scope';
++
++-- AlterTable
++ALTER TABLE "OrganizationalScope" ADD COLUMN "code" TEXT;
++
++-- CreateIndex
++CREATE UNIQUE INDEX "OrganizationalScope_code_key" ON "OrganizationalScope"("code");
+
+
+diff --git a/packages/kernel/temporal-engine/src/date-only.ts b/packages/kernel/temporal-engine/src/date-only.ts
+new file mode 100644
+index 0000000..3b41a89
+--- /dev/null
++++ b/packages/kernel/temporal-engine/src/date-only.ts
+@@ -0,0 +1,115 @@
++/**
++ * Pure AR-TEMPORAL date helpers (Story 2.6).
++ * Date-only YYYY-MM-DD in Asia/Tehran calendar day semantics.
++ * No projection rebuild / event engine ΓÇö Epic 4 owns that.
++ */
++
++export const TEHRAN_TZ = "Asia/Tehran";
++
++const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
++
++/**
++ * Validate a date-only string. Rejects timestamps, timezone suffixes,
++ * and impossible calendar days. Fail-closed for authz callers.
++ */
++export function parseDateOnly(
++  raw: string | null | undefined,
++): { ok: true; value: string } | { ok: false; reason: string } {
++  if (raw === null || raw === undefined) {
++    return { ok: false, reason: "as_of_missing" };
++  }
++  const trimmed = raw.trim();
++  if (!trimmed) {
++    return { ok: false, reason: "as_of_empty" };
++  }
++  // Reject timestamps / time / timezone fragments
++  if (/[T\s]|Z|[+-]\d{2}:?\d{2}$/i.test(trimmed) || trimmed.includes(":")) {
++    return { ok: false, reason: "as_of_ambiguous_timestamp" };
++  }
++  const m = DATE_ONLY_RE.exec(trimmed);
++  if (!m) {
++    return { ok: false, reason: "as_of_invalid_format" };
++  }
++  const y = Number(m[1]);
++  const mo = Number(m[2]);
++  const d = Number(m[3]);
++  if (mo < 1 || mo > 12 || d < 1 || d > 31) {
++    return { ok: false, reason: "as_of_invalid_calendar" };
++  }
++  // Construct UTC noon probe to avoid DST edge on pure calendar validity
++  const probe = new Date(Date.UTC(y, mo - 1, d));
++  if (
++    probe.getUTCFullYear() !== y ||
++    probe.getUTCMonth() !== mo - 1 ||
++    probe.getUTCDate() !== d
++  ) {
++    return { ok: false, reason: "as_of_invalid_calendar" };
++  }
++  return { ok: true, value: trimmed };
++}
++
++/** Today's calendar date in Asia/Tehran as YYYY-MM-DD. */
++export function todayDateOnlyTehran(now: Date = new Date()): string {
++  const parts = new Intl.DateTimeFormat("en-CA", {
++    timeZone: TEHRAN_TZ,
++    year: "numeric",
++    month: "2-digit",
++    day: "2-digit",
++  }).formatToParts(now);
++  const y = parts.find((p) => p.type === "year")?.value;
++  const m = parts.find((p) => p.type === "month")?.value;
++  const d = parts.find((p) => p.type === "day")?.value;
++  if (!y || !m || !d) {
++    // Fail-closed callers should treat empty as invalid; provide UTC fallback only for labeling.
++    return now.toISOString().slice(0, 10);
++  }
++  return `${y}-${m}-${d}`;
++}
++
++/**
++ * True when `asOf` is strictly after today's Tehran date (future ΓåÆ planned, not Effective).
++ */
++export function isFutureAsOf(
++  asOfDate: string,
++  now: Date = new Date(),
++): boolean {
++  const parsed = parseDateOnly(asOfDate);
++  if (!parsed.ok) return false;
++  return parsed.value > todayDateOnlyTehran(now);
++}
++
++/**
++ * Half-open interval [start, end): end exclusive.
++ * Missing end ΓåÆ unbounded future; missing start ΓåÆ unbounded past.
++ */
++export function dateOnlyInInterval(
++  date: string,
++  start: string | null | undefined,
++  endExclusive: string | null | undefined,
++): boolean {
++  const d = parseDateOnly(date);
++  if (!d.ok) return false;
++  if (start) {
++    const s = parseDateOnly(start);
++    if (!s.ok || d.value < s.value) return false;
++  }
++  if (endExclusive) {
++    const e = parseDateOnly(endExclusive);
++    if (!e.ok || d.value >= e.value) return false;
++  }
++  return true;
++}
++
++/** Overlap of two half-open date-only intervals. */
++export function intervalsOverlap(
++  aStart: string | null | undefined,
++  aEndExclusive: string | null | undefined,
++  bStart: string | null | undefined,
++  bEndExclusive: string | null | undefined,
++): boolean {
++  const aS = aStart ?? "0001-01-01";
++  const aE = aEndExclusive ?? "9999-12-31";
++  const bS = bStart ?? "0001-01-01";
++  const bE = bEndExclusive ?? "9999-12-31";
++  return aS < bE && bS < aE;
++}
+
+
+diff --git a/packages/modules/identity-access/src/population-authz.ts b/packages/modules/identity-access/src/population-authz.ts
+new file mode 100644
+index 0000000..6087465
+--- /dev/null
++++ b/packages/modules/identity-access/src/population-authz.ts
+@@ -0,0 +1,355 @@
++/**
++ * PopulationPort ΓÇö temporal + cross-boundary intersection (Story 2.6 / FR-47).
++ *
++ * Fixture-backed until Epic 3/4 Person / Assignment projections exist.
++ * Callers: after envelope allow (or as part of authorize path for demos).
++ * Empty intersection ΓåÆ safe empty / omit ΓÇö never invent out-of-scope rows.
++ *
++ * Management-derived default: only facts inside the authorized relationship
++ * interval. Pre-scope (current manager) and post-scope (former manager)
++ * require an active cross_time_scope grant ΓÇö never silent widen.
++ */
++
++import {
++  dateOnlyInInterval,
++  parseDateOnly,
++  todayDateOnlyTehran,
++} from "@divan/temporal-engine";
++
++export type RetrievalChannel =
++  | "profile"
++  | "timeline"
++  | "search"
++  | "count"
++  | "dashboard"
++  | "report"
++  | "export"
++  | "audit";
++
++export type PopulationSubject = {
++  id: string;
++  /** Scope codes this subject belongs to (fixture). */
++  scopeCodes: string[];
++};
++
++export type ManagementRelationship = {
++  managerAccountId: string;
++  subjectId: string;
++  /** Inclusive start YYYY-MM-DD. */
++  validFrom: string;
++  /** Exclusive end YYYY-MM-DD; null = still current. */
++  validToExclusive: string | null;
++};
++
++export type CrossTimeGrantFixture = {
++  accountId: string;
++  purpose: string;
++  category: string;
++  /** Inclusive start. */
++  validFrom: string;
++  /** Exclusive end. */
++  validToExclusive: string;
++  /** Subject ids covered by this bounded grant. */
++  subjectIds: string[];
++  active: boolean;
++};
++
++export type PopulationFact = {
++  subjectId: string;
++  /** Fact validity date (date-only). */
++  asOf: string;
++  kind: string;
++};
++
++export type PopulationPortInput = {
++  actorAccountId: string;
++  actorScopeCodes: string[];
++  /** Evaluation date ΓÇö current mode uses today Tehran. */
++  asOfDate: string;
++  channel: RetrievalChannel;
++  /** Optional object/subject id filters (drill-down / profile). */
++  objectIds?: string[];
++  /**
++   * When set, intersect against these facts (timeline). Otherwise use
++   * subject membership only.
++   */
++  facts?: PopulationFact[];
++  /**
++   * Unreconciled / stale membership flag ΓÇö fail closed when true.
++   */
++  unreconciled?: boolean;
++  /**
++   * Missing port dependency simulation ΓÇö fail closed when true.
++   */
++  portUnavailable?: boolean;
++};
++
++export type PopulationPortDeny = {
++  ok: false;
++  reason: string;
++};
++
++export type PopulationPortAllow = {
++  ok: true;
++  /** Authorized subject ids ΓÇö intersection only. */
++  subjectIds: string[];
++  /** When facts were requested, authorized fact keys (subjectId|asOf|kind). */
++  factKeys: string[];
++};
++
++export type PopulationPortResult = PopulationPortAllow | PopulationPortDeny;
++
++export type PopulationFixtureRegistry = {
++  subjects: PopulationSubject[];
++  relationships: ManagementRelationship[];
++  crossTimeGrants: CrossTimeGrantFixture[];
++  facts: PopulationFact[];
++};
++
++/**
++ * Demo fixture population ΓÇö proves FR-47 without Person tables.
++ * Scope A Γê⌐ B subjects; management intervals; cross-time grants.
++ */
++export const DEMO_POPULATION_FIXTURES: PopulationFixtureRegistry = {
++  subjects: [
++    { id: "person:a1", scopeCodes: ["org:fixture-a"] },
++    { id: "person:a2", scopeCodes: ["org:fixture-a"] },
++    { id: "person:b1", scopeCodes: ["org:fixture-b"] },
++    { id: "person:ab", scopeCodes: ["org:fixture-a", "org:fixture-b"] },
++    { id: "person:mgr-sub", scopeCodes: ["org:fixture-a"] },
++  ],
++  relationships: [
++    {
++      // Current manager for person:mgr-sub from 2024-01-01 (open-ended)
++      managerAccountId: "account:manager-current",
++      subjectId: "person:mgr-sub",
++      validFrom: "2024-01-01",
++      validToExclusive: null,
++    },
++    {
++      // Former manager ΓÇö relationship ended 2023-06-01 (exclusive)
++      managerAccountId: "account:manager-former",
++      subjectId: "person:mgr-sub",
++      validFrom: "2020-01-01",
++      validToExclusive: "2023-06-01",
++    },
++  ],
++  crossTimeGrants: [
++    {
++      accountId: "account:manager-current",
++      purpose: "pre_scope_history_review",
++      category: "demo.non_hr",
++      validFrom: "2023-01-01",
++      validToExclusive: "2024-01-01",
++      subjectIds: ["person:mgr-sub"],
++      active: true,
++    },
++    {
++      accountId: "account:manager-former",
++      purpose: "post_scope_audit_slice",
++      category: "demo.non_hr",
++      validFrom: "2023-06-01",
++      validToExclusive: "2023-12-01",
++      subjectIds: ["person:mgr-sub"],
++      active: true,
++    },
++  ],
++  facts: [
++    { subjectId: "person:mgr-sub", asOf: "2023-03-15", kind: "assignment" },
++    { subjectId: "person:mgr-sub", asOf: "2024-06-01", kind: "assignment" },
++    { subjectId: "person:mgr-sub", asOf: "2023-09-01", kind: "assignment" },
++  ],
++};
++
++let activeRegistry: PopulationFixtureRegistry = DEMO_POPULATION_FIXTURES;
++let portEnabled = true;
++
++export function getPopulationFixtureRegistry(): PopulationFixtureRegistry {
++  return activeRegistry;
++}
++
++/** Test/selfcheck hook. Pass null to restore demo fixtures. */
++export function setPopulationFixtureRegistryForTests(
++  registry: PopulationFixtureRegistry | null,
++): void {
++  activeRegistry = registry ?? DEMO_POPULATION_FIXTURES;
++}
++
++export function setPopulationPortEnabledForTests(enabled: boolean): void {
++  portEnabled = enabled;
++}
++
++function factKey(f: PopulationFact): string {
++  return `${f.subjectId}|${f.asOf}|${f.kind}`;
++}
++
++function subjectInActorScopes(
++  subject: PopulationSubject,
++  actorScopeCodes: string[],
++): boolean {
++  return subject.scopeCodes.some((c) => actorScopeCodes.includes(c));
++}
++
++function activeCrossTimeFor(
++  accountId: string,
++  subjectId: string,
++  asOfDate: string,
++  registry: PopulationFixtureRegistry,
++): boolean {
++  return registry.crossTimeGrants.some(
++    (g) =>
++      g.active &&
++      g.accountId === accountId &&
++      g.subjectIds.includes(subjectId) &&
++      dateOnlyInInterval(asOfDate, g.validFrom, g.validToExclusive),
++  );
++}
++
++function managementCovers(
++  accountId: string,
++  subjectId: string,
++  asOfDate: string,
++  registry: PopulationFixtureRegistry,
++): boolean {
++  return registry.relationships.some(
++    (r) =>
++      r.managerAccountId === accountId &&
++      r.subjectId === subjectId &&
++      dateOnlyInInterval(asOfDate, r.validFrom, r.validToExclusive),
++  );
++}
++
++/**
++ * Intersect authorized population for a retrieval channel.
++ * Fail-closed on unreconciled / missing port / invalid as-of.
++ */
++export function intersectPopulation(
++  input: PopulationPortInput,
++  registry: PopulationFixtureRegistry = activeRegistry,
++): PopulationPortResult {
++  if (!portEnabled || input.portUnavailable) {
++    return { ok: false, reason: "population_port_unavailable" };
++  }
++  if (input.unreconciled) {
++    return { ok: false, reason: "membership_unreconciled" };
++  }
++
++  const asOfParsed = parseDateOnly(input.asOfDate);
++  if (!asOfParsed.ok) {
++    return { ok: false, reason: asOfParsed.reason };
++  }
++  const asOf = asOfParsed.value;
++
++  if (!input.actorScopeCodes.length) {
++    return { ok: false, reason: "scope_membership_missing" };
++  }
++
++  const scopedSubjects = registry.subjects.filter((s) =>
++    subjectInActorScopes(s, input.actorScopeCodes),
++  );
++
++  let candidateIds = new Set(scopedSubjects.map((s) => s.id));
++
++  if (input.objectIds?.length) {
++    const wanted = new Set(input.objectIds);
++    candidateIds = new Set([...candidateIds].filter((id) => wanted.has(id)));
++  }
++
++  // Management-derived channels: further narrow by relationship interval
++  // (or explicit cross-time grant). Non-manager actors keep scope intersection.
++  const isManagerActor =
++    input.actorAccountId.startsWith("account:manager-") ||
++    registry.relationships.some(
++      (r) => r.managerAccountId === input.actorAccountId,
++    );
++
++  const facts =
++    input.facts ??
++    (input.channel === "timeline" || input.channel === "profile"
++      ? registry.facts.filter((f) => candidateIds.has(f.subjectId))
++      : []);
++
++  if (isManagerActor && facts.length > 0) {
++    const authorizedFacts: PopulationFact[] = [];
++    for (const f of facts) {
++      if (!candidateIds.has(f.subjectId)) continue;
++      const inRel = managementCovers(
++        input.actorAccountId,
++        f.subjectId,
++        f.asOf,
++        registry,
++      );
++      const viaGrant = activeCrossTimeFor(
++        input.actorAccountId,
++        f.subjectId,
++        f.asOf,
++        registry,
++      );
++      if (inRel || viaGrant) {
++        authorizedFacts.push(f);
++      }
++    }
++    const subjectIds = [...new Set(authorizedFacts.map((f) => f.subjectId))];
++    return {
++      ok: true,
++      subjectIds,
++      factKeys: authorizedFacts.map(factKey),
++    };
++  }
++
++  if (isManagerActor && (input.channel === "profile" || input.objectIds?.length)) {
++    // Subject-level check at evaluation asOf
++    const allowed: string[] = [];
++    for (const id of candidateIds) {
++      const inRel = managementCovers(
++        input.actorAccountId,
++        id,
++        asOf,
++        registry,
++      );
++      const viaGrant = activeCrossTimeFor(
++        input.actorAccountId,
++        id,
++        asOf,
++        registry,
++      );
++      if (inRel || viaGrant) {
++        allowed.push(id);
++      }
++    }
++    return { ok: true, subjectIds: allowed, factKeys: [] };
++  }
++
++  // Aggregate channels (search/count/dashboard/report/export/audit):
++  // intersection of scope membership only ΓÇö omit out-of-scope, never mask as 0.
++  return {
++    ok: true,
++    subjectIds: [...candidateIds],
++    factKeys: [],
++  };
++}
++
++/**
++ * Drill-down MUST reuse the same authorized id set as the parent aggregate.
++ * Documented choice: recompute identically with the same inputs (deterministic).
++ */
++export function drillDownPopulation(
++  parent: PopulationPortInput,
++  objectId: string,
++  registry: PopulationFixtureRegistry = activeRegistry,
++): PopulationPortResult {
++  const parentResult = intersectPopulation(parent, registry);
++  if (!parentResult.ok) return parentResult;
++  if (!parentResult.subjectIds.includes(objectId)) {
++    return { ok: true, subjectIds: [], factKeys: [] };
++  }
++  return intersectPopulation(
++    { ...parent, objectIds: [objectId] },
++    registry,
++  );
++}
++
++/** Convenience: current-mode as-of = today Tehran. */
++export function currentAsOfDate(now: Date = new Date()): string {
++  return todayDateOnlyTehran(now);
++}
+
+
+diff --git a/packages/modules/identity-access/src/temporal-cross-boundary.selfcheck.ts b/packages/modules/identity-access/src/temporal-cross-boundary.selfcheck.ts
+new file mode 100644
+index 0000000..18d9851
+--- /dev/null
++++ b/packages/modules/identity-access/src/temporal-cross-boundary.selfcheck.ts
+@@ -0,0 +1,349 @@
++/**
++ * Self-check for temporal + cross-boundary authorization (Story 2.6 / FR-47).
++ * Run: pnpm --filter @divan/identity-access selfcheck:temporal-authz
++ * Requires DATABASE_URL + seed.
++ */
++import assert from "node:assert/strict";
++import { resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import {
++  AuthorizationError,
++  DEV_DEMO_CATEGORIES,
++  DEV_DEMO_POLICY,
++  actorHoldsOrganizationalScope,
++  createAuditEnvelope,
++  evaluateAuthorizationWithMembership,
++  resolveEvaluationTime,
++} from "@divan/audit-envelope";
++import { createPgPool } from "@divan/db";
++import {
++  parseDateOnly,
++  todayDateOnlyTehran,
++} from "@divan/temporal-engine";
++import { config as loadEnv } from "dotenv";
++import { randomUUID } from "node:crypto";
++
++import {
++  AuthzChangedError,
++  computeAuthzBindingFingerprint,
++  getIdentityDb,
++  getSessionContext,
++  intersectPopulation,
++  drillDownPopulation,
++  reauthorizeForQueuedOrArtifactWork,
++  seedAccessAdministrationFixtures,
++  setPopulationPortEnabledForTests,
++  DEMO_POPULATION_FIXTURES,
++  kindRequiresIndependentApproval,
++} from "./index";
++
++const rootEnv = resolve(
++  fileURLToPath(new URL(".", import.meta.url)),
++  "../../../../.env",
++);
++loadEnv({ path: rootEnv });
++
++async function main() {
++  // --- Pure temporal helpers ---
++  assert.equal(parseDateOnly("2024-06-15").ok, true);
++  assert.equal(parseDateOnly("2024-06-15T12:00:00Z").ok, false);
++  assert.equal(parseDateOnly("15/06/2024").ok, false);
++  assert.ok(todayDateOnlyTehran().match(/^\d{4}-\d{2}-\d{2}$/));
++
++  const timeOk = resolveEvaluationTime({
++    evaluationMode: "as_of",
++    asOfDate: "2024-01-01",
++  });
++  assert.equal(timeOk.ok, true);
++  if (timeOk.ok) assert.equal(timeOk.resultSemantics, "effective");
++
++  const timeBad = resolveEvaluationTime({
++    evaluationMode: "as_of",
++    asOfDate: "2024-01-01T00:00:00Z",
++  });
++  assert.equal(timeBad.ok, false);
++
++  // --- Membership ---
++  assert.equal(
++    actorHoldsOrganizationalScope(
++      {
++        accountId: "a",
++        coarseRole: "hr_operator",
++        organizationalScopeIds: ["cuid1"],
++        organizationalScopeCodes: ["org:selfcheck"],
++      },
++      "org:selfcheck",
++    ),
++    true,
++  );
++  assert.equal(
++    actorHoldsOrganizationalScope(
++      {
++        accountId: "a",
++        coarseRole: "hr_operator",
++        organizationalScopeIds: [],
++        organizationalScopeCodes: [],
++      },
++      "org:selfcheck",
++    ),
++    false,
++  );
++  assert.equal(
++    evaluateAuthorizationWithMembership(
++      DEV_DEMO_POLICY,
++      DEV_DEMO_CATEGORIES,
++      {
++        permission: "demo.selfcheck.read",
++        dataCategory: "demo.non_hr",
++        action: "read",
++        organizationalScope: "org:selfcheck",
++      },
++      {
++        accountId: "a",
++        coarseRole: "hr_operator",
++        organizationalScopeIds: [],
++        organizationalScopeCodes: [],
++      },
++    ),
++    "deny",
++  );
++
++  assert.equal(kindRequiresIndependentApproval("cross_time_scope"), true);
++
++  // --- Population intersection fixtures ---
++  const scoped = intersectPopulation({
++    actorAccountId: "account:hr",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2024-06-01",
++    channel: "search",
++  });
++  assert.equal(scoped.ok, true);
++  if (scoped.ok) {
++    assert.ok(scoped.subjectIds.includes("person:a1"));
++    assert.ok(scoped.subjectIds.includes("person:ab"));
++    assert.equal(scoped.subjectIds.includes("person:b1"), false);
++  }
++
++  const parent = {
++    actorAccountId: "account:hr",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2024-06-01",
++    channel: "search" as const,
++  };
++  const parentIds = intersectPopulation(parent);
++  assert.ok(parentIds.ok);
++  const drill = drillDownPopulation(parent, "person:a1");
++  assert.ok(drill.ok);
++  if (drill.ok && parentIds.ok) {
++    assert.deepEqual(drill.subjectIds, ["person:a1"]);
++    assert.equal(
++      drill.subjectIds.some((id) => !parentIds.subjectIds.includes(id)),
++      false,
++    );
++  }
++
++  // Current manager ΓÇö fact inside interval
++  const mgrIn = intersectPopulation({
++    actorAccountId: "account:manager-current",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2024-06-01",
++    channel: "timeline",
++    facts: DEMO_POPULATION_FIXTURES.facts,
++  });
++  assert.ok(mgrIn.ok);
++  if (mgrIn.ok) {
++    assert.ok(
++      mgrIn.factKeys.includes("person:mgr-sub|2024-06-01|assignment"),
++    );
++  }
++
++  // Current manager ΓÇö pre-scope WITHOUT cross-time grant ΓåÆ omit
++  const mgrPreNoGrant = intersectPopulation({
++    actorAccountId: "account:manager-current",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2022-06-01",
++    channel: "timeline",
++    facts: [
++      { subjectId: "person:mgr-sub", asOf: "2022-06-01", kind: "assignment" },
++    ],
++  });
++  assert.ok(mgrPreNoGrant.ok);
++  if (mgrPreNoGrant.ok) {
++    assert.equal(mgrPreNoGrant.factKeys.length, 0);
++  }
++
++  // Current manager ΓÇö pre-scope WITH cross-time grant ΓåÆ allow slice
++  const mgrPreWithGrant = intersectPopulation({
++    actorAccountId: "account:manager-current",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2023-03-15",
++    channel: "timeline",
++    facts: [
++      { subjectId: "person:mgr-sub", asOf: "2023-03-15", kind: "assignment" },
++    ],
++  });
++  assert.ok(mgrPreWithGrant.ok);
++  if (mgrPreWithGrant.ok) {
++    assert.ok(mgrPreWithGrant.factKeys.length === 1);
++  }
++
++  // Former manager ΓÇö post-scope fact without grant window ΓåÆ omit
++  const formerPost = intersectPopulation({
++    actorAccountId: "account:manager-former",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2024-06-01",
++    channel: "timeline",
++    facts: [
++      { subjectId: "person:mgr-sub", asOf: "2024-06-01", kind: "assignment" },
++    ],
++  });
++  assert.ok(formerPost.ok);
++  if (formerPost.ok) {
++    assert.equal(formerPost.factKeys.length, 0);
++  }
++
++  // Former manager ΓÇö post-scope with bounded cross-time grant
++  const formerGranted = intersectPopulation({
++    actorAccountId: "account:manager-former",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2023-09-01",
++    channel: "timeline",
++    facts: [
++      { subjectId: "person:mgr-sub", asOf: "2023-09-01", kind: "assignment" },
++    ],
++  });
++  assert.ok(formerGranted.ok);
++  if (formerGranted.ok) {
++    assert.equal(formerGranted.factKeys.length, 1);
++  }
++
++  // Unreconciled / missing port ΓåÆ fail closed
++  const unrec = intersectPopulation({
++    actorAccountId: "account:hr",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2024-06-01",
++    channel: "search",
++    unreconciled: true,
++  });
++  assert.equal(unrec.ok, false);
++
++  setPopulationPortEnabledForTests(false);
++  const noPort = intersectPopulation({
++    actorAccountId: "account:hr",
++    actorScopeCodes: ["org:fixture-a"],
++    asOfDate: "2024-06-01",
++    channel: "search",
++  });
++  assert.equal(noPort.ok, false);
++  setPopulationPortEnabledForTests(true);
++
++  // Fingerprint change
++  const fp1 = computeAuthzBindingFingerprint({
++    coarseRole: "hr_operator",
++    organizationalScopeIds: ["s1"],
++    accessRoleIds: [],
++  });
++  const fp2 = computeAuthzBindingFingerprint({
++    coarseRole: "hr_operator",
++    organizationalScopeIds: [],
++    accessRoleIds: [],
++  });
++  assert.notEqual(fp1, fp2);
++  const changed = new AuthzChangedError();
++  assert.equal(changed.code, "AUTHZ_CHANGED");
++  assert.equal(changed.messageFa, "╪»╪│╪¬╪▒╪│█î ╪┤┘à╪º ╪¬╪║█î█î╪▒ ┌⌐╪▒╪».");
++
++  // --- DB probes ---
++  const url = process.env.DATABASE_URL?.trim();
++  assert.ok(url, "DATABASE_URL required");
++  const pool = createPgPool(url);
++  const db = getIdentityDb();
++  await seedAccessAdministrationFixtures(db);
++
++  const envelope = createAuditEnvelope({
++    pool,
++    getPolicy: () => DEV_DEMO_POLICY,
++    getCategories: () => DEV_DEMO_CATEGORIES,
++  });
++
++  try {
++    const hrOp = await db.internalAccount.findUnique({
++      where: { username: "hr.operator" },
++    });
++    assert.ok(hrOp, "seeded hr.operator required");
++    const session = await getSessionContext(hrOp.id);
++    assert.ok(session);
++    assert.ok(session.organizationalScopeCodes.includes("org:selfcheck"));
++    assert.ok(session.authzBindingFingerprint.length > 0);
++
++    await envelope.authorizeOrThrow({
++      context: {
++        accountId: session.accountId,
++        coarseRole: session.coarseRole,
++        organizationalScopeIds: session.organizationalScopeIds,
++        organizationalScopeCodes: session.organizationalScopeCodes,
++      },
++      permission: "demo.selfcheck.read",
++      dataCategory: "demo.non_hr",
++      action: "read",
++      organizationalScope: "org:selfcheck",
++      operation: "temporal.selfcheck.membership_allow",
++      correlationId: randomUUID(),
++      sensitive: true,
++    });
++
++    // sys.admin typically has no org:selfcheck membership ΓåÆ deny
++    const sys = await db.internalAccount.findUnique({
++      where: { username: "sys.admin" },
++    });
++    assert.ok(sys);
++    const sysSession = await getSessionContext(sys.id);
++    assert.ok(sysSession);
++    await assert.rejects(
++      () =>
++        envelope.authorizeOrThrow({
++          context: {
++            accountId: sysSession.accountId,
++            coarseRole: sysSession.coarseRole,
++            organizationalScopeIds: sysSession.organizationalScopeIds,
++            organizationalScopeCodes: sysSession.organizationalScopeCodes,
++          },
++          permission: "demo.selfcheck.read",
++          dataCategory: "demo.non_hr",
++          action: "read",
++          organizationalScope: "org:selfcheck",
++          operation: "temporal.selfcheck.sysadmin_no_membership",
++          correlationId: randomUUID(),
++          sensitive: true,
++        }),
++      AuthorizationError,
++    );
++
++    const reauth = await reauthorizeForQueuedOrArtifactWork({
++      accountId: hrOp.id,
++      asOfDate: "2024-06-01",
++      actorScopeCodes: ["org:fixture-a"],
++      objectIds: ["person:a1"],
++      populationChannel: "audit",
++    });
++    assert.equal(reauth.allowed, true);
++
++    const reauthDeny = await reauthorizeForQueuedOrArtifactWork({
++      accountId: hrOp.id,
++      asOfDate: "not-a-date",
++      actorScopeCodes: ["org:fixture-a"],
++      objectIds: ["person:a1"],
++    });
++    assert.equal(reauthDeny.allowed, false);
++
++    console.log("temporal-cross-boundary.selfcheck: ok");
++  } finally {
++    await pool.end();
++  }
++}
++
++main().catch((err) => {
++  console.error(err);
++  process.exit(1);
++});

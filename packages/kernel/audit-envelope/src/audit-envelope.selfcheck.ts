@@ -307,7 +307,8 @@ async function main() {
       context: {
         accountId: randomUUID(), // synthetic — FK not enforced on kernel_events
         coarseRole: "system_admin",
-        organizationalScopeIds: [],
+        organizationalScopeIds: ["scope:demo"],
+        organizationalScopeCodes: ["org:selfcheck"],
       },
       permission: "demo.selfcheck.read",
       dataCategory: "demo.non_hr",
@@ -394,13 +395,14 @@ async function main() {
     );
     assert.equal(exportDenyRows.rows[0]?.result, "deny");
 
-    // Explicit export allow + access event
+    // Explicit export allow + access event (membership required — Story 2.6)
     const exportAllowCorr = randomUUID();
     const exportAllowed = await envelope.authorizeOrThrow({
       context: {
         accountId: randomUUID(),
         coarseRole: "hr_operator",
-        organizationalScopeIds: [],
+        organizationalScopeIds: ["scope:demo"],
+        organizationalScopeCodes: ["org:selfcheck"],
       },
       ...DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE,
       correlationId: exportAllowCorr,
@@ -412,6 +414,58 @@ async function main() {
       [exportAllowCorr],
     );
     assert.equal(exportAllowRows.rows[0]?.result, "allow");
+
+    // Policy allow but no membership → deny (Story 2.6)
+    await assert.rejects(
+      () =>
+        envelope.authorizeOrThrow({
+          context: {
+            accountId: randomUUID(),
+            coarseRole: "hr_operator",
+            organizationalScopeIds: [],
+            organizationalScopeCodes: [],
+          },
+          permission: "demo.selfcheck.read",
+          dataCategory: "demo.non_hr",
+          action: "read",
+          organizationalScope: "org:selfcheck",
+          operation: "demo.selfcheck.no_membership",
+          correlationId: randomUUID(),
+          sensitive: true,
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof AuthorizationError);
+        assert.equal(err.denyReason, "scope_membership_missing");
+        return true;
+      },
+    );
+
+    // Ambiguous as-of → fail closed
+    await assert.rejects(
+      () =>
+        envelope.authorizeOrThrow({
+          context: {
+            accountId: randomUUID(),
+            coarseRole: "hr_operator",
+            organizationalScopeIds: ["scope:demo"],
+            organizationalScopeCodes: ["org:selfcheck"],
+          },
+          permission: "demo.selfcheck.read",
+          dataCategory: "demo.non_hr",
+          action: "read",
+          organizationalScope: "org:selfcheck",
+          operation: "demo.selfcheck.ambiguous_asof",
+          correlationId: randomUUID(),
+          sensitive: true,
+          evaluationMode: "as_of",
+          asOfDate: "2024-01-01T12:00:00Z",
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof AuthorizationError);
+        assert.ok(err.denyReason?.includes("as_of"));
+        return true;
+      },
+    );
 
     // Disabled compensation category deny via envelope even with rogue policy
     const disabledEnv = createAuditEnvelope({
@@ -450,7 +504,8 @@ async function main() {
           context: {
             accountId: randomUUID(),
             coarseRole: "system_admin",
-            organizationalScopeIds: [],
+            organizationalScopeIds: ["scope:demo"],
+            organizationalScopeCodes: ["org:selfcheck"],
           },
           permission: "demo.selfcheck.read",
           dataCategory: "demo.non_hr",

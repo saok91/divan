@@ -108,9 +108,9 @@
 ## Deferred from: Story 2.4 entitlement lifecycle (2026-07-16)
 
 - ~~**Break-glass** incident-bound grants + banner + post-use review ? Story 2.5~~ **done in Story 2.5**
-- **Temporal / as-of / cross-boundary** retrieval authz ? Story 2.6
+- ~~**Temporal / as-of / cross-boundary** retrieval authz ? Story 2.6~~ **done in Story 2.6** (control plane: PopulationPort fixtures, membership, as-of, cross_time_scope, mid-session modal; Epic 3/4 replace fixture port with real projections)
 - **Inference / bulk / small-cohort** thresholds ? Story 2.7
-- **Artifact / export reauth consumers** must call `reauthorizeForQueuedOrArtifactWork` ? Stories 6.5 / 7.x (hook shipped; no full artifact lifecycle here)
+- **Artifact / export reauth consumers** must call `reauthorizeForQueuedOrArtifactWork` ? Stories 6.5 / 7.x (hook shipped + asOf/population optional; no full artifact lifecycle here)
 - **Optional background expiry/recert worker** (pg-boss) ? MVP uses lazy fail-safe on `getSessionContext` / governed entry; cron not required
 - **AR-ACCESS** production matrix values (approval kinds, recert SLA, revocation objective milliseconds) still pending ? demo hooks are configurable + fail-closed
 - Dual-admin UX for independent approve in single-seed environments ? selfcheck temporarily binds `access_admin` to a second account; production needs ?2 access admins
@@ -119,7 +119,7 @@
 
 - **AR-ACCESS** exact break-glass policy / max-duration SLA / production elevation matrix ? launch artifacts; demo hooks only
 - **Emergency LDAP/local break-glass account** vaulting, FIDO, dual-custody ? AR-IDENTITY (open)
-- **Temporal / as-of** must still bound break-glass retrievals ? Story 2.6
+- ~~**Temporal / as-of** must still bound break-glass retrievals ? Story 2.6~~ **done in Story 2.6** (privileged demo read runs PopulationPort intersection)
 - **Inference / bulk** must not be bypassed by break-glass channels ? Story 2.7
 - **Full export artifact panel** / exceptional export UX ? Story 6.5
 - **Audit investigation UI** / ?no self-review of sensitive activity? surface ? Story 7.1 (evidence + toxic review API shipped here)
@@ -127,6 +127,14 @@
 - **Paging / SIEM / credential rotation** runbooks ? ops / infra-security
 - ~~Access admin grant expiry/`datetime-local` Gregorian inputs~~ **resolved 2026-07-17**: break-glass + entitlement grant forms use `JalaliDateTimePicker` (FR44 / Story 1.6); storage remains ISO Gregorian
 
+## Deferred from: Story 2.6 temporal & cross-boundary authorization (2026-07-17)
+
+- **Epic 3/4** replace fixture `PopulationPort` with Person / Assignment / OrgUnit projection-backed population
+- **Full personnel search / profile / dashboard / report catalogue** consume intersection API ? Epic 5
+- **Inference / bulk / small-cohort** thresholds ? Story 2.7
+- **Artifact reauth consumers** with as-of/population ? Stories 6.5 / 7.x
+- **AR-ACCESS** production field?action?scope?time matrix values
+- **AR-TEMPORAL** full freeze beyond partial (Asia/Tehran date-only / exclusive ends / future?Effective labeling already hooked)
 ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
 
 - Empty `assignAccountAccessRoles` / `assignAccountScopes` (full wipe) bypasses the new mass-assign lifecycle gate ? pre-existing Story 2.3 full-replace semantics; only `length > 1` was gated in 2.4
@@ -136,3 +144,10 @@
 ## Deferred from: code review of 2-5-break-glass-privileged-access.md (2026-07-17)
 
 - PermissionSet of an elevated break-glass role can be mutated after activate to add non-allowlisted permissions; allowlist is only checked at request/activate ? continuous revalidation belongs to AR-ACCESS / access-admin hardening
+
+## Deferred from: code review of 2-6-temporal-cross-boundary-authorization.md (2026-07-17)
+
+- Sticky `breakGlassOverride` in `PlatformStatusProvider` can keep a live banner after server-side revoke/expiry until remount ? revisit with stronger me-poll reconciliation
+- Authz binding fingerprint hashes role/scope ids only; permission-set content edits on the same role ids do not trigger mid-session AUTHZ_CHANGED ? deepen when AR-ACCESS classifies privileged permission mutations
+- PopulationPort `unreconciled` is only a caller flag; no server-side membership reconciliation signal yet ? Epic 3/4 projection sync owns real stale/unreconciled detection
+- `intervalsOverlap` compares raw strings without `parseDateOnly` ? fine for trusted fixture bounds; harden if untrusted interval inputs appear

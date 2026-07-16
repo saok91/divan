@@ -56,6 +56,7 @@ const nextAuth = NextAuth({
             coarseRole: result.coarseRole,
             humanIdentityId: result.humanIdentityId,
             organizationalScopeIds: result.organizationalScopeIds,
+            authzBindingFingerprint: result.authzBindingFingerprint,
             correlationId: result.correlationId,
           };
         } catch (err) {
@@ -76,7 +77,7 @@ const nextAuth = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       const now = Math.floor(Date.now() / 1000);
       const timeouts = getSessionTimeoutConfig();
 
@@ -87,8 +88,24 @@ const nextAuth = NextAuth({
         token.humanIdentityId = user.humanIdentityId;
         token.displayName = user.name ?? user.username;
         token.organizationalScopeIds = user.organizationalScopeIds ?? [];
+        // Login-time snapshot — do NOT overwrite on refresh (Story 2.6 mid-session).
+        token.authzBindingFingerprint = user.authzBindingFingerprint ?? "";
         token.lastActivityAt = now;
         token.absoluteExp = now + timeouts.absoluteTimeoutSeconds;
+        return token;
+      }
+
+      // Explicit session.update() after mid-session authz ack — refresh fingerprint.
+      if (trigger === "update" && typeof token.accountId === "string") {
+        const ctx = await getSessionContext(token.accountId);
+        if (!ctx) return null;
+        token.username = ctx.username;
+        token.coarseRole = ctx.coarseRole;
+        token.humanIdentityId = ctx.humanIdentityId;
+        token.displayName = ctx.displayName;
+        token.organizationalScopeIds = ctx.organizationalScopeIds;
+        token.authzBindingFingerprint = ctx.authzBindingFingerprint;
+        token.lastActivityAt = now;
         return token;
       }
 
@@ -119,6 +136,14 @@ const nextAuth = NextAuth({
       token.humanIdentityId = ctx.humanIdentityId;
       token.displayName = ctx.displayName;
       token.organizationalScopeIds = ctx.organizationalScopeIds;
+      // Login-time snapshot for mid-session detect. Empty/legacy → hydrate once
+      // (do not leave blank — blank was treated as perpetual AUTHZ_CHANGED).
+      if (
+        typeof token.authzBindingFingerprint !== "string" ||
+        !token.authzBindingFingerprint.trim()
+      ) {
+        token.authzBindingFingerprint = ctx.authzBindingFingerprint;
+      }
       token.lastActivityAt = now;
       return token;
     },
@@ -138,6 +163,10 @@ const nextAuth = NextAuth({
               (x): x is string => typeof x === "string",
             )
           : [],
+        authzBindingFingerprint:
+          typeof token.authzBindingFingerprint === "string"
+            ? token.authzBindingFingerprint
+            : "",
         name: (token.displayName as string) ?? session.user?.name,
       };
       return session;
