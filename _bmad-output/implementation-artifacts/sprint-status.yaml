@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-16T22:50:00+03:30
+# last_updated: 2026-07-17T00:45:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-16T22:50:00+03:30
+last_updated: 2026-07-17T00:45:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -63,7 +63,7 @@ development_status:
   2-1-audit-envelope-default-deny-authorization-substrate: done
   2-2-sensitive-categories-separate-export-permission: done
   2-3-access-administration-ui-apis: done
-  2-4-entitlement-lifecycle-grant-expiry-revocation-recertification: backlog
+  2-4-entitlement-lifecycle-grant-expiry-revocation-recertification: done
   2-5-break-glass-privileged-access: backlog
   2-6-temporal-cross-boundary-authorization: backlog
   2-7-inference-resistant-bulk-retrieval-controls: backlog
@@ -148,7 +148,8 @@ action_items:
   - epic: 1
     action: "Add a11y/focus DoD checklist snippet for create-story on interactive surfaces"
     owner: "Sally + Amelia"
-    status: open
+    status: done
+    resolved_in: "2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (Task 5 interactive a11y DoD)"
   - epic: 1
     action: "Wire one identity/web selfcheck into a package script; document manual remainder"
     owner: "Amelia"

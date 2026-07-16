@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 
+import { EntitlementGrantsPanel } from "@/components/access/entitlement-grants-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { operationalCopy } from "@/lib/operational-copy";
@@ -48,7 +49,11 @@ function StatusMessage({
   );
 }
 
-export function AccessAdminPanel() {
+export function AccessAdminPanel({
+  currentAccountId,
+}: {
+  currentAccountId?: string;
+}) {
   const entitlementsQuery = api.accessAdmin.listEntitlements.useQuery();
   const scopesQuery = api.accessAdmin.listScopes.useQuery();
   const permissionSetsQuery = api.accessAdmin.listPermissionSets.useQuery();
@@ -59,6 +64,7 @@ export function AccessAdminPanel() {
   const createScope = api.accessAdmin.createScope.useMutation({
     onSuccess: async () => {
       await utils.accessAdmin.listScopes.invalidate();
+      await utils.accessAdmin.listGrants.invalidate();
     },
   });
   const createPermissionSet = api.accessAdmin.createPermissionSet.useMutation({
@@ -69,6 +75,7 @@ export function AccessAdminPanel() {
   const createRole = api.accessAdmin.createRole.useMutation({
     onSuccess: async () => {
       await utils.accessAdmin.listRoles.invalidate();
+      await utils.accessAdmin.listGrants.invalidate();
     },
   });
   const assignRoles = api.accessAdmin.assignAccountRoles.useMutation({
@@ -128,8 +135,8 @@ export function AccessAdminPanel() {
       <header className="flex flex-col gap-2">
         <h1 className="text-headline-small text-foreground">دسترسی‌ها</h1>
         <p className="text-body-large text-muted-foreground">
-          مدیریت نقش‌ها، مجموعه‌های مجوز، محدوده‌های سازمانی، پیوند حساب و وضعیت
-          فعال — با ثبت قابل انتساب در شواهد دسترسی.
+          مدیریت نقش‌ها، مجموعه‌های مجوز، محدوده‌های سازمانی، چرخهٔ entitlement،
+          پیوند حساب و وضعیت فعال — با ثبت قابل انتساب در شواهد دسترسی.
         </p>
       </header>
 
@@ -137,9 +144,11 @@ export function AccessAdminPanel() {
         <StatusMessage kind="error">{actionError}</StatusMessage>
       ) : null}
 
+      <EntitlementGrantsPanel currentAccountId={currentAccountId} />
+
       <Section
         title="تخصیص نقش و محدوده"
-        description="فهرست تخصیص‌های فعلی حساب‌ها."
+        description="فهرست تخصیص‌های فعلی حساب‌ها. تخصیص انبوه یا ایجاد نقش/محدوده از مسیر تأیید مستقل است."
       >
         {entitlementsQuery.isLoading ? (
           <StatusMessage kind="loading">در حال بارگذاری تخصیص‌ها…</StatusMessage>
@@ -281,7 +290,7 @@ export function AccessAdminPanel() {
 
       <Section
         title="محدوده‌های سازمانی"
-        description="محدوده‌های فعال برای هیدراته شدن session؛ بدون همگام‌سازی گروه LDAP."
+        description="ایجاد محدوده به‌صورت درخواست entitlement ثبت می‌شود و پس از تأیید مستقل فعال می‌گردد."
       >
         {scopesQuery.isLoading ? (
           <StatusMessage kind="loading">در حال بارگذاری…</StatusMessage>
@@ -329,14 +338,14 @@ export function AccessAdminPanel() {
             variant="secondary"
             disabled={createScope.isPending}
           >
-            افزودن محدوده
+            درخواست ایجاد محدوده
           </Button>
         </form>
       </Section>
 
       <Section
         title="نقش‌های دسترسی"
-        description="هر نقش باید دقیقاً به یک مجموعه مجوز متصل باشد."
+        description="ایجاد نقش به‌صورت درخواست entitlement ثبت می‌شود؛ هر نقش باید به یک مجموعه مجوز متصل باشد."
       >
         {rolesQuery.isLoading ? (
           <StatusMessage kind="loading">در حال بارگذاری…</StatusMessage>
@@ -421,7 +430,7 @@ export function AccessAdminPanel() {
             variant="secondary"
             disabled={createRole.isPending}
           >
-            افزودن نقش
+            درخواست ایجاد نقش
           </Button>
         </form>
       </Section>

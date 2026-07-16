@@ -34,6 +34,23 @@ export const operationalCopy = {
   /** Access admin empty entitlements (Story 2.3 AC #4 — exact). */
   emptyEntitlements: "تخصیص دسترسی‌ای ثبت نشده.",
 
+  /** Entitlement lifecycle (Story 2.4). */
+  emptyGrants: "درخواست دسترسی‌ای ثبت نشده.",
+  grantListLoading: "در حال بارگذاری درخواست‌های دسترسی…",
+  grantListError: "بارگذاری درخواست‌های دسترسی ممکن نشد.",
+  grantActionFailed: "عملیات دسترسی انجام نشد.",
+  grantRequested: "درخواست دسترسی ثبت شد و در انتظار تأیید است.",
+  grantApproved: "درخواست دسترسی تأیید شد.",
+  grantActivated: "دسترسی فعال شد.",
+  grantRevoked: "دسترسی لغو شد.",
+  grantWaived: "درخواست دسترسی رد شد.",
+  grantRecertified: "بازتأیید دسترسی ثبت شد.",
+  grantOverdueHint:
+    "برخی دسترسی‌ها معلق یا نیازمند بازتأیید هستند و تا اقدام مستقل فعال نمی‌مانند.",
+  grantSubjectRequired: "حساب موضوع را انتخاب کنید.",
+  /** Mid-session revocation — EXPERIENCE exact. */
+  // scopeRevoked already defined above
+
   breakGlassActive: "دسترسی اضطراری فعال است.",
   breakGlassExpired: "دسترسی اضطراری پایان یافت.",
   breakGlassDismiss: "بستن",

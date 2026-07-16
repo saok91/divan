@@ -70,11 +70,16 @@ async function main() {
     "hr.admin scopes must hydrate from DB bindings",
   );
 
-  // AC #2 — role without permission set rejected
+  // AC #2 — role without permission set rejected (lifecycle gate bypassed for this probe)
   await assert.rejects(
     () =>
       createAccessRole(
-        { code: "orphan", labelFa: "یتیم", permissionSetId: "" },
+        {
+          code: "orphan",
+          labelFa: "یتیم",
+          permissionSetId: "",
+          viaLifecycleActivation: true,
+        },
         { accountId: hrAdmin.id, correlationId: randomUUID() },
         db,
       ),
@@ -248,15 +253,37 @@ async function main() {
       },
     );
 
-    // Scope create (non-self) succeeds at module layer
+    // Scope create requires lifecycle approval (FR-46) — direct path gated
+    await assert.rejects(
+      () =>
+        createOrganizationalScope(
+          { labelFa: `محدوده خودآزمایی ${Date.now()}` },
+          { accountId: hrAdmin.id, correlationId: randomUUID() },
+          db,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof AccessAdminError);
+        assert.equal(
+          err.messageFa,
+          "ایجاد نقش/محدوده یا تخصیص حساس نیازمند تأیید مستقل است. از درخواست entitlement استفاده کنید.",
+        );
+        return true;
+      },
+    );
+
+    // Lifecycle-approved create still works at module layer
     const scope = await createOrganizationalScope(
-      { labelFa: `محدوده خودآزمایی ${Date.now()}` },
+      {
+        labelFa: `محدوده خودآزمایی ${Date.now()}`,
+        viaLifecycleActivation: true,
+      },
       { accountId: hrAdmin.id, correlationId: randomUUID() },
       db,
     );
     assert.ok(scope.entity.id);
     assert.equal(scope.before, null);
     assert.ok(scope.after.labelFa);
+    await db.organizationalScope.delete({ where: { id: scope.entity.id } });
 
     console.log("access-admin.selfcheck: ok");
   } finally {

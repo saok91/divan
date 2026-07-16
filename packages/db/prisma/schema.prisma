@@ -51,6 +51,11 @@ model InternalAccount {
   /// Explicit entitlement bindings (Story 2.3) — coarseRole remains nav-only.
   organizationalScopes AccountOrganizationalScope[]
   accessRoles          AccountAccessRole[]
+
+  /// Entitlement grant lifecycle (Story 2.4) — governs when bindings apply.
+  grantsAsSubject   EntitlementGrant[] @relation("GrantSubject")
+  grantsAsRequester EntitlementGrant[] @relation("GrantRequester")
+  grantsAsApprover  EntitlementGrant[] @relation("GrantApprover")
 }
 
 /// Organizational Scope projection — Admin-managed; not LDAP group sync.
@@ -62,6 +67,7 @@ model OrganizationalScope {
   updatedAt DateTime @updatedAt
 
   accounts AccountOrganizationalScope[]
+  grants   EntitlementGrant[]
 }
 
 /// Explicit envelope permission codes only — never implies coarse-role allows.
@@ -87,6 +93,67 @@ model AccessRole {
   updatedAt       DateTime      @updatedAt
 
   accounts AccountAccessRole[]
+  grants   EntitlementGrant[]
+}
+
+/// Grant class — sensitive/global/bulk/mass require independent approval (FR-46).
+enum EntitlementGrantKind {
+  sensitive
+  global
+  bulk
+  mass_assignment
+  standard
+  role_create
+  scope_create
+}
+
+/// Lifecycle status: requested → approved → active → (expired|revoked|suspended).
+/// rejected is a terminal waive/deny path from requested.
+enum EntitlementGrantStatus {
+  requested
+  approved
+  active
+  expired
+  revoked
+  suspended
+  rejected
+}
+
+/// Entitlement grant projection (Story 2.4). Evidence stays in event-store.
+/// Effective bindings remain AccountAccessRole / AccountOrganizationalScope;
+/// grants govern when those bindings are applied or withdrawn.
+model EntitlementGrant {
+  id                    String                 @id @default(cuid())
+  subjectAccountId      String
+  requesterAccountId    String
+  approverAccountId     String?
+  kind                  EntitlementGrantKind
+  status                EntitlementGrantStatus @default(requested)
+  accessRoleId          String?
+  organizationalScopeId String?
+  /// Pending create params for role_create / scope_create (no HR fields).
+  createPayload         Json?
+  startsAt              DateTime?
+  expiresAt             DateTime?
+  recertifyBy           DateTime?
+  revokedAt             DateTime?
+  revokeReason          String?
+  correlationId         String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  subject               InternalAccount        @relation("GrantSubject", fields: [subjectAccountId], references: [id], onDelete: Cascade)
+  requester             InternalAccount        @relation("GrantRequester", fields: [requesterAccountId], references: [id], onDelete: Cascade)
+  approver              InternalAccount?       @relation("GrantApprover", fields: [approverAccountId], references: [id], onDelete: SetNull)
+  accessRole            AccessRole?            @relation(fields: [accessRoleId], references: [id], onDelete: SetNull)
+  organizationalScope   OrganizationalScope?   @relation(fields: [organizationalScopeId], references: [id], onDelete: SetNull)
+
+  @@index([subjectAccountId, status])
+  @@index([expiresAt])
+  @@index([recertifyBy])
+  @@index([approverAccountId])
+  @@index([status])
+  @@index([requesterAccountId])
 }
 
 model AccountOrganizationalScope {

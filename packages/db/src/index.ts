@@ -55,3 +55,9 @@ export async function checkDatabaseConnectivity(
 }
 
 export type { PrismaClient };
+export type {
+  EntitlementGrant,
+  EntitlementGrantKind,
+  EntitlementGrantStatus,
+  Prisma,
+} from "@prisma/client";

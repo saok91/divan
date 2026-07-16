@@ -28,6 +28,10 @@ export const MSG_ACCESS_ADMIN_REQUIRED_FA = "دسترسی ندارید.";
 
 export const EMPTY_ENTITLEMENTS_COPY_FA = "تخصیص دسترسی‌ای ثبت نشده.";
 
+/** FR-46: elevated creates/mass assigns must use entitlement lifecycle. */
+export const MSG_LIFECYCLE_APPROVAL_REQUIRED_FA =
+  "ایجاد نقش/محدوده یا تخصیص حساس نیازمند تأیید مستقل است. از درخواست entitlement استفاده کنید.";
+
 export type AccessAdminActor = {
   accountId: string;
   correlationId: string;
@@ -62,7 +66,11 @@ export class AccessAdminError extends Error {
 }
 
 export type ToxicOperation =
+  | "grant.request"
   | "grant.approve"
+  | "grant.waive"
+  | "grant.recertify"
+  | "grant.activate"
   | "access.role.assign"
   | "access.scope.assign"
   | "access.permission_set.create"
@@ -76,7 +84,11 @@ export type ToxicOperation =
   | "demo.non_toxic";
 
 const SELF_TOXIC_OPERATIONS = new Set<string>([
+  // grant.request self-block is kind-aware in requestGrant (elevated binding only)
   "grant.approve",
+  "grant.waive",
+  "grant.recertify",
+  "grant.activate",
   "access.role.assign",
   "access.scope.assign",
   "access.account.status",
@@ -265,10 +277,26 @@ export async function listOrganizationalScopes(
 }
 
 export async function createOrganizationalScope(
-  input: { labelFa: string; active?: boolean },
+  input: {
+    labelFa: string;
+    active?: boolean;
+    /**
+     * Only set by entitlement activateGrant (scope_create). Direct Admin
+     * create is blocked — FR-46 requires independent approval.
+     */
+    viaLifecycleActivation?: boolean;
+  },
   _actor: AccessAdminActor,
   db: PrismaClient = getIdentityDb(),
 ): Promise<MutateResult<{ id: string; labelFa: string; active: boolean }>> {
+  if (!input.viaLifecycleActivation) {
+    throw new AccessAdminError(
+      "VALIDATION",
+      MSG_LIFECYCLE_APPROVAL_REQUIRED_FA,
+      "scope_create_requires_lifecycle",
+    );
+  }
+
   assertToxicCombinationAllowed({
     actorAccountId: _actor.accountId,
     operation: "access.scope.create",
@@ -442,7 +470,13 @@ export async function listAccessRoles(db: PrismaClient = getIdentityDb()) {
 }
 
 export async function createAccessRole(
-  input: { code: string; labelFa: string; permissionSetId: string },
+  input: {
+    code: string;
+    labelFa: string;
+    permissionSetId: string;
+    /** Only set by entitlement activateGrant (role_create). */
+    viaLifecycleActivation?: boolean;
+  },
   _actor: AccessAdminActor,
   db: PrismaClient = getIdentityDb(),
 ): Promise<
@@ -453,6 +487,14 @@ export async function createAccessRole(
     permissionSetId: string;
   }>
 > {
+  if (!input.viaLifecycleActivation) {
+    throw new AccessAdminError(
+      "VALIDATION",
+      MSG_LIFECYCLE_APPROVAL_REQUIRED_FA,
+      "role_create_requires_lifecycle",
+    );
+  }
+
   assertToxicCombinationAllowed({
     actorAccountId: _actor.accountId,
     operation: "access.role.create",
@@ -614,9 +656,17 @@ export async function listEntitlements(
  * Assign or replace an account's access roles. Roles only grant their
  * explicit PermissionSet (AC #2 — structural FK + non-empty set).
  * Self-assign is toxic when matrix missing.
+ *
+ * Mass assignment (>1 role) requires entitlement lifecycle (FR-46) unless
+ * `viaLifecycleActivation` is set by activateGrant.
+ * Single-role assign remains for Admin convenience as `standard`.
  */
 export async function assignAccountAccessRoles(
-  input: { accountId: string; accessRoleIds: string[] },
+  input: {
+    accountId: string;
+    accessRoleIds: string[];
+    viaLifecycleActivation?: boolean;
+  },
   actor: AccessAdminActor,
   db: PrismaClient = getIdentityDb(),
 ): Promise<MutateResult<{ accountId: string; accessRoleIds: string[] }>> {
@@ -626,6 +676,15 @@ export async function assignAccountAccessRoles(
     operation: "access.role.assign",
   });
 
+  const uniqueRoleIds = [...new Set(input.accessRoleIds)];
+  if (uniqueRoleIds.length > 1 && !input.viaLifecycleActivation) {
+    throw new AccessAdminError(
+      "VALIDATION",
+      MSG_LIFECYCLE_APPROVAL_REQUIRED_FA,
+      "mass_role_assign_requires_lifecycle",
+    );
+  }
+
   const account = await db.internalAccount.findUnique({
     where: { id: input.accountId },
     include: { accessRoles: true },
@@ -634,7 +693,6 @@ export async function assignAccountAccessRoles(
     throw new AccessAdminError("NOT_FOUND", "حساب یافت نشد.");
   }
 
-  const uniqueRoleIds = [...new Set(input.accessRoleIds)];
   const roles = await db.accessRole.findMany({
     where: { id: { in: uniqueRoleIds } },
     include: { permissionSet: true },
@@ -655,6 +713,16 @@ export async function assignAccountAccessRoles(
       throw new AccessAdminError(
         "VALIDATION",
         MSG_EMPTY_PERMISSION_SET_FA,
+      );
+    }
+    if (
+      !input.viaLifecycleActivation &&
+      role.permissionSet.permissions.includes(ACCESS_ADMINISTRATION_PERMISSION)
+    ) {
+      throw new AccessAdminError(
+        "VALIDATION",
+        MSG_LIFECYCLE_APPROVAL_REQUIRED_FA,
+        "privileged_role_requires_lifecycle",
       );
     }
   }
@@ -690,7 +758,11 @@ export async function assignAccountAccessRoles(
 }
 
 export async function assignAccountScopes(
-  input: { accountId: string; organizationalScopeIds: string[] },
+  input: {
+    accountId: string;
+    organizationalScopeIds: string[];
+    viaLifecycleActivation?: boolean;
+  },
   actor: AccessAdminActor,
   db: PrismaClient = getIdentityDb(),
 ): Promise<
@@ -702,6 +774,15 @@ export async function assignAccountScopes(
     operation: "access.scope.assign",
   });
 
+  const uniqueScopeIds = [...new Set(input.organizationalScopeIds)];
+  if (uniqueScopeIds.length > 1 && !input.viaLifecycleActivation) {
+    throw new AccessAdminError(
+      "VALIDATION",
+      MSG_LIFECYCLE_APPROVAL_REQUIRED_FA,
+      "mass_scope_assign_requires_lifecycle",
+    );
+  }
+
   const account = await db.internalAccount.findUnique({
     where: { id: input.accountId },
     include: { organizationalScopes: true },
@@ -710,7 +791,6 @@ export async function assignAccountScopes(
     throw new AccessAdminError("NOT_FOUND", "حساب یافت نشد.");
   }
 
-  const uniqueScopeIds = [...new Set(input.organizationalScopeIds)];
   const scopes = await db.organizationalScope.findMany({
     where: { id: { in: uniqueScopeIds } },
   });
@@ -884,6 +964,18 @@ export async function setAccountActiveStatus(
     where: { id: input.accountId },
     data: { status: input.status },
   });
+
+  // FR-49: directory disablement → revoke grants before next protected action.
+  if (input.status === "inactive") {
+    const { revokeActiveGrantsForAccount } = await import(
+      "./entitlement-lifecycle"
+    );
+    await revokeActiveGrantsForAccount(
+      input.accountId,
+      "directory_disablement",
+      db,
+    );
+  }
 
   return {
     entity: { accountId: updated.id, status: updated.status },

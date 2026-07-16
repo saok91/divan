@@ -8,24 +8,31 @@ import {
   ACCESS_ADMINISTRATION_PERMISSION,
   ACCESS_ADMIN_DATA_CATEGORY,
   AccessAdminError,
+  activateGrant,
+  approveGrant,
   assertActorHasAccessAdministration,
   assignAccountAccessRoles,
   assignAccountScopes,
-  createAccessRole,
-  createOrganizationalScope,
+  compensateActivateGrant,
   createPermissionSet,
   getAccountLink,
+  getGrant,
   getIdentityDb,
   listAccessRoles,
   listEntitlements,
+  listGrants,
   listOrganizationalScopes,
   listPermissionSets,
   previewApproveGrant,
+  recertifyGrant,
+  requestGrant,
+  revokeGrant,
   setAccountActiveStatus,
   updateAccessRole,
   updateAccountLink,
   updateOrganizationalScope,
   updatePermissionSet,
+  waiveGrant,
   type MutateResult,
 } from "@divan/identity-access";
 import { createPgPool } from "@divan/db";
@@ -34,6 +41,26 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, governedProcedure } from "./trpc";
+
+const grantKindSchema = z.enum([
+  "sensitive",
+  "global",
+  "bulk",
+  "mass_assignment",
+  "standard",
+  "role_create",
+  "scope_create",
+]);
+
+const grantStatusSchema = z.enum([
+  "requested",
+  "approved",
+  "active",
+  "expired",
+  "revoked",
+  "suspended",
+  "rejected",
+]);
 
 const adminReadMeta = {
   permission: ACCESS_ADMINISTRATION_PERMISSION,
@@ -221,24 +248,35 @@ export const accessAdminRouter = createTRPCRouter({
   createScope: governedProcedure
     .meta({
       ...adminWriteMeta,
-      operation: "access.scope.create",
+      operation: "grant.request",
     })
     .input(z.object({ labelFa: z.string().min(1), active: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
       try {
+        // FR-46: scope creation requires independent approval via grant lifecycle.
         return await mutateWithEvidence({
           accountId: ctx.session.accountId,
           correlationId: ctx.correlationId,
           decisionId: ctx.decisionId,
-          operation: "access.scope.create",
+          operation: "grant.request",
           mutate: () =>
-            createOrganizationalScope(input, {
-              accountId: ctx.session.accountId,
-              correlationId: ctx.correlationId,
-            }),
+            requestGrant(
+              {
+                subjectAccountId: ctx.session.accountId,
+                kind: "scope_create",
+                createPayload: {
+                  scopeLabelFa: input.labelFa,
+                  scopeActive: input.active,
+                },
+              },
+              {
+                accountId: ctx.session.accountId,
+                correlationId: ctx.correlationId,
+              },
+            ),
           compensate: async (result) => {
             const id = result.after.id as string;
-            await getIdentityDb().organizationalScope.delete({ where: { id } });
+            await getIdentityDb().entitlementGrant.delete({ where: { id } });
           },
         });
       } catch (err) {
@@ -365,7 +403,7 @@ export const accessAdminRouter = createTRPCRouter({
   createRole: governedProcedure
     .meta({
       ...adminWriteMeta,
-      operation: "access.role.create",
+      operation: "grant.request",
     })
     .input(
       z.object({
@@ -376,20 +414,31 @@ export const accessAdminRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        // FR-46: role creation requires independent approval via grant lifecycle.
         return await mutateWithEvidence({
           accountId: ctx.session.accountId,
           correlationId: ctx.correlationId,
           decisionId: ctx.decisionId,
-          operation: "access.role.create",
+          operation: "grant.request",
           mutate: () =>
-            createAccessRole(input, {
-              accountId: ctx.session.accountId,
-              correlationId: ctx.correlationId,
-            }),
+            requestGrant(
+              {
+                subjectAccountId: ctx.session.accountId,
+                kind: "role_create",
+                createPayload: {
+                  roleCode: input.code,
+                  roleLabelFa: input.labelFa,
+                  permissionSetId: input.permissionSetId,
+                },
+              },
+              {
+                accountId: ctx.session.accountId,
+                correlationId: ctx.correlationId,
+              },
+            ),
           compensate: async (result) => {
-            await getIdentityDb().accessRole.delete({
-              where: { id: result.after.id as string },
-            });
+            const id = result.after.id as string;
+            await getIdentityDb().entitlementGrant.delete({ where: { id } });
           },
         });
       } catch (err) {
@@ -466,7 +515,11 @@ export const accessAdminRouter = createTRPCRouter({
           compensate: async (result) => {
             const beforeIds = (result.before?.accessRoleIds as string[]) ?? [];
             await assignAccountAccessRoles(
-              { accountId: input.accountId, accessRoleIds: beforeIds },
+              {
+                accountId: input.accountId,
+                accessRoleIds: beforeIds,
+                viaLifecycleActivation: true,
+              },
               {
                 accountId: "compensate",
                 correlationId: ctx.correlationId,
@@ -509,6 +562,7 @@ export const accessAdminRouter = createTRPCRouter({
               {
                 accountId: input.accountId,
                 organizationalScopeIds: beforeIds,
+                viaLifecycleActivation: true,
               },
               {
                 accountId: "compensate",
@@ -622,13 +676,13 @@ export const accessAdminRouter = createTRPCRouter({
     }),
 
   /**
-   * Stub approve-grant preview — toxic fail-closed for Story 2.4 lifecycle.
-   * Not a full entitlement approval API.
+   * Stub approve-grant preview — toxic fail-closed compatibility for Story 2.3.
+   * Prefer approveGrant for real lifecycle approvals.
    */
   previewApproveGrant: governedProcedure
     .meta({
       ...adminWriteMeta,
-      operation: "access.grant.approve.preview",
+      operation: "grant.approve",
     })
     .input(
       z.object({
@@ -646,6 +700,335 @@ export const accessAdminRouter = createTRPCRouter({
           grantId: input.grantId,
           combinesPermissionAdminWithSameGrantApproval:
             input.combinesPermissionAdminWithSameGrantApproval,
+        });
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  listGrants: governedProcedure
+    .meta({
+      ...adminReadMeta,
+      operation: "grant.list",
+    })
+    .input(
+      z
+        .object({
+          status: z
+            .union([grantStatusSchema, z.array(grantStatusSchema)])
+            .optional(),
+          subjectAccountId: z.string().min(1).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      await requireAdminBinding(ctx.session.accountId);
+      return listGrants(input ?? {});
+    }),
+
+  getGrant: governedProcedure
+    .meta({
+      ...adminReadMeta,
+      operation: "grant.get",
+    })
+    .input(z.object({ grantId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await requireAdminBinding(ctx.session.accountId);
+      const grant = await getGrant(input.grantId);
+      if (!grant) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "درخواست دسترسی یافت نشد.",
+        });
+      }
+      return grant;
+    }),
+
+  requestGrant: governedProcedure
+    .meta({
+      ...adminWriteMeta,
+      operation: "grant.request",
+    })
+    .input(
+      z.object({
+        subjectAccountId: z.string().min(1),
+        kind: grantKindSchema,
+        accessRoleId: z.string().min(1).nullable().optional(),
+        organizationalScopeId: z.string().min(1).nullable().optional(),
+        createPayload: z
+          .object({
+            roleCode: z.string().optional(),
+            roleLabelFa: z.string().optional(),
+            permissionSetId: z.string().optional(),
+            scopeLabelFa: z.string().optional(),
+            scopeActive: z.boolean().optional(),
+          })
+          .nullable()
+          .optional(),
+        startsAt: z.string().datetime().nullable().optional(),
+        expiresAt: z.string().datetime().nullable().optional(),
+        recertifyBy: z.string().datetime().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mutateWithEvidence({
+          accountId: ctx.session.accountId,
+          correlationId: ctx.correlationId,
+          decisionId: ctx.decisionId,
+          operation: "grant.request",
+          mutate: () =>
+            requestGrant(
+              {
+                subjectAccountId: input.subjectAccountId,
+                kind: input.kind,
+                accessRoleId: input.accessRoleId,
+                organizationalScopeId: input.organizationalScopeId,
+                createPayload: input.createPayload,
+                startsAt: input.startsAt ? new Date(input.startsAt) : null,
+                expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+                recertifyBy: input.recertifyBy
+                  ? new Date(input.recertifyBy)
+                  : null,
+              },
+              {
+                accountId: ctx.session.accountId,
+                correlationId: ctx.correlationId,
+              },
+            ),
+          compensate: async (result) => {
+            const id = result.after.id as string;
+            await getIdentityDb().entitlementGrant.delete({ where: { id } });
+          },
+        });
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  approveGrant: governedProcedure
+    .meta({
+      ...adminWriteMeta,
+      operation: "grant.approve",
+    })
+    .input(
+      z.object({
+        grantId: z.string().min(1),
+        combinesPermissionAdminWithSameGrantApproval: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mutateWithEvidence({
+          accountId: ctx.session.accountId,
+          correlationId: ctx.correlationId,
+          decisionId: ctx.decisionId,
+          operation: "grant.approve",
+          mutate: () =>
+            approveGrant(input, {
+              accountId: ctx.session.accountId,
+              correlationId: ctx.correlationId,
+            }),
+          compensate: async (result) => {
+            const id = result.after.id as string;
+            const beforeStatus = result.before?.status as string | undefined;
+            if (!beforeStatus) return;
+            await getIdentityDb().entitlementGrant.update({
+              where: { id },
+              data: {
+                status: beforeStatus as
+                  | "requested"
+                  | "approved"
+                  | "active"
+                  | "expired"
+                  | "revoked"
+                  | "suspended"
+                  | "rejected",
+                approverAccountId:
+                  (result.before?.approverAccountId as string | null) ?? null,
+              },
+            });
+          },
+        });
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  activateGrant: governedProcedure
+    .meta({
+      ...adminWriteMeta,
+      operation: "grant.activate",
+    })
+    .input(
+      z.object({
+        grantId: z.string().min(1),
+        recertifyBy: z.string().datetime().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mutateWithEvidence({
+          accountId: ctx.session.accountId,
+          correlationId: ctx.correlationId,
+          decisionId: ctx.decisionId,
+          operation: "grant.activate",
+          mutate: () =>
+            activateGrant(
+              {
+                grantId: input.grantId,
+                recertifyBy: input.recertifyBy
+                  ? new Date(input.recertifyBy)
+                  : undefined,
+              },
+              {
+                accountId: ctx.session.accountId,
+                correlationId: ctx.correlationId,
+              },
+            ),
+          compensate: async (result) => {
+            await compensateActivateGrant(result);
+          },
+        });
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  revokeGrant: governedProcedure
+    .meta({
+      ...adminWriteMeta,
+      operation: "grant.revoke",
+    })
+    .input(
+      z.object({
+        grantId: z.string().min(1),
+        reason: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mutateWithEvidence({
+          accountId: ctx.session.accountId,
+          correlationId: ctx.correlationId,
+          decisionId: ctx.decisionId,
+          operation: "grant.revoke",
+          mutate: () =>
+            revokeGrant(input, {
+              accountId: ctx.session.accountId,
+              correlationId: ctx.correlationId,
+            }),
+          compensate: async () => {
+            // Best-effort: revocation evidence failure cannot safely re-bind
+            // without risking privilege restoration — leave revoked.
+          },
+        });
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  waiveGrant: governedProcedure
+    .meta({
+      ...adminWriteMeta,
+      operation: "grant.waive",
+    })
+    .input(
+      z.object({
+        grantId: z.string().min(1),
+        reason: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mutateWithEvidence({
+          accountId: ctx.session.accountId,
+          correlationId: ctx.correlationId,
+          decisionId: ctx.decisionId,
+          operation: "grant.waive",
+          mutate: () =>
+            waiveGrant(input, {
+              accountId: ctx.session.accountId,
+              correlationId: ctx.correlationId,
+            }),
+          compensate: async (result) => {
+            const id = result.after.id as string;
+            const beforeStatus = result.before?.status as string | undefined;
+            if (!beforeStatus) return;
+            await getIdentityDb().entitlementGrant.update({
+              where: { id },
+              data: {
+                status: beforeStatus as
+                  | "requested"
+                  | "approved"
+                  | "active"
+                  | "expired"
+                  | "revoked"
+                  | "suspended"
+                  | "rejected",
+                revokedAt: null,
+                revokeReason: null,
+              },
+            });
+          },
+        });
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  recertifyGrant: governedProcedure
+    .meta({
+      ...adminWriteMeta,
+      operation: "grant.recertify",
+    })
+    .input(
+      z.object({
+        grantId: z.string().min(1),
+        recertifyBy: z.string().datetime().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mutateWithEvidence({
+          accountId: ctx.session.accountId,
+          correlationId: ctx.correlationId,
+          decisionId: ctx.decisionId,
+          operation: "grant.recertify",
+          mutate: () =>
+            recertifyGrant(
+              {
+                grantId: input.grantId,
+                recertifyBy: input.recertifyBy
+                  ? new Date(input.recertifyBy)
+                  : undefined,
+              },
+              {
+                accountId: ctx.session.accountId,
+                correlationId: ctx.correlationId,
+              },
+            ),
+          compensate: async (result) => {
+            const id = result.after.id as string;
+            const beforeStatus = result.before?.status as string | undefined;
+            if (!beforeStatus) return;
+            await getIdentityDb().entitlementGrant.update({
+              where: { id },
+              data: {
+                status: beforeStatus as
+                  | "requested"
+                  | "approved"
+                  | "active"
+                  | "expired"
+                  | "revoked"
+                  | "suspended"
+                  | "rejected",
+                recertifyBy: result.before?.recertifyBy
+                  ? new Date(String(result.before.recertifyBy))
+                  : null,
+              },
+            });
+          },
         });
       } catch (err) {
         mapAdminError(err);

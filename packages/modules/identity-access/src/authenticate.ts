@@ -311,6 +311,12 @@ export async function getSessionContext(
   });
   if (!account || account.status !== "active") return null;
 
+  // Story 2.4: lazy expiry + overdue-recert fail-safe before next protected action.
+  const { applyProtectedEntryFailSafes } = await import(
+    "./entitlement-lifecycle"
+  );
+  await applyProtectedEntryFailSafes(account.id, new Date(), db);
+
   const organizationalScopeIds = await loadOrganizationalScopeIdsForAccount(
     account.id,
     db,
@@ -352,17 +358,27 @@ export async function signOut(_accountId?: string): Promise<void> {
 
 /**
  * Dev helper: mark an account active/inactive so inactive fail-closed is testable.
- * Not a production admin API.
+ * Not a production admin API. On inactive, revokes grants (FR-49).
  */
 export async function setAccountStatus(
   username: string,
   status: "active" | "inactive",
   db: PrismaClient = getIdentityDb(),
 ): Promise<void> {
-  await db.internalAccount.update({
+  const updated = await db.internalAccount.update({
     where: { username },
     data: { status },
   });
+  if (status === "inactive") {
+    const { revokeActiveGrantsForAccount } = await import(
+      "./entitlement-lifecycle"
+    );
+    await revokeActiveGrantsForAccount(
+      updated.id,
+      "directory_disablement",
+      db,
+    );
+  }
 }
 
 async function recordAttempt(

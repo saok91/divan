@@ -91,7 +91,7 @@
 ## Deferred from: Story 2.3 access administration UI & APIs (2026-07-16)
 
 - **AR-ACCESS** still pending ? production field?action?scope matrix, full toxic-combination catalog, bulk thresholds; Story 2.3 ships fail-closed toxic hooks + governed CRUD only
-- Entitlement request?approval?expiry?recertification lifecycle ? Story 2.4 (preview approve path only blocks toxic combinations)
+- ~~Entitlement request?approval?expiry?recertification lifecycle ? Story 2.4~~ **done in Story 2.4** (real grant state machine + lazy fail-safe on protected entry)
 - Break-glass grant UI / elevation ? Story 2.5 (permission administration must remain deniable under break-glass by default)
 - LDAP/AD group ? coarse role or Organizational Scope sync ? still forbidden until AR-IDENTITY; Admin may only view/clear/relink `externalDirectoryId`
 - Full audit investigation UI for access evidence ? Story 7.1 (events append to event-store; reviewable via query)
@@ -104,3 +104,19 @@
 - `governedProcedure` `decisionId ?? correlationId` fallback ? pre-existing 2.1 substrate; not reachable after successful `authorizeOrThrow`
 - Minimal UI first-item role/scope assign ? MVP acceptable; APIs already support full id lists; richer multi-select/clear UX later
 - PermissionSet.permissions free-string catalog ? defer allowlist until AR-ACCESS freezes production permission codes; empty sets still rejected
+
+## Deferred from: Story 2.4 entitlement lifecycle (2026-07-16)
+
+- **Break-glass** incident-bound grants + banner + post-use review ? Story 2.5
+- **Temporal / as-of / cross-boundary** retrieval authz ? Story 2.6
+- **Inference / bulk / small-cohort** thresholds ? Story 2.7
+- **Artifact / export reauth consumers** must call `reauthorizeForQueuedOrArtifactWork` ? Stories 6.5 / 7.x (hook shipped; no full artifact lifecycle here)
+- **Optional background expiry/recert worker** (pg-boss) ? MVP uses lazy fail-safe on `getSessionContext` / governed entry; cron not required
+- **AR-ACCESS** production matrix values (approval kinds, recert SLA, revocation objective milliseconds) still pending ? demo hooks are configurable + fail-closed
+- Dual-admin UX for independent approve in single-seed environments ? selfcheck temporarily binds `access_admin` to a second account; production needs ?2 access admins
+
+## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
+
+- Empty `assignAccountAccessRoles` / `assignAccountScopes` (full wipe) bypasses the new mass-assign lifecycle gate ? pre-existing Story 2.3 full-replace semantics; only `length > 1` was gated in 2.4
+- Legacy/non-grant `AccountAccessRole` / scope joins (direct standard assign) are invisible to expiry/recert fail-safes ? intentional while standard single assign remains; revisit when AR-ACCESS classifies privileged singles
+- `mass_assignment` grant kind is gated at direct assign but has no multi-target activate payload ? defer fulfillment until AR-ACCESS / follow-up; avoid scope creep in 2.4 patch pass
