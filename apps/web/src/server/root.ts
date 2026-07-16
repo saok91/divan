@@ -13,8 +13,6 @@ import {
   assertActorHasBreakGlassPrivilegedRead,
   assertBreakGlassElevationLimits,
   currentAsOfDate,
-  drillDownPopulation,
-  intersectPopulation,
 } from "@divan/identity-access";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -26,6 +24,23 @@ import {
   protectedProcedure,
 } from "./trpc";
 import { accessAdminRouter } from "./access-admin";
+import {
+  actorHasActiveBulkGrant,
+  runGovernedDrillDown,
+  runGovernedRetrieval,
+} from "./retrieval-control";
+
+const retrievalChannelSchema = z.enum([
+  "profile",
+  "timeline",
+  "search",
+  "list",
+  "count",
+  "dashboard",
+  "report",
+  "export",
+  "audit",
+]);
 
 /**
  * `me` is session-only identity (not sensitive HR content) — deliberately
@@ -84,6 +99,7 @@ export const appRouter = createTRPCRouter({
    * Privileged demo HR read under break-glass elevation (Story 2.5).
    * Envelope allow + PermissionSet binding from active break-glass activate.
    * Story 2.6: still runs population intersection — no out-of-scope bypass.
+   * Story 2.7: InferenceBulkPort still evaluates — BG cannot bypass thresholds.
    */
   demoBreakGlassPrivilegedHrRead: governedProcedure
     .meta({
@@ -115,35 +131,31 @@ export const appRouter = createTRPCRouter({
         throw err;
       }
 
-      const pop = intersectPopulation({
+      const result = await runGovernedRetrieval({
         actorAccountId: ctx.session.accountId,
         actorScopeCodes: ctx.session.organizationalScopeCodes,
-        asOfDate: currentAsOfDate(),
         channel: "profile",
         objectIds: input?.objectIds,
         dataCategory: DEMO_SENSITIVE_HR_READ_TUPLE.dataCategory,
+        correlationId: ctx.correlationId,
+        purpose: "break_glass_privileged_hr_read",
+        organizationalScope: DEMO_SENSITIVE_HR_READ_TUPLE.organizationalScope,
       });
-      if (!pop.ok) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "دسترسی ندارید.",
-        });
-      }
 
       return {
         ok: true as const,
         fixture: "break_glass_privileged_hr_read" as const,
         incidentId: ctx.session.breakGlass.incidentId,
         grantId: ctx.session.breakGlass.grantId,
-        authorizedSubjectIds: pop.subjectIds,
+        retrieval: result.payload,
         // No HR field values — purpose/incident correlation only (FR-51).
       };
     }),
 
   /**
-   * Demo scoped retrieval — intersection-only aggregate (Story 2.6 / FR-47).
-   * Out-of-scope ids omitted (not masked as 0).
-   * Client temporal fields honored only via allowClientTemporal (synced with envelope).
+   * Demo scoped retrieval — PopulationPort ∩ InferenceBulkPort (Stories 2.6–2.7).
+   * Out-of-scope ids omitted (not masked as 0). Suppress ≠ empty ≠ zero.
+   * All channels (search|list|count|dashboard|report|export|…) share this plane.
    */
   demoScopedRetrieval: governedProcedure
     .meta({
@@ -159,58 +171,54 @@ export const appRouter = createTRPCRouter({
     .input(
       z
         .object({
-          channel: z
-            .enum([
-              "profile",
-              "timeline",
-              "search",
-              "count",
-              "dashboard",
-              "report",
-              "export",
-              "audit",
-            ])
-            .default("search"),
+          channel: retrievalChannelSchema.default("search"),
           asOfDate: z.string().optional(),
           evaluationMode: z.enum(["current", "as_of"]).optional(),
           objectIds: z.array(z.string()).optional(),
           /** Clamped to session membership — cannot invent out-of-membership codes. */
           actorScopeCodesOverride: z.array(z.string()).optional(),
           unreconciled: z.boolean().optional(),
+          cellKey: z.string().optional(),
+          fields: z.array(z.string()).optional(),
+          /** Aggregate sensitivity — may require activated bulk grant. */
+          sensitiveAggregate: z.boolean().optional(),
+          /** Explicit demo co-approval (in addition to activated bulk grant). */
+          demoBulkApproval: z.boolean().optional(),
         })
         .optional(),
     )
-    .query(({ ctx, input }) => {
+    .query(async ({ ctx, input }) => {
       const held = ctx.session.organizationalScopeCodes;
       const requested = input?.actorScopeCodesOverride;
       const codes = requested?.length
         ? requested.filter((c) => held.includes(c))
         : held;
-      // Population as-of must match envelope evaluation (no split-brain).
       const asOf =
         ctx.evaluationMode === "as_of" && ctx.asOfDate
           ? ctx.asOfDate
           : currentAsOfDate();
-      const pop = intersectPopulation({
+      const channel = input?.channel ?? "search";
+      const result = await runGovernedRetrieval({
         actorAccountId: ctx.session.accountId,
         actorScopeCodes: codes,
+        channel,
         asOfDate: asOf,
-        channel: input?.channel ?? "search",
         objectIds: input?.objectIds,
         dataCategory: "demo.non_hr",
-        unreconciled: input?.unreconciled === true ? true : undefined,
+        unreconciled: input?.unreconciled,
+        correlationId: ctx.correlationId,
+        purpose: "demo.retrieval.scoped",
+        organizationalScope: "org:selfcheck",
+        cellKey: input?.cellKey,
+        fields: input?.fields,
+        sensitivity: input?.sensitiveAggregate === true,
+        demoBulkApproval: input?.demoBulkApproval === true,
       });
-      if (!pop.ok) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "دسترسی ندارید.",
-        });
-      }
+
       return {
         ok: true as const,
-        subjectIds: pop.subjectIds,
-        factKeys: pop.factKeys,
-        volume: pop.subjectIds.length,
+        channel,
+        retrieval: result.payload,
         resultSemantics: ctx.resultSemantics,
         evaluationMode: ctx.evaluationMode,
         asOfDate: asOf,
@@ -219,7 +227,7 @@ export const appRouter = createTRPCRouter({
 
   /**
    * Drill-down from aggregate — same authorized set (recomputed identically).
-   * Widening beyond parent set → deny (fail closed).
+   * Widening beyond parent set → deny. Suppressed parent → fail closed (2.7).
    */
   demoRetrievalDrillDown: governedProcedure
     .meta({
@@ -230,47 +238,98 @@ export const appRouter = createTRPCRouter({
       operation: "demo.retrieval.drill_down",
       sensitive: true,
       devOnly: true,
+      allowClientTemporal: true,
     })
     .input(
       z.object({
         objectId: z.string().min(1),
         actorScopeCodesOverride: z.array(z.string()).optional(),
+        demoBulkApproval: z.boolean().optional(),
       }),
     )
-    .query(({ ctx, input }) => {
+    .query(async ({ ctx, input }) => {
       const held = ctx.session.organizationalScopeCodes;
       const requested = input.actorScopeCodesOverride;
       const codes = requested?.length
         ? requested.filter((c) => held.includes(c))
         : held;
-      const parent = {
+      const asOf =
+        ctx.evaluationMode === "as_of" && ctx.asOfDate
+          ? ctx.asOfDate
+          : currentAsOfDate();
+      const result = await runGovernedDrillDown({
         actorAccountId: ctx.session.accountId,
         actorScopeCodes: codes,
-        asOfDate: currentAsOfDate(),
-        channel: "search" as const,
+        objectId: input.objectId,
         dataCategory: "demo.non_hr",
-      };
-      const parentResult = intersectPopulation(parent);
-      const child = drillDownPopulation(parent, input.objectId);
-      if (!parentResult.ok || !child.ok) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "دسترسی ندارید.",
-        });
-      }
-      const widened = child.subjectIds.some(
-        (id) => !parentResult.subjectIds.includes(id),
-      );
-      if (widened) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "دسترسی ندارید.",
-        });
-      }
+        asOfDate: asOf,
+        correlationId: ctx.correlationId,
+        purpose: "demo.retrieval.drill_down",
+        organizationalScope: "org:selfcheck",
+        demoBulkApproval: input.demoBulkApproval === true,
+      });
+
       return {
-        parentSubjectIds: parentResult.subjectIds,
-        childSubjectIds: child.subjectIds,
+        retrieval: result.payload,
       };
+    }),
+
+  /**
+   * Multi-channel inference parity probe — same control plane for count vs export.
+   * Does not invent export permission; uses read + channel facet for FR-48 demos.
+   * Runs full runGovernedRetrieval (evidence + window) per channel.
+   */
+  demoInferenceBulkProbe: governedProcedure
+    .meta({
+      permission: "demo.retrieval.read",
+      dataCategory: "demo.non_hr",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+      operation: "demo.inference_bulk.probe",
+      sensitive: true,
+      devOnly: true,
+    })
+    .input(
+      z.object({
+        channels: z
+          .array(retrievalChannelSchema)
+          .min(1)
+          .default(["count", "dashboard", "export"]),
+        objectIds: z.array(z.string()).optional(),
+        actorScopeCodesOverride: z.array(z.string()).optional(),
+        sensitiveAggregate: z.boolean().optional(),
+        demoBulkApproval: z.boolean().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const held = ctx.session.organizationalScopeCodes;
+      const requested = input.actorScopeCodesOverride;
+      const codes = requested?.length
+        ? requested.filter((c) => held.includes(c))
+        : held;
+      const hasBulk =
+        input.demoBulkApproval === true ||
+        (await actorHasActiveBulkGrant(ctx.session.accountId));
+      const results: Record<
+        string,
+        Awaited<ReturnType<typeof runGovernedRetrieval>>["payload"]
+      > = {};
+      for (const channel of input.channels) {
+        const result = await runGovernedRetrieval({
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: codes,
+          channel,
+          objectIds: input.objectIds,
+          dataCategory: "demo.non_hr",
+          correlationId: ctx.correlationId,
+          purpose: "demo.inference_bulk.probe",
+          organizationalScope: "org:selfcheck",
+          sensitivity: input.sensitiveAggregate === true,
+          demoBulkApproval: input.demoBulkApproval === true,
+        });
+        results[channel] = result.payload;
+      }
+      return { ok: true as const, results, bulkApprovalPresent: hasBulk };
     }),
 
   /**

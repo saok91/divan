@@ -109,7 +109,7 @@
 
 - ~~**Break-glass** incident-bound grants + banner + post-use review ? Story 2.5~~ **done in Story 2.5**
 - ~~**Temporal / as-of / cross-boundary** retrieval authz ? Story 2.6~~ **done in Story 2.6** (control plane: PopulationPort fixtures, membership, as-of, cross_time_scope, mid-session modal; Epic 3/4 replace fixture port with real projections)
-- **Inference / bulk / small-cohort** thresholds ? Story 2.7
+- ~~**Inference / bulk / small-cohort** thresholds ? Story 2.7~~ **done in Story 2.7** (InferenceBulkPort + shared channel plane + bulk approval gate + BG non-bypass; AR-ACCESS/AR-REPORTING production numbers still pending)
 - **Artifact / export reauth consumers** must call `reauthorizeForQueuedOrArtifactWork` ? Stories 6.5 / 7.x (hook shipped + asOf/population optional; no full artifact lifecycle here)
 - **Optional background expiry/recert worker** (pg-boss) ? MVP uses lazy fail-safe on `getSessionContext` / governed entry; cron not required
 - **AR-ACCESS** production matrix values (approval kinds, recert SLA, revocation objective milliseconds) still pending ? demo hooks are configurable + fail-closed
@@ -120,7 +120,7 @@
 - **AR-ACCESS** exact break-glass policy / max-duration SLA / production elevation matrix ? launch artifacts; demo hooks only
 - **Emergency LDAP/local break-glass account** vaulting, FIDO, dual-custody ? AR-IDENTITY (open)
 - ~~**Temporal / as-of** must still bound break-glass retrievals ? Story 2.6~~ **done in Story 2.6** (privileged demo read runs PopulationPort intersection)
-- **Inference / bulk** must not be bypassed by break-glass channels ? Story 2.7
+- ~~**Inference / bulk** must not be bypassed by break-glass channels ? Story 2.7~~ **done in Story 2.7** (privileged demo read runs InferenceBulkPort; export/admin denials unchanged)
 - **Full export artifact panel** / exceptional export UX ? Story 6.5
 - **Audit investigation UI** / ?no self-review of sensitive activity? surface ? Story 7.1 (evidence + toxic review API shipped here)
 - **NFR-6 restore-invalidates-emergency-grants** ? no backup restore path yet; deferred hook documented in `break-glass.ts`
@@ -131,10 +131,19 @@
 
 - **Epic 3/4** replace fixture `PopulationPort` with Person / Assignment / OrgUnit projection-backed population
 - **Full personnel search / profile / dashboard / report catalogue** consume intersection API ? Epic 5
-- **Inference / bulk / small-cohort** thresholds ? Story 2.7
+- ~~**Inference / bulk / small-cohort** thresholds ? Story 2.7~~ **done in Story 2.7** (control plane shipped; Epic 5/6 consumers + AR-* production numbers remain)
 - **Artifact reauth consumers** with as-of/population ? Stories 6.5 / 7.x
 - **AR-ACCESS** production field?action?scope?time matrix values
 - **AR-TEMPORAL** full freeze beyond partial (Asia/Tehran date-only / exclusive ends / future?Effective labeling already hooked)
+
+## Deferred from: Story 2.7 inference-resistant & bulk retrieval controls (2026-07-17)
+
+- **AR-ACCESS** production bulk/volume/window/field-cumulative threshold numbers + toxic catalog freeze
+- **AR-REPORTING** production small-cohort numbers + sequential acceptance fixtures + full secondary cell-suppression table algebra
+- **Epic 5** search / profile / dashboard / report catalogue consumers of InferenceBulkPort (demo plane only here)
+- **Story 6.5** export artifact panel / custody ack on top of same thresholds
+- Complementary secondary-suppression sophistication beyond demo equivalent (fail-closed comparison surface)
+
 ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
 
 - Empty `assignAccountAccessRoles` / `assignAccountScopes` (full wipe) bypasses the new mass-assign lifecycle gate ? pre-existing Story 2.3 full-replace semantics; only `length > 1` was gated in 2.4
@@ -151,3 +160,10 @@
 - Authz binding fingerprint hashes role/scope ids only; permission-set content edits on the same role ids do not trigger mid-session AUTHZ_CHANGED ? deepen when AR-ACCESS classifies privileged permission mutations
 - PopulationPort `unreconciled` is only a caller flag; no server-side membership reconciliation signal yet ? Epic 3/4 projection sync owns real stale/unreconciled detection
 - `intervalsOverlap` compares raw strings without `parseDateOnly` ? fine for trusted fixture bounds; harden if untrusted interval inputs appear
+
+## Deferred from: code review of 2-7-inference-resistant-bulk-retrieval-controls.md (2026-07-17)
+
+- In-memory `actorWindows` Map is process-local ? multi-instance / serverless / restart bypasses volume + differencing until a shared store lands with AR-ACCESS
+- Concurrent `evaluateInferenceBulk` for the same `actorId` can race window counters ? needs actor-scoped lock or shared atomic store (same production hardening as above)
+- `AUDIT_INFERENCE_BULK_ENABLED=true` in production loads DEMO hook numbers ? keep fail-closed default; wire real AR-ACCESS/AR-REPORTING values when freeze lands (do not invent)
+- Export channel facet on `demoScopedRetrieval` / `demoInferenceBulkProbe` uses `action: "read"` for FR-48 parity ? full FR-3 export allow + 2.5 elevation denials on channel facet wait for Story 6.5 / real export surfaces

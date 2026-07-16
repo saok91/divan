@@ -10,7 +10,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "selfcheck": "tsx src/audit-envelope.selfcheck.ts"
+    "selfcheck": "tsx src/audit-envelope.selfcheck.ts",
+    "selfcheck:inference-bulk": "tsx src/inference-bulk.selfcheck.ts"
   },
   "dependencies": {
     "@divan/event-store": "workspace:*",

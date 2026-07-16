@@ -16,6 +16,12 @@ export const operationalCopy = {
   /** Empty search (palette / personnel stub). */
   emptySearch: "نتیجه‌ای پیدا نشد. عبارت یا فیلتر را عوض کنید.",
 
+  /**
+   * Suppressed small-cohort / differencing (Story 2.7 / UX-DR15).
+   * Never render as 0 — cards and cells use this exact string.
+   */
+  suppressedCohort: "داده قابل نمایش نیست",
+
   /** Viewport gate (genuine small window). */
   viewportGateBody:
     "برای استفاده از دیوان، حداقل وضوح صفحهٔ نمایش {size} لازم است. لطفاً پنجره را بزرگ‌تر کنید یا از نمایشگر دسکتاپ استفاده کنید.",

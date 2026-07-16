@@ -1467,6 +1467,7 @@ export async function reauthorizeForQueuedOrArtifactWork(
       | "profile"
       | "timeline"
       | "search"
+      | "list"
       | "count"
       | "dashboard"
       | "report"

@@ -22,7 +22,8 @@
     "selfcheck:access-admin": "pnpm --filter @divan/identity-access selfcheck:access-admin",
     "selfcheck:entitlement-lifecycle": "pnpm --filter @divan/identity-access selfcheck:entitlement-lifecycle",
     "selfcheck:break-glass": "pnpm --filter @divan/identity-access selfcheck:break-glass",
-    "selfcheck:temporal-authz": "pnpm --filter @divan/identity-access selfcheck:temporal-authz"
+    "selfcheck:temporal-authz": "pnpm --filter @divan/identity-access selfcheck:temporal-authz",
+    "selfcheck:inference-bulk": "pnpm --filter @divan/audit-envelope selfcheck:inference-bulk"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

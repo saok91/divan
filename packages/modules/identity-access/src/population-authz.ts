@@ -5,6 +5,10 @@
  * Callers: after envelope allow (or as part of authorize path for demos).
  * Empty intersection → safe empty / omit — never invent out-of-scope rows.
  *
+ * Story 2.7: after intersect, callers MUST run InferenceBulkPort
+ * (`evaluateInferenceBulk` in `@divan/audit-envelope`) before returning
+ * counts/lists/exports — cohort size is on the authorized set only.
+ *
  * Management-derived default: only facts inside the authorized relationship
  * interval. Pre-scope (current manager) and post-scope (former manager)
  * require an active cross_time_scope grant — never silent widen.
@@ -23,6 +27,7 @@ export type RetrievalChannel =
   | "profile"
   | "timeline"
   | "search"
+  | "list"
   | "count"
   | "dashboard"
   | "report"

@@ -15,6 +15,16 @@ import {
   loadCategoryRegistry,
   type CategoryRegistry,
 } from "./categories";
+import {
+  AuthorizationError,
+  MSG_ACCESS_DENIED_FA,
+} from "./authorization-error";
+
+export {
+  AuthorizationError,
+  MSG_ACCESS_DENIED_FA,
+  type AuthorizationErrorCode,
+} from "./authorization-error";
 
 export {
   DEV_DEMO_CATEGORIES,
@@ -27,11 +37,31 @@ export {
   type SensitiveCategory,
 } from "./categories";
 
-/**
- * Persian FORBIDDEN copy — must stay aligned with
- * `operationalCopy.accessDeniedTitle` in apps/web (`دسترسی ندارید.`).
- */
-export const MSG_ACCESS_DENIED_FA = "دسترسی ندارید.";
+export {
+  DEMO_INFERENCE_BULK_HOOKS,
+  DISABLED_INFERENCE_BULK_HOOKS,
+  MSG_SUPPRESSED_COHORT_FA,
+  clearInferenceBulkWindowsForTests,
+  evaluateInferenceBulk,
+  fingerprintAuthorizedSet,
+  getInferenceBulkHooks,
+  isIdentityRetrievalChannel,
+  loadInferenceBulkHooks,
+  newInferenceCorrelationId,
+  recordInferenceBulkAccessEvent,
+  setInferenceBulkHooksForTests,
+  symmetricDifferenceSize,
+  toGovernedRetrievalPayload,
+  type GovernedRetrievalPayload,
+  type InferenceBulkAccessOutcome,
+  type InferenceBulkChannel,
+  type InferenceBulkDecision,
+  type InferenceBulkEvaluateInput,
+  type InferenceBulkEvaluateResult,
+  type InferenceBulkHooks,
+  type QueryFingerprint,
+  type RecordInferenceBulkAccessInput,
+} from "./inference-bulk";
 
 export type EvaluationMode = "current" | "as_of";
 
@@ -95,37 +125,6 @@ export type PolicyRule = {
 export type PolicyRegistry = {
   rules: readonly PolicyRule[];
 };
-
-export type AuthorizationErrorCode = "FORBIDDEN" | "AUDIT_APPEND_FAILED";
-
-/**
- * Envelope-owned deny / audit-failure error.
- * API boundary maps FORBIDDEN → TRPCError FORBIDDEN with messageFa.
- */
-export class AuthorizationError extends Error {
-  readonly code: AuthorizationErrorCode;
-  readonly messageFa: string;
-  readonly correlationId: string;
-  readonly decisionId: string | null;
-  /** Internal deny reason for access-event payload (never shown to user). */
-  readonly denyReason: string | null;
-
-  constructor(
-    code: AuthorizationErrorCode,
-    messageFa: string,
-    correlationId: string,
-    decisionId: string | null = null,
-    denyReason: string | null = null,
-  ) {
-    super(code);
-    this.name = "AuthorizationError";
-    this.code = code;
-    this.messageFa = messageFa;
-    this.correlationId = correlationId;
-    this.decisionId = decisionId;
-    this.denyReason = denyReason;
-  }
-}
 
 /**
  * Tiny local/dev fixture — proves default-deny + controlled allows.

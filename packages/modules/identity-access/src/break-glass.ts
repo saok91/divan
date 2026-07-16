@@ -11,6 +11,9 @@
  * - `allowExceptionalExportCoApproval` / `allowExceptionalPermissionAdminCoApproval`
  *   (default **false** — export + permission-admin stay denied under elevation)
  *
+ * Story 2.7: elevation does **not** bypass InferenceBulkPort — privileged
+ * retrieval demos still evaluate small-cohort / volume / differencing hooks.
+ *
  * NFR-6 deferred hook: restored emergency grants remain invalid until catch-up.
  * No backup-restore path exists yet — do not fake invalidate-on-restore here.
  */
