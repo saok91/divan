@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UX Design Validation: Divan HRIS</title>
+<style>
+  :root {
+    --bg: #fafaf9; --surface: #ffffff; --border: #e7e5e4; --text: #1c1917; --muted: #78716c;
+    --verdict-strong: #16a34a; --verdict-adequate: #65a30d; --verdict-thin: #d97706; --verdict-broken: #dc2626;
+    --sev-low: #64748b; --sev-medium: #ca8a04; --sev-high: #ea580c; --sev-critical: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; font-size: 15px; margin: 0; }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+  header.report-header { display: flex; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, monospace; }
+  .synthesis { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--muted); border-radius: 8px; padding: 18px 22px; margin-bottom: 24px; }
+  .dimension-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .dim-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+  section.dimension details, section.reviewer-section details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
+  section summary { padding: 14px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; list-style: none; }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before { content: "▸"; color: var(--muted); }
+  section details[open] summary::before { transform: rotate(90deg); display: inline-block; }
+  section summary h2 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+  .verdict-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; text-transform: uppercase; color: white; }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .dim-body { padding: 4px 20px 18px; font-size: 14.5px; }
+  .findings-list { padding: 0 20px 4px; }
+  article.finding { padding: 14px 0; border-top: 1px solid var(--border); }
+  article.finding header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .badge { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+  .badge-sev-critical { background: rgba(220,38,38,.14); color: var(--sev-critical); }
+  .badge-sev-high { background: rgba(234,88,12,.14); color: var(--sev-high); }
+  .badge-sev-medium { background: rgba(202,138,4,.14); color: var(--sev-medium); }
+  .badge-sev-low { background: rgba(100,116,139,.12); color: var(--sev-low); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; }
+  .finding-location { font-family: ui-monospace, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); }
+  .reviewer-source { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .mechanical { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-top: 24px; font-size: 14px; }
+  footer.report-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .count-grid { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0 24px; }
+  .count-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; text-align: center; min-width: 90px; }
+  .count-box .n { font-size: 24px; font-weight: 700; }
+  .count-box.critical .n { color: var(--sev-critical); }
+  .count-box.high .n { color: var(--sev-high); }
+  .count-box.medium .n { color: var(--sev-medium); }
+  .count-box.low .n { color: var(--sev-low); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="report-header">
+    <div class="title">
+      <h1>Divan HRIS — UX Design Validation Report</h1>
+      <div class="subtitle">ux-divan-2026-07-13 · DESIGN.md + EXPERIENCE.md</div>
+    </div>
+  </header>
+
+  <div class="synthesis">
+    <p>The spine pair is <strong>architecture-ready</strong> with strong UJ-1–UJ-5 coverage and correct canonical shape. Validation found gaps in dark-mode tokens, Jalali/export components, accessibility contracts, and session-edge UI — address via a focused Update before import/reporting story baselines.</p>
+    <p>Accessibility review adds one <strong>critical</strong> contrast verification item for gold CTAs in dark mode. Edge-case review highlights scope-revocation, banner stacking, and recalc blocking as high-priority additions to State Patterns.</p>
+  </div>
+
+  <div class="count-grid">
+    <div class="count-box critical"><div class="n">1</div>critical</div>
+    <div class="count-box high"><div class="n">8</div>high</div>
+    <div class="count-box medium"><div class="n">19</div>medium</div>
+    <div class="count-box low"><div class="n">10</div>low</div>
+  </div>
+
+  <div class="dimension-summary">
+    <div class="dim-card"><div class="dim-name">Flow coverage</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Token completeness</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Component coverage</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">State coverage</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Visual reference</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Bloat</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Inheritance</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+  </div>
+
+  <section class="dimension">
+    <details open>
+      <summary><h2>Token completeness</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+      <div class="dim-body"><p>Light/dark brand pairs present; status badges and stale banner lack dark variants.</p></div>
+      <div class="findings-list">
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Status badge tokens lack dark-mode pairs</h3><span class="finding-location">DESIGN.md YAML</span></header>
+          <div class="finding-fix"><strong>Fix:</strong> Add scheduled/effective/cancelled/reversed/draft dark tokens.</div>
+        </article>
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">stale-banner light-only</h3><span class="finding-location">DESIGN.md YAML</span></header>
+          <div class="finding-fix"><strong>Fix:</strong> Add stale-banner-dark pair for dark content canvas.</div>
+        </article>
+      </div>
+    </details>
+  </section>
+
+  <section class="dimension">
+    <details open>
+      <summary><h2>Component coverage</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+      <div class="dim-body"><p>Jalali picker and export retrieval missing from both spines.</p></div>
+      <div class="findings-list">
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Jalali date picker unspecified</h3><span class="finding-location">FR-44 · both spines</span></header>
+          <div class="finding-fix"><strong>Fix:</strong> Add jalali-date-picker visual + behavioral rows.</div>
+        </article>
+      </div>
+    </details>
+  </section>
+
+  <section class="reviewer-section">
+    <details open>
+      <summary><h2>Accessibility review</h2><span class="reviewer-source">review-accessibility.md</span></summary>
+      <div class="dim-body"><p>WCAG intent credible; contrast evidence, picker, table keyboard, and stale banner semantics need commitment.</p></div>
+      <div class="findings-list">
+        <article class="finding">
+          <header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">Gold CTA contrast in dark mode unverified</h3><span class="finding-location">DESIGN.md button-primary</span></header>
+          <div class="finding-fix"><strong>Fix:</strong> Test and document allowed CTA placements per theme mode.</div>
+        </article>
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Jalali picker a11y unspecified</h3><span class="finding-location">EXPERIENCE.md</span></header>
+          <div class="finding-fix"><strong>Fix:</strong> Keyboard grid, aria-selected, describedby for errors.</div>
+        </article>
+      </div>
+    </details>
+  </section>
+
+  <section class="reviewer-section">
+    <details>
+      <summary><h2>Edge case review</h2><span class="reviewer-source">review-edge-cases.md</span></summary>
+      <div class="dim-body"><p>3 high findings: scope revocation mid-form, banner stacking, recalc blocking finalize/export.</p></div>
+      <div class="findings-list">
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Scope change mid-session with open Draft</h3><span class="finding-location">EXPERIENCE.md State Patterns</span></header>
+          <div class="finding-fix"><strong>Fix:</strong> Modal + draft save/discard on scope revocation.</div>
+        </article>
+      </div>
+    </details>
+  </section>
+
+  <div class="mechanical">
+    <h3 style="margin:0 0 10px;font-size:14px;color:var(--muted)">MECHANICAL NOTES</h3>
+    <ul>
+      <li>Component naming: Title Case (EXPERIENCE) vs kebab-case (DESIGN) — align before story-dev</li>
+      <li>Font imports path exists but unlinked in DESIGN Typography</li>
+      <li>Full findings: validation-report.md</li>
+    </ul>
+  </div>
+
+  <footer class="report-footer">
+    <span>Rubric: review-rubric.md</span> ·
+    <span>Accessibility: review-accessibility.md</span> ·
+    <span>Edge cases: review-edge-cases.md</span> ·
+    <span>Generated: 2026-07-15</span>
+  </footer>
+</div>
+</body>
+</html>

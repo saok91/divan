@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Divan — Color Theme Options</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Tahoma, Arial, sans-serif; background: #f5f5f5; padding: 24px; color: #1a1a1a; }
+    h1 { text-align: center; margin-bottom: 8px; font-size: 20px; }
+    p.sub { text-align: center; color: #666; margin-bottom: 24px; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; }
+    .theme { border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.08); background: #fff; }
+    .theme-head { padding: 14px 16px; color: #fff; }
+    .theme-head h2 { font-size: 16px; margin-bottom: 4px; }
+    .theme-head small { opacity: .85; font-size: 12px; }
+    .tokens { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #eee; }
+    .chip { font-size: 11px; padding: 4px 8px; border-radius: 6px; color: #fff; }
+    .preview { padding: 16px; }
+    .mock-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 8px 8px 0 0; font-size: 13px; }
+    .mock-body { padding: 14px; border: 1px solid; border-top: none; border-radius: 0 0 8px 8px; font-size: 13px; }
+    .mock-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,.06); }
+    .mock-row:last-child { border: none; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+    .btn { display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 6px; font-size: 12px; border: none; color: #fff; cursor: default; }
+
+    /* V1: Org palette — primary #006FFF, deep #051061, accent #FDB913, gray #808184 */
+    .v1 .theme-head { background: #051061; }
+    .v1 .chip.primary { background: #006FFF; }
+    .v1 .chip.deep { background: #051061; }
+    .v1 .chip.accent { background: #FDB913; color: #1a1208; }
+    .v1 .chip.muted { background: #808184; }
+    .v1 .mock-header { background: #051061; color: #fff; }
+    .v1 .mock-body { background: #fff; border-color: #e9ecef; }
+    .v1 .badge { background: #FDB913; color: #1a1208; }
+    .v1 .btn { background: #006FFF; }
+
+    /* V2: Org palette — accent-led (gold CTAs, blue structure) */
+    .v2 .theme-head { background: #006FFF; }
+    .v2 .chip.primary { background: #006FFF; }
+    .v2 .chip.deep { background: #051061; }
+    .v2 .chip.accent { background: #FDB913; color: #1a1208; }
+    .v2 .chip.muted { background: #808184; }
+    .v2 .mock-header { background: #006FFF; color: #fff; }
+    .v2 .mock-body { background: #fff; border-color: #e9ecef; }
+    .v2 .badge { background: #dbe4ff; color: #051061; }
+    .v2 .btn { background: #FDB913; color: #1a1208; }
+
+    /* V3: Restrained — blue primary, gray UI, gold sparingly */
+    .v3 .theme-head { background: #343a40; }
+    .v3 .chip.primary { background: #006FFF; }
+    .v3 .chip.deep { background: #051061; }
+    .v3 .chip.accent { background: #FDB913; color: #1a1208; }
+    .v3 .chip.muted { background: #808184; }
+    .v3 .mock-header { background: #fff; color: #343a40; border: 1px solid #dee2e6; border-bottom: none; }
+    .v3 .mock-body { background: #fff; border-color: #dee2e6; }
+    .v3 .badge { background: #f1f3f5; color: #495057; }
+    .v3 .btn { background: #006FFF; }
+
+    /* V4: Dark sidebar shell (common enterprise HRIS) */
+    .v4 .theme-head { background: #051061; }
+    .v4 .chip.primary { background: #006FFF; }
+    .v4 .chip.deep { background: #051061; }
+    .v4 .chip.accent { background: #FDB913; color: #1a1208; }
+    .v4 .chip.muted { background: #808184; }
+    .v4 .mock-header { background: #051061; color: #fff; }
+    .v4 .mock-body { background: #f8f9fa; border-color: #dee2e6; }
+    .v4 .badge { background: #006FFF; color: #fff; }
+    .v4 .btn { background: #006FFF; }
+  </style>
+</head>
+<body>
+  <h1>Divan — گزینه‌های پالت رنگ</h1>
+  <p class="sub">بر پایه رنگ‌های سازمانی شما · shadcn brand-layer delta · light mode MVP</p>
+  <div class="grid">
+    <div class="theme v1">
+      <div class="theme-head"><h2>V1 — Deep navy shell</h2><small>رسمی-سازمانی · header/sidebar تیره · CTA آبی</small></div>
+      <div class="tokens">
+        <span class="chip primary">primary #006FFF</span>
+        <span class="chip deep">deep #051061</span>
+        <span class="chip accent">accent #FDB913</span>
+        <span class="chip muted">muted #808184</span>
+      </div>
+      <div class="preview">
+        <div class="mock-header"><span>دیوان · پرسنل</span><span>Ctrl+K</span></div>
+        <div class="mock-body">
+          <div class="mock-row"><span>علی رضایی · ۱۰۴۲</span><span class="badge">Scheduled</span></div>
+          <div class="mock-row"><span>تیم: فناوری</span><span style="color:#808184">ظرفیت: ۲ آزاد</span></div>
+          <button class="btn">ثبت انتقال</button>
+        </div>
+      </div>
+    </div>
+    <div class="theme v2">
+      <div class="theme-head"><h2>V2 — Blue shell, gold action</h2><small>عملیاتی · CTA طلایی برای اقدام اصلی</small></div>
+      <div class="tokens">
+        <span class="chip primary">primary #006FFF</span>
+        <span class="chip deep">deep #051061</span>
+        <span class="chip accent">accent #FDB913</span>
+        <span class="chip muted">muted #808184</span>
+      </div>
+      <div class="preview">
+        <div class="mock-header"><span>دیوان · پرسنل</span><span>Ctrl+K</span></div>
+        <div class="mock-body">
+          <div class="mock-row"><span>علی رضایی · ۱۰۴۲</span><span class="badge">Scheduled</span></div>
+          <div class="mock-row"><span>تیم: فناوری</span><span style="color:#808184">ظرفیت: ۲ آزاد</span></div>
+          <button class="btn">ثبت انتقال</button>
+        </div>
+      </div>
+    </div>
+    <div class="theme v3">
+      <div class="theme-head"><h2>V3 — Restrained neutral</h2><small>مینیمال · رنگ فقط برای CTA و وضعیت</small></div>
+      <div class="tokens">
+        <span class="chip primary">primary #006FFF</span>
+        <span class="chip deep">deep #051061</span>
+        <span class="chip accent">accent #FDB913</span>
+        <span class="chip muted">muted #808184</span>
+      </div>
+      <div class="preview">
+        <div class="mock-header"><span>دیوان · پرسنل</span><span>Ctrl+K</span></div>
+        <div class="mock-body">
+          <div class="mock-row"><span>علی رضایی · ۱۰۴۲</span><span class="badge">Scheduled</span></div>
+          <div class="mock-row"><span>تیم: فناوری</span><span style="color:#808184">ظرفیت: ۲ آزاد</span></div>
+          <button class="btn">ثبت انتقال</button>
+        </div>
+      </div>
+    </div>
+    <div class="theme v4">
+      <div class="theme-head"><h2>V4 — Enterprise dark chrome</h2><small>HRIS کلاسیک · chrome تیره · محتوا روشن</small></div>
+      <div class="tokens">
+        <span class="chip primary">primary #006FFF</span>
+        <span class="chip deep">deep #051061</span>
+        <span class="chip accent">accent #FDB913</span>
+        <span class="chip muted">muted #808184</span>
+      </div>
+      <div class="preview">
+        <div class="mock-header"><span>دیوان · پرسنل</span><span>Ctrl+K</span></div>
+        <div class="mock-body">
+          <div class="mock-row"><span>علی رضایی · ۱۰۴۲</span><span class="badge">Scheduled</span></div>
+          <div class="mock-row"><span>تیم: فناوری</span><span style="color:#808184">ظرفیت: ۲ آزاد</span></div>
+          <button class="btn">ثبت انتقال</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Divan — پرسنل (Operator landing)</title>
+  <!-- Governs: DESIGN.md app-chrome, personnel-data-table; EXPERIENCE.md IA پرسنل, Component Patterns command palette + table -->
+  <style>
+    @font-face { font-family: 'Yekan'; src: url('../imports/fonts/yekan-bakh/Yekan Bakh Fa-En 04 Regular.woff') format('woff'); }
+    @font-face { font-family: 'Yekan'; src: url('../imports/fonts/yekan-bakh/Yekan Bakh Fa-En 06 Bold.woff') format('woff'); font-weight: 700; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Yekan, Tahoma, sans-serif; background: #111; padding: 24px; display: flex; justify-content: center; }
+    .frame { width: 960px; background: #f8f9fa; border-radius: 10px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.35); }
+    .header { background: #051061; color: #fff; height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 14px; }
+    .search-pill { background: rgba(255,255,255,.12); padding: 6px 14px; border-radius: 6px; color: #adb5bd; font-size: 13px; }
+    .layout { display: flex; min-height: 520px; }
+    .sidebar { width: 240px; background: #051061; color: #fff; padding: 12px 0; font-size: 13px; }
+    .nav-item { padding: 10px 16px; color: rgba(255,255,255,.75); border-right: 2px solid transparent; }
+    .nav-item.active { background: rgba(255,255,255,.12); border-right-color: #FDB913; color: #fff; }
+    .content { flex: 1; padding: 20px; }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+    .filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter { background: #fff; border: 1px solid #dee2e6; padding: 6px 12px; border-radius: 6px; font-size: 12px; color: #495057; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; font-size: 13px; }
+    th { background: #f1f3f5; text-align: right; padding: 10px 12px; font-weight: 500; color: #808184; font-size: 12px; }
+    td { padding: 10px 12px; border-top: 1px solid #f1f3f5; }
+    tr:hover td { background: #f8f9fa; }
+    .count { color: #808184; font-size: 12px; margin-bottom: 8px; }
+    .badge { background: #d3f9d8; color: #2b8a3e; font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <span>دیوان</span>
+      <span class="search-pill">جستجو… Ctrl+K</span>
+      <span>مینا · اپراتور HR</span>
+    </div>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="nav-item active">پرسنل</div>
+        <div class="nav-item">داشبورد</div>
+        <div class="nav-item">ظرفیت و جذب</div>
+        <div class="nav-item">گزارش‌ها</div>
+      </aside>
+      <main class="content">
+        <h1>پرسنل</h1>
+        <div class="filters">
+          <span class="filter">وضعیت: فعال</span>
+          <span class="filter">تیم: همه</span>
+          <span class="filter">+ فیلتر</span>
+        </div>
+        <div class="count">۴۸۷ نفر · صفحه ۱ از ۲۵</div>
+        <table>
+          <thead><tr><th>نام</th><th>کد پرسنلی</th><th>تیم</th><th>عنوان</th><th>وضعیت</th></tr></thead>
+          <tbody>
+            <tr><td>علی رضایی</td><td>۱۰۴۲</td><td>فناوری</td><td>تحلیلگر</td><td><span class="badge">فعال</span></td></tr>
+            <tr><td>سارا محمدی</td><td>۱۰۸۷</td><td>منابع انسانی</td><td>کارشناس</td><td><span class="badge">فعال</span></td></tr>
+            <tr><td>رضا کریمی</td><td>۰۹۵۱</td><td>مالی</td><td>مدیر</td><td><span class="badge">فعال</span></td></tr>
+          </tbody>
+        </table>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

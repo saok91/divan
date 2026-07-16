@@ -1,0 +1,6 @@
+packages:
+  - "apps/*"
+  - "packages/kernel/*"
+  - "packages/modules/*"
+  - "packages/db"
+  - "workers"

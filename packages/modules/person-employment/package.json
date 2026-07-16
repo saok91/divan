@@ -1,0 +1,23 @@
+{
+  "name": "@divan/person-employment",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@divan/audit-envelope": "workspace:*",
+    "@divan/db": "workspace:*",
+    "@divan/event-store": "workspace:*",
+    "@divan/temporal-engine": "workspace:*"
+  }
+}

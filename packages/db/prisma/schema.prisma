@@ -1,0 +1,10 @@
+// Prisma schema — projections only. No domain models in Story 1.1.
+// Kernel event-store tables will use raw SQL under packages/db/sql/.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

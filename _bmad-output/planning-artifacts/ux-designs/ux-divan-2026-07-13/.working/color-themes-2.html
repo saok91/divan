@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Divan — V2+V4 Hybrid (Light / Dark)</title>
+  <style>
+    /* V2+V4 hybrid: navy chrome, gold primary CTA, blue structure */
+    /* Light content: #ffffff / #f8f9fa | Dark content: #0f1117 / #1a1d27 */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Tahoma, Arial, sans-serif; background: #eee; padding: 20px; }
+    h1 { text-align: center; font-size: 18px; margin-bottom: 4px; }
+    p.sub { text-align: center; color: #666; font-size: 12px; margin-bottom: 20px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1100px; margin: 0 auto 24px; }
+    .panel { border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+    .label { padding: 10px 14px; font-size: 13px; font-weight: bold; }
+    .shell { display: flex; flex-direction: column; min-height: 220px; }
+    .header { background: #051061; color: #fff; padding: 10px 14px; display: flex; justify-content: space-between; font-size: 13px; }
+    .body { display: flex; flex: 1; }
+    .sidebar { width: 72px; background: #051061; color: #fff; padding: 10px 6px; font-size: 10px; text-align: center; border-top: 1px solid rgba(255,255,255,.1); }
+    .sidebar span { display: block; padding: 8px 4px; margin-bottom: 4px; border-radius: 4px; }
+    .sidebar .active { background: rgba(255,255,255,.12); border-right: 2px solid #FDB913; }
+    .main { flex: 1; padding: 14px; font-size: 13px; }
+    .main.light { background: #f8f9fa; color: #212529; }
+    .main.dark { background: #0f1117; color: #e9ecef; }
+    .card { border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    .light .card { background: #fff; border: 1px solid #dee2e6; }
+    .dark .card { background: #1a1d27; border: 1px solid #343a40; }
+    .row-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,.06); }
+    .dark .row-item { border-color: rgba(255,255,255,.06); }
+    .btn-gold { background: #FDB913; color: #1a1208; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; margin-top: 8px; }
+    .btn-blue { background: #006FFF; color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-size: 11px; }
+    .badge { font-size: 10px; padding: 2px 8px; border-radius: 999px; background: #dbe4ff; color: #051061; }
+    .tokens { padding: 10px 14px; font-size: 11px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { padding: 3px 8px; border-radius: 4px; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>Divan — V2 + V4 Hybrid · Light &amp; Dark</h1>
+  <p class="sub">Gold primary CTA · Blue links/structure · Navy chrome (both modes)</p>
+  <div class="row">
+    <div class="panel">
+      <div class="label" style="background:#d3f9d8">Light content + dark chrome</div>
+      <div class="tokens">
+        <span class="chip" style="background:#051061">chrome #051061</span>
+        <span class="chip" style="background:#006FFF">primary #006FFF</span>
+        <span class="chip" style="background:#FDB913;color:#1a1208">accent #FDB913</span>
+        <span class="chip" style="background:#808184">muted #808184</span>
+      </div>
+      <div class="shell">
+        <div class="header"><span>دیوان · پرسنل</span><span>Ctrl+K · ☀</span></div>
+        <div class="body">
+          <div class="sidebar"><span class="active">پرسنل</span><span>داشبورد</span><span>گزارش</span></div>
+          <div class="main light">
+            <div class="card">
+              <div class="row-item"><span>علی رضایی · ۱۰۴۲</span><span class="badge">Scheduled</span></div>
+              <div class="row-item"><span style="color:#808184">ظرفیت: ۲ آزاد</span><button class="btn-blue">جزئیات</button></div>
+              <button class="btn-gold">ثبت انتقال</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="label" style="background:#e5dbff">Dark content + dark chrome</div>
+      <div class="tokens">
+        <span class="chip" style="background:#030825">chrome #030825</span>
+        <span class="chip" style="background:#4D9FFF">primary #4D9FFF</span>
+        <span class="chip" style="background:#FBC470;color:#1a1208">accent #FBC470</span>
+        <span class="chip" style="background:#9E9EA0">muted #9E9EA0</span>
+      </div>
+      <div class="shell">
+        <div class="header" style="background:#030825"><span>دیوان · پرسنل</span><span>Ctrl+K · 🌙</span></div>
+        <div class="body">
+          <div class="sidebar" style="background:#030825"><span class="active">پرسنل</span><span>داشبورد</span><span>گزارش</span></div>
+          <div class="main dark">
+            <div class="card">
+              <div class="row-item"><span>علی رضایی · ۱۰۴۲</span><span class="badge">Scheduled</span></div>
+              <div class="row-item"><span style="color:#9E9EA0">ظرفیت: ۲ آزاد</span><button class="btn-blue" style="background:#4D9FFF">جزئیات</button></div>
+              <button class="btn-gold" style="background:#FBC470">ثبت انتقال</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

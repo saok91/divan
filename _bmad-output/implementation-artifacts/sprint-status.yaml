@@ -1,0 +1,126 @@
+# generated: 2026-07-16
+# last_updated: 2026-07-16
+# project: divan
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+
+generated: 2026-07-16
+last_updated: 2026-07-16
+project: divan
+project_key: NOKEY
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  epic-1: in-progress
+  1-1-initialize-modular-monolith-monorepo: done
+  1-2-brand-tokens-typography-theme-toggle: backlog
+  1-3-app-shell-chrome-sidebar-skip-link: backlog
+  1-4-seeded-accounts-coarse-role-auth-dev-bootstrap: backlog
+  1-5-role-landings-permission-filtered-navigation: backlog
+  1-6-command-palette-jalali-date-picker-persian-digits: backlog
+  1-7-accessibility-floor-banner-behavior-operational-copy: backlog
+  1-8-ldap-authentication-internal-account-link-infra-gated: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-audit-envelope-default-deny-authorization-substrate: backlog
+  2-2-sensitive-categories-separate-export-permission: backlog
+  2-3-access-administration-ui-apis: backlog
+  2-4-entitlement-lifecycle-grant-expiry-revocation-recertification: backlog
+  2-5-break-glass-privileged-access: backlog
+  2-6-temporal-cross-boundary-authorization: backlog
+  2-7-inference-resistant-bulk-retrieval-controls: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-stable-person-identity: backlog
+  3-2-employment-lifecycle-invariants: backlog
+  3-3-data-dictionary-governed-profile-fields: backlog
+  3-4-compensation-contractual-facts-module: backlog
+  3-5-organization-hierarchy-management: backlog
+  3-6-independent-job-reference-concepts: backlog
+  3-7-primary-assignment-integrity: backlog
+  3-8-secondary-assignment-fidelity: backlog
+  3-9-derived-management-relationships: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-append-only-event-store-attributable-event-record: backlog
+  4-2-draft-finalization-conflict-classification: backlog
+  4-3-scheduled-state-cancel-reverse-correction: backlog
+  4-4-deterministic-ordering-recalculation: backlog
+  4-5-start-return-events: backlog
+  4-6-termination-events: backlog
+  4-7-team-transfer-with-atomic-capacity-movement: backlog
+  4-8-job-level-contract-compensation-change-events: backlog
+  4-9-current-person-state-projection: backlog
+  4-10-historical-person-reconstruction: backlog
+  4-11-historical-organization-headcount-reconstruction: backlog
+  4-12-headcount-approval-lifecycle: backlog
+  4-13-universal-coverage-matching-exemptions: backlog
+  4-14-reservation-expiry-exceptions-headcount-override: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-permission-safe-personnel-search-lists: backlog
+  5-2-personnel-profile-sections: backlog
+  5-3-personnel-event-timeline: backlog
+  5-4-core-launch-dashboard: backlog
+  5-5-launch-report-catalogue: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-controlled-import-wizard-with-preview: backlog
+  6-2-atomic-import-batch-execution-staging-cutover: backlog
+  6-3-baseline-provenance-reconstructable-history-boundary: backlog
+  6-4-migration-reconciliation-workspace: backlog
+  6-5-governed-export-artifact-panel: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-audit-investigation-surface: backlog
+  7-2-operations-health-without-hr-content: backlog
+  7-3-retention-disposal-legal-hold: backlog
+  7-4-audit-trust-fail-safe: backlog
+  7-5-external-data-subject-correction-cases: backlog
+  7-6-published-decision-report-reproducibility: backlog
+  7-7-launch-artifact-change-control-hooks: backlog
+  7-8-authoritative-evaluation-snapshot-integrity: backlog
+  epic-7-retrospective: optional

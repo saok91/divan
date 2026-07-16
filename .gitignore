@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────
-# Divan — agent tooling only (tech stack TBD)
+# Divan — agent tooling + Node/Next/Prisma artifacts
 # Project documentation (docs/, _bmad-output/planning-artifacts/, …) stays tracked.
 # ─────────────────────────────────────────────────────────────────
 
@@ -17,3 +17,43 @@ _bmad/
 
 # Agent session / memory logs
 **/.memlog.md
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Next.js
+apps/web/.next/
+apps/web/out/
+
+# Build / TypeScript
+dist/
+build/
+*.tsbuildinfo
+
+# Prisma
+packages/db/prisma/generated/
+packages/db/src/generated/
+
+# Logs & caches
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.turbo/
+.eslintcache
+.cache/
+
+# Test / coverage
+coverage/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

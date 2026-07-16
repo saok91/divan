@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Divan — پروفایل + Timeline</title>
+  <!-- Governs: DESIGN.md person-profile-section, event-timeline-row, headcount-capacity-panel; EXPERIENCE.md UJ-1 -->
+  <style>
+    @font-face { font-family: 'Yekan'; src: url('../imports/fonts/yekan-bakh/Yekan Bakh Fa-En 04 Regular.woff') format('woff'); }
+    @font-face { font-family: 'Yekan'; src: url('../imports/fonts/yekan-bakh/Yekan Bakh Fa-En 06 Bold.woff') format('woff'); font-weight: 700; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Yekan, Tahoma, sans-serif; background: #111; padding: 24px; display: flex; justify-content: center; }
+    .frame { width: 960px; background: #f8f9fa; border-radius: 10px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.35); }
+    .header { background: #051061; color: #fff; height: 56px; display: flex; align-items: center; padding: 0 16px; font-size: 14px; gap: 12px; }
+    .content { padding: 20px; }
+    h1 { font-size: 20px; font-weight: 700; }
+    .meta { color: #808184; font-size: 13px; margin: 4px 0 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; }
+    .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+    .field { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f1f3f5; }
+    .field span:first-child { color: #808184; }
+    .capacity { display: flex; gap: 12px; margin-top: 8px; font-size: 13px; }
+    .cap-item { background: #f8f9fa; padding: 8px 12px; border-radius: 6px; }
+    .cap-item strong { color: #006FFF; }
+    .timeline { grid-column: 1 / -1; }
+    .tl-row { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f1f3f5; font-size: 13px; align-items: flex-start; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+    .dot.scheduled { background: #006FFF; }
+    .dot.effective { background: #2b8a3e; }
+    .badge-s { background: #e7f5ff; color: #1864ab; font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+    .btn-gold { background: #FDB913; color: #1a1208; border: none; padding: 8px 16px; border-radius: 6px; font-family: inherit; font-size: 13px; margin-top: 12px; cursor: default; }
+    .actions { margin-bottom: 16px; }
+    .btn-outline { background: #fff; border: 1px solid #006FFF; color: #006FFF; padding: 6px 12px; border-radius: 6px; font-family: inherit; font-size: 12px; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">← پرسنل · علی رضایی</div>
+    <div class="content">
+      <h1>علی رضایی</h1>
+      <div class="meta">کد پرسنلی ۱۰۴۲ · همکاری فعال</div>
+      <div class="actions">
+        <button class="btn-outline">انتقال</button>
+        <button class="btn-outline">خاتمه</button>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h2>تخصیص فعلی</h2>
+          <div class="field"><span>تیم</span><span>فناوری</span></div>
+          <div class="field"><span>عنوان</span><span>تحلیلگر ارشد</span></div>
+          <div class="field"><span>از</span><span>۱۴۰۳/۰۶/۱۵</span></div>
+        </div>
+        <div class="card">
+          <h2>ظرفیت تیم مقصد (پیش‌نمایش)</h2>
+          <div class="capacity">
+            <div class="cap-item">آزاد: <strong>۲</strong></div>
+            <div class="cap-item">رزرو: <strong>۱</strong></div>
+            <div class="cap-item">مصرف‌شده: <strong>۸</strong></div>
+          </div>
+          <button class="btn-gold">ثبت انتقال</button>
+        </div>
+        <div class="card timeline">
+          <h2>Timeline رویدادها</h2>
+          <div class="tl-row">
+            <div class="dot scheduled"></div>
+            <div><strong>انتقال</strong> · <span class="badge-s">Scheduled</span><br><span style="color:#808184">مؤثر ۱۴۰۴/۰۴/۰۱ · ثبت ۱۴۰۴/۰۳/۲۸</span></div>
+          </div>
+          <div class="tl-row">
+            <div class="dot effective"></div>
+            <div><strong>تغییر عنوان</strong> · Effective<br><span style="color:#808184">مؤثر ۱۴۰۳/۰۶/۱۵</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

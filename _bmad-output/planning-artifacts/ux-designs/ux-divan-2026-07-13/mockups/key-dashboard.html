@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Divan — داشبورد</title>
+  <!-- Governs: DESIGN.md dashboard-metric-card; EXPERIENCE.md UJ-3 dashboard -->
+  <style>
+    @font-face { font-family: 'Yekan'; src: url('../imports/fonts/yekan-bakh/Yekan Bakh Fa-En 04 Regular.woff') format('woff'); }
+    @font-face { font-family: 'Yekan'; src: url('../imports/fonts/yekan-bakh/Yekan Bakh Fa-En 06 Bold.woff') format('woff'); font-weight: 700; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Yekan, Tahoma, sans-serif; background: #111; padding: 24px; display: flex; justify-content: center; }
+    .frame { width: 960px; background: #f8f9fa; border-radius: 10px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.35); }
+    .header { background: #051061; color: #fff; height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 14px; }
+    .layout { display: flex; min-height: 480px; }
+    .sidebar { width: 240px; background: #051061; color: #fff; padding: 12px 0; font-size: 13px; }
+    .nav-item { padding: 10px 16px; color: rgba(255,255,255,.75); border-right: 2px solid transparent; }
+    .nav-item.active { background: rgba(255,255,255,.12); border-right-color: #FDB913; color: #fff; }
+    .content { flex: 1; padding: 20px; }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+    .filters { display: flex; gap: 8px; margin-bottom: 16px; }
+    .filter { background: #fff; border: 1px solid #dee2e6; padding: 6px 12px; border-radius: 6px; font-size: 12px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; }
+    .card h2 { font-size: 13px; color: #808184; font-weight: 500; margin-bottom: 8px; }
+    .card .val { font-size: 28px; font-weight: 700; color: #051061; }
+    .card .link { font-size: 11px; color: #006FFF; margin-top: 8px; display: block; }
+    .wide { grid-column: 1 / -1; }
+    .chart-placeholder { height: 80px; background: linear-gradient(to left, #e7f5ff, #fff); border-radius: 6px; margin-top: 8px; display: flex; align-items: flex-end; padding: 8px; gap: 4px; }
+    .bar { background: #006FFF; width: 12px; border-radius: 2px 2px 0 0; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header"><span>دیوان</span><span>سارا · مدیر</span></div>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="nav-item active">داشبورد</div>
+        <div class="nav-item">پرسنل</div>
+        <div class="nav-item">گزارش‌ها</div>
+      </aside>
+      <main class="content">
+        <h1>داشبورد</h1>
+        <div class="filters">
+          <span class="filter">واحد: فناوری</span>
+          <span class="filter">بازه: ۱۴۰۴/۰۱ – ۱۴۰۴/۰۳</span>
+        </div>
+        <div class="cards">
+          <div class="card"><h2>نفر فعال</h2><div class="val">۱۲۴</div><a class="link" href="#">جزئیات ←</a></div>
+          <div class="card"><h2>ظرفیت آزاد</h2><div class="val">۷</div><a class="link" href="#">جزئیات ←</a></div>
+          <div class="card"><h2>شروع / خاتمه</h2><div class="val">۳ / ۱</div><a class="link" href="#">جزئیات ←</a></div>
+          <div class="card wide">
+            <h2>روند نیروی کار</h2>
+            <div class="chart-placeholder">
+              <div class="bar" style="height:40%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:50%"></div><div class="bar" style="height:70%"></div><div class="bar" style="height:65%"></div>
+            </div>
+            <span style="font-size:11px;color:#808184">آخرین محاسبه: ۱۴۰۴/۰۳/۲۹ · ۰۹:۱۴</span>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
