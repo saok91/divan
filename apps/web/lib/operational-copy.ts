@@ -54,6 +54,30 @@ export const operationalCopy = {
   breakGlassActive: "دسترسی اضطراری فعال است.",
   breakGlassExpired: "دسترسی اضطراری پایان یافت.",
   breakGlassDismiss: "بستن",
+  breakGlassIncidentHint: "(حادثه: {incident})",
+  breakGlassActiveHint:
+    "دسترسی اضطراری از سرور hydrate شده؛ برای درخواست یا بازبینی به مدیریت دسترسی بروید.",
+  breakGlassAdminLink: "مدیریت دسترسی اضطراری",
+  breakGlassRequestTitle: "درخواست دسترسی اضطراری",
+  breakGlassRequestHint:
+    "حادثه، هدف، موضوع و تاریخ انقضا الزامی است. خروجی و مدیریت مجوز به‌صورت پیش‌فرض انکار می‌شود.",
+  breakGlassIncidentLabel: "شناسهٔ حادثه",
+  breakGlassPurposeLabel: "هدف دسترسی",
+  breakGlassExpiresLabel: "تاریخ و ساعت انقضا",
+  breakGlassExpiresHelper: "انقضای دسترسی اضطراری (جلالی)",
+  breakGlassExpiryInvalid: "تاریخ انقضا باید در آینده باشد.",
+  breakGlassRequested: "درخواست دسترسی اضطراری ثبت شد.",
+  breakGlassReviewQueue: "صف بازبینی پس از استفاده",
+  breakGlassReviewEmpty: "بازبینی معلقی ثبت نشده.",
+  breakGlassReviewComplete: "بازبینی پس از استفاده ثبت شد.",
+  breakGlassReviewAction: "ثبت بازبینی",
+  breakGlassDenyExport: "خروجی تحت دسترسی اضطراری مجاز نیست.",
+  breakGlassDenyAdmin: "مدیریت دسترسی تحت ارتفاع اضطراری مجاز نیست.",
+
+  grantExpiresLabel: "انقضا (اختیاری)",
+  grantExpiresHelper: "تاریخ و ساعت انقضای دسترسی (جلالی)",
+  grantRecertifyLabel: "مهلت بازتأیید (اختیاری)",
+  grantRecertifyHelper: "مهلت بازتأیید دسترسی (جلالی)",
 
   staleGoldCtaHint:
     "تا به‌روز شدن داده، نهایی‌سازی و خروجی غیرفعال است.",

@@ -1,23 +1,23 @@
+import { getSessionContext } from "@divan/identity-access";
+
 import { auth } from "@/auth";
-import type { SessionContext } from "@divan/identity-access";
 
 import type { TrpcContext } from "./trpc";
 
+/**
+ * tRPC context — JWT proves login; DB session is authz source of truth.
+ * Break-glass summary is hydrated from active grants (Story 2.5).
+ */
 export async function createContext(): Promise<TrpcContext> {
   const session = await auth();
   if (!session?.user?.accountId || !session.user.coarseRole) {
     return { session: null };
   }
 
-  const mapped: SessionContext = {
-    accountId: session.user.accountId,
-    username: session.user.username,
-    displayName: session.user.name ?? session.user.username,
-    coarseRole: session.user.coarseRole,
-    humanIdentityId: session.user.humanIdentityId,
-    // Scope hooks empty until Story 2.3; governed paths revalidate via DB.
-    organizationalScopeIds: session.user.organizationalScopeIds ?? [],
-  };
+  const fresh = await getSessionContext(session.user.accountId);
+  if (!fresh) {
+    return { session: null };
+  }
 
-  return { session: mapped };
+  return { session: fresh };
 }

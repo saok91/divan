@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 
+import { BreakGlassPanel } from "@/components/access/break-glass-panel";
 import { EntitlementGrantsPanel } from "@/components/access/entitlement-grants-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,6 +146,13 @@ export function AccessAdminPanel({
       ) : null}
 
       <EntitlementGrantsPanel currentAccountId={currentAccountId} />
+
+      <Section
+        title={operationalCopy.breakGlassRequestTitle}
+        description={operationalCopy.breakGlassRequestHint}
+      >
+        <BreakGlassPanel currentAccountId={currentAccountId} />
+      </Section>
 
       <Section
         title="تخصیص نقش و محدوده"

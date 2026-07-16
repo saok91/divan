@@ -59,5 +59,6 @@ export type {
   EntitlementGrant,
   EntitlementGrantKind,
   EntitlementGrantStatus,
+  PostUseReviewStatus,
   Prisma,
 } from "@prisma/client";

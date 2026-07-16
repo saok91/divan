@@ -11,7 +11,8 @@ import { readFileSync } from "node:fs";
  * exact-match (permission × dataCategory × action × organizationalScope).
  *
  * Routine System Admin path = identity/config/health only. HR-content
- * elevation (break-glass) is Story 2.5 — out of scope here.
+ * elevation is break-glass (Story 2.5): minimal PermissionSet binding via
+ * EntitlementGrant kind=break_glass — not a blanket SysAdmin allow here.
  */
 
 export type CategorySensitivity = "ordinary" | "sensitive";

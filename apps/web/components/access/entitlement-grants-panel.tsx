@@ -2,8 +2,13 @@
 
 import { useId, useMemo, useState } from "react";
 
+import { JalaliDateTimePicker } from "@/components/jalali-date-picker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  formatJalaliDateTimeFromIso,
+  gregorianDateTimePartsToIso,
+  type GregorianDateTimeParts,
+} from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -15,7 +20,8 @@ type GrantKind =
   | "mass_assignment"
   | "standard"
   | "role_create"
-  | "scope_create";
+  | "scope_create"
+  | "break_glass";
 
 type GrantStatus =
   | "requested"
@@ -34,6 +40,7 @@ const KIND_LABELS: Record<GrantKind, string> = {
   standard: "استاندارد",
   role_create: "ایجاد نقش",
   scope_create: "ایجاد محدوده",
+  break_glass: "اضطراری",
 };
 
 const STATUS_LABELS: Record<GrantStatus, string> = {
@@ -78,8 +85,8 @@ export function EntitlementGrantsPanel({
   const [subjectAccountId, setSubjectAccountId] = useState("");
   const [accessRoleId, setAccessRoleId] = useState("");
   const [organizationalScopeId, setOrganizationalScopeId] = useState("");
-  const [expiresAt, setExpiresAt] = useState("");
-  const [recertifyBy, setRecertifyBy] = useState("");
+  const [expiresAt, setExpiresAt] = useState<GregorianDateTimeParts>({});
+  const [recertifyBy, setRecertifyBy] = useState<GregorianDateTimeParts>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
 
@@ -256,12 +263,12 @@ export function EntitlementGrantsPanel({
                   </span>
                   {g.expiresAt ? (
                     <span className="text-muted-foreground">
-                      انقضا: {g.expiresAt}
+                      انقضا: {formatJalaliDateTimeFromIso(g.expiresAt)}
                     </span>
                   ) : null}
                   {g.recertifyBy ? (
                     <span className="text-muted-foreground">
-                      بازتأیید تا: {g.recertifyBy}
+                      بازتأیید تا: {formatJalaliDateTimeFromIso(g.recertifyBy)}
                     </span>
                   ) : null}
                 </div>
@@ -386,12 +393,8 @@ export function EntitlementGrantsPanel({
               kind,
               accessRoleId: accessRoleId || null,
               organizationalScopeId: organizationalScopeId || null,
-              expiresAt: expiresAt
-                ? new Date(expiresAt).toISOString()
-                : null,
-              recertifyBy: recertifyBy
-                ? new Date(recertifyBy).toISOString()
-                : null,
+              expiresAt: gregorianDateTimePartsToIso(expiresAt),
+              recertifyBy: gregorianDateTimePartsToIso(recertifyBy),
             },
             { onError: captureError },
           );
@@ -410,7 +413,12 @@ export function EntitlementGrantsPanel({
               onChange={(e) => setKind(e.target.value as GrantKind)}
             >
               {(Object.keys(KIND_LABELS) as GrantKind[])
-                .filter((k) => k !== "role_create" && k !== "scope_create")
+                .filter(
+                  (k) =>
+                    k !== "role_create" &&
+                    k !== "scope_create" &&
+                    k !== "break_glass",
+                )
                 .map((k) => (
                   <option key={k} value={k}>
                     {KIND_LABELS[k]}
@@ -473,26 +481,28 @@ export function EntitlementGrantsPanel({
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={expiresId} className="text-label-medium">
-              انقضا (اختیاری)
-            </label>
-            <Input
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <span className="text-label-medium">
+              {operationalCopy.grantExpiresLabel}
+            </span>
+            <JalaliDateTimePicker
               id={expiresId}
-              type="datetime-local"
+              aria-label={operationalCopy.grantExpiresLabel}
               value={expiresAt}
-              onChange={(e) => setExpiresAt(e.target.value)}
+              onChange={setExpiresAt}
+              helperText={operationalCopy.grantExpiresHelper}
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={recertId} className="text-label-medium">
-              مهلت بازتأیید (اختیاری)
-            </label>
-            <Input
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <span className="text-label-medium">
+              {operationalCopy.grantRecertifyLabel}
+            </span>
+            <JalaliDateTimePicker
               id={recertId}
-              type="datetime-local"
+              aria-label={operationalCopy.grantRecertifyLabel}
               value={recertifyBy}
-              onChange={(e) => setRecertifyBy(e.target.value)}
+              onChange={setRecertifyBy}
+              helperText={operationalCopy.grantRecertifyHelper}
             />
           </div>
         </div>

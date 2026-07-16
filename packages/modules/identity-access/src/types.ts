@@ -35,6 +35,16 @@ export type SessionContext = {
    * Never invent LDAP group→scope sync.
    */
   organizationalScopeIds: string[];
+  /**
+   * Active break-glass summary for banner hydration (Story 2.5).
+   * When active, `expiresAt` is always a finite future ISO timestamp.
+   */
+  breakGlass: {
+    active: boolean;
+    expiresAt: string | null;
+    incidentId: string | null;
+    grantId: string | null;
+  };
 };
 
 /**

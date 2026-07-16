@@ -196,3 +196,72 @@ export function todayGregorianInTehran(): GregorianDateOnly {
 export function todayJalaliInTehran(): JalaliDateOnly {
   return gregorianToJalali(todayGregorianInTehran());
 }
+
+export type GregorianDateTimeParts = {
+  /** Gregorian `YYYY-MM-DD` storage. */
+  date?: string;
+  /** 24h `HH:mm`. */
+  time?: string;
+};
+
+/**
+ * Convert JalaliDateTimePicker parts to an ISO instant.
+ * Interprets date+time as Asia/Tehran wall clock (fixed UTC+03:30; no DST).
+ * Incomplete or invalid parts → null.
+ */
+export function gregorianDateTimePartsToIso(
+  parts: GregorianDateTimeParts | null | undefined,
+): string | null {
+  if (!parts?.date || !parts.time) return null;
+  const g = parseGregorianDateOnly(parts.date);
+  if (!g) return null;
+  const tm = /^(\d{2}):(\d{2})$/.exec(parts.time.trim());
+  if (!tm) return null;
+  const hour = Number(tm[1]);
+  const minute = Number(tm[2]);
+  if (hour > 23 || minute > 59) return null;
+  // Asia/Tehran is permanently UTC+03:30 (DST abolished 2022).
+  const TEHRAN_OFFSET_MS = (3 * 60 + 30) * 60 * 1000;
+  const utcMs =
+    Date.UTC(g.year, g.month - 1, g.day, hour, minute, 0, 0) - TEHRAN_OFFSET_MS;
+  const d = new Date(utcMs);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+/**
+ * Display an ISO instant as Jalali date + Persian time (Asia/Tehran).
+ * Example: «۱۴۰۵/۰۴/۲۶ ۱۴:۳۰»
+ */
+export function formatJalaliDateTimeFromIso(
+  iso: string | null | undefined,
+): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const dateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tehran",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const year = Number(dateParts.find((p) => p.type === "year")?.value);
+  const month = Number(dateParts.find((p) => p.type === "month")?.value);
+  const day = Number(dateParts.find((p) => p.type === "day")?.value);
+  if (!year || !month || !day) return "";
+
+  const timeParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Tehran",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const hour = timeParts.find((p) => p.type === "hour")?.value ?? "00";
+  const minute = timeParts.find((p) => p.type === "minute")?.value ?? "00";
+
+  const jalali = formatJalaliDisplay(
+    gregorianToJalali({ year, month, day }),
+  );
+  return `${jalali} ${toPersianDigits(`${hour}:${minute}`)}`;
+}

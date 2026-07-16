@@ -10,6 +10,8 @@ import {
 } from "@divan/audit-envelope";
 import { createPgPool, type Pool } from "@divan/db";
 import {
+  AccessAdminError,
+  assertBreakGlassElevationLimits,
   getSessionContext,
   toEnvelopeAuthzContext,
   type SessionContext,
@@ -152,6 +154,21 @@ export const governedProcedure = protectedProcedure.use(
         });
       }
       throw err;
+    }
+
+    // Story 2.5 AC #2: under live break-glass, export is denied unless exceptional.
+    if (meta.action.trim() === "export") {
+      try {
+        await assertBreakGlassElevationLimits(fresh.accountId, "export");
+      } catch (err) {
+        if (err instanceof AccessAdminError) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: err.messageFa,
+          });
+        }
+        throw err;
+      }
     }
 
     return next({

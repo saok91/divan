@@ -71,6 +71,10 @@ export type ToxicOperation =
   | "grant.waive"
   | "grant.recertify"
   | "grant.activate"
+  | "grant.break_glass.request"
+  | "grant.break_glass.approve"
+  | "grant.break_glass.activate"
+  | "grant.break_glass.review"
   | "access.role.assign"
   | "access.scope.assign"
   | "access.permission_set.create"
@@ -84,11 +88,14 @@ export type ToxicOperation =
   | "demo.non_toxic";
 
 const SELF_TOXIC_OPERATIONS = new Set<string>([
-  // grant.request self-block is kind-aware in requestGrant (elevated binding only)
+  // grant.request / grant.break_glass.request self-block is kind-aware in request paths
   "grant.approve",
+  "grant.break_glass.approve",
   "grant.waive",
   "grant.recertify",
   "grant.activate",
+  "grant.break_glass.activate",
+  "grant.break_glass.review",
   "access.role.assign",
   "access.scope.assign",
   "access.account.status",
@@ -724,6 +731,17 @@ export async function assignAccountAccessRoles(
         MSG_LIFECYCLE_APPROVAL_REQUIRED_FA,
         "privileged_role_requires_lifecycle",
       );
+    }
+    if (!input.viaLifecycleActivation) {
+      const { isBreakGlassElevationRoleCode, MSG_BREAK_GLASS_ROLE_LIFECYCLE_ONLY_FA } =
+        await import("./break-glass");
+      if (isBreakGlassElevationRoleCode(role.code)) {
+        throw new AccessAdminError(
+          "VALIDATION",
+          MSG_BREAK_GLASS_ROLE_LIFECYCLE_ONLY_FA,
+          "break_glass_role_lifecycle_only",
+        );
+      }
     }
   }
 

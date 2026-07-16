@@ -144,4 +144,37 @@ export {
   type RecertOverdueAction,
 } from "./entitlement-lifecycle";
 
+export {
+  BREAK_GLASS_PRIVILEGED_READ_PERMISSION,
+  DEMO_BREAK_GLASS_MAX_DURATION_MS,
+  SEED_BREAK_GLASS,
+  MSG_BREAK_GLASS_INCIDENT_REQUIRED_FA,
+  MSG_BREAK_GLASS_EXPIRES_REQUIRED_FA,
+  MSG_BREAK_GLASS_DURATION_EXCEEDED_FA,
+  MSG_BREAK_GLASS_ELEVATION_DENIED_FA,
+  MSG_BREAK_GLASS_EXPORT_DENIED_FA,
+  MSG_BREAK_GLASS_ADMIN_DENIED_FA,
+  MSG_BREAK_GLASS_REVIEW_TOXIC_FA,
+  MSG_BREAK_GLASS_PRIVILEGED_READ_REQUIRED_FA,
+  MSG_BREAK_GLASS_SELF_REQUEST_FA,
+  MSG_BREAK_GLASS_OVERLAP_FA,
+  MSG_BREAK_GLASS_ROLE_LIFECYCLE_ONLY_FA,
+  MSG_BREAK_GLASS_RECERTIFY_DENIED_FA,
+  isBreakGlassElevationRoleCode,
+  requestBreakGlassGrant,
+  completeBreakGlassPostUseReview,
+  getActiveBreakGlassForAccount,
+  listBreakGlassGrants,
+  assertActorHasBreakGlassPrivilegedRead,
+  assertBreakGlassElevationLimits,
+  assertBreakGlassActivationAllowed,
+  validateBreakGlassRequestInput,
+  seedBreakGlassFixtures,
+  getBreakGlassHooks,
+  setBreakGlassHooksForTests,
+  type BreakGlassHooks,
+  type ActiveBreakGlassSummary,
+  type RequestBreakGlassInput,
+} from "./break-glass";
+
 export { getIdentityDb, setIdentityDb } from "./db";

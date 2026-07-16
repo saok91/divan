@@ -5,10 +5,8 @@ import { usePlatformStatus } from "@/components/platform-status-provider";
 
 /**
  * Break-glass banner — below stale; dismissible only after grant expiry.
- * Real grant lifecycle is Story 2.5; this is the UI contract + mock.
- *
- * Expiry UI: when grant was active and is no longer live but `active` is still
- * true with an expiresAt, show dismiss. Dismiss clears grant state in provider.
+ * Hydrated from server grant state (Story 2.5). Dismiss clears local display
+ * only — does not resurrect elevation.
  */
 export function BreakGlassBanner() {
   const { breakGlass, isBreakGlassLive, setBreakGlass } = usePlatformStatus();
@@ -24,8 +22,17 @@ export function BreakGlassBanner() {
   if (!isBreakGlassLive && !expiredPendingDismiss) return null;
 
   function onDismissExpired() {
-    setBreakGlass({ active: false, expiresAt: null });
+    setBreakGlass({
+      active: false,
+      expiresAt: null,
+      incidentId: null,
+      grantId: null,
+    });
   }
+
+  const liveCopy = breakGlass.incidentId
+    ? `${operationalCopy.breakGlassActive} ${operationalCopy.breakGlassIncidentHint.replace("{incident}", breakGlass.incidentId)}`
+    : operationalCopy.breakGlassActive;
 
   return (
     <div
@@ -35,11 +42,7 @@ export function BreakGlassBanner() {
       className="border-b border-break-glass-banner-border bg-break-glass-banner-background px-4 py-2 text-body text-break-glass-banner-foreground"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p>
-          {isBreakGlassLive
-            ? operationalCopy.breakGlassActive
-            : operationalCopy.breakGlassExpired}
-        </p>
+        <p>{isBreakGlassLive ? liveCopy : operationalCopy.breakGlassExpired}</p>
         {expiredPendingDismiss ? (
           <button
             type="button"

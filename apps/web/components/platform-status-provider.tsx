@@ -2,10 +2,14 @@
 
 import * as React from "react";
 
+import { api } from "@/lib/trpc/client";
+
 export type BreakGlassGrant = {
   active: boolean;
-  /** ISO timestamp; when past, grant is expired and banner may dismiss. */
+  /** ISO timestamp; required when active for a live real grant. */
   expiresAt: string | null;
+  incidentId?: string | null;
+  grantId?: string | null;
 };
 
 export type PlatformStatus = {
@@ -25,7 +29,7 @@ type PlatformStatusContextValue = PlatformStatus & {
   setBreakGlass: (value: BreakGlassGrant) => void;
   /** True while blocking stale / recalc pending — Epic 4–6 gold CTA gate. */
   isGoldCtaBlocked: boolean;
-  /** Break-glass grant still within expiry window. */
+  /** Break-glass grant still within expiry window (requires finite future expiresAt). */
   isBreakGlassLive: boolean;
 };
 
@@ -39,12 +43,28 @@ const DEFAULT_STATUS: PlatformStatus = {
   breakGlass: { active: false, expiresAt: null },
 };
 
+/**
+ * Live break-glass requires active + finite future expiresAt.
+ * Forever-live (`active` + `expiresAt: null`) is no longer valid for real grants.
+ */
 function isGrantLive(grant: BreakGlassGrant, nowMs: number): boolean {
   if (!grant.active) return false;
-  if (!grant.expiresAt) return true;
+  if (!grant.expiresAt) return false;
   const expires = Date.parse(grant.expiresAt);
   if (Number.isNaN(expires)) return false;
   return expires > nowMs;
+}
+
+function toBreakGlassGrant(
+  value: BreakGlassGrant | undefined | null,
+): BreakGlassGrant {
+  if (!value) return DEFAULT_STATUS.breakGlass;
+  return {
+    active: value.active,
+    expiresAt: value.expiresAt,
+    incidentId: value.incidentId ?? null,
+    grantId: value.grantId ?? null,
+  };
 }
 
 export function PlatformStatusProvider({
@@ -63,10 +83,32 @@ export function PlatformStatusProvider({
   const [stalePendingUntil, setStalePendingUntil] = React.useState(
     initial?.stalePendingUntil ?? DEFAULT_STATUS.stalePendingUntil,
   );
-  const [breakGlass, setBreakGlass] = React.useState<BreakGlassGrant>(
-    initial?.breakGlass ?? DEFAULT_STATUS.breakGlass,
+  const [breakGlass, setBreakGlass] = React.useState<BreakGlassGrant>(() =>
+    toBreakGlassGrant(initial?.breakGlass),
   );
   const [nowMs, setNowMs] = React.useState(() => Date.now());
+
+  // Keep banner in sync when layout RSC re-hydrates (e.g. router.refresh).
+  React.useEffect(() => {
+    if (!initial?.breakGlass) return;
+    setBreakGlass(toBreakGlassGrant(initial.breakGlass));
+  }, [
+    initial?.breakGlass?.active,
+    initial?.breakGlass?.expiresAt,
+    initial?.breakGlass?.grantId,
+    initial?.breakGlass?.incidentId,
+  ]);
+
+  // Mid-session sync: poll fresh session breakGlass (activate/revoke without remount).
+  const meQuery = api.me.useQuery(undefined, {
+    refetchInterval: breakGlass.active ? 10_000 : 30_000,
+    refetchOnWindowFocus: true,
+  });
+  React.useEffect(() => {
+    const next = meQuery.data?.breakGlass;
+    if (!next) return;
+    setBreakGlass(toBreakGlassGrant(next));
+  }, [meQuery.data?.breakGlass]);
 
   React.useEffect(() => {
     if (!breakGlass.active || !breakGlass.expiresAt) return;

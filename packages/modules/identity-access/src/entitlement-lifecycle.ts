@@ -1,10 +1,14 @@
 /**
- * Entitlement grant lifecycle (Story 2.4 / FR-46).
+ * Entitlement grant lifecycle (Story 2.4 / FR-46 + Story 2.5 break-glass).
  *
  * State machine (pure + Prisma projection):
  *   requested → approved → active → (expired | revoked | suspended)
  *   requested → rejected (waive)
  *   suspended → active (via recertify)
+ *
+ * `break_glass` specializes this machine (incident/purpose/required expiresAt /
+ * post-use review) via `./break-glass` — not a parallel privilege system.
+ * Ordinary `standard` assign must not become “break-glass without review”.
  *
  * Configurable hooks (AR-ACCESS owns production values):
  *   - kinds requiring independent approval (empty/missing → fail-closed for those kinds)
@@ -87,6 +91,7 @@ const DEFAULT_APPROVAL_KINDS: readonly GrantKind[] = Object.freeze([
   "mass_assignment",
   "role_create",
   "scope_create",
+  "break_glass",
 ]);
 
 let lifecycleHooks: EntitlementLifecycleHooks = {
@@ -159,6 +164,12 @@ export type RequestGrantInput = {
   recertifyBy?: Date | null;
   /** Default recert window after activate when not provided (ms). Demo: 30d. */
   recertWindowMs?: number;
+  /** Break-glass: incident / ticket reference (required when kind=break_glass). */
+  incidentId?: string | null;
+  /** Break-glass: attributable purpose — no HR field values. */
+  purpose?: string | null;
+  exceptionalExportApproved?: boolean;
+  exceptionalPermissionAdminApproved?: boolean;
 };
 
 export type GrantView = {
@@ -177,6 +188,13 @@ export type GrantView = {
   revokedAt: string | null;
   revokeReason: string | null;
   correlationId: string | null;
+  incidentId: string | null;
+  purpose: string | null;
+  postUseReviewStatus: "pending" | "completed" | "not_required";
+  postUseReviewedAt: string | null;
+  postUseReviewerAccountId: string | null;
+  exceptionalExportApproved: boolean;
+  exceptionalPermissionAdminApproved: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -211,6 +229,13 @@ export function grantSnapshot(row: EntitlementGrant): Snapshot {
     revokedAt: toIso(row.revokedAt),
     revokeReason: row.revokeReason,
     correlationId: row.correlationId,
+    incidentId: row.incidentId,
+    purpose: row.purpose,
+    postUseReviewStatus: row.postUseReviewStatus,
+    postUseReviewedAt: toIso(row.postUseReviewedAt),
+    postUseReviewerAccountId: row.postUseReviewerAccountId,
+    exceptionalExportApproved: row.exceptionalExportApproved,
+    exceptionalPermissionAdminApproved: row.exceptionalPermissionAdminApproved,
   };
 }
 
@@ -231,6 +256,13 @@ export function toGrantView(row: EntitlementGrant): GrantView {
     revokedAt: toIso(row.revokedAt),
     revokeReason: row.revokeReason,
     correlationId: row.correlationId,
+    incidentId: row.incidentId,
+    purpose: row.purpose,
+    postUseReviewStatus: row.postUseReviewStatus,
+    postUseReviewedAt: toIso(row.postUseReviewedAt),
+    postUseReviewerAccountId: row.postUseReviewerAccountId,
+    exceptionalExportApproved: row.exceptionalExportApproved,
+    exceptionalPermissionAdminApproved: row.exceptionalPermissionAdminApproved,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -280,10 +312,17 @@ async function emitLifecycleTransitionEvidence(
   }
   for (const result of results) {
     try {
+      const kind = String(result.after.kind ?? "");
+      const op =
+        operation === "grant.expire" && kind === "break_glass"
+          ? "grant.break_glass.expire"
+          : operation === "grant.revoke" && kind === "break_glass"
+            ? "grant.break_glass.revoke"
+            : operation;
       await appendAccessEvent(pool, {
         correlationId: randomUUID(),
         actorAccountId: null,
-        operation,
+        operation: op,
         entityType: "EntitlementGrant",
         entityId: String(result.after.id ?? ""),
         scope: {
@@ -309,6 +348,7 @@ async function emitLifecycleTransitionEvidence(
 
 /**
  * Request a grant. Toxic: cannot request elevated kinds for self.
+ * Break-glass always requires incidentId, purpose, expiresAt (see break-glass.ts).
  */
 export async function requestGrant(
   input: RequestGrantInput,
@@ -318,10 +358,16 @@ export async function requestGrant(
   assertToxicCombinationAllowed({
     actorAccountId: actor.accountId,
     subjectAccountId: input.subjectAccountId,
-    operation: "grant.request",
+    operation:
+      input.kind === "break_glass"
+        ? "grant.break_glass.request"
+        : "grant.request",
   });
 
-  if (
+  if (input.kind === "break_glass") {
+    const { validateBreakGlassRequestInput } = await import("./break-glass");
+    await validateBreakGlassRequestInput(input, actor, db);
+  } else if (
     kindRequiresIndependentApproval(input.kind) &&
     actor.accountId === input.subjectAccountId &&
     input.kind !== "role_create" &&
@@ -399,6 +445,19 @@ export async function requestGrant(
     if (!role) {
       throw new AccessAdminError("VALIDATION", "نقش نامعتبر است.");
     }
+    if (input.kind !== "break_glass") {
+      const {
+        isBreakGlassElevationRoleCode,
+        MSG_BREAK_GLASS_ROLE_LIFECYCLE_ONLY_FA,
+      } = await import("./break-glass");
+      if (isBreakGlassElevationRoleCode(role.code)) {
+        throw new AccessAdminError(
+          "VALIDATION",
+          MSG_BREAK_GLASS_ROLE_LIFECYCLE_ONLY_FA,
+          "break_glass_role_lifecycle_only",
+        );
+      }
+    }
     const perms = role.permissionSet?.permissions ?? [];
     if (
       perms.includes(ACCESS_ADMINISTRATION_PERMISSION) &&
@@ -435,6 +494,24 @@ export async function requestGrant(
       expiresAt: input.expiresAt ?? null,
       recertifyBy: input.recertifyBy ?? null,
       correlationId: actor.correlationId,
+      incidentId:
+        input.kind === "break_glass"
+          ? (input.incidentId ?? "").trim() || null
+          : null,
+      purpose:
+        input.kind === "break_glass"
+          ? (input.purpose ?? "").trim() || null
+          : null,
+      postUseReviewStatus:
+        input.kind === "break_glass" ? "pending" : "not_required",
+      exceptionalExportApproved:
+        input.kind === "break_glass"
+          ? input.exceptionalExportApproved === true
+          : false,
+      exceptionalPermissionAdminApproved:
+        input.kind === "break_glass"
+          ? input.exceptionalPermissionAdminApproved === true
+          : false,
     },
   });
 
@@ -488,7 +565,10 @@ export async function approveGrant(
   assertToxicCombinationAllowed({
     actorAccountId: actor.accountId,
     subjectAccountId: grant.subjectAccountId,
-    operation: "grant.approve",
+    operation:
+      grant.kind === "break_glass"
+        ? "grant.break_glass.approve"
+        : "grant.approve",
     combinesPermissionAdminWithSameGrantApproval: combines,
   });
 
@@ -637,15 +717,23 @@ async function withdrawGrantBindings(
   db: PrismaClient,
 ): Promise<void> {
   const payload = parseCreatePayload(grant.createPayload);
-  // Only remove joins this grant applied. Legacy grants (flags unset) keep
+  // Break-glass always withdraws its elevation role (review decision: force withdraw).
+  // Other kinds: only remove joins this grant applied. Legacy (flags unset) keep
   // prior withdraw behavior. Explicit false preserves pre-lifecycle bindings.
-  const mayWithdrawRole = payload?.appliedRoleBinding !== false;
+  const forceBreakGlassWithdraw = grant.kind === "break_glass";
+  const mayWithdrawRole =
+    forceBreakGlassWithdraw || payload?.appliedRoleBinding !== false;
   const mayWithdrawScope = payload?.appliedScopeBinding !== false;
 
   if (grant.accessRoleId && mayWithdrawRole) {
     // When flag is true, this grant owns the join — withdraw unless another
     // active grant still needs it. When unset (legacy), same as true.
-    if (payload?.appliedRoleBinding === true || payload?.appliedRoleBinding === undefined) {
+    // Break-glass always owns its elevation role for withdraw purposes.
+    if (
+      forceBreakGlassWithdraw ||
+      payload?.appliedRoleBinding === true ||
+      payload?.appliedRoleBinding === undefined
+    ) {
       const keep = await otherActiveGrantNeedsRole(
         grant.id,
         grant.subjectAccountId,
@@ -726,7 +814,10 @@ export async function activateGrant(
       grant.kind === "role_create" || grant.kind === "scope_create"
         ? undefined
         : grant.subjectAccountId,
-    operation: "grant.activate",
+    operation:
+      grant.kind === "break_glass"
+        ? "grant.break_glass.activate"
+        : "grant.activate",
   });
 
   if (
@@ -754,6 +845,11 @@ export async function activateGrant(
       "VALIDATION",
       "این درخواست منقضی شده و قابل فعال‌سازی نیست.",
     );
+  }
+
+  if (grant.kind === "break_glass") {
+    const { assertBreakGlassActivationAllowed } = await import("./break-glass");
+    await assertBreakGlassActivationAllowed(grant, db);
   }
 
   const before = grantSnapshot(grant);
@@ -822,6 +918,9 @@ export async function activateGrant(
       });
       if (!preexisting) {
         await applyRoleBinding(grant.subjectAccountId, accessRoleId, tx as PrismaClient);
+        appliedRoleBinding = true;
+      } else if (grant.kind === "break_glass") {
+        // Decision (code review): claim ownership so expire/revoke always withdraws.
         appliedRoleBinding = true;
       }
     }
@@ -1007,6 +1106,14 @@ export async function recertifyGrant(
   });
   if (!grant) {
     throw new AccessAdminError("NOT_FOUND", MSG_GRANT_NOT_FOUND_FA);
+  }
+  if (grant.kind === "break_glass") {
+    const { MSG_BREAK_GLASS_RECERTIFY_DENIED_FA } = await import("./break-glass");
+    throw new AccessAdminError(
+      "VALIDATION",
+      MSG_BREAK_GLASS_RECERTIFY_DENIED_FA,
+      "break_glass_recertify_denied",
+    );
   }
   if (grant.status !== "active" && grant.status !== "suspended") {
     throw new AccessAdminError(

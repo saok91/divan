@@ -13,8 +13,8 @@ import { operationalCopy } from "@/lib/operational-copy";
 import { formatPersianCurrency } from "@/lib/persian-digits";
 
 /**
- * Story 1.6–1.7 demo host: Jalali pickers + banner/gold-CTA smoke controls.
- * Not a domain form — Epic 4/5 own persistence.
+ * Story 1.6–1.7 demo host: Jalali pickers + stale/gold-CTA smoke controls.
+ * Break-glass is grant-backed (Story 2.5) — no mock elevation toggle.
  */
 export default function PersonnelPage() {
   const [effectiveDate, setEffectiveDate] = React.useState<string | undefined>();
@@ -27,19 +27,8 @@ export default function PersonnelPage() {
     blockingStale,
     setBlockingStale,
     isBreakGlassLive,
-    breakGlass,
-    setBreakGlass,
     isGoldCtaBlocked,
   } = usePlatformStatus();
-
-  function toggleBreakGlass() {
-    if (isBreakGlassLive || breakGlass.active) {
-      setBreakGlass({ active: false, expiresAt: null });
-      return;
-    }
-    const expiresAt = new Date(Date.now() + 15_000).toISOString();
-    setBreakGlass({ active: true, expiresAt });
-  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 bg-background p-6 text-foreground">
@@ -47,7 +36,7 @@ export default function PersonnelPage() {
         <h1 className="text-heading">پرسنل</h1>
         <p className="text-body text-muted-foreground">
           فهرست و پروندهٔ پرسنل در این بخش در دسترس خواهد بود. نمونهٔ انتخابگر
-          تاریخ جلالی و کنترل بنرهای پلتفرم برای تأیید دستی:
+          تاریخ جلالی و کنترل بنر دادهٔ کهنه برای تأیید دستی:
         </p>
       </header>
 
@@ -61,6 +50,11 @@ export default function PersonnelPage() {
         <p className="text-caption text-muted-foreground">
           {operationalCopy.staleGoldCtaHint}
         </p>
+        {isBreakGlassLive ? (
+          <p className="text-caption text-muted-foreground" role="status">
+            {operationalCopy.breakGlassActiveHint}
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -70,15 +64,8 @@ export default function PersonnelPage() {
           >
             {blockingStale ? "خاموش کردن دادهٔ کهنه" : "فعال‌سازی دادهٔ کهنه"}
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            aria-pressed={isBreakGlassLive || breakGlass.active}
-            onClick={toggleBreakGlass}
-          >
-            {isBreakGlassLive || breakGlass.active
-              ? "پایان دسترسی اضطراری"
-              : "فعال‌سازی دسترسی اضطراری (۱۵ث)"}
+          <Button type="button" variant="secondary" asChild>
+            <a href="/access">{operationalCopy.breakGlassAdminLink}</a>
           </Button>
         </div>
         <div className="flex flex-wrap gap-2 pt-2">

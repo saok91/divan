@@ -39,7 +39,6 @@ import {
   createOrganizationalScope,
   createAccessRole,
   assignAccountAccessRoles,
-  MSG_LIFECYCLE_APPROVAL_REQUIRED_FA,
 } from "./index";
 
 const rootEnv = resolve(

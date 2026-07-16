@@ -11,20 +11,24 @@ import {
   activateGrant,
   approveGrant,
   assertActorHasAccessAdministration,
+  assertBreakGlassElevationLimits,
   assignAccountAccessRoles,
   assignAccountScopes,
   compensateActivateGrant,
+  completeBreakGlassPostUseReview,
   createPermissionSet,
   getAccountLink,
   getGrant,
   getIdentityDb,
   listAccessRoles,
+  listBreakGlassGrants,
   listEntitlements,
   listGrants,
   listOrganizationalScopes,
   listPermissionSets,
   previewApproveGrant,
   recertifyGrant,
+  requestBreakGlassGrant,
   requestGrant,
   revokeGrant,
   setAccountActiveStatus,
@@ -50,6 +54,7 @@ const grantKindSchema = z.enum([
   "standard",
   "role_create",
   "scope_create",
+  "break_glass",
 ]);
 
 const grantStatusSchema = z.enum([
@@ -167,6 +172,10 @@ async function mutateWithEvidence<T>(input: {
   mutate: () => Promise<MutateResult<T>>;
   compensate: (result: MutateResult<T>) => Promise<void>;
 }): Promise<T> {
+  await assertBreakGlassElevationLimits(
+    input.accountId,
+    "access.administration",
+  );
   await assertActorHasAccessAdministration(input.accountId);
   const result = await input.mutate();
   try {
@@ -198,6 +207,7 @@ async function mutateWithEvidence<T>(input: {
 
 async function requireAdminBinding(accountId: string): Promise<void> {
   try {
+    await assertBreakGlassElevationLimits(accountId, "access.administration");
     await assertActorHasAccessAdministration(accountId);
   } catch (err) {
     mapAdminError(err);
@@ -768,6 +778,8 @@ export const accessAdminRouter = createTRPCRouter({
         startsAt: z.string().datetime().nullable().optional(),
         expiresAt: z.string().datetime().nullable().optional(),
         recertifyBy: z.string().datetime().nullable().optional(),
+        incidentId: z.string().min(1).optional(),
+        purpose: z.string().min(1).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -776,7 +788,10 @@ export const accessAdminRouter = createTRPCRouter({
           accountId: ctx.session.accountId,
           correlationId: ctx.correlationId,
           decisionId: ctx.decisionId,
-          operation: "grant.request",
+          operation:
+            input.kind === "break_glass"
+              ? "grant.break_glass.request"
+              : "grant.request",
           mutate: () =>
             requestGrant(
               {
@@ -790,6 +805,8 @@ export const accessAdminRouter = createTRPCRouter({
                 recertifyBy: input.recertifyBy
                   ? new Date(input.recertifyBy)
                   : null,
+                incidentId: input.incidentId,
+                purpose: input.purpose,
               },
               {
                 accountId: ctx.session.accountId,
@@ -799,6 +816,118 @@ export const accessAdminRouter = createTRPCRouter({
           compensate: async (result) => {
             const id = result.after.id as string;
             await getIdentityDb().entitlementGrant.delete({ where: { id } });
+          },
+        });
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  requestBreakGlassGrant: governedProcedure
+    .meta({
+      ...adminWriteMeta,
+      operation: "grant.break_glass.request",
+    })
+    .input(
+      z.object({
+        subjectAccountId: z.string().min(1),
+        incidentId: z.string().min(1),
+        purpose: z.string().min(1),
+        expiresAt: z.string().datetime(),
+        accessRoleId: z.string().min(1).nullable().optional(),
+        organizationalScopeId: z.string().min(1).nullable().optional(),
+        startsAt: z.string().datetime().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mutateWithEvidence({
+          accountId: ctx.session.accountId,
+          correlationId: ctx.correlationId,
+          decisionId: ctx.decisionId,
+          operation: "grant.break_glass.request",
+          mutate: () =>
+            requestBreakGlassGrant(
+              {
+                subjectAccountId: input.subjectAccountId,
+                incidentId: input.incidentId,
+                purpose: input.purpose,
+                expiresAt: new Date(input.expiresAt),
+                accessRoleId: input.accessRoleId,
+                organizationalScopeId: input.organizationalScopeId,
+                startsAt: input.startsAt ? new Date(input.startsAt) : null,
+              },
+              {
+                accountId: ctx.session.accountId,
+                correlationId: ctx.correlationId,
+              },
+            ),
+          compensate: async (result) => {
+            const id = result.after.id as string;
+            await getIdentityDb().entitlementGrant.delete({ where: { id } });
+          },
+        });
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  listBreakGlassGrants: governedProcedure
+    .meta({
+      ...adminReadMeta,
+      operation: "grant.break_glass.list",
+    })
+    .input(
+      z
+        .object({
+          status: grantStatusSchema.optional(),
+          postUseReviewStatus: z
+            .enum(["pending", "completed", "not_required"])
+            .optional(),
+          subjectAccountId: z.string().min(1).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        await requireAdminBinding(ctx.session.accountId);
+        return listBreakGlassGrants(input ?? {});
+      } catch (err) {
+        mapAdminError(err);
+      }
+    }),
+
+  completeBreakGlassPostUseReview: governedProcedure
+    .meta({
+      ...adminWriteMeta,
+      operation: "grant.break_glass.post_use_review",
+    })
+    .input(z.object({ grantId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mutateWithEvidence({
+          accountId: ctx.session.accountId,
+          correlationId: ctx.correlationId,
+          decisionId: ctx.decisionId,
+          operation: "grant.break_glass.post_use_review",
+          mutate: () =>
+            completeBreakGlassPostUseReview(
+              { grantId: input.grantId },
+              {
+                accountId: ctx.session.accountId,
+                correlationId: ctx.correlationId,
+              },
+            ),
+          compensate: async (result) => {
+            const id = result.after.id as string;
+            await getIdentityDb().entitlementGrant.update({
+              where: { id },
+              data: {
+                postUseReviewStatus: "pending",
+                postUseReviewedAt: null,
+                postUseReviewerAccountId: null,
+              },
+            });
           },
         });
       } catch (err) {
@@ -819,11 +948,16 @@ export const accessAdminRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        const existing = await getGrant(input.grantId);
+        const evidenceOp =
+          existing?.kind === "break_glass"
+            ? "grant.break_glass.approve"
+            : "grant.approve";
         return await mutateWithEvidence({
           accountId: ctx.session.accountId,
           correlationId: ctx.correlationId,
           decisionId: ctx.decisionId,
-          operation: "grant.approve",
+          operation: evidenceOp,
           mutate: () =>
             approveGrant(input, {
               accountId: ctx.session.accountId,
@@ -868,11 +1002,16 @@ export const accessAdminRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        const existing = await getGrant(input.grantId);
+        const evidenceOp =
+          existing?.kind === "break_glass"
+            ? "grant.break_glass.activate"
+            : "grant.activate";
         return await mutateWithEvidence({
           accountId: ctx.session.accountId,
           correlationId: ctx.correlationId,
           decisionId: ctx.decisionId,
-          operation: "grant.activate",
+          operation: evidenceOp,
           mutate: () =>
             activateGrant(
               {

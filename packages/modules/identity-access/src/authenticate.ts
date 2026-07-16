@@ -35,6 +35,28 @@ export type AuthenticateResult = SessionContext & {
   correlationId: string;
 };
 
+async function loadBreakGlassSessionField(
+  accountId: string,
+  db: PrismaClient,
+): Promise<SessionContext["breakGlass"]> {
+  const { getActiveBreakGlassForAccount } = await import("./break-glass");
+  const bg = await getActiveBreakGlassForAccount(accountId, db);
+  if (!bg.active) {
+    return {
+      active: false,
+      expiresAt: null,
+      incidentId: null,
+      grantId: null,
+    };
+  }
+  return {
+    active: true,
+    expiresAt: bg.expiresAt,
+    incidentId: bg.incidentId,
+    grantId: bg.grantId,
+  };
+}
+
 /**
  * Verify credentials against the active identity provider.
  * - seeded: bcrypt against InternalAccount (refused when NODE_ENV=production)
@@ -188,6 +210,7 @@ async function authenticateLdap(
     linked.accountId,
     db,
   );
+  const breakGlass = await loadBreakGlassSessionField(linked.accountId, db);
 
   return {
     correlationId,
@@ -197,6 +220,7 @@ async function authenticateLdap(
     coarseRole: linked.coarseRole,
     humanIdentityId: linked.humanIdentityId,
     organizationalScopeIds,
+    breakGlass,
   };
 }
 
@@ -280,6 +304,7 @@ async function authenticateSeeded(
     account.id,
     db,
   );
+  const breakGlass = await loadBreakGlassSessionField(account.id, db);
 
   return {
     correlationId,
@@ -289,6 +314,7 @@ async function authenticateSeeded(
     coarseRole: account.coarseRole as CoarseRole,
     humanIdentityId: account.humanIdentityId,
     organizationalScopeIds,
+    breakGlass,
   };
 }
 
@@ -322,6 +348,8 @@ export async function getSessionContext(
     db,
   );
 
+  const breakGlass = await loadBreakGlassSessionField(account.id, db);
+
   return {
     accountId: account.id,
     username: account.username,
@@ -329,6 +357,7 @@ export async function getSessionContext(
     coarseRole: account.coarseRole as CoarseRole,
     humanIdentityId: account.humanIdentityId,
     organizationalScopeIds,
+    breakGlass,
   };
 }
 

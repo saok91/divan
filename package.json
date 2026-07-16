@@ -20,7 +20,8 @@
     "selfcheck:audit-envelope": "pnpm --filter @divan/audit-envelope selfcheck",
     "selfcheck:governed": "pnpm --filter @divan/web selfcheck:governed",
     "selfcheck:access-admin": "pnpm --filter @divan/identity-access selfcheck:access-admin",
-    "selfcheck:entitlement-lifecycle": "pnpm --filter @divan/identity-access selfcheck:entitlement-lifecycle"
+    "selfcheck:entitlement-lifecycle": "pnpm --filter @divan/identity-access selfcheck:entitlement-lifecycle",
+    "selfcheck:break-glass": "pnpm --filter @divan/identity-access selfcheck:break-glass"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

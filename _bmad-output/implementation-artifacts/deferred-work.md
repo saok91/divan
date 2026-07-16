@@ -45,7 +45,7 @@
 
 ## Deferred from: code review of 1-7-accessibility-floor-banner-behavior-operational-copy.md (2026-07-16)
 
-- Break-glass grant with `active: true` and `expiresAt: null` is treated as forever-live (`isGrantLive`) ? UI contract allows it; real grant lifecycle / required expiry belongs in Story 2.5
+- Break-glass grant with `active: true` and `expiresAt: null` is treated as forever-live (`isGrantLive`) ? **resolved in Story 2.5**: live grants require finite future `expiresAt`; server hydrate from real grants; personnel mock toggle removed
 - Viewport gate using `window.screen` can mis-classify windows on a small secondary display when the primary screen reports large metrics ? browser display-API limitation; revisit if multi-monitor support becomes an MVP requirement
 
 ## Deferred from: Story 2.1 audit-envelope / event-store (2026-07-16)
@@ -78,7 +78,7 @@
 ## Deferred from: Story 2.2 sensitive categories / separate export (2026-07-16)
 
 - **AR-DATA** ? production enablement of religion/health/family/bank/insurance/national-ID/compensation-like categories (registry hooks ship disabled)
-- **Break-glass elevation** for System Admin / privileged HR-content access ? Story 2.5 (this story only proves deny-by-default)
+- ~~**Break-glass elevation** for System Admin / privileged HR-content access ? Story 2.5~~ **done in Story 2.5** (incident-bound grant + minimal HR-read binding + banner + post-use review)
 - **Full export artifact panel** (CSV/XLSX, custody, reauth, formula-safe files) ? Story 6.5 / FR41?FR52 (2.2 proves `action: "export"` segregation only)
 - **Real compensation schema + repository** ? Story 3.4 / FR8 (`@divan/compensation-facts` is a typed boundary seam only)
 - Profile **DOM omit** for unauthorized sensitive fields ? Story 5.2+ (2.2 establishes API/response omit contract)
@@ -92,7 +92,7 @@
 
 - **AR-ACCESS** still pending ? production field?action?scope matrix, full toxic-combination catalog, bulk thresholds; Story 2.3 ships fail-closed toxic hooks + governed CRUD only
 - ~~Entitlement request?approval?expiry?recertification lifecycle ? Story 2.4~~ **done in Story 2.4** (real grant state machine + lazy fail-safe on protected entry)
-- Break-glass grant UI / elevation ? Story 2.5 (permission administration must remain deniable under break-glass by default)
+- ~~Break-glass grant UI / elevation ? Story 2.5~~ **done in Story 2.5** (permission administration remains deniable under break-glass by default)
 - LDAP/AD group ? coarse role or Organizational Scope sync ? still forbidden until AR-IDENTITY; Admin may only view/clear/relink `externalDirectoryId`
 - Full audit investigation UI for access evidence ? Story 7.1 (events append to event-store; reviewable via query)
 - FR42 migration plan from Story 2.1 remains intact ? no new Prisma audit tables; `actor_account_id` widened to TEXT so cuid account ids attribute correctly
@@ -107,7 +107,7 @@
 
 ## Deferred from: Story 2.4 entitlement lifecycle (2026-07-16)
 
-- **Break-glass** incident-bound grants + banner + post-use review ? Story 2.5
+- ~~**Break-glass** incident-bound grants + banner + post-use review ? Story 2.5~~ **done in Story 2.5**
 - **Temporal / as-of / cross-boundary** retrieval authz ? Story 2.6
 - **Inference / bulk / small-cohort** thresholds ? Story 2.7
 - **Artifact / export reauth consumers** must call `reauthorizeForQueuedOrArtifactWork` ? Stories 6.5 / 7.x (hook shipped; no full artifact lifecycle here)
@@ -115,8 +115,24 @@
 - **AR-ACCESS** production matrix values (approval kinds, recert SLA, revocation objective milliseconds) still pending ? demo hooks are configurable + fail-closed
 - Dual-admin UX for independent approve in single-seed environments ? selfcheck temporarily binds `access_admin` to a second account; production needs ?2 access admins
 
+## Deferred from: Story 2.5 break-glass privileged access (2026-07-17)
+
+- **AR-ACCESS** exact break-glass policy / max-duration SLA / production elevation matrix ? launch artifacts; demo hooks only
+- **Emergency LDAP/local break-glass account** vaulting, FIDO, dual-custody ? AR-IDENTITY (open)
+- **Temporal / as-of** must still bound break-glass retrievals ? Story 2.6
+- **Inference / bulk** must not be bypassed by break-glass channels ? Story 2.7
+- **Full export artifact panel** / exceptional export UX ? Story 6.5
+- **Audit investigation UI** / ?no self-review of sensitive activity? surface ? Story 7.1 (evidence + toxic review API shipped here)
+- **NFR-6 restore-invalidates-emergency-grants** ? no backup restore path yet; deferred hook documented in `break-glass.ts`
+- **Paging / SIEM / credential rotation** runbooks ? ops / infra-security
+- ~~Access admin grant expiry/`datetime-local` Gregorian inputs~~ **resolved 2026-07-17**: break-glass + entitlement grant forms use `JalaliDateTimePicker` (FR44 / Story 1.6); storage remains ISO Gregorian
+
 ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
 
 - Empty `assignAccountAccessRoles` / `assignAccountScopes` (full wipe) bypasses the new mass-assign lifecycle gate ? pre-existing Story 2.3 full-replace semantics; only `length > 1` was gated in 2.4
 - Legacy/non-grant `AccountAccessRole` / scope joins (direct standard assign) are invisible to expiry/recert fail-safes ? intentional while standard single assign remains; revisit when AR-ACCESS classifies privileged singles
 - `mass_assignment` grant kind is gated at direct assign but has no multi-target activate payload ? defer fulfillment until AR-ACCESS / follow-up; avoid scope creep in 2.4 patch pass
+
+## Deferred from: code review of 2-5-break-glass-privileged-access.md (2026-07-17)
+
+- PermissionSet of an elevated break-glass role can be mutated after activate to add non-allowlisted permissions; allowlist is only checked at request/activate ? continuous revalidation belongs to AR-ACCESS / access-admin hardening
