@@ -1,5 +1,11 @@
 import {
+  DEMO_OMIT_FIELD_CATEGORIES,
+  DEMO_OMIT_FIXTURE_PAYLOAD,
+  DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE,
+  DEMO_SENSITIVE_EXPORT_DENY_TUPLE,
   DEMO_SENSITIVE_TUPLE,
+  DEV_DEMO_CATEGORIES,
+  omitUnauthorizedCategories,
 } from "@divan/audit-envelope";
 
 import {
@@ -14,6 +20,9 @@ import {
  * NOT routed through the audit-envelope. It must not become a backdoor for
  * category data; returns only accountId / username / displayName / coarseRole /
  * organizationalScopeIds.
+ *
+ * Routine System Admin path = identity/config/health only. HR-content
+ * elevation (break-glass) is Story 2.5 — not implemented here.
  */
 export const appRouter = createTRPCRouter({
   health: publicProcedure.query(() => ({
@@ -67,6 +76,68 @@ export const appRouter = createTRPCRouter({
     })
     .query(() => ({
       secret: "SHOULD_NEVER_RETURN",
+    })),
+
+  /**
+   * Ordinary view (demo.non_hr) + omit projection — proves AC#1:
+   * view without category-view for `demo.sensitive_hr` → sensitive key
+   * **absent** from the success body (not masked; not FORBIDDEN-only).
+   * UI profile DOM omit follows the same contract in Story 5.2+.
+   */
+  demoOmitProjection: governedProcedure
+    .meta({
+      permission: "demo.selfcheck.read",
+      dataCategory: "demo.non_hr",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+      operation: "demo.omit.projection",
+      sensitive: true,
+      devOnly: true,
+    })
+    .query(() =>
+      omitUnauthorizedCategories(
+        { ...DEMO_OMIT_FIXTURE_PAYLOAD },
+        DEMO_OMIT_FIELD_CATEGORIES,
+        new Set(["demo.non_hr"]),
+        DEV_DEMO_CATEGORIES,
+      ),
+    ),
+
+  /**
+   * Export with read permission tuple — must deny (read ≠ export).
+   * Even when a related read rule exists, export needs an explicit export rule.
+   */
+  demoSensitiveExport: governedProcedure
+    .meta({
+      permission: DEMO_SENSITIVE_EXPORT_DENY_TUPLE.permission,
+      dataCategory: DEMO_SENSITIVE_EXPORT_DENY_TUPLE.dataCategory,
+      action: DEMO_SENSITIVE_EXPORT_DENY_TUPLE.action,
+      organizationalScope: DEMO_SENSITIVE_EXPORT_DENY_TUPLE.organizationalScope,
+      operation: DEMO_SENSITIVE_EXPORT_DENY_TUPLE.operation,
+      sensitive: true,
+      devOnly: true,
+    })
+    .mutation(() => ({
+      exported: true as const,
+    })),
+
+  /**
+   * Explicit export allow fixture (demo only) — positive export path.
+   * Not a real CSV/artifact export (Story 6.5).
+   */
+  demoSensitiveExportAllowed: governedProcedure
+    .meta({
+      permission: DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE.permission,
+      dataCategory: DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE.dataCategory,
+      action: DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE.action,
+      organizationalScope: DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE.organizationalScope,
+      operation: DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE.operation,
+      sensitive: true,
+      devOnly: true,
+    })
+    .mutation(() => ({
+      exported: true as const,
+      fixture: "sensitive_hr_export_demo" as const,
     })),
 });
 

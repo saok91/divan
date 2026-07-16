@@ -11,7 +11,9 @@ import { fileURLToPath } from "node:url";
 
 import {
   AuthorizationError,
+  DEMO_SENSITIVE_EXPORT_DENY_TUPLE,
   DEMO_SENSITIVE_TUPLE,
+  DEV_DEMO_CATEGORIES,
   DEV_DEMO_POLICY,
   MSG_ACCESS_DENIED_FA,
   createAuditEnvelope,
@@ -41,6 +43,7 @@ async function main() {
   const envelope = createAuditEnvelope({
     pool,
     getPolicy: () => DEV_DEMO_POLICY,
+    getCategories: () => DEV_DEMO_CATEGORIES,
   });
 
   const db = getIdentityDb();
@@ -77,6 +80,18 @@ async function main() {
         envelope.authorizeOrThrow({
           context: authz,
           ...DEMO_SENSITIVE_TUPLE,
+          correlationId: randomUUID(),
+          sensitive: true,
+        }),
+      AuthorizationError,
+    );
+
+    // system_admin (and demoted manager) cannot export without explicit rule
+    await assert.rejects(
+      () =>
+        envelope.authorizeOrThrow({
+          context: authz,
+          ...DEMO_SENSITIVE_EXPORT_DENY_TUPLE,
           correlationId: randomUUID(),
           sensitive: true,
         }),

@@ -4,6 +4,7 @@ import {
   AuthorizationError,
   MSG_ACCESS_DENIED_FA,
   createAuditEnvelope,
+  loadCategoryRegistry,
   loadPolicyRegistry,
   type AuditEnvelope,
 } from "@divan/audit-envelope";
@@ -81,6 +82,7 @@ function getEnvelope(): AuditEnvelope {
   envelope = createAuditEnvelope({
     pool: envelopePool,
     getPolicy: () => loadPolicyRegistry(),
+    getCategories: () => loadCategoryRegistry(),
   });
   return envelope;
 }

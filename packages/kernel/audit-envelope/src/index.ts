@@ -6,6 +6,23 @@ import {
 } from "@divan/event-store";
 import type { Pool } from "pg";
 
+import {
+  isCategoryGrantable,
+  loadCategoryRegistry,
+  type CategoryRegistry,
+} from "./categories";
+
+export {
+  DEV_DEMO_CATEGORIES,
+  PRODUCTION_SENSITIVE_CATEGORY_HOOKS,
+  emptyCategoryRegistry,
+  isCategoryGrantable,
+  loadCategoryRegistry,
+  type CategoryRegistry,
+  type CategorySensitivity,
+  type SensitiveCategory,
+} from "./categories";
+
 /**
  * Persian FORBIDDEN copy — must stay aligned with
  * `operationalCopy.accessDeniedTitle` in apps/web (`دسترسی ندارید.`).
@@ -79,8 +96,11 @@ export class AuthorizationError extends Error {
 }
 
 /**
- * Tiny local/dev fixture — proves default-deny + one controlled allow.
+ * Tiny local/dev fixture — proves default-deny + controlled allows.
  * Not the AR-ACCESS launch matrix. Coarse roles never appear as allow keys.
+ *
+ * Read ≠ export: `demo.sensitive_hr.read` allows read only; export on the same
+ * (or related) tuple denies unless an explicit `action: "export"` rule exists.
  */
 export const DEV_DEMO_POLICY: PolicyRegistry = {
   rules: [
@@ -90,10 +110,22 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "read",
       organizationalScope: "org:selfcheck",
     },
+    {
+      permission: "demo.sensitive_hr.read",
+      dataCategory: "demo.sensitive_hr",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "demo.sensitive_hr.export",
+      dataCategory: "demo.sensitive_hr",
+      action: "export",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 
-/** Sensitive fixture category — no rule; every coarse role must deny. */
+/** Sensitive fixture with no policy rule — every coarse role must deny. */
 export const DEMO_SENSITIVE_TUPLE = {
   permission: "demo.sensitive.read",
   dataCategory: "demo.sensitive_hr",
@@ -101,6 +133,56 @@ export const DEMO_SENSITIVE_TUPLE = {
   organizationalScope: "org:any",
   operation: "demo.sensitive.read",
 } as const;
+
+/**
+ * Category-view read allow (demo) — does **not** imply export.
+ * Used for omit-when-authorized and read≠export proofs.
+ */
+export const DEMO_SENSITIVE_HR_READ_TUPLE = {
+  permission: "demo.sensitive_hr.read",
+  dataCategory: "demo.sensitive_hr",
+  action: "read",
+  organizationalScope: "org:selfcheck",
+  operation: "demo.sensitive_hr.read",
+} as const;
+
+/**
+ * Export attempt on the read permission tuple — must deny (no export rule for
+ * this 4-tuple even though a related read rule exists).
+ */
+export const DEMO_SENSITIVE_EXPORT_DENY_TUPLE = {
+  permission: "demo.sensitive_hr.read",
+  dataCategory: "demo.sensitive_hr",
+  action: "export",
+  organizationalScope: "org:selfcheck",
+  operation: "demo.sensitive.export",
+} as const;
+
+/** Explicit export allow fixture (demo only). */
+export const DEMO_SENSITIVE_EXPORT_ALLOW_TUPLE = {
+  permission: "demo.sensitive_hr.export",
+  dataCategory: "demo.sensitive_hr",
+  action: "export",
+  organizationalScope: "org:selfcheck",
+  operation: "demo.sensitive_hr.export",
+} as const;
+
+/** Fixture row for omit selfcheck / demo query. */
+export const DEMO_OMIT_FIXTURE_PAYLOAD = {
+  displayName: "نمونه",
+  teamLabel: "تیم الف",
+  compensationHint: "SHOULD_OMIT_WHEN_UNAUTHORIZED",
+} as const;
+
+/** Field → category map for {@link DEMO_OMIT_FIXTURE_PAYLOAD}. */
+export const DEMO_OMIT_FIELD_CATEGORIES: Record<
+  keyof typeof DEMO_OMIT_FIXTURE_PAYLOAD,
+  string
+> = {
+  displayName: "demo.non_hr",
+  teamLabel: "demo.non_hr",
+  compensationHint: "demo.sensitive_hr",
+};
 
 export function emptyPolicyRegistry(): PolicyRegistry {
   return { rules: [] };
@@ -130,7 +212,7 @@ export function loadPolicyRegistry(
     }
   }
 
-  if (env.AUDIT_ENVELOPE_USE_DEV_FIXTURE?.trim() === "false") {
+  if (env.AUDIT_ENVELOPE_USE_DEV_FIXTURE?.trim().toLowerCase() === "false") {
     return emptyPolicyRegistry();
   }
 
@@ -141,7 +223,12 @@ export function loadPolicyRegistry(
   return DEV_DEMO_POLICY;
 }
 
-export function evaluatePolicy(
+/**
+ * Exact-match policy only — **not** a public authz API.
+ * Callers must use {@link evaluateAuthorization} so the category registry
+ * gate cannot be bypassed.
+ */
+function evaluatePolicyExact(
   registry: PolicyRegistry,
   request: {
     permission: string;
@@ -162,9 +249,70 @@ export function evaluatePolicy(
   return hit ? "allow" : "deny";
 }
 
+/**
+ * Full authorization eval: category registry gate **first**, then policy.
+ * Disabled/unknown category → deny even if a rogue policy rule mentions it.
+ */
+export function evaluateAuthorization(
+  policy: PolicyRegistry,
+  categories: CategoryRegistry,
+  request: {
+    permission: string;
+    dataCategory: string;
+    action: string;
+    organizationalScope: string;
+  },
+): "allow" | "deny" {
+  if (!isCategoryGrantable(categories, request.dataCategory)) {
+    return "deny";
+  }
+  return evaluatePolicyExact(policy, request);
+}
+
+/**
+ * Project a row so unauthorized / disabled category keys are **absent**
+ * (not masked as `0`, `null`, `"—"`, or redacted placeholders).
+ *
+ * **Map completeness contract:** keys absent from `fieldCategory` pass through
+ * unchanged (ordinary / uncategorized fields). Callers must map every
+ * sensitive field — an unmapped sensitive key will leak. Prefer exhaustive
+ * maps (e.g. `Record<keyof Row, string>`) at each call site.
+ *
+ * `allowedCategories` alone is not enough: a category must also be
+ * grantable in `categories` (registered + enabled). Disabled / unknown ids
+ * in the allow set are ignored.
+ *
+ * API/response omit is authoritative in Story 2.2; profile DOM omit follows
+ * the same rule when person profiles land (Story 5.2+ / UX OQ-3).
+ */
+export function omitUnauthorizedCategories<T extends Record<string, unknown>>(
+  row: T,
+  fieldCategory: Record<string, string>,
+  allowedCategories: ReadonlySet<string>,
+  categories: CategoryRegistry,
+): Partial<T> {
+  const out: Partial<T> = {};
+  for (const key of Object.keys(row) as (keyof T & string)[]) {
+    const categoryId = fieldCategory[key];
+    if (categoryId === undefined) {
+      out[key] = row[key];
+      continue;
+    }
+    if (
+      allowedCategories.has(categoryId) &&
+      isCategoryGrantable(categories, categoryId)
+    ) {
+      out[key] = row[key];
+    }
+  }
+  return out;
+}
+
 export type AuditEnvelopeDeps = {
   pool: Pool;
   getPolicy: () => PolicyRegistry;
+  /** Defaults to {@link loadCategoryRegistry} when omitted. */
+  getCategories?: () => CategoryRegistry;
 };
 
 export type AuditEnvelope = {
@@ -173,22 +321,28 @@ export type AuditEnvelope = {
 
 /**
  * Default-deny authorize API. Coarse role is context only — never an allow key.
- * Sensitive decisions append `event_class=access` atomically with the outcome.
+ * Category registry gates before policy. Sensitive decisions append
+ * `event_class=access` atomically with the outcome.
  */
 export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
+  const getCategories = deps.getCategories ?? (() => loadCategoryRegistry());
+
   return {
     async authorizeOrThrow(input: AuthorizeInput): Promise<AuthorizeResult> {
       const sensitive = input.sensitive !== false;
 
       let decision: "allow" | "deny";
       try {
-        const registry = deps.getPolicy();
-        decision = evaluatePolicy(registry, {
-          permission: input.permission,
-          dataCategory: input.dataCategory,
-          action: input.action,
-          organizationalScope: input.organizationalScope,
-        });
+        decision = evaluateAuthorization(
+          deps.getPolicy(),
+          getCategories(),
+          {
+            permission: input.permission,
+            dataCategory: input.dataCategory,
+            action: input.action,
+            organizationalScope: input.organizationalScope,
+          },
+        );
       } catch {
         throw new AuthorizationError(
           "FORBIDDEN",

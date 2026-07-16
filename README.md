@@ -64,7 +64,7 @@ After Prisma migrate, apply append-only `kernel_events` via:
 pnpm db:sql:apply
 ```
 
-Selfcheck (wired): `pnpm selfcheck:audit-envelope`, `pnpm selfcheck:governed` (freshness + governed path). Other Epic-1 selfchecks remain manual (`tsx`).
+Selfcheck (wired): `pnpm selfcheck:audit-envelope`, `pnpm selfcheck:governed` (freshness + governed path; categories + read≠export + omit). Other Epic-1 selfchecks remain manual (`tsx`).
 
 #### Dev-only seeded accounts
 
