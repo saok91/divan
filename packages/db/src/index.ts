@@ -1,8 +1,10 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
 export type { Pool, PoolClient } from "pg";
+/** Runtime Prisma namespace (JsonNull, etc.) — modules import from `@divan/db`, not `@prisma/client`. */
+export { Prisma };
 
 /**
  * Shared `pg.Pool` for kernel raw-SQL paths (event-store) and Prisma adapter.
@@ -60,5 +62,4 @@ export type {
   EntitlementGrantKind,
   EntitlementGrantStatus,
   PostUseReviewStatus,
-  Prisma,
 } from "@prisma/client";

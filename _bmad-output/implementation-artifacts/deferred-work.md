@@ -83,11 +83,11 @@
 
 ## Deferred from: Story 2.2 sensitive categories / separate export (2026-07-16)
 
-- **AR-DATA** ? production enablement of religion/health/family/bank/insurance/national-ID/compensation-like categories (registry hooks ship disabled)
-- ~~**Break-glass elevation** for System Admin / privileged HR-content access ? Story 2.5~~ **done in Story 2.5** (incident-bound grant + minimal HR-read binding + banner + post-use review)
-- **Full export artifact panel** (CSV/XLSX, custody, reauth, formula-safe files) ? Story 6.5 / FR41?FR52 (2.2 proves `action: "export"` segregation only)
-- **Real compensation schema + repository** ? Story 3.4 / FR8 (`@divan/compensation-facts` is a typed boundary seam only)
-- Profile **DOM omit** for unauthorized sensitive fields ? Story 5.2+ (2.2 establishes API/response omit contract)
+- **AR-DATA** — production enablement of religion/health/family/bank/insurance/national-ID/compensation-like categories (registry hooks ship disabled)
+- ~~**Break-glass elevation** for System Admin / privileged HR-content access — Story 2.5~~ **done in Story 2.5** (incident-bound grant + minimal HR-read binding + banner + post-use review)
+- **Full export artifact panel** (CSV/XLSX, custody, reauth, formula-safe files) — Story 6.5 / FR41–FR52 (2.2 proves `action: "export"` segregation only)
+- ~~**Real compensation schema + repository** — Story 3.4 / FR8 (`@divan/compensation-facts` is a typed boundary seam only)~~ **done in Story 3.4** (schema `compensation` + `CompensationFact` + projection writers; category still disabled; mutations = Story 4.8; profile section = 5.2; export panel = 6.5; AR-DATA owns enablement/masking)
+- Profile **DOM omit** for unauthorized sensitive fields — Story 5.2+ (2.2 establishes API/response omit contract)
 - FR42 migration plan from Story 2.1 remains intact ? no new Prisma audit tables
 
 ## Deferred from: code review of 2-2-sensitive-categories-separate-export-permission.md (2026-07-16)
@@ -207,8 +207,24 @@
 - Data Dictionary registry landed (`DataElement` + enablement gates + thin personnel DOM omit for enabled approve fields)
 - Full personnel profile section DOM omit for all Epic 5 categories → Story 5.2
 - FR-55 formal dictionary versioning / owner sign-off UI → still open (registryVersion foreshadow only)
-- Employment / contract / compensation field enablement walks → Stories 3.4+ / AR-DATA
-- Derived elements not in MVP seed — helpers stubbed for 3.4+ hooks
+- Employment / contract / compensation field enablement walks → AR-DATA (Story 3.4 seeded `later` candidates; production enablement still open)
+- Derived elements not in MVP seed — helpers stubbed; `assertDerivedSensitivityAllowed` reusable for compensation components when AR-DATA enables
+
+## Deferred from: story 3-4-compensation-contractual-facts-module (2026-07-17)
+
+- Isolated compensation schema + projection writers landed (`compensation.CompensationFact`, `apply*Projection`, selfcheck)
+- Production `compensation` category enablement + exact field enablement/masking → AR-DATA
+- User-facing contract/compensation mutations → Story 4.8 (same projection surface)
+- Personnel profile compensation section → Story 5.2
+- Export artifact panel → Story 6.5
+- Payroll / tax / insurance / payment calculation → permanently out of scope (FR-8)
+
+## Deferred from: code review of 3-4-compensation-contractual-facts-module.md (2026-07-17)
+
+- Domain check-then-act race on compensation overlap / second-open — EXCLUDE remains NFR-4 backstop; concurrent path may map to `OVERLAPPING_COMPENSATION` via `23P01` rather than `CONCURRENT_COMPENSATION_FORBIDDEN` (same deferral pattern as Employment 3.2)
+- Selfcheck creates mutation Person + facts on shared `DATABASE_URL` without cleanup — thin selfcheck pattern continues; use ephemeral DB in CI when suite hardens
+- `assertDerivedSensitivityAllowed` not wired on compensation `components` Json writes — stub reusable from 3.3; wire when AR-DATA defines derived component lineage/sensitivity (storage of opaque components remains allowed)
+- Contractual free-text notes share `compensation.notes` ELEMENT_ID — add separate `contract.notes` only after AR-DATA catalogue walk
 
 ## Deferred from: code review of 3-2-employment-lifecycle-invariants.md (2026-07-17)
 

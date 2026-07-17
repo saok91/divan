@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",
+    "@divan/compensation-facts": "workspace:*",
     "@divan/db": "workspace:*",
     "@divan/event-store": "workspace:*",
     "@divan/person-employment": "workspace:*",

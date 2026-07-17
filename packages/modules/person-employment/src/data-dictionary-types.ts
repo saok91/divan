@@ -81,6 +81,18 @@ export const ELEMENT_ID = {
   bank: "person.bank",
   insurance: "person.insurance",
   health: "person.health",
+  // Compensation / contractual candidates (Story 3.4) — disposition later until AR-DATA
+  compensationAmount: "compensation.amount",
+  compensationComponents: "compensation.components",
+  compensationCurrency: "compensation.currency",
+  compensationChangeType: "compensation.change_type",
+  compensationNotes: "compensation.notes",
+  contractCollaborationType: "contract.collaboration_type",
+  contractType: "contract.contract_type",
+  contractingEntity: "contract.contracting_entity",
+  insuringEntity: "contract.insuring_entity",
+  contractReference: "contract.reference",
+  contractDates: "contract.dates",
 } as const;
 
 export const PERSON_FIELD_TO_ELEMENT: Record<
@@ -340,6 +352,75 @@ export const DATA_ELEMENT_SEED: readonly SeedDataElementDef[] = [
     elementId: ELEMENT_ID.health,
     disposition: "later",
     labelFa: "سلامت / وضعیت جسمانی",
+  },
+  // Compensation / contractual candidates (Story 3.4 / addendum §3.2 / §3.4)
+  // disposition later + enabled=false — spreadsheet alone never enables (AR-DATA)
+  {
+    elementId: ELEMENT_ID.compensationAmount,
+    disposition: "later",
+    labelFa: "مبلغ جبران‌خدمت",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.compensationComponents,
+    disposition: "later",
+    labelFa: "اجزای جبران‌خدمت",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.compensationCurrency,
+    disposition: "later",
+    labelFa: "واحد پول جبران‌خدمت",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.compensationChangeType,
+    disposition: "later",
+    labelFa: "نوع تغییر جبران‌خدمت",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.compensationNotes,
+    disposition: "later",
+    labelFa: "توضیحات / دلیل جبران‌خدمت",
+    categoryId: "compensation",
+    freeTextPurpose: "purpose-limited compensation change notes (AR-DATA)",
+  },
+  {
+    elementId: ELEMENT_ID.contractCollaborationType,
+    disposition: "later",
+    labelFa: "نوع همکاری (تاریخ‌دار قراردادی)",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.contractType,
+    disposition: "later",
+    labelFa: "نوع قرارداد",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.contractingEntity,
+    disposition: "later",
+    labelFa: "شخص حقوقی طرف قرارداد",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.insuringEntity,
+    disposition: "later",
+    labelFa: "بیمه‌گر",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.contractReference,
+    disposition: "later",
+    labelFa: "مرجع / شماره قرارداد",
+    categoryId: "compensation",
+  },
+  {
+    elementId: ELEMENT_ID.contractDates,
+    disposition: "later",
+    labelFa: "تاریخ‌های قرارداد",
+    categoryId: "compensation",
   },
   // reject — never enable via API
   {

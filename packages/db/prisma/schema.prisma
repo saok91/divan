@@ -1,7 +1,9 @@
-// Prisma schema — identity projections (Story 1.4) + Person / Employment / DataElement (3.1–3.3).
+// Prisma schema — identity projections (Story 1.4) + Person / Employment / DataElement (3.1–3.3)
+// + compensation-facts isolated schema (3.4 / AD-3).
 // Person is HR identity aggregate — distinct from HumanIdentity (login).
 // Employment is a projection (AD-2), not event-store truth. Assignment / event-store = Epic 3.7+ / Epic 4.
 // DataElement registry governs field enablement (FR-7) — values stay on Person columns for MVP approve set.
+// CompensationFact lives in PostgreSQL schema "compensation" — owned by @divan/compensation-facts only.
 // Kernel event-store tables use raw SQL under packages/db/sql/.
 
 generator client {
@@ -10,6 +12,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public", "compensation"]
 }
 
 /// MVP coarse roles — machine codes only (Story 1.4 / 1.5 consumers).
@@ -19,11 +22,13 @@ enum CoarseRole {
   manager
   audit_reviewer
   system_admin
+  @@schema("public")
 }
 
 enum AccountStatus {
   active
   inactive
+  @@schema("public")
 }
 
 /// Internal human identity projection — not an HR Person record.
@@ -34,6 +39,7 @@ model HumanIdentity {
   createdAt   DateTime @default(now())
 
   account InternalAccount?
+  @@schema("public")
 }
 
 /// HR Person master-data projection (Story 3.1 / FR-5).
@@ -57,6 +63,7 @@ model Person {
   updatedAt     DateTime  @updatedAt
 
   employments Employment[]
+  @@schema("public")
 }
 
 /// Data Dictionary registry row (Story 3.3 / FR-7).
@@ -91,6 +98,7 @@ model DataElement {
 
   @@index([enabled])
   @@index([disposition])
+  @@schema("public")
 }
 
 /// Employment period projection (Story 3.2 / FR-6). AD-2: not authoritative event truth.
@@ -112,6 +120,7 @@ model Employment {
   updatedAt         DateTime  @updatedAt
 
   @@index([personId])
+  @@schema("public")
 }
 
 /// One internal account per human; one coarse role per account.
@@ -138,6 +147,7 @@ model InternalAccount {
   grantsAsRequester EntitlementGrant[] @relation("GrantRequester")
   grantsAsApprover  EntitlementGrant[] @relation("GrantApprover")
   grantsAsPostUseReviewer EntitlementGrant[] @relation("GrantPostUseReviewer")
+  @@schema("public")
 }
 
 /// Organizational Scope projection — Admin-managed; not LDAP group sync.
@@ -153,6 +163,7 @@ model OrganizationalScope {
 
   accounts AccountOrganizationalScope[]
   grants   EntitlementGrant[]
+  @@schema("public")
 }
 
 /// Explicit envelope permission codes only — never implies coarse-role allows.
@@ -165,6 +176,7 @@ model PermissionSet {
   updatedAt   DateTime @updatedAt
 
   roles AccessRole[]
+  @@schema("public")
 }
 
 /// Entitlement role — must reference exactly one PermissionSet (AC #2).
@@ -179,6 +191,7 @@ model AccessRole {
 
   accounts AccountAccessRole[]
   grants   EntitlementGrant[]
+  @@schema("public")
 }
 
 /// Grant class — sensitive/global/bulk/mass/break_glass/cross_time require independent approval (FR-46/47).
@@ -193,6 +206,7 @@ enum EntitlementGrantKind {
   break_glass
   /// Bounded pre/post relationship history — not management-derived default (Story 2.6).
   cross_time_scope
+  @@schema("public")
 }
 
 /// Post-use review for break-glass (Story 2.5). Non-break-glass stays not_required.
@@ -200,6 +214,7 @@ enum PostUseReviewStatus {
   pending
   completed
   not_required
+  @@schema("public")
 }
 
 /// Lifecycle status: requested → approved → active → (expired|revoked|suspended).
@@ -212,6 +227,7 @@ enum EntitlementGrantStatus {
   revoked
   suspended
   rejected
+  @@schema("public")
 }
 
 /// Entitlement grant projection (Story 2.4 + 2.5 break-glass). Evidence stays in event-store.
@@ -263,6 +279,7 @@ model EntitlementGrant {
   @@index([kind, status])
   @@index([incidentId])
   @@index([postUseReviewStatus, status])
+  @@schema("public")
 }
 
 model AccountOrganizationalScope {
@@ -273,6 +290,7 @@ model AccountOrganizationalScope {
 
   @@id([accountId, organizationalScopeId])
   @@index([organizationalScopeId])
+  @@schema("public")
 }
 
 model AccountAccessRole {
@@ -283,6 +301,7 @@ model AccountAccessRole {
 
   @@id([accountId, accessRoleId])
   @@index([accessRoleId])
+  @@schema("public")
 }
 
 /// FR42 attribution substrate — success and failure attempts.
@@ -296,6 +315,7 @@ model AuthAttempt {
 
   @@index([correlationId])
   @@index([occurredAt])
+  @@schema("public")
 }
 
 /// FR42 attribution substrate — deep-link / route denials (Story 1.5).
@@ -311,4 +331,47 @@ model AccessDenial {
 
   @@index([correlationId])
   @@index([occurredAt])
+  @@schema("public")
+}
+
+
+/// Compensation / contractual fact projection (Story 3.4 / FR-8). AD-2: not event-store truth.
+/// Lives in isolated schema `compensation` — only @divan/compensation-facts may access.
+/// Half-open [startDate, endDateExclusive); null end = unbounded open.
+/// Non-overlap per (personId, factKind) via domain + PostgreSQL EXCLUDE in migration SQL.
+/// No payroll/tax/insurance/payment calculation columns or helpers.
+model CompensationFact {
+  id                       String    @id @default(uuid(7))
+  personId                 String
+  /// Optional Employment scope — Restrict; nullable until always known.
+  employmentId             String?
+  /// "compensation" | "contractual" — partitions overlap exclusion.
+  factKind                 String
+  startDate                DateTime  @db.Date
+  endDateExclusive         DateTime? @db.Date
+  /// Compensation attributes (dictionary-gated on write when enforce).
+  /// Stored as decimal string — no payroll arithmetic in this module.
+  amount                   String?
+  components               Json?
+  currency                 String?
+  changeType               String?
+  notes                    String?
+  /// Contractual attributes (rich history; Employment.collaborationType stays lean).
+  collaborationType        String?
+  contractType             String?
+  contractingEntity        String?
+  insuringEntity           String?
+  contractReference        String?
+  contractStartDate        DateTime? @db.Date
+  contractEndDateExclusive DateTime? @db.Date
+  /// Provenance — null until Epic 4 Personnel Events (Story 4.8).
+  sourceEventId            String?
+  /// Registration/system time — distinct from Effective Date (FR-44 foreshadow).
+  recordedAt               DateTime  @default(now())
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([personId, factKind])
+  @@index([personId])
+  @@schema("compensation")
 }

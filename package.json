@@ -26,7 +26,8 @@
     "selfcheck:inference-bulk": "pnpm --filter @divan/audit-envelope selfcheck:inference-bulk",
     "selfcheck:person-identity": "pnpm --filter @divan/person-employment selfcheck:person-identity",
     "selfcheck:employment-lifecycle": "pnpm --filter @divan/person-employment selfcheck:employment-lifecycle",
-    "selfcheck:data-dictionary": "pnpm --filter @divan/person-employment selfcheck:data-dictionary"
+    "selfcheck:data-dictionary": "pnpm --filter @divan/person-employment selfcheck:data-dictionary",
+    "selfcheck:compensation-facts": "pnpm --filter @divan/compensation-facts selfcheck:compensation-facts"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
