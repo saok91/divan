@@ -1,17 +1,30 @@
 /**
- * Person identity master-data APIs (Story 3.1 / FR-5).
+ * Person identity master-data APIs (Stories 3.1 / 3.3 / FR-5 / FR-7).
  *
  * Create / update / read identity facts only — not Employment, Assignment,
  * or compensation mutations (Epic 4). No business events to event-store.
  *
  * AC #5: Person delete-on-Employment-end is not offered. When Employment
  * appears later (3.2+), `onDelete` must not cascade-remove Person.
+ *
+ * Historical workforce-affecting overwrite (Story 3.3 AC #4):
+ * Names / mobile / ordinary identity contact updates are master-data projection
+ * updates only. They must NOT rewrite historical Employment, Assignment,
+ * contract, compensation, or org effective-dated facts — those mutate only via
+ * Epic 4 AR-TEMPORAL events. This module exposes no “edit history cell” path.
  */
 
 import type { PrismaClient } from "@divan/db";
 
+import {
+  assertPersonFieldEnabled,
+  type PersonProfileFieldKey,
+} from "./data-dictionary";
 import { getPersonDb } from "./db";
-import { normalizeDigitsForMatch } from "./digits";
+import {
+  normalizeDigitsForMatch,
+  normalizeIranianMobilePhone,
+} from "./digits";
 import {
   MSG_BLOCKED_IDENTITY_OPERATION_FA,
   MSG_DUPLICATE_NATIONAL_ID_FA,
@@ -205,9 +218,29 @@ function normalizeNationalId(
   );
 }
 
+function normalizeMobilePhone(raw: string): string {
+  const required = requireNonEmpty(raw, "شماره موبایل الزامی است.");
+  const canonical = normalizeIranianMobilePhone(required);
+  return enforceMaxLength(
+    canonical,
+    PERSON_FIELD_MAX.mobilePhone,
+    "شماره موبایل بیش از حد طولانی است.",
+  );
+}
+
+async function requireEnabledFields(
+  fieldKeys: readonly PersonProfileFieldKey[],
+  db: PrismaClient,
+): Promise<void> {
+  for (const key of fieldKeys) {
+    await assertPersonFieldEnabled(key, db);
+  }
+}
+
 /**
  * Create a Person with unique Personnel Code.
  * National ID uniqueness enforced when non-null.
+ * Writes rejected when target dictionary fields are not enabled+approved.
  */
 export async function createPerson(
   input: CreatePersonInput,
@@ -224,6 +257,27 @@ export async function createPerson(
     );
   }
 
+  const requiredKeys: PersonProfileFieldKey[] = [
+    "personnelCode",
+    "givenName",
+    "familyName",
+    "mobilePhone",
+  ];
+  const optionalPresent: PersonProfileFieldKey[] = [];
+  if (normalizeOptionalString(input.fatherName ?? null) !== null) {
+    optionalPresent.push("fatherName");
+  }
+  if (normalizeOptionalString(input.birthDate ?? null) !== null) {
+    optionalPresent.push("birthDate");
+  }
+  if (normalizeOptionalString(input.gender ?? null) !== null) {
+    optionalPresent.push("gender");
+  }
+  if (normalizeOptionalString(input.nationality ?? null) !== null) {
+    optionalPresent.push("nationality");
+  }
+  await requireEnabledFields([...requiredKeys, ...optionalPresent], db);
+
   const personnelCode = normalizePersonnelCode(input.personnelCode);
   const givenName = enforceMaxLength(
     requireNonEmpty(input.givenName, "نام الزامی است."),
@@ -235,11 +289,7 @@ export async function createPerson(
     PERSON_FIELD_MAX.familyName,
     "نام خانوادگی بیش از حد طولانی است.",
   );
-  const mobilePhone = enforceMaxLength(
-    requireNonEmpty(input.mobilePhone, "شماره موبایل الزامی است."),
-    PERSON_FIELD_MAX.mobilePhone,
-    "شماره موبایل بیش از حد طولانی است.",
-  );
+  const mobilePhone = normalizeMobilePhone(input.mobilePhone);
   const fatherNameRaw = normalizeOptionalString(input.fatherName);
   const fatherName = fatherNameRaw
     ? enforceMaxLength(
@@ -304,6 +354,7 @@ export async function createPerson(
 
 /**
  * Update identity fields — not Personnel Code (correction is blocked).
+ * Master-data only — does not rewrite Employment/Assignment/compensation history.
  */
 export async function updatePersonIdentity(
   id: string,
@@ -318,6 +369,17 @@ export async function updatePersonIdentity(
       MSG_PERSON_NOT_FOUND_FA,
     );
   }
+
+  const writeKeys: PersonProfileFieldKey[] = [];
+  if (input.givenName !== undefined) writeKeys.push("givenName");
+  if (input.familyName !== undefined) writeKeys.push("familyName");
+  if (input.mobilePhone !== undefined) writeKeys.push("mobilePhone");
+  if (input.fatherName !== undefined) writeKeys.push("fatherName");
+  if (input.birthDate !== undefined) writeKeys.push("birthDate");
+  if (input.gender !== undefined) writeKeys.push("gender");
+  if (input.nationality !== undefined) writeKeys.push("nationality");
+  if (input.nationalId !== undefined) writeKeys.push("nationalId");
+  await requireEnabledFields(writeKeys, db);
 
   const data: {
     givenName?: string;
@@ -345,11 +407,7 @@ export async function updatePersonIdentity(
     );
   }
   if (input.mobilePhone !== undefined) {
-    data.mobilePhone = enforceMaxLength(
-      requireNonEmpty(input.mobilePhone, "شماره موبایل الزامی است."),
-      PERSON_FIELD_MAX.mobilePhone,
-      "شماره موبایل بیش از حد طولانی است.",
-    );
+    data.mobilePhone = normalizeMobilePhone(input.mobilePhone);
   }
   if (input.fatherName !== undefined) {
     const fatherName = normalizeOptionalString(input.fatherName);

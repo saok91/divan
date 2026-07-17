@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "selfcheck:person-identity": "tsx src/person-identity.selfcheck.ts",
-    "selfcheck:employment-lifecycle": "tsx src/employment-lifecycle.selfcheck.ts"
+    "selfcheck:employment-lifecycle": "tsx src/employment-lifecycle.selfcheck.ts",
+    "selfcheck:data-dictionary": "tsx src/data-dictionary.selfcheck.ts"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

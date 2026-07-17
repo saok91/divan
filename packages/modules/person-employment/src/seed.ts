@@ -1,10 +1,11 @@
 /**
- * Demo seed for Person + Employment projections (Stories 3.1–3.2).
+ * Demo seed for Person + Employment + Data Dictionary (Stories 3.1–3.3).
  * Invoked from identity-access seedDevAccounts after access-admin fixtures.
  */
 
 import type { PrismaClient } from "@divan/db";
 
+import { seedDataDictionary } from "./data-dictionary";
 import {
   applyEmploymentProjection,
   listEmploymentsForPerson,
@@ -90,6 +91,7 @@ export async function seedPersonPermissionFixtures(
 
 /**
  * Ensure ≥1 demo Person exists (unique personnel code).
+ * Requires Data Dictionary approve fields enabled first.
  */
 export async function seedDemoPerson(
   db: PrismaClient,
@@ -182,6 +184,7 @@ export async function seedDemoEmployments(
 export async function seedPersonIdentityFixtures(
   db: PrismaClient,
 ): Promise<void> {
+  await seedDataDictionary(db);
   await seedPersonPermissionFixtures(db);
   await seedDemoPerson(db);
 }
@@ -192,4 +195,11 @@ export async function seedEmploymentLifecycleFixtures(
 ): Promise<void> {
   await seedPersonIdentityFixtures(db);
   await seedDemoEmployments(db);
+}
+
+/** Data Dictionary + Person identity fixtures (Story 3.3). */
+export async function seedDataDictionaryFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  await seedPersonIdentityFixtures(db);
 }

@@ -1,6 +1,7 @@
-// Prisma schema — identity projections (Story 1.4) + Person / Employment projections (3.1–3.2).
+// Prisma schema — identity projections (Story 1.4) + Person / Employment / DataElement (3.1–3.3).
 // Person is HR identity aggregate — distinct from HumanIdentity (login).
 // Employment is a projection (AD-2), not event-store truth. Assignment / event-store = Epic 3.7+ / Epic 4.
+// DataElement registry governs field enablement (FR-7) — values stay on Person columns for MVP approve set.
 // Kernel event-store tables use raw SQL under packages/db/sql/.
 
 generator client {
@@ -44,7 +45,7 @@ model Person {
   personnelCode String    @unique
   givenName     String
   familyName    String
-  /// MVP mandatory contact (AR-DATA approve); full contact dictionary = Story 3.3.
+  /// MVP mandatory contact (AR-DATA approve); format governed by Data Dictionary (Story 3.3).
   mobilePhone   String
   fatherName    String?
   birthDate     DateTime? @db.Date
@@ -56,6 +57,40 @@ model Person {
   updatedAt     DateTime  @updatedAt
 
   employments Employment[]
+}
+
+/// Data Dictionary registry row (Story 3.3 / FR-7).
+/// Governs which Person attributes may be collected/shown — not EAV value storage.
+/// Values for MVP approve identity fields stay on Person columns (AD-2 projection).
+model DataElement {
+  /// Stable id (e.g. person.mobile_phone) — never Excel column titles.
+  elementId       String   @id
+  /// approve | later | reject (AR-DATA partial freeze).
+  disposition     String
+  /// May be true only when disposition=approve AND mandatory metadata complete.
+  enabled         Boolean  @default(false)
+  purpose         String?
+  ownerSource     String?
+  format          String?
+  sensitivity     String?
+  access          String?
+  retention       String?
+  export          String?
+  audit           String?
+  /// Maps to audit-envelope category when sensitive (e.g. identity.national_id).
+  categoryId      String?
+  freeTextPurpose String?
+  lineage         String?
+  /// Person column key when this element maps to a Person field (e.g. mobilePhone).
+  personFieldKey  String?
+  labelFa         String
+  /// FR-55 foreshadow — full governed versioning UI later.
+  registryVersion String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([enabled])
+  @@index([disposition])
 }
 
 /// Employment period projection (Story 3.2 / FR-6). AD-2: not authoritative event truth.

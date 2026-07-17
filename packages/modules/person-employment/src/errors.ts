@@ -1,5 +1,5 @@
 /**
- * Person identity + Employment domain errors (Stories 3.1–3.2 / FR-5–FR-6).
+ * Person identity + Employment + Data Dictionary domain errors (Stories 3.1–3.3).
  * Persian copy at API boundary — English `message` for logs only.
  */
 
@@ -10,7 +10,9 @@ export type PersonIdentityErrorCode =
   | "BLOCKED_IDENTITY_OPERATION"
   | "PERMISSION_DENIED"
   | "VALIDATION"
-  | "SENTINEL_VALUE";
+  | "SENTINEL_VALUE"
+  | "FIELD_NOT_ENABLED"
+  | "MOBILE_PHONE_FORMAT";
 
 export class PersonIdentityError extends Error {
   readonly code: PersonIdentityErrorCode;
@@ -53,6 +55,30 @@ export class EmploymentError extends Error {
   }
 }
 
+export type DataDictionaryErrorCode =
+  | "ELEMENT_NOT_FOUND"
+  | "ENABLE_REJECTED"
+  | "REJECT_DISPOSITION"
+  | "METADATA_INCOMPLETE"
+  | "FREE_TEXT_PURPOSE_REQUIRED"
+  | "DERIVED_SENSITIVITY_DOWNGRADE";
+
+export class DataDictionaryError extends Error {
+  readonly code: DataDictionaryErrorCode;
+  readonly messageFa: string;
+
+  constructor(
+    code: DataDictionaryErrorCode,
+    messageFa: string,
+    message?: string,
+  ) {
+    super(message ?? messageFa);
+    this.name = "DataDictionaryError";
+    this.code = code;
+    this.messageFa = messageFa;
+  }
+}
+
 export const MSG_DUPLICATE_PERSONNEL_CODE_FA =
   "کد پرسنلی تکراری است. کد دیگری انتخاب کنید.";
 
@@ -84,6 +110,29 @@ export const MSG_CONCURRENT_EMPLOYMENT_FORBIDDEN_FA =
 
 export const MSG_EMPLOYMENT_ALREADY_CLOSED_FA =
   "این سابقه همکاری قبلاً پایان یافته است.";
+
+export const MSG_FIELD_NOT_ENABLED_FA =
+  "این فیلد در فرهنگ‌داده فعال نیست و قابل ثبت یا نمایش نیست.";
+
+export const MSG_MOBILE_PHONE_FORMAT_FA =
+  "شماره موبایل نامعتبر است. فرمت مجاز: ۰۹XXXXXXXXX.";
+
+export const MSG_DATA_ELEMENT_NOT_FOUND_FA = "عنصر داده یافت نشد.";
+
+export const MSG_DATA_ELEMENT_ENABLE_REJECT_FA =
+  "عنصر با وضعیت reject قابل فعال‌سازی نیست.";
+
+export const MSG_DATA_ELEMENT_ENABLE_LATER_FA =
+  "عنصر later تا تغییر disposition به approve قابل فعال‌سازی نیست.";
+
+export const MSG_DATA_ELEMENT_ENABLE_INCOMPLETE_FA =
+  "فعال‌سازی بدون تکمیل فراداده الزامی (purpose، owner، format، …) مجاز نیست.";
+
+export const MSG_FREE_TEXT_PURPOSE_REQUIRED_FA =
+  "متن آزاد بدون purpose و کنترل دسترسی مجاز نیست.";
+
+export const MSG_DERIVED_SENSITIVITY_DOWNGRADE_FA =
+  "کاهش حساسیت عنصر مشتق بدون ثبت ارزیابی مجاز نیست.";
 
 export const PERSON_READ_PERMISSION = "person.read";
 export const PERSON_WRITE_PERMISSION = "person.write";

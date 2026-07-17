@@ -72,7 +72,8 @@ const t = initTRPC
         typeof cause === "object" &&
         cause !== null &&
         "name" in cause &&
-        (cause as { name: unknown }).name === "PersonIdentityError" &&
+        ((cause as { name: unknown }).name === "PersonIdentityError" ||
+          (cause as { name: unknown }).name === "DataDictionaryError") &&
         "code" in cause &&
         typeof (cause as { code: unknown }).code === "string"
           ? (cause as { code: string }).code

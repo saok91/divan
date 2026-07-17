@@ -25,7 +25,8 @@
     "selfcheck:temporal-authz": "pnpm --filter @divan/identity-access selfcheck:temporal-authz",
     "selfcheck:inference-bulk": "pnpm --filter @divan/audit-envelope selfcheck:inference-bulk",
     "selfcheck:person-identity": "pnpm --filter @divan/person-employment selfcheck:person-identity",
-    "selfcheck:employment-lifecycle": "pnpm --filter @divan/person-employment selfcheck:employment-lifecycle"
+    "selfcheck:employment-lifecycle": "pnpm --filter @divan/person-employment selfcheck:employment-lifecycle",
+    "selfcheck:data-dictionary": "pnpm --filter @divan/person-employment selfcheck:data-dictionary"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

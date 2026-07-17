@@ -109,6 +109,15 @@ export const operationalCopy = {
     "کد ملی تکراری است. مقدار دیگری وارد کنید یا خالی بگذارید.",
   personBlockedIdentityOp:
     "این عملیات تا تعیین سیاست داده/مهاجرت مجاز نیست.",
+  personFieldsLoading: "در حال بارگذاری فیلدهای مجاز…",
+  personFieldsError: "بارگذاری فیلدهای فرهنگ‌داده ممکن نشد.",
+  personCreateFieldsDisabled:
+    "ایجاد پرسنل ممکن نیست؛ فیلدهای الزامی در فرهنگ‌داده فعال نیستند.",
+  personDictionaryHeading: "فرهنگ‌داده (خلاصه)",
+  personDictionaryHint:
+    "فقط عناصر approve با فراداده کامل فعال می‌شوند؛ حضور در اکسل کافی نیست.",
+  personDictionaryLoading: "در حال بارگذاری رجیستری…",
+  personDictionaryError: "بارگذاری رجیستری فرهنگ‌داده ممکن نشد.",
 } as const;
 
 /**

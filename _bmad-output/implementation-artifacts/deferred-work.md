@@ -1,3 +1,9 @@
+## Deferred from: code review of 3-3-data-dictionary-governed-profile-fields.md (2026-07-17)
+
+- No DB CHECK that `enabled` ⇒ `disposition=approve` / disposition ∈ {approve,later,reject} — domain `enableDataElement` enforces; add constraint if raw-SQL hardening becomes a threat
+- `data-dictionary.selfcheck` mutates shared DB rows (temp disable / force-approve) with best-effort restore — same thin-selfcheck pattern as prior stories; isolate DB when Vitest/CI lands
+- Per-actor category/grant filtering inside `listEnabledProfileFields(actorCtx)` — MVP keeps dictionary-only list; `appearOnProfile` value omit stays on `projectPersonRecord` until grant resolution is wired end-to-end
+
 ## Deferred from: code review of 1-2-brand-tokens-typography-theme-toggle.md (2026-07-16)
 
 - Dark/light `button` secondary contrast vs DESIGN primary pairs (`#FFFFFF` on `#4D9FFF` / `#006FFF`) ? **resolved in Story 1.7**: measured AA fail; nudged `--primary` to `#006DFF` (light) / `#1E6FE0` (dark) so secondary ? 4.5:1 at 14px (`a11y-floor.selfcheck.ts`)
@@ -191,14 +197,22 @@
 - Envelope records allow before PermissionSet deny on Person procedures ? governedProcedure 4-tuple allow/audit then handler PermissionSet gate; same layering as other governed routes
 - `identity-access` depends on `person-employment` for seed fixtures ? monorepo seed orchestration; revisit module boundary if AD-3 ownership hardens
 - No optimistic concurrency / `updatedAt` precondition on `updatePersonIdentity` ? last-write-wins acceptable for 3.1 thin maintain; add version check when concurrent HR editors matter
-- `mobilePhone` stored raw without digit/format normalization ? Personnel Code/national ID only for 3.1; contact dictionary / format rules belong in Story 3.3
+- ~~`mobilePhone` stored raw without digit/format normalization~~ → **closed in Story 3.3** (`normalizeIranianMobilePhone` + dictionary `format` metadata)
 - Blocked deep-link ops still pass envelope allow then domain FORBIDDEN ? intentional deep-link surface for fail-closed Persian copy; quieter audit meta can wait
-- Domain `PersonRecord` always loads `nationalId`; omission only in `toPublicPerson` ? tRPC public DTO is gated; tighten domain select when more in-process callers appear
+- Domain `PersonRecord` always loads `nationalId`; omission only in `toPublicPerson` / `projectPersonRecord` ? tRPC public DTO is gated; tighten domain select when more in-process callers appear
 - Person PermissionSet checks ignore entitlement grant lifecycle (as-of / expiry / break-glass) ? PermissionSet-only OK for 3.1 demo; deepen when Person joins full Epic 2 authz path
+
+## Deferred from: story 3-3-data-dictionary-governed-profile-fields (2026-07-17)
+
+- Data Dictionary registry landed (`DataElement` + enablement gates + thin personnel DOM omit for enabled approve fields)
+- Full personnel profile section DOM omit for all Epic 5 categories → Story 5.2
+- FR-55 formal dictionary versioning / owner sign-off UI → still open (registryVersion foreshadow only)
+- Employment / contract / compensation field enablement walks → Stories 3.4+ / AR-DATA
+- Derived elements not in MVP seed — helpers stubbed for 3.4+ hooks
 
 ## Deferred from: code review of 3-2-employment-lifecycle-invariants.md (2026-07-17)
 
-- Domain check-then-act race maps concurrent second-open to `OVERLAPPING_EMPLOYMENT` via `23P01` rather than `CONCURRENT_EMPLOYMENT_FORBIDDEN` � EXCLUDE remains NFR-4 backstop; refine error mapping when Epic 4 writers need distinct codes under contention
-- `dateOnlyFromDb` via `toISOString().slice(0,10)` � same Person 3.1 DATE mapping; harden if non-UTC driver behavior appears
-- No DB `CHECK (endDateExclusive > startDate)` � domain `assertValidEmploymentInterval` remains mandatory; add CHECK if raw SQL writers become a threat
-- temporal-engine open-end sentinel `9999-12-31` vs PG unbounded `daterange` � engine pre-existing; revisit only if far-horizon intervals matter
+- Domain check-then-act race maps concurrent second-open to `OVERLAPPING_EMPLOYMENT` via `23P01` rather than `CONCURRENT_EMPLOYMENT_FORBIDDEN` � EXCLUDE remains NFR-4 backstop; refine error mapping when Epic 4 writers need distinct codes under contention
+- `dateOnlyFromDb` via `toISOString().slice(0,10)` � same Person 3.1 DATE mapping; harden if non-UTC driver behavior appears
+- No DB `CHECK (endDateExclusive > startDate)` � domain `assertValidEmploymentInterval` remains mandatory; add CHECK if raw SQL writers become a threat
+- temporal-engine open-end sentinel `9999-12-31` vs PG unbounded `daterange` � engine pre-existing; revisit only if far-horizon intervals matter

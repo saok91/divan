@@ -1,8 +1,11 @@
 /**
- * Person identity governed router (Story 3.1 / FR-5).
+ * Person identity + Data Dictionary governed router (Stories 3.1 / 3.3 / FR-5 / FR-7).
  * Coarse hr_admin / hr_operator unlock nav only — mutations require
  * `person.write` / `person.read` via PermissionSet + envelope.
  */
+import {
+  DEV_DEMO_CATEGORIES,
+} from "@divan/audit-envelope";
 import {
   PERSON_DATA_CATEGORY,
   PERSON_FIELD_MAX,
@@ -10,6 +13,7 @@ import {
   PERSON_WRITE_PERMISSION,
   NATIONAL_ID_DATA_CATEGORY,
   PersonIdentityError,
+  DataDictionaryError,
   MSG_BLOCKED_IDENTITY_OPERATION_FA,
   assertActorHasPersonRead,
   assertActorHasPersonWrite,
@@ -17,11 +21,16 @@ import {
   createPerson,
   getPersonById,
   getPersonByPersonnelCode,
+  listDataElements,
+  listEnabledProfileFields,
   listPersons,
   matchReturn,
   mergePersons,
+  projectPersonRecord,
+  getEnabledPersonFieldKeys,
   splitPerson,
   updatePersonIdentity,
+  type PersonProfileFieldKey,
 } from "@divan/person-employment";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -53,6 +62,13 @@ const nationalIdWriteMeta = {
 };
 
 function mapPersonError(err: unknown): never {
+  if (err instanceof DataDictionaryError) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: err.messageFa,
+      cause: err,
+    });
+  }
   if (err instanceof PersonIdentityError) {
     if (err.code === "PERSON_NOT_FOUND") {
       throw new TRPCError({
@@ -71,16 +87,16 @@ function mapPersonError(err: unknown): never {
         cause: err,
       });
     }
-    if (err.code === "BLOCKED_IDENTITY_OPERATION") {
+    if (err.code === "BLOCKED_IDENTITY_OPERATION" || err.code === "PERMISSION_DENIED") {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: err.messageFa,
         cause: err,
       });
     }
-    if (err.code === "PERMISSION_DENIED") {
+    if (err.code === "FIELD_NOT_ENABLED") {
       throw new TRPCError({
-        code: "FORBIDDEN",
+        code: "BAD_REQUEST",
         message: err.messageFa,
         cause: err,
       });
@@ -121,8 +137,10 @@ async function requirePersonWrite(accountId: string): Promise<void> {
   }
 }
 
-/** Public Person DTO — nationalId omitted unless national-id path authorized. */
-function toPublicPerson(
+/** Ordinary identity category for demo reads — national_id omitted unless granted. */
+const ORDINARY_ALLOWED = new Set([PERSON_DATA_CATEGORY]);
+
+async function toPublicPerson(
   person: {
     id: string;
     personnelCode: string;
@@ -137,22 +155,14 @@ function toPublicPerson(
     createdAt: Date;
     updatedAt: Date;
   },
-  includeNationalId: boolean,
+  enabledFields?: ReadonlySet<PersonProfileFieldKey>,
 ) {
-  return {
-    id: person.id,
-    personnelCode: person.personnelCode,
-    givenName: person.givenName,
-    familyName: person.familyName,
-    mobilePhone: person.mobilePhone,
-    fatherName: person.fatherName,
-    birthDate: person.birthDate,
-    gender: person.gender,
-    nationality: person.nationality,
-    ...(includeNationalId ? { nationalId: person.nationalId } : {}),
-    createdAt: person.createdAt,
-    updatedAt: person.updatedAt,
-  };
+  const fields = enabledFields ?? (await getEnabledPersonFieldKeys());
+  return projectPersonRecord(person, {
+    enabledFields: fields,
+    allowedCategories: ORDINARY_ALLOWED,
+    categories: DEV_DEMO_CATEGORIES,
+  });
 }
 
 const identityFieldsSchema = z.object({
@@ -180,7 +190,8 @@ export const personRouter = createTRPCRouter({
       await requirePersonRead(ctx.session.accountId);
       try {
         const rows = await listPersons();
-        return rows.map((p) => toPublicPerson(p, false));
+        const enabledFields = await getEnabledPersonFieldKeys();
+        return Promise.all(rows.map((p) => toPublicPerson(p, enabledFields)));
       } catch (err) {
         mapPersonError(err);
       }
@@ -199,7 +210,7 @@ export const personRouter = createTRPCRouter({
             "پرسنل یافت نشد.",
           );
         }
-        return toPublicPerson(person, false);
+        return toPublicPerson(person);
       } catch (err) {
         mapPersonError(err);
       }
@@ -218,7 +229,41 @@ export const personRouter = createTRPCRouter({
             "پرسنل یافت نشد.",
           );
         }
-        return toPublicPerson(person, false);
+        return toPublicPerson(person);
+      } catch (err) {
+        mapPersonError(err);
+      }
+    }),
+
+  /** Enabled profile fields for thin render/edit (dictionary gate). */
+  listEnabledFields: governedProcedure
+    .meta({ ...personReadMeta, operation: "person.enabled_fields" })
+    .query(async ({ ctx }) => {
+      await requirePersonRead(ctx.session.accountId);
+      try {
+        return await listEnabledProfileFields({
+          accountId: ctx.session.accountId,
+        });
+      } catch (err) {
+        mapPersonError(err);
+      }
+    }),
+
+  /** Thin admin registry read — disposition + enabled (not full governance UI). */
+  listDictionary: governedProcedure
+    .meta({ ...personReadMeta, operation: "person.dictionary.list" })
+    .query(async ({ ctx }) => {
+      await requirePersonRead(ctx.session.accountId);
+      try {
+        const rows = await listDataElements();
+        return rows.map((r) => ({
+          elementId: r.elementId,
+          disposition: r.disposition,
+          enabled: r.enabled,
+          labelFa: r.labelFa,
+          categoryId: r.categoryId,
+          registryVersion: r.registryVersion,
+        }));
       } catch (err) {
         mapPersonError(err);
       }
@@ -241,7 +286,7 @@ export const personRouter = createTRPCRouter({
           accountId: ctx.session.accountId,
           correlationId: ctx.correlationId,
         });
-        return toPublicPerson(person, false);
+        return toPublicPerson(person);
       } catch (err) {
         mapPersonError(err);
       }
@@ -293,7 +338,7 @@ export const personRouter = createTRPCRouter({
           accountId: ctx.session.accountId,
           correlationId: ctx.correlationId,
         });
-        return toPublicPerson(person, false);
+        return toPublicPerson(person);
       } catch (err) {
         mapPersonError(err);
       }
@@ -302,6 +347,7 @@ export const personRouter = createTRPCRouter({
   /**
    * National ID write — category gate first (`identity.national_id`).
    * Production hook stays disabled → fail closed unless explicit enablement.
+   * Dictionary disposition approve ≠ production category enabled.
    */
   setNationalId: governedProcedure
     .meta({ ...nationalIdWriteMeta, operation: "person.national_id.write" })
@@ -326,7 +372,7 @@ export const personRouter = createTRPCRouter({
           },
         );
         // Write grant ≠ read grant — do not echo nationalId.
-        return toPublicPerson(person, false);
+        return toPublicPerson(person);
       } catch (err) {
         mapPersonError(err);
       }
