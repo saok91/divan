@@ -173,9 +173,27 @@
 - **OrgUnit adjacency hierarchy landed** (LE→BU→Dept→Team; half-open validity; activate/deactivate without erase)
 - **AR-TEMPORAL / AR-HEADCOUNT disposition** for deactivation-with-members still open — fail-closed `DEACTIVATION_BLOCKED_DEPENDENCIES` remains
 - **Primary Assignment Team membership / Employment.orgUnitId** = Story 3.7 + Epic 4 (not this story)
-- **Job Role / Title / Ladder / Grade** = Story 3.6
+- **Job Role / Title / Ladder / Grade / Seniority** = **Story 3.6 (done)** — five distinct refs; Grade∈Ladder + half-grades; no universal Grade↔Seniority mapping; AR-TEMPORAL disposition for deactivation-with-Assignment/Event deps still open; Assignment FKs → 3.7 / Epic 4
 - **Interactive org chart / drag-drop reorg** remains non-goal / Could-Have
 - **PopulationPort full cutover** still waits on Assignment projections (3.7+/4.x); OrgUnit alone does not complete cutover
+
+## Deferred from: Story 3.6 independent job reference concepts (2026-07-17)
+
+- **Job refs landed** (OrganizationalRole, JobTitle, Ladder, Grade, Seniority; Decimal half-grades; synced dual activate/deactivate)
+- **AR-TEMPORAL disposition** for deactivating refs used by active/Scheduled Assignment or Personnel Event still open — fail-closed hooks remain
+- **Assignment FKs / Primary Assignment job facts** = Story 3.7 + Epic 4 writers (not this story)
+- **Job-change Personnel Events** (Role/Title/Ladder/Grade/Seniority change) = Story 4.8
+- **Universal or Ladder-specific Grade↔Seniority mapping** remains out of scope / non-MVP
+- **Headcount Approval matching** (Job Title + optional Seniority) = Epic 4
+
+## Deferred from: code review of 3-6-independent-job-reference-concepts.md (2026-07-17)
+
+- Read-then-create code uniqueness race before insert — unique constraint still catches; harden with transaction/upsert pattern later if needed
+- Selfcheck does not cover `update*Identity` / rank-change dependency gate — extend when Assignment deps exist
+- Seed `ensureByCode` only checks existence; mutated seed rows are not healed on re-seed
+- Optional `update*Identity` APIs exist but Admin UI only exposes create/activate/deactivate
+- Job-ref panel has no as-of picker; API `listGradesForLadder(asOf?)` already supports helpers for later stories
+- Grade validity interval is not constrained within parent Ladder interval — leave unconstrained until AR-TEMPORAL / Assignment (do not invent containment policy in 3.6)
 
 ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
 

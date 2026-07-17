@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { JobReferencePanel } from "@/components/organization/job-reference-panel";
 import { OrganizationPanel } from "@/components/organization/organization-panel";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 /**
- * ساختار سازمان (Story 3.5 / FR-9).
- * Layout path-gate is not enough — assert before any client data load (Layout ≠ RSC).
+ * ساختار سازمان (Stories 3.5–3.6 / FR-9 + FR-10).
+ * Hierarchy + job reference master-data. Layout ≠ RSC — assert before panels.
  */
 export default async function OrganizationPage() {
   const session = await auth();
@@ -19,6 +20,7 @@ export default async function OrganizationPage() {
   return (
     <div className="space-y-10 p-6">
       <OrganizationPanel />
+      <JobReferencePanel />
     </div>
   );
 }

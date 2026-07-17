@@ -3,6 +3,7 @@
  * Story 3.1: Person identity. Story 3.2: Employment projection + invariants.
  * Story 3.3: Data-Dictionary-governed profile fields (FR-7).
  * Story 3.5: Organizational Unit hierarchy (FR-9) — not OrganizationalScope authz.
+ * Story 3.6: Job reference concepts (FR-10) — Role / Title / Ladder / Grade / Seniority.
  * Start/Return/Terminate product flows = Epic 4 (4.5–4.6).
  */
 
@@ -19,10 +20,14 @@ export {
   ORGANIZATION_READ_PERMISSION,
   ORGANIZATION_WRITE_PERMISSION,
   ORGANIZATION_DATA_CATEGORY,
+  JOB_REFERENCE_READ_PERMISSION,
+  JOB_REFERENCE_WRITE_PERMISSION,
+  JOB_REFERENCE_DATA_CATEGORY,
   PersonIdentityError,
   EmploymentError,
   DataDictionaryError,
   OrgUnitError,
+  JobRefError,
   MSG_DUPLICATE_PERSONNEL_CODE_FA,
   MSG_DUPLICATE_NATIONAL_ID_FA,
   MSG_PERSON_NOT_FOUND_FA,
@@ -57,6 +62,21 @@ export {
   MSG_ORG_CODE_REQUIRED_FA,
   MSG_BLOCKED_ORG_OPERATION_FA,
   MSG_ORG_PERMISSION_REQUIRED_FA,
+  MSG_JOB_REF_NOT_FOUND_FA,
+  MSG_GRADE_NOT_IN_LADDER_FA,
+  MSG_DUPLICATE_JOB_REF_CODE_FA,
+  MSG_DUPLICATE_JOB_REF_RANK_FA,
+  MSG_INVALID_HALF_GRADE_RANK_FA,
+  MSG_LADDER_HAS_ACTIVE_GRADES_FA,
+  MSG_BLOCKED_JOB_REF_OPERATION_FA,
+  MSG_INVALID_JOB_REF_INTERVAL_FA,
+  MSG_JOB_REF_DEACTIVATE_END_REQUIRED_FA,
+  MSG_JOB_REF_NAME_REQUIRED_FA,
+  MSG_JOB_REF_CODE_REQUIRED_FA,
+  MSG_JOB_REF_LADDER_REQUIRED_FA,
+  MSG_JOB_REF_RANK_REQUIRED_FA,
+  MSG_INACTIVE_LADDER_FA,
+  MSG_JOB_REF_PERMISSION_REQUIRED_FA,
 } from "./errors";
 
 export type {
@@ -64,6 +84,7 @@ export type {
   EmploymentErrorCode,
   DataDictionaryErrorCode,
   OrgUnitErrorCode,
+  JobRefErrorCode,
 } from "./errors";
 
 export {
@@ -188,6 +209,65 @@ export type {
 export type { OrgInterval, OrgUnitType } from "./org-unit-invariants";
 
 export {
+  createOrganizationalRole,
+  activateOrganizationalRole,
+  deactivateOrganizationalRole,
+  updateOrganizationalRoleIdentity,
+  getOrganizationalRoleById,
+  listOrganizationalRoles,
+  createJobTitle,
+  activateJobTitle,
+  deactivateJobTitle,
+  updateJobTitleIdentity,
+  getJobTitleById,
+  listJobTitles,
+  createLadder,
+  activateLadder,
+  deactivateLadder,
+  updateLadderIdentity,
+  getLadderById,
+  listLadders,
+  createGrade,
+  activateGrade,
+  deactivateGrade,
+  updateGradeIdentity,
+  getGradeById,
+  listGradesForLadder,
+  createSeniority,
+  activateSeniority,
+  deactivateSeniority,
+  updateSeniorityIdentity,
+  getSeniorityById,
+  listSeniorities,
+  assertJobRefDeactivationAllowed,
+  assertJobRefChangeAllowed,
+  registerJobRefDependencyHook,
+  clearJobRefDependencyHooksForTests,
+  assertValidJobRefInterval,
+  assertGradeBelongsToLadder,
+  assertValidHalfGradeRank,
+  isJobRefActiveAsOf,
+  JOB_REF_NO_GRADE_SENIORITY_MAPPING,
+} from "./job-reference";
+
+export type {
+  JobRefBaseRecord,
+  OrganizationalRoleRecord,
+  JobTitleRecord,
+  LadderRecord,
+  GradeRecord,
+  SeniorityRecord,
+  CreateJobRefInput,
+  CreateGradeInput,
+  UpdateJobRefIdentityInput,
+  UpdateGradeIdentityInput,
+  JobRefDependencyCheckResult,
+  JobRefDependencyHook,
+  JobRefInterval,
+  JobRefConcept,
+} from "./job-reference";
+
+export {
   EMPLOYMENT_MINIMUM_FACTS,
 } from "./employment-minimum-facts";
 
@@ -197,6 +277,7 @@ export {
   SEED_PERSON_IDENTITY,
   SEED_EMPLOYMENT_LIFECYCLE,
   SEED_ORGANIZATION_HIERARCHY,
+  SEED_JOB_REFERENCES,
   seedPersonIdentityFixtures,
   seedPersonPermissionFixtures,
   seedDemoPerson,
@@ -206,6 +287,9 @@ export {
   seedOrganizationPermissionFixtures,
   seedDemoOrganizationHierarchy,
   seedOrganizationHierarchyFixtures,
+  seedJobReferencePermissionFixtures,
+  seedDemoJobReferences,
+  seedJobReferenceFixtures,
 } from "./seed";
 
 export {
@@ -213,6 +297,8 @@ export {
   assertActorHasPersonWrite,
   assertActorHasOrganizationRead,
   assertActorHasOrganizationWrite,
+  assertActorHasJobReferenceRead,
+  assertActorHasJobReferenceWrite,
   MSG_PERSON_PERMISSION_REQUIRED_FA,
 } from "./permissions";
 

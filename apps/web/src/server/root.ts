@@ -24,6 +24,7 @@ import {
   protectedProcedure,
 } from "./trpc";
 import { accessAdminRouter } from "./access-admin";
+import { jobReferenceRouter } from "./job-reference";
 import { organizationRouter } from "./organization";
 import { personRouter } from "./person";
 import {
@@ -78,6 +79,8 @@ export const appRouter = createTRPCRouter({
   person: personRouter,
 
   organization: organizationRouter,
+
+  jobReference: jobReferenceRouter,
 
   /**
    * Demo governed read — controlled allow via DEV_DEMO_POLICY fixture.

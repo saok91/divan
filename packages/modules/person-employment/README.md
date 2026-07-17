@@ -121,3 +121,40 @@ Primary Assignment Team membership = Story 3.7 + Epic 4.
 
 Deactivation dependency gate: `assertOrgUnitDeactivationAllowed` (+ hook
 registry). Full member/Reservation disposition = AR-TEMPORAL / AR-HEADCOUNT.
+
+## Story 3.6 — Independent job reference concepts (FR-10)
+
+Five distinct master-data tables (not OrgUnit, not OrganizationalScope, not
+CoarseRole):
+
+| Concept | Notes |
+| --- | --- |
+| OrganizationalRole | Responsibility/function reference |
+| JobTitle | Later Assignment + headcount match key |
+| Ladder | Grade family |
+| Grade | Belongs to exactly one Ladder; `rank` Decimal(4,1) for half-grades; unique `(ladderId, code)` and `(ladderId, rank)` |
+| Seniority | Independent — **no** required Grade/Ladder FK |
+
+Public product verbs: `createOrganizationalRole` / `createJobTitle` /
+`createLadder` / `createGrade` / `createSeniority`, plus per-concept
+`activate*` / `deactivate*` / `update*Identity`.
+
+Reads: `listOrganizationalRoles`, `listJobTitles`, `listLadders`,
+`listGradesForLadder(ladderId)`, `listSeniorities`.
+
+**Do not** export Assignment / Personnel Event verbs (`assignJobTitle`,
+`changeGrade`, …). **Do not** implement `assertGradeSeniorityCompatible` or
+any Grade↔Seniority mapping.
+
+Deactivation gate: `assertJobRefDeactivationAllowed` (+ hook registry).
+Ladder deactivate blocked while active Grades exist.
+
+### Selfchecks
+
+```bash
+pnpm selfcheck:person-identity
+pnpm selfcheck:employment-lifecycle
+pnpm selfcheck:data-dictionary
+pnpm selfcheck:organization-hierarchy
+pnpm selfcheck:job-reference
+```

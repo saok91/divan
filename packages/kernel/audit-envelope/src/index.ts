@@ -202,6 +202,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 3.6 — Job reference concepts (FR-10)
+    {
+      permission: "job_reference.read",
+      dataCategory: "organization.job_reference",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "job_reference.write",
+      dataCategory: "organization.job_reference",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 

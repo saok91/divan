@@ -213,3 +213,77 @@ export const MSG_BLOCKED_ORG_OPERATION_FA =
   "این عملیات سازمانی تا تعیین سیاست زمانی/ظرفیت مجاز نیست.";
 
 export const MSG_ORG_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";
+
+/** Job-reference master-data errors (Story 3.6 / FR-10). Clients match codes, not Persian substrings. */
+export type JobRefErrorCode =
+  | "JOB_REF_NOT_FOUND"
+  | "GRADE_NOT_IN_LADDER"
+  | "DUPLICATE_JOB_REF_CODE"
+  | "DUPLICATE_JOB_REF_RANK"
+  | "DEACTIVATION_BLOCKED_DEPENDENCIES"
+  | "INVALID_HALF_GRADE_RANK"
+  | "LADDER_HAS_ACTIVE_GRADES"
+  | "BLOCKED_JOB_REF_OPERATION"
+  | "INVALID_JOB_REF_INTERVAL"
+  | "VALIDATION"
+  | "SENTINEL_VALUE"
+  | "PERMISSION_DENIED";
+
+export class JobRefError extends Error {
+  readonly code: JobRefErrorCode;
+  readonly messageFa: string;
+
+  constructor(
+    code: JobRefErrorCode,
+    messageFa: string,
+    message?: string,
+  ) {
+    super(message ?? messageFa);
+    this.name = "JobRefError";
+    this.code = code;
+    this.messageFa = messageFa;
+  }
+}
+
+export const JOB_REFERENCE_READ_PERMISSION = "job_reference.read";
+export const JOB_REFERENCE_WRITE_PERMISSION = "job_reference.write";
+export const JOB_REFERENCE_DATA_CATEGORY = "organization.job_reference";
+
+export const MSG_JOB_REF_NOT_FOUND_FA = "مرجع شغلی یافت نشد.";
+
+export const MSG_GRADE_NOT_IN_LADDER_FA =
+  "گرید به لدر انتخاب‌شده تعلق ندارد.";
+
+export const MSG_DUPLICATE_JOB_REF_CODE_FA =
+  "کد مرجع شغلی تکراری است. کد دیگری انتخاب کنید.";
+
+export const MSG_DUPLICATE_JOB_REF_RANK_FA =
+  "رتبه گرید در این لدر تکراری است. رتبه دیگری انتخاب کنید.";
+
+export const MSG_INVALID_HALF_GRADE_RANK_FA =
+  "رتبه گرید نامعتبر است. فقط اعداد مثبت با گام نیم‌واحد تا ۹۹۹٫۹ (مثلاً ۱۲ یا ۱۲٫۵) مجاز است.";
+
+export const MSG_LADDER_HAS_ACTIVE_GRADES_FA =
+  "غیرفعال‌سازی لدر در حالی که گرید فعال دارد مجاز نیست.";
+
+export const MSG_BLOCKED_JOB_REF_OPERATION_FA =
+  "این عملیات مرجع شغلی تا تعیین سیاست زمانی مجاز نیست.";
+
+export const MSG_INVALID_JOB_REF_INTERVAL_FA =
+  "بازه اعتبار مرجع شغلی نامعتبر است. تاریخ پایان باید بعد از تاریخ شروع باشد.";
+
+export const MSG_JOB_REF_DEACTIVATE_END_REQUIRED_FA =
+  "برای غیرفعال‌سازی باید تاریخ پایان اعتبار مشخص شود.";
+
+export const MSG_JOB_REF_NAME_REQUIRED_FA = "نام فارسی مرجع شغلی الزامی است.";
+
+export const MSG_JOB_REF_CODE_REQUIRED_FA = "کد مرجع شغلی الزامی است.";
+
+export const MSG_JOB_REF_LADDER_REQUIRED_FA = "انتخاب لدر برای گرید الزامی است.";
+
+export const MSG_JOB_REF_RANK_REQUIRED_FA = "رتبه گرید الزامی است.";
+
+export const MSG_INACTIVE_LADDER_FA =
+  "نمی‌توان زیر لدر غیرفعال، گرید جدید ایجاد یا فعال کرد.";
+
+export const MSG_JOB_REF_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";

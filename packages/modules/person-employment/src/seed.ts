@@ -1,5 +1,5 @@
 /**
- * Demo seed for Person + Employment + Data Dictionary + Org units (Stories 3.1–3.5).
+ * Demo seed for Person + Employment + Data Dictionary + Org units + Job refs (Stories 3.1–3.6).
  * Invoked from identity-access seedDevAccounts after access-admin fixtures.
  */
 
@@ -11,11 +11,20 @@ import {
   listEmploymentsForPerson,
 } from "./employment";
 import {
+  JOB_REFERENCE_READ_PERMISSION,
+  JOB_REFERENCE_WRITE_PERMISSION,
   ORGANIZATION_READ_PERMISSION,
   ORGANIZATION_WRITE_PERMISSION,
   PERSON_READ_PERMISSION,
   PERSON_WRITE_PERMISSION,
 } from "./errors";
+import {
+  createGrade,
+  createJobTitle,
+  createLadder,
+  createOrganizationalRole,
+  createSeniority,
+} from "./job-reference";
 import { createOrgUnit } from "./org-unit";
 import { createPerson } from "./person";
 
@@ -70,6 +79,59 @@ export const SEED_ORGANIZATION_HIERARCHY = {
     code: "TEAM-DEMO",
     nameFa: "تیم جذب و نگهداشت",
     startDate: "2023-01-01",
+  },
+} as const;
+
+/** Demo job references: Ladder + Grades (incl. half-grade), Role, Title, Seniority (Story 3.6). */
+export const SEED_JOB_REFERENCES = {
+  permissionSetName: "job-reference",
+  roleCode: "job_reference_operator",
+  roleLabelFa: "اپراتور مراجع شغلی",
+  ladder: {
+    code: "LAD-DEMO",
+    nameFa: "لدر تخصصی نمونه",
+    startDate: "2019-01-01",
+  },
+  gradeLow: {
+    code: "G-12",
+    nameFa: "گرید ۱۲",
+    rank: "12.0",
+    startDate: "2019-01-01",
+  },
+  /** Half-grade — proves Decimal(4,1) storage. */
+  gradeHalf: {
+    code: "G-12.5",
+    nameFa: "گرید ۱۲٫۵",
+    rank: "12.5",
+    startDate: "2019-01-01",
+  },
+  gradeHigh: {
+    code: "G-13",
+    nameFa: "گرید ۱۳",
+    rank: "13.0",
+    startDate: "2019-01-01",
+  },
+  /** Closed historical seniority — retained for as-of history. */
+  seniorityHistorical: {
+    code: "SEN-HIST",
+    nameFa: "ارشدیت تاریخی",
+    startDate: "2018-01-01",
+    endDateExclusive: "2022-01-01",
+  },
+  role: {
+    code: "ROLE-HR-SPEC",
+    nameFa: "کارشناس منابع انسانی",
+    startDate: "2020-01-01",
+  },
+  jobTitle: {
+    code: "JT-HR-SPEC",
+    nameFa: "عنوان شغلی کارشناس منابع انسانی",
+    startDate: "2020-01-01",
+  },
+  seniority: {
+    code: "SEN-MID",
+    nameFa: "میانی",
+    startDate: "2020-01-01",
   },
 } as const;
 
@@ -368,4 +430,223 @@ export async function seedOrganizationHierarchyFixtures(
 ): Promise<void> {
   await seedOrganizationPermissionFixtures(db);
   await seedDemoOrganizationHierarchy(db);
+}
+
+/**
+ * Bind job_reference.read / job_reference.write for hr.admin.
+ * Idempotent. Does not invent AR-ACCESS production matrices.
+ */
+export async function seedJobReferencePermissionFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  const permissionSet = await db.permissionSet.upsert({
+    where: { name: SEED_JOB_REFERENCES.permissionSetName },
+    create: {
+      name: SEED_JOB_REFERENCES.permissionSetName,
+      permissions: [
+        JOB_REFERENCE_READ_PERMISSION,
+        JOB_REFERENCE_WRITE_PERMISSION,
+      ],
+    },
+    update: {
+      permissions: [
+        JOB_REFERENCE_READ_PERMISSION,
+        JOB_REFERENCE_WRITE_PERMISSION,
+      ],
+    },
+  });
+
+  const role = await db.accessRole.upsert({
+    where: { code: SEED_JOB_REFERENCES.roleCode },
+    create: {
+      code: SEED_JOB_REFERENCES.roleCode,
+      labelFa: SEED_JOB_REFERENCES.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+    update: {
+      labelFa: SEED_JOB_REFERENCES.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+  });
+
+  for (const username of ["hr.admin"] as const) {
+    const account = await db.internalAccount.findUnique({
+      where: { username },
+    });
+    if (!account) continue;
+
+    await db.accountAccessRole.upsert({
+      where: {
+        accountId_accessRoleId: {
+          accountId: account.id,
+          accessRoleId: role.id,
+        },
+      },
+      create: {
+        accountId: account.id,
+        accessRoleId: role.id,
+      },
+      update: {},
+    });
+  }
+}
+
+async function ensureByCode<T extends { id: string; code: string }>(
+  find: () => Promise<T | null>,
+  create: () => Promise<T>,
+): Promise<T> {
+  const existing = await find();
+  if (existing) return existing;
+  return create();
+}
+
+/**
+ * Minimal demo job refs: 1 Ladder, ≥2 Grades incl. half-grade, Role, Title,
+ * Seniority + 1 inactive historical Seniority. Idempotent by stable codes.
+ * No Grade↔Seniority FK. No Assignment FKs.
+ */
+export async function seedDemoJobReferences(
+  db: PrismaClient,
+): Promise<{ ladderId: string; gradeIds: string[] }> {
+  const seed = SEED_JOB_REFERENCES;
+
+  const ladder = await ensureByCode(
+    async () => {
+      const row = await db.ladder.findUnique({
+        where: { code: seed.ladder.code },
+      });
+      return row ? { id: row.id, code: row.code } : null;
+    },
+    async () => {
+      const created = await createLadder(
+        {
+          code: seed.ladder.code,
+          nameFa: seed.ladder.nameFa,
+          startDate: seed.ladder.startDate,
+        },
+        db,
+      );
+      return { id: created.id, code: created.code };
+    },
+  );
+
+  const gradeDefs = [seed.gradeLow, seed.gradeHalf, seed.gradeHigh] as const;
+  const gradeIds: string[] = [];
+  for (const g of gradeDefs) {
+    const grade = await ensureByCode(
+      async () => {
+        const row = await db.grade.findUnique({
+          where: {
+            ladderId_code: { ladderId: ladder.id, code: g.code },
+          },
+        });
+        return row ? { id: row.id, code: row.code } : null;
+      },
+      async () => {
+        const created = await createGrade(
+          {
+            code: g.code,
+            nameFa: g.nameFa,
+            ladderId: ladder.id,
+            rank: g.rank,
+            startDate: g.startDate,
+          },
+          db,
+        );
+        return { id: created.id, code: created.code };
+      },
+    );
+    gradeIds.push(grade.id);
+  }
+
+  await ensureByCode(
+    async () => {
+      const row = await db.organizationalRole.findUnique({
+        where: { code: seed.role.code },
+      });
+      return row ? { id: row.id, code: row.code } : null;
+    },
+    async () => {
+      const created = await createOrganizationalRole(
+        {
+          code: seed.role.code,
+          nameFa: seed.role.nameFa,
+          startDate: seed.role.startDate,
+        },
+        db,
+      );
+      return { id: created.id, code: created.code };
+    },
+  );
+
+  await ensureByCode(
+    async () => {
+      const row = await db.jobTitle.findUnique({
+        where: { code: seed.jobTitle.code },
+      });
+      return row ? { id: row.id, code: row.code } : null;
+    },
+    async () => {
+      const created = await createJobTitle(
+        {
+          code: seed.jobTitle.code,
+          nameFa: seed.jobTitle.nameFa,
+          startDate: seed.jobTitle.startDate,
+        },
+        db,
+      );
+      return { id: created.id, code: created.code };
+    },
+  );
+
+  await ensureByCode(
+    async () => {
+      const row = await db.seniority.findUnique({
+        where: { code: seed.seniority.code },
+      });
+      return row ? { id: row.id, code: row.code } : null;
+    },
+    async () => {
+      const created = await createSeniority(
+        {
+          code: seed.seniority.code,
+          nameFa: seed.seniority.nameFa,
+          startDate: seed.seniority.startDate,
+        },
+        db,
+      );
+      return { id: created.id, code: created.code };
+    },
+  );
+
+  await ensureByCode(
+    async () => {
+      const row = await db.seniority.findUnique({
+        where: { code: seed.seniorityHistorical.code },
+      });
+      return row ? { id: row.id, code: row.code } : null;
+    },
+    async () => {
+      const created = await createSeniority(
+        {
+          code: seed.seniorityHistorical.code,
+          nameFa: seed.seniorityHistorical.nameFa,
+          startDate: seed.seniorityHistorical.startDate,
+          endDateExclusive: seed.seniorityHistorical.endDateExclusive,
+        },
+        db,
+      );
+      return { id: created.id, code: created.code };
+    },
+  );
+
+  return { ladderId: ladder.id, gradeIds };
+}
+
+/** Job-reference permissions + demo fixtures (Story 3.6). */
+export async function seedJobReferenceFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  await seedJobReferencePermissionFixtures(db);
+  await seedDemoJobReferences(db);
 }

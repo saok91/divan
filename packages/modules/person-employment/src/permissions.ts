@@ -7,6 +7,10 @@ import type { PrismaClient } from "@divan/db";
 
 import { getPersonDb } from "./db";
 import {
+  JOB_REFERENCE_READ_PERMISSION,
+  JOB_REFERENCE_WRITE_PERMISSION,
+  JobRefError,
+  MSG_JOB_REF_PERMISSION_REQUIRED_FA,
   MSG_ORG_PERMISSION_REQUIRED_FA,
   ORGANIZATION_READ_PERMISSION,
   ORGANIZATION_WRITE_PERMISSION,
@@ -102,6 +106,42 @@ export async function assertActorHasOrganizationWrite(
       "PERMISSION_DENIED",
       MSG_ORG_PERMISSION_REQUIRED_FA,
       "organization_write_required",
+    );
+  }
+}
+
+export async function assertActorHasJobReferenceRead(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    JOB_REFERENCE_READ_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new JobRefError(
+      "PERMISSION_DENIED",
+      MSG_JOB_REF_PERMISSION_REQUIRED_FA,
+      "job_reference_read_required",
+    );
+  }
+}
+
+export async function assertActorHasJobReferenceWrite(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    JOB_REFERENCE_WRITE_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new JobRefError(
+      "PERMISSION_DENIED",
+      MSG_JOB_REF_PERMISSION_REQUIRED_FA,
+      "job_reference_write_required",
     );
   }
 }

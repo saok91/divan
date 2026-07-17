@@ -45,6 +45,30 @@ export const EMPLOYMENT_MINIMUM_FACTS: readonly EmploymentMinimumFact[] = [
     notes: "OrgUnit schema live (3.5); Primary Assignment Team membership still Epic 4 / Story 3.7 — no Employment.orgUnitId FK yet",
   },
   {
+    fact: "Organizational Role (job reference)",
+    ownerStory: "3.6",
+    required: true,
+    notes: "Schema ready (3.6); Assignment carriers still 3.7 / Epic 4 — no Assignment FK yet",
+  },
+  {
+    fact: "Job Title (job reference)",
+    ownerStory: "3.6",
+    required: true,
+    notes: "Schema ready (3.6); Assignment + headcount match carriers still 3.7 / Epic 4",
+  },
+  {
+    fact: "Ladder + Grade (job reference; Grade∈Ladder, half-grades)",
+    ownerStory: "3.6",
+    required: true,
+    notes: "Schema ready (3.6); no universal Grade↔Seniority map; Assignment carriers still 3.7 / Epic 4",
+  },
+  {
+    fact: "Seniority (independent job reference)",
+    ownerStory: "3.6",
+    required: false,
+    notes: "Schema ready (3.6); optional for headcount later; no required Grade/Ladder FK; Assignment carriers still 3.7 / Epic 4",
+  },
+  {
     fact: "Exactly one active Primary Assignment",
     ownerStory: "3.7 + Epic 4",
     required: true,

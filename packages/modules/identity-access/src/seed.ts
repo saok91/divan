@@ -2,7 +2,11 @@ import type { PrismaClient } from "@divan/db";
 import bcrypt from "bcryptjs";
 
 import { seedCompensationFactsFixtures } from "@divan/compensation-facts";
-import { seedEmploymentLifecycleFixtures, seedOrganizationHierarchyFixtures } from "@divan/person-employment";
+import {
+  seedEmploymentLifecycleFixtures,
+  seedJobReferenceFixtures,
+  seedOrganizationHierarchyFixtures,
+} from "@divan/person-employment";
 
 import { seedAccessAdministrationFixtures } from "./access-admin";
 import { seedBreakGlassFixtures } from "./break-glass";
@@ -143,6 +147,7 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
     await seedBreakGlassFixtures(tx as unknown as PrismaClient);
     await seedEmploymentLifecycleFixtures(tx as unknown as PrismaClient);
     await seedOrganizationHierarchyFixtures(tx as unknown as PrismaClient);
+    await seedJobReferenceFixtures(tx as unknown as PrismaClient);
     await seedCompensationFactsFixtures(tx as unknown as PrismaClient);
 
     return { createdOrUpdated };

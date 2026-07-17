@@ -130,6 +130,9 @@ export const operationalCopy = {
   orgParentRequired: "انتخاب والد برای این نوع واحد الزامی است.",
   orgDeactivateEndRequired:
     "برای غیرفعال‌سازی باید تاریخ پایان اعتبار مشخص شود.",
+
+  /** Job reference master-data (Story 3.6). */
+  jobRefListError: "بارگذاری مراجع شغلی ممکن نشد.",
 } as const;
 
 /**

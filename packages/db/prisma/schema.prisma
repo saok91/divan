@@ -1,10 +1,13 @@
 // Prisma schema — identity projections (Story 1.4) + Person / Employment / DataElement (3.1–3.3)
-// + compensation-facts isolated schema (3.4 / AD-3) + OrganizationalUnit hierarchy (3.5 / FR-9).
+// + compensation-facts isolated schema (3.4 / AD-3) + OrganizationalUnit hierarchy (3.5 / FR-9)
+// + job reference concepts (3.6 / FR-10): OrganizationalRole, JobTitle, Ladder, Grade, Seniority.
 // Person is HR identity aggregate — distinct from HumanIdentity (login).
 // Employment is a projection (AD-2), not event-store truth. Assignment / event-store = Epic 3.7+ / Epic 4.
 // DataElement registry governs field enablement (FR-7) — values stay on Person columns for MVP approve set.
 // CompensationFact lives in PostgreSQL schema "compensation" — owned by @divan/compensation-facts only.
 // OrganizationalUnit (LE→BU→Dept→Team) is org master-data — NOT OrganizationalScope (authz population).
+// Job refs are independent master-data — NOT OrgUnit, NOT OrganizationalScope, NOT CoarseRole/AccessRole.
+// Grade belongs to exactly one Ladder; Seniority has no required Grade/Ladder link.
 // Kernel event-store tables use raw SQL under packages/db/sql/.
 
 generator client {
@@ -151,6 +154,93 @@ model OrganizationalUnit {
 
   @@index([parentId])
   @@index([unitType])
+  @@schema("public")
+}
+
+/// Organizational Role job reference (Story 3.6 / FR-10). Responsibility/function — not Auth.js CoarseRole.
+/// Half-open [startDate, endDateExclusive); deactivate closes interval — never hard-deletes.
+model OrganizationalRole {
+  id               String    @id @default(uuid(7))
+  code             String    @unique
+  nameFa           String
+  startDate        DateTime  @db.Date
+  endDateExclusive DateTime? @db.Date
+  active           Boolean   @default(true)
+  sourceEventId    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@schema("public")
+}
+
+/// Job Title classification (Story 3.6 / FR-10). Later: Assignment + headcount match key — no Assignment FK yet.
+model JobTitle {
+  id               String    @id @default(uuid(7))
+  code             String    @unique
+  nameFa           String
+  startDate        DateTime  @db.Date
+  endDateExclusive DateTime? @db.Date
+  active           Boolean   @default(true)
+  sourceEventId    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@schema("public")
+}
+
+/// Ladder — ordered grade family (Story 3.6 / FR-10). Deactivate blocked while active Grades exist.
+model Ladder {
+  id               String    @id @default(uuid(7))
+  code             String    @unique
+  nameFa           String
+  startDate        DateTime  @db.Date
+  endDateExclusive DateTime? @db.Date
+  active           Boolean   @default(true)
+  sourceEventId    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  grades Grade[]
+
+  @@schema("public")
+}
+
+/// Grade — level within exactly one Ladder (Story 3.6 / FR-10).
+/// rank is Decimal(4,1) so half-grades (e.g. 12.5) are exact — never Float.
+/// Uniqueness: (ladderId, code) and (ladderId, rank).
+model Grade {
+  id               String    @id @default(uuid(7))
+  code             String
+  nameFa           String
+  ladderId         String
+  ladder           Ladder    @relation(fields: [ladderId], references: [id], onDelete: Restrict)
+  /// Half-grade capable: e.g. 12.0, 12.5 — Decimal only (no IEEE Float).
+  rank             Decimal   @db.Decimal(4, 1)
+  startDate        DateTime  @db.Date
+  endDateExclusive DateTime? @db.Date
+  active           Boolean   @default(true)
+  sourceEventId    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([ladderId, code])
+  @@unique([ladderId, rank])
+  @@index([ladderId])
+  @@schema("public")
+}
+
+/// Seniority — independent classification (Story 3.6 / FR-10). No required FK to Grade or Ladder.
+model Seniority {
+  id               String    @id @default(uuid(7))
+  code             String    @unique
+  nameFa           String
+  startDate        DateTime  @db.Date
+  endDateExclusive DateTime? @db.Date
+  active           Boolean   @default(true)
+  sourceEventId    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
   @@schema("public")
 }
 
