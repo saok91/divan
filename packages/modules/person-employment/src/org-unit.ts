@@ -206,6 +206,12 @@ export async function assertOrgUnitDeactivationAllowed(
   unitId: string,
   db: PrismaClient = getPersonDb(),
 ): Promise<void> {
+  // Ensure Primary Assignment hooks are registered even if seed/apply never ran.
+  const { ensurePrimaryAssignmentHooksRegistered } = await import(
+    "./primary-assignment"
+  );
+  ensurePrimaryAssignmentHooksRegistered();
+
   const children = await db.organizationalUnit.findMany({
     where: { parentId: unitId, active: true },
     select: { id: true, code: true },

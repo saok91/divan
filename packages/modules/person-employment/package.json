@@ -14,7 +14,8 @@
     "selfcheck:employment-lifecycle": "tsx src/employment-lifecycle.selfcheck.ts",
     "selfcheck:data-dictionary": "tsx src/data-dictionary.selfcheck.ts",
     "selfcheck:organization-hierarchy": "tsx src/org-unit.selfcheck.ts",
-    "selfcheck:job-reference": "tsx src/job-reference.selfcheck.ts"
+    "selfcheck:job-reference": "tsx src/job-reference.selfcheck.ts",
+    "selfcheck:primary-assignment": "tsx src/primary-assignment.selfcheck.ts"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

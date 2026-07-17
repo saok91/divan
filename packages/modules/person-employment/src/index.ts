@@ -4,6 +4,7 @@
  * Story 3.3: Data-Dictionary-governed profile fields (FR-7).
  * Story 3.5: Organizational Unit hierarchy (FR-9) — not OrganizationalScope authz.
  * Story 3.6: Job reference concepts (FR-10) — Role / Title / Ladder / Grade / Seniority.
+ * Story 3.7: Primary Assignment integrity (FR-11) — projection + exactly-one + Team/job facts.
  * Start/Return/Terminate product flows = Epic 4 (4.5–4.6).
  */
 
@@ -28,6 +29,7 @@ export {
   DataDictionaryError,
   OrgUnitError,
   JobRefError,
+  PrimaryAssignmentError,
   MSG_DUPLICATE_PERSONNEL_CODE_FA,
   MSG_DUPLICATE_NATIONAL_ID_FA,
   MSG_PERSON_NOT_FOUND_FA,
@@ -77,6 +79,15 @@ export {
   MSG_JOB_REF_RANK_REQUIRED_FA,
   MSG_INACTIVE_LADDER_FA,
   MSG_JOB_REF_PERMISSION_REQUIRED_FA,
+  MSG_OVERLAPPING_PRIMARY_ASSIGNMENT_FA,
+  MSG_PRIMARY_ASSIGNMENT_REQUIRED_FA,
+  MSG_PRIMARY_COVERAGE_GAP_FA,
+  MSG_PRIMARY_OUTSIDE_EMPLOYMENT_FA,
+  MSG_TEAM_UNIT_REQUIRED_FA,
+  MSG_PRIMARY_ASSIGNMENT_NOT_FOUND_FA,
+  MSG_PRIMARY_ALREADY_CLOSED_FA,
+  MSG_INVALID_PRIMARY_INTERVAL_FA,
+  MSG_PRIMARY_REF_NOT_FOUND_FA,
 } from "./errors";
 
 export type {
@@ -85,6 +96,7 @@ export type {
   DataDictionaryErrorCode,
   OrgUnitErrorCode,
   JobRefErrorCode,
+  PrimaryAssignmentErrorCode,
 } from "./errors";
 
 export {
@@ -268,6 +280,33 @@ export type {
 } from "./job-reference";
 
 export {
+  applyPrimaryAssignmentProjection,
+  closePrimaryAssignmentProjection,
+  listPrimaryAssignmentsForEmployment,
+  getPrimaryAssignmentById,
+  getActivePrimaryAssignmentAsOf,
+  resolveTeamMembershipAsOf,
+  ensurePrimaryAssignmentHooksRegistered,
+  resetPrimaryAssignmentHooksRegistrationForTests,
+  assertValidPrimaryInterval,
+  assertNoOverlapWithExistingPrimaries,
+  isPrimaryActiveAsOf,
+  assertExactlyOneActivePrimaryAsOf,
+  assertPrimaryWithinEmployment,
+  assertPrimaryCoverageForActiveEmployment,
+  assertTeamUnitIsTeam,
+  assertGradeMatchesLadder,
+} from "./primary-assignment";
+
+export type {
+  PrimaryAssignmentRecord,
+  ApplyPrimaryAssignmentProjectionInput,
+  TeamMembershipAsOf,
+} from "./primary-assignment";
+
+export type { PrimaryInterval } from "./primary-assignment-invariants";
+
+export {
   EMPLOYMENT_MINIMUM_FACTS,
 } from "./employment-minimum-facts";
 
@@ -278,6 +317,7 @@ export {
   SEED_EMPLOYMENT_LIFECYCLE,
   SEED_ORGANIZATION_HIERARCHY,
   SEED_JOB_REFERENCES,
+  SEED_PRIMARY_ASSIGNMENT,
   seedPersonIdentityFixtures,
   seedPersonPermissionFixtures,
   seedDemoPerson,
@@ -290,6 +330,8 @@ export {
   seedJobReferencePermissionFixtures,
   seedDemoJobReferences,
   seedJobReferenceFixtures,
+  seedDemoPrimaryAssignments,
+  seedPrimaryAssignmentFixtures,
 } from "./seed";
 
 export {

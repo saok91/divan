@@ -287,3 +287,61 @@ export const MSG_INACTIVE_LADDER_FA =
   "نمی‌توان زیر لدر غیرفعال، گرید جدید ایجاد یا فعال کرد.";
 
 export const MSG_JOB_REF_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";
+
+/** Primary Assignment projection errors (Story 3.7 / FR-11). Clients match codes. */
+export type PrimaryAssignmentErrorCode =
+  | "OVERLAPPING_PRIMARY_ASSIGNMENT"
+  | "PRIMARY_ASSIGNMENT_REQUIRED"
+  | "PRIMARY_COVERAGE_GAP"
+  | "PRIMARY_OUTSIDE_EMPLOYMENT"
+  | "TEAM_UNIT_REQUIRED"
+  | "GRADE_NOT_IN_LADDER"
+  | "PRIMARY_ASSIGNMENT_NOT_FOUND"
+  | "PRIMARY_ALREADY_CLOSED"
+  | "INVALID_PRIMARY_INTERVAL"
+  | "EMPLOYMENT_NOT_FOUND"
+  | "REF_NOT_FOUND"
+  | "VALIDATION"
+  | "SENTINEL_VALUE";
+
+export class PrimaryAssignmentError extends Error {
+  readonly code: PrimaryAssignmentErrorCode;
+  readonly messageFa: string;
+
+  constructor(
+    code: PrimaryAssignmentErrorCode,
+    messageFa: string,
+    message?: string,
+  ) {
+    super(message ?? messageFa);
+    this.name = "PrimaryAssignmentError";
+    this.code = code;
+    this.messageFa = messageFa;
+  }
+}
+
+export const MSG_OVERLAPPING_PRIMARY_ASSIGNMENT_FA =
+  "بازه تخصیص اصلی با تخصیص موجود هم‌پوشانی دارد.";
+
+export const MSG_PRIMARY_ASSIGNMENT_REQUIRED_FA =
+  "برای همکاری فعال باید دقیقاً یک تخصیص اصلی فعال وجود داشته باشد.";
+
+export const MSG_PRIMARY_COVERAGE_GAP_FA =
+  "بازه همکاری فعال باید بدون شکاف توسط تخصیص‌های اصلی پوشش داده شود.";
+
+export const MSG_PRIMARY_OUTSIDE_EMPLOYMENT_FA =
+  "بازه تخصیص اصلی باید داخل بازه همکاری باشد.";
+
+export const MSG_TEAM_UNIT_REQUIRED_FA =
+  "تخصیص اصلی فقط به واحد از نوع تیم مجاز است.";
+
+export const MSG_PRIMARY_ASSIGNMENT_NOT_FOUND_FA = "تخصیص اصلی یافت نشد.";
+
+export const MSG_PRIMARY_ALREADY_CLOSED_FA =
+  "این تخصیص اصلی قبلاً پایان یافته است.";
+
+export const MSG_INVALID_PRIMARY_INTERVAL_FA =
+  "بازه تخصیص اصلی نامعتبر است. تاریخ پایان باید بعد از تاریخ شروع باشد.";
+
+export const MSG_PRIMARY_REF_NOT_FOUND_FA =
+  "مرجع مرتبط با تخصیص اصلی یافت نشد.";

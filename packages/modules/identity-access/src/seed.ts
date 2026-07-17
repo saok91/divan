@@ -6,6 +6,7 @@ import {
   seedEmploymentLifecycleFixtures,
   seedJobReferenceFixtures,
   seedOrganizationHierarchyFixtures,
+  seedPrimaryAssignmentFixtures,
 } from "@divan/person-employment";
 
 import { seedAccessAdministrationFixtures } from "./access-admin";
@@ -148,6 +149,7 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
     await seedEmploymentLifecycleFixtures(tx as unknown as PrismaClient);
     await seedOrganizationHierarchyFixtures(tx as unknown as PrismaClient);
     await seedJobReferenceFixtures(tx as unknown as PrismaClient);
+    await seedPrimaryAssignmentFixtures(tx as unknown as PrismaClient);
     await seedCompensationFactsFixtures(tx as unknown as PrismaClient);
 
     return { createdOrUpdated };

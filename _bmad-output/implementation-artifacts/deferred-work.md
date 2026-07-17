@@ -164,24 +164,24 @@
 - **Employment projection + invariants landed** (`applyEmploymentProjection` / `closeEmploymentProjection`; domain non-overlap + PG EXCLUDE; ?1 active as-of)
 - **Start / Return / Termination** user flows + authoritative event append = Stories 4.5?4.6 (not this story)
 - **Concurrent multi-Employment policy exceptions** still AR-DATA ? fail-closed Persian reject remains
-- **Primary Assignment integrity** (exactly one active) = Story 3.7
-- **PopulationPort fixture → Person UUID cutover** still waits on assignment (3.7–3.9 / 4.x); OrgUnit projections landed in 3.5
-- Org hierarchy tables / Legal Entity→Team master-data = **Story 3.5 (done)**; Employment/Assignment org FKs = Story 3.7 + Epic 4
+- **Primary Assignment integrity** (exactly one active) = **Story 3.7 (done)** — schema + invariants live; product mutations = Epic 4
+- **PopulationPort fixture → Person UUID cutover** still waits on Secondary/management/events (3.8–3.9 / 4.x); Team membership helper live in 3.7
+- Org hierarchy tables / Legal Entity→Team master-data = **Story 3.5 (done)**; Primary Team membership = **Story 3.7 (done)** via `PrimaryAssignment.teamId` (no Employment.orgUnitId)
 
 ## Deferred from: Story 3.5 organization hierarchy management (2026-07-17)
 
 - **OrgUnit adjacency hierarchy landed** (LE→BU→Dept→Team; half-open validity; activate/deactivate without erase)
 - **AR-TEMPORAL / AR-HEADCOUNT disposition** for deactivation-with-members still open — fail-closed `DEACTIVATION_BLOCKED_DEPENDENCIES` remains
-- **Primary Assignment Team membership / Employment.orgUnitId** = Story 3.7 + Epic 4 (not this story)
-- **Job Role / Title / Ladder / Grade / Seniority** = **Story 3.6 (done)** — five distinct refs; Grade∈Ladder + half-grades; no universal Grade↔Seniority mapping; AR-TEMPORAL disposition for deactivation-with-Assignment/Event deps still open; Assignment FKs → 3.7 / Epic 4
+- **Primary Assignment Team membership** = **Story 3.7 (done)** via `PrimaryAssignment.teamId` (no Employment.orgUnitId); product mutations = Epic 4
+- **Job Role / Title / Ladder / Grade / Seniority** = **Story 3.6 (done)** — five distinct refs; Grade∈Ladder + half-grades; no universal Grade↔Seniority mapping; Primary FKs = **Story 3.7 (done)**; AR-TEMPORAL disposition for deactivation-with-Assignment/Event deps still open
 - **Interactive org chart / drag-drop reorg** remains non-goal / Could-Have
-- **PopulationPort full cutover** still waits on Assignment projections (3.7+/4.x); OrgUnit alone does not complete cutover
+- **PopulationPort full cutover** still waits on Secondary / management / events (3.8+/4.x); Primary Team helper alone does not complete cutover
 
 ## Deferred from: Story 3.6 independent job reference concepts (2026-07-17)
 
 - **Job refs landed** (OrganizationalRole, JobTitle, Ladder, Grade, Seniority; Decimal half-grades; synced dual activate/deactivate)
-- **AR-TEMPORAL disposition** for deactivating refs used by active/Scheduled Assignment or Personnel Event still open — fail-closed hooks remain
-- **Assignment FKs / Primary Assignment job facts** = Story 3.7 + Epic 4 writers (not this story)
+- **AR-TEMPORAL disposition** for deactivating refs used by active/Scheduled Assignment or Personnel Event still open — fail-closed hooks remain (Primary deps wired in 3.7)
+- **Assignment FKs / Primary Assignment job facts** = **Story 3.7 (done)** for schema + projection writers; Epic 4 for event-backed product mutations
 - **Job-change Personnel Events** (Role/Title/Ladder/Grade/Seniority change) = Story 4.8
 - **Universal or Ladder-specific Grade↔Seniority mapping** remains out of scope / non-MVP
 - **Headcount Approval matching** (Job Title + optional Seniority) = Epic 4
@@ -194,6 +194,23 @@
 - Optional `update*Identity` APIs exist but Admin UI only exposes create/activate/deactivate
 - Job-ref panel has no as-of picker; API `listGradesForLadder(asOf?)` already supports helpers for later stories
 - Grade validity interval is not constrained within parent Ladder interval — leave unconstrained until AR-TEMPORAL / Assignment (do not invent containment policy in 3.6)
+
+## Deferred from: Story 3.7 primary assignment integrity (2026-07-17)
+
+- **Primary Assignment schema + integrity landed** (`PrimaryAssignment` projection, EXCLUDE per Employment, apply/close/read, Team + job-fact FKs, coverage asserts, dependency hooks)
+- **Product create/change/end Primary** (Start / Transfer / job-change UI + event append) = Stories 4.5–4.8 — projection writers only in 3.7
+- **Secondary Assignment** = Story 3.8
+- **Derived management relationships** = Story 3.9
+- **Headcount Approval / consumption / Reservation / Override** = Epic 4 (FR-28..FR-32); `headcountApprovalId` not required on Primary in 3.7
+- **AR-TEMPORAL disposition** for deactivation-with-active-Primary still open — fail-closed hooks remain (`DEACTIVATION_BLOCKED_DEPENDENCIES`)
+- **PopulationPort** — `resolveTeamMembershipAsOf` helper available; **full fixture cutover still not claimed complete** (3.8 / 3.9 / 4.x)
+- Profile Assignments section UI = Epic 5 / UX-DR8
+
+## Deferred from: code review of 3-7-primary-assignment-integrity.md (2026-07-17)
+
+- `assertRefsExist` does not validate Team/job-ref active-as-of the Primary interval — aligns with open AR-TEMPORAL disposition; hooks block deactivate of refs still cited by open Primaries, but apply can still attach inactive/ended refs until disposition lands
+- OrgUnit/job-ref dependency hook registry passes no deactivate-as-of date — future-start vs currently-active Primary filtering cannot be precise without extending the 3.5/3.6 hook signature; revisit when AR-TEMPORAL / Assignment event writers need as-of deactivation
+- **Coverage assert on apply/close** — keep assert-only for Epic 3 projection writers; Epic 4 event finalization (Transfer close+open atomic) must call `assertPrimaryCoverageForActiveEmployment` after the combined write. Reason: enforcing on `close` alone would break mid-Transfer; seed + selfcheck already prove the assert.
 
 ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
 

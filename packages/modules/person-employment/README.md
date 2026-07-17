@@ -38,8 +38,8 @@ Concurrent multi-active Employment exceptions: **fail closed** until AR-DATA.
 | Stable Person + Personnel Code | 3.1 | Required |
 | Employment start date (date-only) | 3.2 | Required |
 | Collaboration / approved employment status | 3.2 lean / AR-DATA | Required for Start; exact codes AR-DATA |
-| Legal Entity → … → Team (Primary org) | 3.5 | Required at finalization |
-| Exactly one active Primary Assignment | 3.7 + Epic 4 | Required; mutations only via events |
+| Legal Entity → … → Team (Primary org) | 3.5 + 3.7 | Team via `PrimaryAssignment.teamId` |
+| Exactly one active Primary Assignment | 3.7 + Epic 4 | Schema + invariants live (3.7); mutations via events |
 | Headcount capacity / Override | Epic 4 / FR-20 | Not this story |
 
 Also exported as `EMPLOYMENT_MINIMUM_FACTS` from `employment-minimum-facts.ts`.
@@ -53,8 +53,10 @@ Person and permitted history.
 ### PopulationPort cutover
 
 Fixture ids (`person:a1`, …) remain in `@divan/identity-access` until
-Assignment / Org projections (3.5–3.9 / 4.x). **Target subject id = Person UUID.**
-See `population-cutover.ts` and `deferred-work.md`.
+Secondary / management / events (3.8–3.9 / 4.x). **Target subject id = Person UUID.**
+Primary Team membership helper (`resolveTeamMembershipAsOf`) is available (3.7) —
+full PopulationPort cutover is **not** claimed complete. See `population-cutover.ts`
+and `deferred-work.md`.
 
 ## Story 3.3 — Data-Dictionary-governed profile fields (FR-7)
 
@@ -149,6 +151,40 @@ any Grade↔Seniority mapping.
 Deactivation gate: `assertJobRefDeactivationAllowed` (+ hook registry).
 Ladder deactivate blocked while active Grades exist.
 
+## Story 3.7 — Primary Assignment integrity (FR-11)
+
+Projection writers (seed / Epic 4 refresh — **not** HR product verbs):
+
+- `applyPrimaryAssignmentProjection` — create/update after interval, Team type,
+  Grade∈Ladder, within-Employment, and non-overlap checks
+- `closePrimaryAssignmentProjection` — close an open interval (conditional update)
+- Reads: `listPrimaryAssignmentsForEmployment` / `getPrimaryAssignmentById` /
+  `getActivePrimaryAssignmentAsOf` / `resolveTeamMembershipAsOf`
+
+**Do not** export `createPrimaryAssignment` / `transferPrimary` /
+`assignPersonToTeam`. Start / Transfer / job-change flows = Stories 4.5–4.8.
+
+Half-open `[startDate, endDateExclusive)`; null end = unbounded open.
+Non-overlap per Employment: domain + PostgreSQL `EXCLUDE` (`btree_gist`).
+Coverage of active Employment: `assertPrimaryCoverageForActiveEmployment`
+(seed + Epic 4 finalization).
+
+Team membership = `PrimaryAssignment.teamId` → OrgUnit (`unitType = TEAM`).
+Job facts: Role, Title, Ladder, Grade (+ optional Seniority). No Grade↔Seniority map.
+`headcountApprovalId` deferred to Epic 4.
+
+Dependency hooks (registered via `ensurePrimaryAssignmentHooksRegistered`,
+called from seed / apply / close):
+
+- `registerOrgUnitDependencyHook` — block Team deactivate while open Primary refs it
+- `registerJobRefDependencyHook` — block Role/Title/Ladder/Grade/Seniority deactivate
+  while open Primary refs them
+
+Fail-closed with existing `DEACTIVATION_BLOCKED_DEPENDENCIES` (+ Persian). No
+AR-TEMPORAL disposition UI in this story.
+
+Default: **no** tRPC / UI — prove via selfcheck (same as Employment).
+
 ### Selfchecks
 
 ```bash
@@ -157,4 +193,5 @@ pnpm selfcheck:employment-lifecycle
 pnpm selfcheck:data-dictionary
 pnpm selfcheck:organization-hierarchy
 pnpm selfcheck:job-reference
+pnpm selfcheck:primary-assignment
 ```

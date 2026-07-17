@@ -1,5 +1,5 @@
 /**
- * Demo seed for Person + Employment + Data Dictionary + Org units + Job refs (Stories 3.1–3.6).
+ * Demo seed for Person + Employment + Data Dictionary + Org + Job refs + Primary (3.1–3.7).
  * Invoked from identity-access seedDevAccounts after access-admin fixtures.
  */
 
@@ -27,6 +27,12 @@ import {
 } from "./job-reference";
 import { createOrgUnit } from "./org-unit";
 import { createPerson } from "./person";
+import {
+  applyPrimaryAssignmentProjection,
+  assertPrimaryCoverageForActiveEmployment,
+  ensurePrimaryAssignmentHooksRegistered,
+  listPrimaryAssignmentsForEmployment,
+} from "./primary-assignment";
 
 export const SEED_PERSON_IDENTITY = {
   permissionSetName: "person-identity",
@@ -133,6 +139,17 @@ export const SEED_JOB_REFERENCES = {
     nameFa: "میانی",
     startDate: "2020-01-01",
   },
+} as const;
+
+/**
+ * Demo Primary Assignment covering open Employment (Story 3.7 / FR-11).
+ * Interval aligns with active Employment; Team + job facts from org/job seeds.
+ */
+export const SEED_PRIMARY_ASSIGNMENT = {
+  /** Optional closed Primary on historical Employment (back-to-back proof). */
+  historicalStart: SEED_EMPLOYMENT_LIFECYCLE.historicalStart,
+  historicalEndExclusive: SEED_EMPLOYMENT_LIFECYCLE.historicalEndExclusive,
+  activeStart: SEED_EMPLOYMENT_LIFECYCLE.activeStart,
 } as const;
 
 /**
@@ -649,4 +666,180 @@ export async function seedJobReferenceFixtures(
 ): Promise<void> {
   await seedJobReferencePermissionFixtures(db);
   await seedDemoJobReferences(db);
+}
+
+function isMatchingOpenPrimaryFixture(
+  rows: Awaited<ReturnType<typeof listPrimaryAssignmentsForEmployment>>,
+  expected: {
+    employmentId: string;
+    startDate: string;
+    teamId: string;
+    organizationalRoleId: string;
+    jobTitleId: string;
+    ladderId: string;
+    gradeId: string;
+    seniorityId: string | null;
+  },
+): boolean {
+  return rows.some(
+    (p) =>
+      p.employmentId === expected.employmentId &&
+      p.startDate === expected.startDate &&
+      p.endDateExclusive === null &&
+      p.teamId === expected.teamId &&
+      p.organizationalRoleId === expected.organizationalRoleId &&
+      p.jobTitleId === expected.jobTitleId &&
+      p.ladderId === expected.ladderId &&
+      p.gradeId === expected.gradeId &&
+      (p.seniorityId ?? null) === expected.seniorityId,
+  );
+}
+
+/**
+ * Seed Primaries for demo Person: closed historical + open active covering
+ * each Employment interval. Idempotent when shape matches. Registers hooks.
+ */
+export async function seedDemoPrimaryAssignments(
+  db: PrismaClient,
+): Promise<{ personId: string; primaryIds: string[] }> {
+  ensurePrimaryAssignmentHooksRegistered();
+
+  await seedEmploymentLifecycleFixtures(db);
+  await seedOrganizationHierarchyFixtures(db);
+  await seedJobReferenceFixtures(db);
+
+  const person = await seedDemoPerson(db);
+  const employments = await listEmploymentsForPerson(person.id, db);
+  const histEmp = employments.find(
+    (e) =>
+      e.startDate === SEED_EMPLOYMENT_LIFECYCLE.historicalStart &&
+      e.endDateExclusive === SEED_EMPLOYMENT_LIFECYCLE.historicalEndExclusive,
+  );
+  const openEmp = employments.find(
+    (e) =>
+      e.startDate === SEED_EMPLOYMENT_LIFECYCLE.activeStart &&
+      e.endDateExclusive === null,
+  );
+  if (!histEmp || !openEmp) {
+    throw new Error("seedDemoPrimaryAssignments: demo employments missing");
+  }
+
+  const team = await db.organizationalUnit.findUnique({
+    where: { code: SEED_ORGANIZATION_HIERARCHY.teamActive.code },
+  });
+  const histTeam = await db.organizationalUnit.findUnique({
+    where: { code: SEED_ORGANIZATION_HIERARCHY.teamHistorical.code },
+  });
+  const role = await db.organizationalRole.findUnique({
+    where: { code: SEED_JOB_REFERENCES.role.code },
+  });
+  const title = await db.jobTitle.findUnique({
+    where: { code: SEED_JOB_REFERENCES.jobTitle.code },
+  });
+  const ladder = await db.ladder.findUnique({
+    where: { code: SEED_JOB_REFERENCES.ladder.code },
+  });
+  const grade = ladder
+    ? await db.grade.findUnique({
+        where: {
+          ladderId_code: {
+            ladderId: ladder.id,
+            code: SEED_JOB_REFERENCES.gradeLow.code,
+          },
+        },
+      })
+    : null;
+  const seniority = await db.seniority.findUnique({
+    where: { code: SEED_JOB_REFERENCES.seniority.code },
+  });
+
+  if (!team || !histTeam || !role || !title || !ladder || !grade) {
+    throw new Error("seedDemoPrimaryAssignments: org/job-ref fixtures missing");
+  }
+
+  const openPrimaries = await listPrimaryAssignmentsForEmployment(
+    openEmp.id,
+    db,
+  );
+  if (
+    openPrimaries.length >= 1 &&
+    isMatchingOpenPrimaryFixture(openPrimaries, {
+      employmentId: openEmp.id,
+      startDate: SEED_PRIMARY_ASSIGNMENT.activeStart,
+      teamId: team.id,
+      organizationalRoleId: role.id,
+      jobTitleId: title.id,
+      ladderId: ladder.id,
+      gradeId: grade.id,
+      seniorityId: seniority?.id ?? null,
+    })
+  ) {
+    assertPrimaryCoverageForActiveEmployment(openEmp, openPrimaries);
+    const histPrimaries = await listPrimaryAssignmentsForEmployment(
+      histEmp.id,
+      db,
+    );
+    if (histPrimaries.length === 0) {
+      // Repair: ensure historical coverage exists.
+    } else {
+      assertPrimaryCoverageForActiveEmployment(histEmp, histPrimaries);
+      return {
+        personId: person.id,
+        primaryIds: [
+          ...histPrimaries.map((p) => p.id),
+          ...openPrimaries.map((p) => p.id),
+        ],
+      };
+    }
+  }
+
+  // Clear wrong-shape Primaries for both demo Employments, then rewrite.
+  await db.primaryAssignment.deleteMany({
+    where: { employmentId: { in: [histEmp.id, openEmp.id] } },
+  });
+
+  const historical = await applyPrimaryAssignmentProjection(
+    {
+      employmentId: histEmp.id,
+      teamId: histTeam.id,
+      organizationalRoleId: role.id,
+      jobTitleId: title.id,
+      ladderId: ladder.id,
+      gradeId: grade.id,
+      // Optional seniority omitted on historical — proves no Grade↔Seniority map.
+      startDate: SEED_PRIMARY_ASSIGNMENT.historicalStart,
+      endDateExclusive: SEED_PRIMARY_ASSIGNMENT.historicalEndExclusive,
+    },
+    db,
+  );
+
+  const active = await applyPrimaryAssignmentProjection(
+    {
+      employmentId: openEmp.id,
+      teamId: team.id,
+      organizationalRoleId: role.id,
+      jobTitleId: title.id,
+      ladderId: ladder.id,
+      gradeId: grade.id,
+      seniorityId: seniority?.id ?? null,
+      startDate: SEED_PRIMARY_ASSIGNMENT.activeStart,
+      endDateExclusive: null,
+    },
+    db,
+  );
+
+  assertPrimaryCoverageForActiveEmployment(histEmp, [historical]);
+  assertPrimaryCoverageForActiveEmployment(openEmp, [active]);
+
+  return {
+    personId: person.id,
+    primaryIds: [historical.id, active.id],
+  };
+}
+
+/** Primary Assignment integrity fixtures (Story 3.7). */
+export async function seedPrimaryAssignmentFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  await seedDemoPrimaryAssignments(db);
 }
