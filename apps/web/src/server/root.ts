@@ -24,6 +24,7 @@ import {
   protectedProcedure,
 } from "./trpc";
 import { accessAdminRouter } from "./access-admin";
+import { personRouter } from "./person";
 import {
   actorHasActiveBulkGrant,
   runGovernedDrillDown,
@@ -72,6 +73,8 @@ export const appRouter = createTRPCRouter({
   })),
 
   accessAdmin: accessAdminRouter,
+
+  person: personRouter,
 
   /**
    * Demo governed read — controlled allow via DEV_DEMO_POLICY fixture.

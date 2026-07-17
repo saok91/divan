@@ -94,6 +94,21 @@ export const operationalCopy = {
 
   staleGoldCtaHint:
     "تا به‌روز شدن داده، نهایی‌سازی و خروجی غیرفعال است.",
+
+  /** Person identity (Story 3.1). */
+  personListLoading: "در حال بارگذاری فهرست پرسنل…",
+  personListError: "بارگذاری فهرست پرسنل ممکن نشد.",
+  personListEmpty: "پرسنلی ثبت نشده. می‌توانید یک نفر ایجاد کنید.",
+  personActionFailed: "عملیات پرسنل انجام نشد.",
+  personPersonnelCodeRequired: "کد پرسنلی الزامی است.",
+  personGivenNameRequired: "نام الزامی است.",
+  personFamilyNameRequired: "نام خانوادگی الزامی است.",
+  personMobileRequired: "شماره موبایل الزامی است.",
+  personDuplicateCode: "کد پرسنلی تکراری است. کد دیگری انتخاب کنید.",
+  personDuplicateNationalId:
+    "کد ملی تکراری است. مقدار دیگری وارد کنید یا خالی بگذارید.",
+  personBlockedIdentityOp:
+    "این عملیات تا تعیین سیاست داده/مهاجرت مجاز نیست.",
 } as const;
 
 /**

@@ -1,6 +1,7 @@
-// Prisma schema — identity projections only (Story 1.4).
-// No Person / Employment / HR domain tables.
-// Kernel event-store tables will use raw SQL under packages/db/sql/.
+// Prisma schema — identity projections (Story 1.4) + Person master-data (Story 3.1).
+// Person is HR identity aggregate — distinct from HumanIdentity (login).
+// No Employment / Assignment / event-store ownership here (Epic 3.2+ / Epic 4).
+// Kernel event-store tables use raw SQL under packages/db/sql/.
 
 generator client {
   provider = "prisma-client-js"
@@ -25,12 +26,34 @@ enum AccountStatus {
 }
 
 /// Internal human identity projection — not an HR Person record.
+/// Distinct aggregate from Person (Story 3.1); no FK either direction (AR-IDENTITY).
 model HumanIdentity {
   id          String   @id @default(cuid())
   displayName String
   createdAt   DateTime @default(now())
 
   account InternalAccount?
+}
+
+/// HR Person master-data projection (Story 3.1 / FR-5).
+/// UUID PK; Personnel Code is the domain identifier (@unique).
+/// Employment end must never cascade-delete Person (AC #5 invariant — no Employment FK here).
+model Person {
+  id            String    @id @default(uuid(7))
+  /// Canonical Latin digits for uniqueness; accept Persian/Arabic-Indic on input.
+  personnelCode String    @unique
+  givenName     String
+  familyName    String
+  /// MVP mandatory contact (AR-DATA approve); full contact dictionary = Story 3.3.
+  mobilePhone   String
+  fatherName    String?
+  birthDate     DateTime? @db.Date
+  gender        String?
+  nationality   String?
+  /// Unique when present — PostgreSQL UNIQUE treats NULLs as distinct.
+  nationalId    String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 /// One internal account per human; one coarse role per account.

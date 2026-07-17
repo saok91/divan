@@ -68,11 +68,22 @@ const t = initTRPC
           cause !== null &&
           "code" in cause &&
           (cause as { code: unknown }).code === "AUTHZ_CHANGED");
+      const personCode =
+        typeof cause === "object" &&
+        cause !== null &&
+        "name" in cause &&
+        (cause as { name: unknown }).name === "PersonIdentityError" &&
+        "code" in cause &&
+        typeof (cause as { code: unknown }).code === "string"
+          ? (cause as { code: string }).code
+          : undefined;
       return {
         ...shape,
         data: {
           ...shape.data,
-          divanCode: authzChanged ? ("AUTHZ_CHANGED" as const) : undefined,
+          divanCode: authzChanged
+            ? ("AUTHZ_CHANGED" as const)
+            : personCode,
         },
       };
     },

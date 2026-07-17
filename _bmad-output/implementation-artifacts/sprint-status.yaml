@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-17T03:00:00+03:30
+# last_updated: 2026-07-17T03:35:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-17T03:00:00+03:30
+last_updated: 2026-07-17T03:35:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -69,8 +69,8 @@ development_status:
   2-7-inference-resistant-bulk-retrieval-controls: done
   epic-2-retrospective: done
 
-  epic-3: backlog
-  3-1-stable-person-identity: backlog
+  epic-3: in-progress
+  3-1-stable-person-identity: done
   3-2-employment-lifecycle-invariants: backlog
   3-3-data-dictionary-governed-profile-fields: backlog
   3-4-compensation-contractual-facts-module: backlog
@@ -177,15 +177,18 @@ action_items:
   - epic: 2
     action: "Encode Epic 3↔4 no temporary CRUD mutation sequencing into Story 3.1 create-story / Dev Notes"
     owner: "Amelia + John"
-    status: open
+    status: done
+    resolved_in: "3-1-stable-person-identity.md (Gate + Tasks 1–2; Epic 2 retro carry-in table)"
   - epic: 2
     action: "Plan PopulationPort replacement with projection-backed population in Epic 3/4 story notes"
     owner: "Winston + Amelia"
-    status: open
+    status: done
+    resolved_in: "3-1-stable-person-identity.md (Task 5 PopulationPort cutover plan; subject id = Person UUID)"
   - epic: 2
     action: "Keep AR-ACCESS / AR-DATA / AR-REPORTING / AR-IDENTITY numbers fail-closed; do not invent in Epic 3"
     owner: "Mary + John"
-    status: open
+    status: done
+    resolved_in: "3-1-stable-person-identity.md (Gate AR fail-closed; national_id category stays disabled)"
   - epic: 2
     action: "Document InferenceBulkPort process-local window + race risk for ops; retain fail-closed default"
     owner: "Winston"

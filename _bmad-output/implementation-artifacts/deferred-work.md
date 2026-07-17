@@ -129,7 +129,7 @@
 
 ## Deferred from: Story 2.6 temporal & cross-boundary authorization (2026-07-17)
 
-- **Epic 3/4** replace fixture `PopulationPort` with Person / Assignment / OrgUnit projection-backed population
+- **Epic 3/4** replace fixture `PopulationPort` with Person / Assignment / OrgUnit projection-backed population ? **cutover named in Story 3.1** (`Person.id` UUID target; fixtures remain until 3.5?3.9 / 4.x)
 - **Full personnel search / profile / dashboard / report catalogue** consume intersection API ? Epic 5
 - ~~**Inference / bulk / small-cohort** thresholds ? Story 2.7~~ **done in Story 2.7** (control plane shipped; Epic 5/6 consumers + AR-* production numbers remain)
 - **Artifact reauth consumers** with as-of/population ? Stories 6.5 / 7.x
@@ -143,6 +143,15 @@
 - **Epic 5** search / profile / dashboard / report catalogue consumers of InferenceBulkPort (demo plane only here)
 - **Story 6.5** export artifact panel / custody ack on top of same thresholds
 - Complementary secondary-suppression sophistication beyond demo equivalent (fail-closed comparison surface)
+
+## Deferred from: Story 3.1 stable Person identity (2026-07-17)
+
+- **Person master-data landed** (create/update identity, Personnel Code uniqueness, `/personnel` RSC + thin form)
+- **Personnel Code correction / merge / split / return-match** still AR-DATA / AR-MIGRATION ? fail-closed Persian ops remain
+- **PopulationPort fixture ? Person UUID cutover** still open until Assignment / Org projections (Stories 3.5?3.9 / 4.x); subject id target = `Person.id` (see `person-employment` `population-cutover.ts` + `population-authz.ts` comment)
+- Sticky break-glass / permission-set fingerprint debt unchanged (code-review of 2.6)
+- **`identity.national_id` category** stays disabled until formal AR-DATA enablement
+- Full personnel search table / profile / timeline ? Epic 5; Employment mutations ? Epic 4
 
 ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
 
@@ -167,3 +176,13 @@
 - Concurrent `evaluateInferenceBulk` for the same `actorId` can race window counters ? needs actor-scoped lock or shared atomic store (same production hardening as above)
 - `AUDIT_INFERENCE_BULK_ENABLED=true` in production loads DEMO hook numbers ? keep fail-closed default; wire real AR-ACCESS/AR-REPORTING values when freeze lands (do not invent)
 - Export channel facet on `demoScopedRetrieval` / `demoInferenceBulkProbe` uses `action: "read"` for FR-48 parity ? full FR-3 export allow + 2.5 elevation denials on channel facet wait for Story 6.5 / real export surfaces
+
+## Deferred from: code review of 3-1-stable-person-identity.md (2026-07-17)
+
+- Envelope records allow before PermissionSet deny on Person procedures — governedProcedure 4-tuple allow/audit then handler PermissionSet gate; same layering as other governed routes
+- `identity-access` depends on `person-employment` for seed fixtures — monorepo seed orchestration; revisit module boundary if AD-3 ownership hardens
+- No optimistic concurrency / `updatedAt` precondition on `updatePersonIdentity` — last-write-wins acceptable for 3.1 thin maintain; add version check when concurrent HR editors matter
+- `mobilePhone` stored raw without digit/format normalization — Personnel Code/national ID only for 3.1; contact dictionary / format rules belong in Story 3.3
+- Blocked deep-link ops still pass envelope allow then domain FORBIDDEN — intentional deep-link surface for fail-closed Persian copy; quieter audit meta can wait
+- Domain `PersonRecord` always loads `nationalId`; omission only in `toPublicPerson` — tRPC public DTO is gated; tighten domain select when more in-process callers appear
+- Person PermissionSet checks ignore entitlement grant lifecycle (as-of / expiry / break-glass) — PermissionSet-only OK for 3.1 demo; deepen when Person joins full Epic 2 authz path

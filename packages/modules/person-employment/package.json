@@ -9,9 +9,12 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "selfcheck:person-identity": "tsx src/person-identity.selfcheck.ts"
   },
   "devDependencies": {
+    "dotenv": "^17.4.2",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   },
   "dependencies": {

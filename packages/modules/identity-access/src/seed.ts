@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@divan/db";
 import bcrypt from "bcryptjs";
 
+import { seedPersonIdentityFixtures } from "@divan/person-employment";
+
 import { seedAccessAdministrationFixtures } from "./access-admin";
 import { seedBreakGlassFixtures } from "./break-glass";
 import { getIdentityProvider } from "./config";
@@ -138,6 +140,7 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
 
     await seedAccessAdministrationFixtures(tx as unknown as PrismaClient);
     await seedBreakGlassFixtures(tx as unknown as PrismaClient);
+    await seedPersonIdentityFixtures(tx as unknown as PrismaClient);
 
     return { createdOrUpdated };
   });

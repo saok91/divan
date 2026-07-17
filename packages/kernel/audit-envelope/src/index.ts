@@ -176,6 +176,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:any",
     },
+    // Story 3.1 — Person identity (coarse role is never an allow key)
+    {
+      permission: "person.read",
+      dataCategory: "identity.person",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "person.write",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 

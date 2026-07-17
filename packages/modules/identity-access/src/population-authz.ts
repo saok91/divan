@@ -2,6 +2,10 @@
  * PopulationPort — temporal + cross-boundary intersection (Story 2.6 / FR-47).
  *
  * Fixture-backed until Epic 3/4 Person / Assignment projections exist.
+ * Story 3.1 cutover target: subject id = Person UUID (`Person.id`).
+ * Fixture ids (`person:a1`, …) remain until Assignment/Org projections
+ * (Stories 3.5–3.9 / 4.x) — see person-employment `population-cutover.ts`
+ * and deferred-work.md. Do not invent a parallel population checker.
  * Callers: after envelope allow (or as part of authorize path for demos).
  * Empty intersection → safe empty / omit — never invent out-of-scope rows.
  *
