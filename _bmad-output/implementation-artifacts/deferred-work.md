@@ -165,7 +165,8 @@
 - **Start / Return / Termination** user flows + authoritative event append = Stories 4.5?4.6 (not this story)
 - **Concurrent multi-Employment policy exceptions** still AR-DATA ? fail-closed Persian reject remains
 - **Primary Assignment integrity** (exactly one active) = **Story 3.7 (done)** — schema + invariants live; product mutations = Epic 4
-- **PopulationPort fixture → Person UUID cutover** still waits on Secondary/management/events (3.8–3.9 / 4.x); Team membership helper live in 3.7
+- **Secondary Assignment fidelity** = **Story 3.8 (done)** — schema + inventory gate + equivalent-overlap; no headcount; product mutations = Epic 4
+- **PopulationPort fixture → Person UUID cutover** still waits on management/events (3.9 / 4.x); Team membership helper live in 3.7; Secondary read helpers live in 3.8
 - Org hierarchy tables / Legal Entity→Team master-data = **Story 3.5 (done)**; Primary Team membership = **Story 3.7 (done)** via `PrimaryAssignment.teamId` (no Employment.orgUnitId)
 
 ## Deferred from: Story 3.5 organization hierarchy management (2026-07-17)
@@ -199,12 +200,29 @@
 
 - **Primary Assignment schema + integrity landed** (`PrimaryAssignment` projection, EXCLUDE per Employment, apply/close/read, Team + job-fact FKs, coverage asserts, dependency hooks)
 - **Product create/change/end Primary** (Start / Transfer / job-change UI + event append) = Stories 4.5–4.8 — projection writers only in 3.7
-- **Secondary Assignment** = Story 3.8
+- **Secondary Assignment** = **Story 3.8 (done)** — see deferred section below
 - **Derived management relationships** = Story 3.9
 - **Headcount Approval / consumption / Reservation / Override** = Epic 4 (FR-28..FR-32); `headcountApprovalId` not required on Primary in 3.7
 - **AR-TEMPORAL disposition** for deactivation-with-active-Primary still open — fail-closed hooks remain (`DEACTIVATION_BLOCKED_DEPENDENCIES`)
-- **PopulationPort** — `resolveTeamMembershipAsOf` helper available; **full fixture cutover still not claimed complete** (3.8 / 3.9 / 4.x)
+- **PopulationPort** — `resolveTeamMembershipAsOf` helper available; Secondary read helpers available (3.8); **full fixture cutover still not claimed complete** (3.9 / 4.x)
 - Profile Assignments section UI = Epic 5 / UX-DR8
+
+## Deferred from: Story 3.8 secondary assignment fidelity (2026-07-18)
+
+- **Secondary Assignment schema + integrity landed** (`SecondaryAssignment` projection separate from Primary, equivalent-overlap EXCLUDE, inventory gate stub, apply/close/read, OrgUnit+job-ref hooks, no headcount columns)
+- **Product create/change/end Secondary** = Epic 4 Personnel Event flows — projection writers only in 3.8
+- **Migration / Baseline Secondary import** = Epic 6
+- **AR-SECONDARY approved inventory / acceptance oracle** still pending — provisional codes (`acting_manager`, `cross_dept_support`) fail-closed stub only
+- **Headcount non-consumption confirmed** for Secondary by default (FR-12 / FR-29); no `@divan/headcount` wiring
+- **Derived management relationships** = Story 3.9 (from Primary, not Secondary)
+- **PopulationPort full cutover** still not claimed (3.9 / 4.x); Secondary read helpers alone do not complete cutover
+- Profile Assignments section UI (Primary + Secondary display) = Epic 5 / UX-DR8
+- Effort %, billing, scheduling, matrix-org, Secondary approval workflow = explicit AR-SECONDARY non-goals
+
+## Deferred from: code review of 3-8-secondary-assignment-fidelity.md (2026-07-18)
+
+- `assertRefsExist` does not validate OrgUnit/job-ref active-as-of the Secondary interval — same disposition as 3.7 Primary; hooks block deactivate of refs still cited by active-as-of-today Secondaries, but apply can still attach inactive/ended refs until AR-TEMPORAL disposition lands
+- OrgUnit/job-ref dependency hook registry passes no deactivate-as-of date — future-start vs currently-active Secondary filtering cannot be precise without extending the 3.5/3.6 hook signature; 3.8 intentionally uses active-as-of-today (per story Dev Notes); revisit when AR-TEMPORAL / Assignment event writers need as-of deactivation
 
 ## Deferred from: code review of 3-7-primary-assignment-integrity.md (2026-07-17)
 

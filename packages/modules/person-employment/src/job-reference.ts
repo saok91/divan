@@ -303,11 +303,15 @@ export async function assertJobRefDeactivationAllowed(
   refId: string,
   db: PrismaClient = getPersonDb(),
 ): Promise<void> {
-  // Ensure Primary Assignment hooks are registered even if seed/apply never ran.
+  // Ensure Primary + Secondary Assignment hooks are registered even if seed/apply never ran.
   const { ensurePrimaryAssignmentHooksRegistered } = await import(
     "./primary-assignment"
   );
   ensurePrimaryAssignmentHooksRegistered();
+  const { ensureSecondaryAssignmentHooksRegistered } = await import(
+    "./secondary-assignment"
+  );
+  ensureSecondaryAssignmentHooksRegistered();
 
   if (concept === "ladder") {
     const activeGrades = await db.grade.findMany({

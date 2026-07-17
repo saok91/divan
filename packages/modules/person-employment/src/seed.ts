@@ -1,5 +1,5 @@
 /**
- * Demo seed for Person + Employment + Data Dictionary + Org + Job refs + Primary (3.1–3.7).
+ * Demo seed for Person + Employment + Data Dictionary + Org + Job refs + Primary + Secondary (3.1–3.8).
  * Invoked from identity-access seedDevAccounts after access-admin fixtures.
  */
 
@@ -33,6 +33,11 @@ import {
   ensurePrimaryAssignmentHooksRegistered,
   listPrimaryAssignmentsForEmployment,
 } from "./primary-assignment";
+import {
+  applySecondaryAssignmentProjection,
+  ensureSecondaryAssignmentHooksRegistered,
+  listSecondaryAssignmentsForEmployment,
+} from "./secondary-assignment";
 
 export const SEED_PERSON_IDENTITY = {
   permissionSetName: "person-identity",
@@ -150,6 +155,24 @@ export const SEED_PRIMARY_ASSIGNMENT = {
   historicalStart: SEED_EMPLOYMENT_LIFECYCLE.historicalStart,
   historicalEndExclusive: SEED_EMPLOYMENT_LIFECYCLE.historicalEndExclusive,
   activeStart: SEED_EMPLOYMENT_LIFECYCLE.activeStart,
+} as const;
+
+/**
+ * Demo Secondary Assignments on open Employment (Story 3.8 / FR-12).
+ * Provisional inventory codes pending AR-SECONDARY approval.
+ * No headcount consumption.
+ */
+export const SEED_SECONDARY_ASSIGNMENT = {
+  /** Closed historical Secondary on open Employment (within Employment span). */
+  historicalReasonType: "acting_manager",
+  historicalStart: "2024-01-01",
+  historicalEndExclusive: "2024-06-01",
+  /** Open concurrent Secondary — Department target (not TEAM-only). */
+  activeReasonType: "acting_manager",
+  activeStart: "2024-06-01",
+  /** Second concurrent Secondary — different reason/type (multi concurrent proof). */
+  concurrentReasonType: "cross_dept_support",
+  concurrentStart: "2024-09-01",
 } as const;
 
 /**
@@ -842,4 +865,184 @@ export async function seedPrimaryAssignmentFixtures(
   db: PrismaClient,
 ): Promise<void> {
   await seedDemoPrimaryAssignments(db);
+}
+
+function isMatchingSecondaryFixture(
+  rows: ReadonlyArray<{
+    employmentId: string;
+    orgUnitId: string;
+    reasonType: string;
+    startDate: string;
+    endDateExclusive: string | null;
+    organizationalRoleId: string | null;
+    jobTitleId: string | null;
+    ladderId: string | null;
+    gradeId: string | null;
+    seniorityId: string | null;
+  }>,
+  expected: {
+    employmentId: string;
+    orgUnitId: string;
+    reasonType: string;
+    startDate: string;
+    endDateExclusive: string | null;
+    organizationalRoleId: string | null;
+    jobTitleId: string | null;
+    ladderId: string | null;
+    gradeId: string | null;
+    seniorityId: string | null;
+  },
+): boolean {
+  return rows.some(
+    (s) =>
+      s.employmentId === expected.employmentId &&
+      s.orgUnitId === expected.orgUnitId &&
+      s.reasonType === expected.reasonType &&
+      s.startDate === expected.startDate &&
+      s.endDateExclusive === expected.endDateExclusive &&
+      (s.organizationalRoleId ?? null) === expected.organizationalRoleId &&
+      (s.jobTitleId ?? null) === expected.jobTitleId &&
+      (s.ladderId ?? null) === expected.ladderId &&
+      (s.gradeId ?? null) === expected.gradeId &&
+      (s.seniorityId ?? null) === expected.seniorityId,
+  );
+}
+
+/**
+ * Seed Secondaries for demo Person's open Employment:
+ * closed historical + open acting_manager (Dept target) + concurrent cross_dept_support.
+ * Idempotent when shape matches. Registers Secondary hooks.
+ */
+export async function seedDemoSecondaryAssignments(
+  db: PrismaClient,
+): Promise<{ personId: string; secondaryIds: string[] }> {
+  ensureSecondaryAssignmentHooksRegistered();
+
+  await seedPrimaryAssignmentFixtures(db);
+
+  const person = await seedDemoPerson(db);
+  const employments = await listEmploymentsForPerson(person.id, db);
+  const openEmp = employments.find(
+    (e) =>
+      e.startDate === SEED_EMPLOYMENT_LIFECYCLE.activeStart &&
+      e.endDateExclusive === null,
+  );
+  if (!openEmp) {
+    throw new Error("seedDemoSecondaryAssignments: open employment missing");
+  }
+
+  const dept = await db.organizationalUnit.findUnique({
+    where: { code: SEED_ORGANIZATION_HIERARCHY.department.code },
+  });
+  const bu = await db.organizationalUnit.findUnique({
+    where: { code: SEED_ORGANIZATION_HIERARCHY.businessUnit.code },
+  });
+  const role = await db.organizationalRole.findUnique({
+    where: { code: SEED_JOB_REFERENCES.role.code },
+  });
+  if (!dept || !bu) {
+    throw new Error("seedDemoSecondaryAssignments: org fixtures missing");
+  }
+
+  const roleId = role?.id ?? null;
+  const nullJobFacts = {
+    organizationalRoleId: null as string | null,
+    jobTitleId: null as string | null,
+    ladderId: null as string | null,
+    gradeId: null as string | null,
+    seniorityId: null as string | null,
+  };
+
+  const existing = await listSecondaryAssignmentsForEmployment(openEmp.id, db);
+  const shapeOk =
+    existing.length === 3 &&
+    isMatchingSecondaryFixture(existing, {
+      employmentId: openEmp.id,
+      orgUnitId: dept.id,
+      reasonType: SEED_SECONDARY_ASSIGNMENT.historicalReasonType,
+      startDate: SEED_SECONDARY_ASSIGNMENT.historicalStart,
+      endDateExclusive: SEED_SECONDARY_ASSIGNMENT.historicalEndExclusive,
+      ...nullJobFacts,
+    }) &&
+    isMatchingSecondaryFixture(existing, {
+      employmentId: openEmp.id,
+      orgUnitId: dept.id,
+      reasonType: SEED_SECONDARY_ASSIGNMENT.activeReasonType,
+      startDate: SEED_SECONDARY_ASSIGNMENT.activeStart,
+      endDateExclusive: null,
+      ...nullJobFacts,
+      organizationalRoleId: roleId,
+    }) &&
+    isMatchingSecondaryFixture(existing, {
+      employmentId: openEmp.id,
+      orgUnitId: bu.id,
+      reasonType: SEED_SECONDARY_ASSIGNMENT.concurrentReasonType,
+      startDate: SEED_SECONDARY_ASSIGNMENT.concurrentStart,
+      endDateExclusive: null,
+      ...nullJobFacts,
+    });
+
+  if (shapeOk) {
+    return {
+      personId: person.id,
+      secondaryIds: existing.map((s) => s.id),
+    };
+  }
+
+  return db.$transaction(async (tx) => {
+    const client = tx as unknown as PrismaClient;
+    await client.secondaryAssignment.deleteMany({
+      where: { employmentId: openEmp.id },
+    });
+
+    const historical = await applySecondaryAssignmentProjection(
+      {
+        personId: person.id,
+        employmentId: openEmp.id,
+        orgUnitId: dept.id,
+        reasonType: SEED_SECONDARY_ASSIGNMENT.historicalReasonType,
+        // Optional job facts omitted on historical.
+        startDate: SEED_SECONDARY_ASSIGNMENT.historicalStart,
+        endDateExclusive: SEED_SECONDARY_ASSIGNMENT.historicalEndExclusive,
+      },
+      client,
+    );
+
+    const active = await applySecondaryAssignmentProjection(
+      {
+        personId: person.id,
+        employmentId: openEmp.id,
+        orgUnitId: dept.id,
+        reasonType: SEED_SECONDARY_ASSIGNMENT.activeReasonType,
+        organizationalRoleId: roleId,
+        startDate: SEED_SECONDARY_ASSIGNMENT.activeStart,
+        endDateExclusive: null,
+      },
+      client,
+    );
+
+    const concurrent = await applySecondaryAssignmentProjection(
+      {
+        personId: person.id,
+        employmentId: openEmp.id,
+        orgUnitId: bu.id,
+        reasonType: SEED_SECONDARY_ASSIGNMENT.concurrentReasonType,
+        startDate: SEED_SECONDARY_ASSIGNMENT.concurrentStart,
+        endDateExclusive: null,
+      },
+      client,
+    );
+
+    return {
+      personId: person.id,
+      secondaryIds: [historical.id, active.id, concurrent.id],
+    };
+  });
+}
+
+/** Secondary Assignment fidelity fixtures (Story 3.8). */
+export async function seedSecondaryAssignmentFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  await seedDemoSecondaryAssignments(db);
 }

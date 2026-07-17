@@ -53,8 +53,10 @@ Person and permitted history.
 ### PopulationPort cutover
 
 Fixture ids (`person:a1`, …) remain in `@divan/identity-access` until
-Secondary / management / events (3.8–3.9 / 4.x). **Target subject id = Person UUID.**
-Primary Team membership helper (`resolveTeamMembershipAsOf`) is available (3.7) —
+Fixture subject ids (`person:a1`, …) remain until management /
+events (3.9 / 4.x). **Target subject id = Person UUID.**
+Primary Team membership helper (`resolveTeamMembershipAsOf`) is available (3.7);
+Secondary read helpers are available (3.8) —
 full PopulationPort cutover is **not** claimed complete. See `population-cutover.ts`
 and `deferred-work.md`.
 
@@ -185,6 +187,38 @@ AR-TEMPORAL disposition UI in this story.
 
 Default: **no** tRPC / UI — prove via selfcheck (same as Employment).
 
+## Story 3.8 — Secondary Assignment fidelity (FR-12)
+
+Projection writers (seed / Epic 4 refresh — **not** HR product verbs):
+
+- `applySecondaryAssignmentProjection` — create/update after inventory, within-Employment,
+  person↔employment match, and equivalent-overlap checks
+- `closeSecondaryAssignmentProjection` — close an open interval (conditional update)
+- Reads: `listSecondaryAssignmentsForEmployment` / `listSecondaryAssignmentsForPerson` /
+  `listActiveSecondaryAssignmentsAsOf` / `getSecondaryAssignmentById`
+
+**Do not** export `createSecondaryAssignment` / `assignSecondaryRole` / `endSecondary`.
+Secondary create/change/end flows = Epic 4 (+ Epic 6 migration).
+
+Half-open `[startDate, endDateExclusive)`; null end = unbounded open.
+Equivalence key = `(personId, orgUnitId, reasonType)` + overlapping interval —
+domain + PostgreSQL `EXCLUDE` (`btree_gist`). Multiple concurrent non-equivalent
+Secondaries OK. Coverage: Employment covers Secondary (not Primary's reverse rule).
+
+`orgUnitId` = organizational target (DEPARTMENT / TEAM / …) — **not** Team membership.
+`reasonType` required + fail-closed provisional AR-SECONDARY inventory
+(`acting_manager`, `cross_dept_support` pending artifact approval).
+Optional job facts when used; Grade∈Ladder if both set.
+**No headcount consumption by default** — no `headcountApprovalId` / `@divan/headcount`.
+
+Dependency hooks (registered via `ensureSecondaryAssignmentHooksRegistered`,
+in addition to Primary 3.7 hooks):
+
+- OrgUnit deactivate blocked while active-as-of-today Secondary refs `orgUnitId`
+- Job-ref deactivate blocked while active Secondary refs Role/Title/Ladder/Grade/Seniority
+
+Default: **no** tRPC / UI — prove via selfcheck.
+
 ### Selfchecks
 
 ```bash
@@ -194,4 +228,5 @@ pnpm selfcheck:data-dictionary
 pnpm selfcheck:organization-hierarchy
 pnpm selfcheck:job-reference
 pnpm selfcheck:primary-assignment
+pnpm selfcheck:secondary-assignment
 ```

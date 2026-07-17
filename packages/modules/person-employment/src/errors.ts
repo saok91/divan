@@ -345,3 +345,62 @@ export const MSG_INVALID_PRIMARY_INTERVAL_FA =
 
 export const MSG_PRIMARY_REF_NOT_FOUND_FA =
   "مرجع مرتبط با تخصیص اصلی یافت نشد.";
+
+/** Secondary Assignment projection errors (Story 3.8 / FR-12). Clients match codes. */
+export type SecondaryAssignmentErrorCode =
+  | "OVERLAPPING_EQUIVALENT_SECONDARY"
+  | "SECONDARY_OUTSIDE_EMPLOYMENT"
+  | "SECONDARY_REASON_REQUIRED"
+  | "SECONDARY_REASON_OUT_OF_INVENTORY"
+  | "SECONDARY_PERSON_MISMATCH"
+  | "SECONDARY_ASSIGNMENT_NOT_FOUND"
+  | "SECONDARY_ALREADY_CLOSED"
+  | "INVALID_SECONDARY_INTERVAL"
+  | "SECONDARY_REF_NOT_FOUND"
+  | "GRADE_NOT_IN_LADDER"
+  | "EMPLOYMENT_NOT_FOUND"
+  | "VALIDATION"
+  | "SENTINEL_VALUE";
+
+export class SecondaryAssignmentError extends Error {
+  readonly code: SecondaryAssignmentErrorCode;
+  readonly messageFa: string;
+
+  constructor(
+    code: SecondaryAssignmentErrorCode,
+    messageFa: string,
+    message?: string,
+  ) {
+    super(message ?? messageFa);
+    this.name = "SecondaryAssignmentError";
+    this.code = code;
+    this.messageFa = messageFa;
+  }
+}
+
+export const MSG_OVERLAPPING_EQUIVALENT_SECONDARY_FA =
+  "تخصیص ثانویه معادل با بازه هم‌پوشان وجود دارد.";
+
+export const MSG_SECONDARY_OUTSIDE_EMPLOYMENT_FA =
+  "بازه تخصیص ثانویه باید داخل بازه همکاری باشد.";
+
+export const MSG_SECONDARY_REASON_REQUIRED_FA =
+  "دلیل/نوع تخصیص ثانویه الزامی است.";
+
+export const MSG_SECONDARY_REASON_OUT_OF_INVENTORY_FA =
+  "دلیل/نوع تخصیص ثانویه خارج از فهرست تأییدشده است.";
+
+export const MSG_SECONDARY_PERSON_MISMATCH_FA =
+  "شناسه فرد با همکاری انتخاب‌شده هم‌خوان نیست.";
+
+export const MSG_SECONDARY_ASSIGNMENT_NOT_FOUND_FA =
+  "تخصیص ثانویه یافت نشد.";
+
+export const MSG_SECONDARY_ALREADY_CLOSED_FA =
+  "این تخصیص ثانویه قبلاً پایان یافته است.";
+
+export const MSG_INVALID_SECONDARY_INTERVAL_FA =
+  "بازه تخصیص ثانویه نامعتبر است. تاریخ پایان باید بعد از تاریخ شروع باشد.";
+
+export const MSG_SECONDARY_REF_NOT_FOUND_FA =
+  "مرجع مرتبط با تخصیص ثانویه یافت نشد.";

@@ -30,6 +30,7 @@
     "selfcheck:organization-hierarchy": "pnpm --filter @divan/person-employment selfcheck:organization-hierarchy",
     "selfcheck:job-reference": "pnpm --filter @divan/person-employment selfcheck:job-reference",
     "selfcheck:primary-assignment": "pnpm --filter @divan/person-employment selfcheck:primary-assignment",
+    "selfcheck:secondary-assignment": "pnpm --filter @divan/person-employment selfcheck:secondary-assignment",
     "selfcheck:compensation-facts": "pnpm --filter @divan/compensation-facts selfcheck:compensation-facts"
   },
   "devDependencies": {

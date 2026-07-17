@@ -5,7 +5,8 @@
  * Story 3.5: Organizational Unit hierarchy (FR-9) — not OrganizationalScope authz.
  * Story 3.6: Job reference concepts (FR-10) — Role / Title / Ladder / Grade / Seniority.
  * Story 3.7: Primary Assignment integrity (FR-11) — projection + exactly-one + Team/job facts.
- * Start/Return/Terminate product flows = Epic 4 (4.5–4.6).
+ * Story 3.8: Secondary Assignment fidelity (FR-12) — dual-role projection; no headcount; inventory gate.
+ * Start/Return/Terminate / Secondary create-change-end product flows = Epic 4 (4.5–4.8).
  */
 
 export {
@@ -30,6 +31,7 @@ export {
   OrgUnitError,
   JobRefError,
   PrimaryAssignmentError,
+  SecondaryAssignmentError,
   MSG_DUPLICATE_PERSONNEL_CODE_FA,
   MSG_DUPLICATE_NATIONAL_ID_FA,
   MSG_PERSON_NOT_FOUND_FA,
@@ -88,6 +90,15 @@ export {
   MSG_PRIMARY_ALREADY_CLOSED_FA,
   MSG_INVALID_PRIMARY_INTERVAL_FA,
   MSG_PRIMARY_REF_NOT_FOUND_FA,
+  MSG_OVERLAPPING_EQUIVALENT_SECONDARY_FA,
+  MSG_SECONDARY_OUTSIDE_EMPLOYMENT_FA,
+  MSG_SECONDARY_REASON_REQUIRED_FA,
+  MSG_SECONDARY_REASON_OUT_OF_INVENTORY_FA,
+  MSG_SECONDARY_PERSON_MISMATCH_FA,
+  MSG_SECONDARY_ASSIGNMENT_NOT_FOUND_FA,
+  MSG_SECONDARY_ALREADY_CLOSED_FA,
+  MSG_INVALID_SECONDARY_INTERVAL_FA,
+  MSG_SECONDARY_REF_NOT_FOUND_FA,
 } from "./errors";
 
 export type {
@@ -97,6 +108,7 @@ export type {
   OrgUnitErrorCode,
   JobRefErrorCode,
   PrimaryAssignmentErrorCode,
+  SecondaryAssignmentErrorCode,
 } from "./errors";
 
 export {
@@ -307,6 +319,35 @@ export type {
 export type { PrimaryInterval } from "./primary-assignment-invariants";
 
 export {
+  applySecondaryAssignmentProjection,
+  closeSecondaryAssignmentProjection,
+  getSecondaryAssignmentById,
+  listSecondaryAssignmentsForEmployment,
+  listSecondaryAssignmentsForPerson,
+  listActiveSecondaryAssignmentsAsOf,
+  ensureSecondaryAssignmentHooksRegistered,
+  resetSecondaryAssignmentHooksRegistrationForTests,
+  assertValidSecondaryInterval,
+  assertNoEquivalentOverlap,
+  assertPersonMatchesEmployment,
+  assertSecondaryWithinEmployment,
+  isSecondaryActiveAsOf,
+  assertSecondaryGradeMatchesLadder,
+  AR_SECONDARY_INVENTORY,
+  assertReasonTypeInInventory,
+  isReasonTypeInInventory,
+  normalizeReasonType,
+} from "./secondary-assignment";
+
+export type {
+  SecondaryAssignmentRecord,
+  ApplySecondaryAssignmentProjectionInput,
+  ListActiveSecondaryAsOfScope,
+  SecondaryInterval,
+  ArSecondaryReasonType,
+} from "./secondary-assignment";
+
+export {
   EMPLOYMENT_MINIMUM_FACTS,
 } from "./employment-minimum-facts";
 
@@ -318,6 +359,7 @@ export {
   SEED_ORGANIZATION_HIERARCHY,
   SEED_JOB_REFERENCES,
   SEED_PRIMARY_ASSIGNMENT,
+  SEED_SECONDARY_ASSIGNMENT,
   seedPersonIdentityFixtures,
   seedPersonPermissionFixtures,
   seedDemoPerson,
@@ -332,6 +374,8 @@ export {
   seedJobReferenceFixtures,
   seedDemoPrimaryAssignments,
   seedPrimaryAssignmentFixtures,
+  seedDemoSecondaryAssignments,
+  seedSecondaryAssignmentFixtures,
 } from "./seed";
 
 export {

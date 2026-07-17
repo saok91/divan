@@ -1,6 +1,7 @@
 /**
  * Epic 4 minimum facts for a valid Employment + Primary Assignment pair (AC #5).
  * Story 3.7: Primary schema + invariants live; product mutations still Epic 4.
+ * Story 3.8: Secondary schema + invariants live (dual-role fidelity); no headcount; mutations still Epic 4.
  *
  * | Fact | Owner story | Notes |
  * | --- | --- | --- |
@@ -9,7 +10,8 @@
  * | Collaboration / approved employment status | 3.2 lean / AR-DATA | Required for Start; exact codes AR-DATA |
  * | Legal Entity → … → Team (Primary org) | 3.5 + 3.7 | OrgUnit live; Team via PrimaryAssignment.teamId |
  * | Exactly one active Primary Assignment | 3.7 + Epic 4 | Schema + invariants live (3.7); mutations via events (Epic 4) |
- * | Headcount capacity / Override | Epic 4 / FR-20 | Not this story |
+ * | Secondary Assignment (0..* concurrent dual roles) | 3.8 + Epic 4 | Schema + inventory gate live (3.8); no headcount; mutations Epic 4 |
+ * | Headcount capacity / Override | Epic 4 / FR-20 | Not this story — Primary only by default |
  */
 
 export type EmploymentMinimumFact = {
@@ -81,9 +83,17 @@ export const EMPLOYMENT_MINIMUM_FACTS: readonly EmploymentMinimumFact[] = [
       "Schema + EXCLUDE + domain invariants live (3.7); product create/change/end only via personnel events (Epic 4)",
   },
   {
+    fact: "Secondary Assignment (dual-role fidelity)",
+    ownerStory: "3.8 + Epic 4",
+    required: false,
+    notes:
+      "Schema + equivalent-overlap EXCLUDE + inventory gate + Employment coverage live (3.8); no headcount consumption; product mutations via events (Epic 4); migration Epic 6",
+  },
+  {
     fact: "Headcount capacity / Override",
     ownerStory: "Epic 4 / FR-20",
     required: false,
-    notes: "Deferred — headcountApprovalId not required on Primary in 3.7",
+    notes:
+      "Deferred — Primary consumes headcount (Epic 4); Secondary never by default (FR-12 / FR-29)",
   },
 ] as const;

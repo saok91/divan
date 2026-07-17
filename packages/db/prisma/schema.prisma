@@ -2,9 +2,11 @@
 // + compensation-facts isolated schema (3.4 / AD-3) + OrganizationalUnit hierarchy (3.5 / FR-9)
 // + job reference concepts (3.6 / FR-10): OrganizationalRole, JobTitle, Ladder, Grade, Seniority
 // + Primary Assignment projection (3.7 / FR-11): exactly-one active + non-overlap + Team/job facts.
+// + Secondary Assignment projection (3.8 / FR-12): dual-role fidelity; no headcount consumption; inventory-gated reason/type.
 // Person is HR identity aggregate — distinct from HumanIdentity (login).
-// Employment / PrimaryAssignment are projections (AD-2), not event-store truth.
-// Secondary Assignment = Story 3.8; product mutations (Start/Transfer/…) = Epic 4; headcount link deferred.
+// Employment / PrimaryAssignment / SecondaryAssignment are projections (AD-2), not event-store truth.
+// Product mutations (Start/Transfer/Secondary create-change-end) = Epic 4; Secondary migration prep = Epic 6.
+// Secondary does NOT consume headcount by default (FR-12 / FR-29 contrast) — no headcount FK/columns.
 // DataElement registry governs field enablement (FR-7) — values stay on Person columns for MVP approve set.
 // CompensationFact lives in PostgreSQL schema "compensation" — owned by @divan/compensation-facts only.
 // OrganizationalUnit (LE→BU→Dept→Team) is org master-data — NOT OrganizationalScope (authz population).
@@ -68,7 +70,9 @@ model Person {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  employments Employment[]
+  employments          Employment[]
+  /// Denormalized carrier for Secondary equivalence EXCLUDE — must match employment.personId.
+  secondaryAssignments SecondaryAssignment[]
   @@schema("public")
 }
 
@@ -126,7 +130,8 @@ model Employment {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  primaryAssignments PrimaryAssignment[]
+  primaryAssignments   PrimaryAssignment[]
+  secondaryAssignments SecondaryAssignment[]
 
   @@index([personId])
   @@schema("public")
@@ -194,8 +199,10 @@ model OrganizationalUnit {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  /// Reverse relation for FK only — Primary is the carrier; OrgUnit remains master-data.
-  primaryAssignments PrimaryAssignment[]
+  /// Reverse relation for FK only — Primary/Secondary are carriers; OrgUnit remains master-data.
+  /// Secondary.orgUnitId is organizational target — NOT Team membership (Primary only).
+  primaryAssignments   PrimaryAssignment[]
+  secondaryAssignments SecondaryAssignment[]
 
   @@index([parentId])
   @@index([unitType])
@@ -215,8 +222,9 @@ model OrganizationalRole {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  /// Reverse relation for FK only — Primary carries the fact; Role remains master-data.
-  primaryAssignments PrimaryAssignment[]
+  /// Reverse relation for FK only — Primary/Secondary carriers; Role remains master-data.
+  primaryAssignments   PrimaryAssignment[]
+  secondaryAssignments SecondaryAssignment[]
 
   @@schema("public")
 }
@@ -233,8 +241,9 @@ model JobTitle {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  /// Reverse relation for FK only — Primary carries the fact; Title remains master-data.
-  primaryAssignments PrimaryAssignment[]
+  /// Reverse relation for FK only — Primary/Secondary carriers; Title remains master-data.
+  primaryAssignments   PrimaryAssignment[]
+  secondaryAssignments SecondaryAssignment[]
 
   @@schema("public")
 }
@@ -252,8 +261,9 @@ model Ladder {
   updatedAt        DateTime  @updatedAt
 
   grades Grade[]
-  /// Reverse relation for FK only — Primary carries the fact; Ladder remains master-data.
-  primaryAssignments PrimaryAssignment[]
+  /// Reverse relation for FK only — Primary/Secondary carriers; Ladder remains master-data.
+  primaryAssignments   PrimaryAssignment[]
+  secondaryAssignments SecondaryAssignment[]
 
   @@schema("public")
 }
@@ -276,8 +286,9 @@ model Grade {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  /// Reverse relation for FK only — Primary carries the fact; Grade remains master-data.
-  primaryAssignments PrimaryAssignment[]
+  /// Reverse relation for FK only — Primary/Secondary carriers; Grade remains master-data.
+  primaryAssignments   PrimaryAssignment[]
+  secondaryAssignments SecondaryAssignment[]
 
   @@unique([ladderId, code])
   @@unique([ladderId, rank])
@@ -297,9 +308,54 @@ model Seniority {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  /// Reverse relation for FK only — optional on Primary; no Grade↔Seniority map.
-  primaryAssignments PrimaryAssignment[]
+  /// Reverse relation for FK only — optional on Primary/Secondary; no Grade↔Seniority map.
+  primaryAssignments   PrimaryAssignment[]
+  secondaryAssignments SecondaryAssignment[]
 
+  @@schema("public")
+}
+
+/// Secondary Assignment projection (Story 3.8 / FR-12). AD-2: not event-store authority.
+/// Multiple concurrent Secondaries OK; equivalence = (personId, orgUnitId, reasonType, overlapping interval).
+/// orgUnitId = organizational target (not TEAM-only; does NOT define Team membership).
+/// reasonType required + inventory-gated (provisional AR-SECONDARY stub). Job facts optional when used.
+/// Does NOT consume headcount by default — no headcountApprovalId / consumption columns.
+/// Product create/change/end = Epic 4; migration = Epic 6.
+model SecondaryAssignment {
+  id                   String    @id @default(uuid(7))
+  /// Denormalized for EXCLUDE; domain: must equal employment.personId.
+  personId             String
+  person               Person    @relation(fields: [personId], references: [id], onDelete: Restrict)
+  employmentId         String
+  employment           Employment @relation(fields: [employmentId], references: [id], onDelete: Restrict)
+  /// Organizational target — BU / Dept / Team / approved level; NOT Team membership.
+  orgUnitId            String
+  orgUnit              OrganizationalUnit @relation(fields: [orgUnitId], references: [id], onDelete: Restrict)
+  /// Machine code from AR-SECONDARY inventory registry (Latin-normalized).
+  reasonType           String
+  organizationalRoleId String?
+  organizationalRole   OrganizationalRole? @relation(fields: [organizationalRoleId], references: [id], onDelete: Restrict)
+  jobTitleId           String?
+  jobTitle             JobTitle? @relation(fields: [jobTitleId], references: [id], onDelete: Restrict)
+  ladderId             String?
+  ladder               Ladder? @relation(fields: [ladderId], references: [id], onDelete: Restrict)
+  /// If both grade+ladder set: grade.ladderId === ladderId.
+  gradeId              String?
+  grade                Grade? @relation(fields: [gradeId], references: [id], onDelete: Restrict)
+  /// Optional — no Grade↔Seniority map.
+  seniorityId          String?
+  seniority            Seniority? @relation(fields: [seniorityId], references: [id], onDelete: Restrict)
+  startDate            DateTime  @db.Date
+  endDateExclusive     DateTime? @db.Date
+  /// Null until Epic 4 Personnel Events exist.
+  sourceEventId        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([personId])
+  @@index([employmentId])
+  @@index([orgUnitId])
+  @@index([reasonType])
   @@schema("public")
 }
 
