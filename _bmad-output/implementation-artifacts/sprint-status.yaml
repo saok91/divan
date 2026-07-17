@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-18T01:55:00+03:30
+# last_updated: 2026-07-18T02:35:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-18T01:15:00+03:30
+last_updated: 2026-07-18T02:35:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -78,7 +78,7 @@ development_status:
   3-6-independent-job-reference-concepts: done
   3-7-primary-assignment-integrity: done
   3-8-secondary-assignment-fidelity: done
-  3-9-derived-management-relationships: backlog
+  3-9-derived-management-relationships: done
   epic-3-retrospective: optional
 
   epic-4: backlog

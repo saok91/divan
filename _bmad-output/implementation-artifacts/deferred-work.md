@@ -1,3 +1,9 @@
+## Deferred from: code review of 3-9-derived-management-relationships.md (2026-07-18)
+
+- N+1 / O(teams×members) queries in `deriveManagementEdgesAsOf` / `listManagedPersonsAsOf` / `listTeamMembersAsOf` without batching or caching — acceptable for ~500 MVP; revisit under NFR-13 pressure
+- `dateOnlyFromDb` via `toISOString().slice(0,10)` — same DATE mapping pattern as Employment/Primary/Secondary; harden if non-UTC driver behavior appears
+- `management-relationship.selfcheck` mutates shared seed DB (temp second middle-manager / leave-team) with best-effort restore — same thin-selfcheck pattern; isolate DB when Vitest/CI lands
+
 ## Deferred from: code review of 3-3-data-dictionary-governed-profile-fields.md (2026-07-17)
 
 - No DB CHECK that `enabled` ⇒ `disposition=approve` / disposition ∈ {approve,later,reject} — domain `enableDataElement` enforces; add constraint if raw-SQL hardening becomes a threat
@@ -201,10 +207,10 @@
 - **Primary Assignment schema + integrity landed** (`PrimaryAssignment` projection, EXCLUDE per Employment, apply/close/read, Team + job-fact FKs, coverage asserts, dependency hooks)
 - **Product create/change/end Primary** (Start / Transfer / job-change UI + event append) = Stories 4.5–4.8 — projection writers only in 3.7
 - **Secondary Assignment** = **Story 3.8 (done)** — see deferred section below
-- **Derived management relationships** = Story 3.9
+- **Derived management relationships** = **Story 3.9 (done)** — see deferred section below
 - **Headcount Approval / consumption / Reservation / Override** = Epic 4 (FR-28..FR-32); `headcountApprovalId` not required on Primary in 3.7
 - **AR-TEMPORAL disposition** for deactivation-with-active-Primary still open — fail-closed hooks remain (`DEACTIVATION_BLOCKED_DEPENDENCIES`)
-- **PopulationPort** — `resolveTeamMembershipAsOf` helper available; Secondary read helpers available (3.8); **full fixture cutover still not claimed complete** (3.9 / 4.x)
+- **PopulationPort** — `resolveTeamMembershipAsOf` helper available; Secondary read helpers available (3.8); management derive + adapter available (3.9); **full fixture cutover still not claimed complete** (AR-IDENTITY / 4.x)
 - Profile Assignments section UI = Epic 5 / UX-DR8
 
 ## Deferred from: Story 3.8 secondary assignment fidelity (2026-07-18)
@@ -214,10 +220,20 @@
 - **Migration / Baseline Secondary import** = Epic 6
 - **AR-SECONDARY approved inventory / acceptance oracle** still pending — provisional codes (`acting_manager`, `cross_dept_support`) fail-closed stub only
 - **Headcount non-consumption confirmed** for Secondary by default (FR-12 / FR-29); no `@divan/headcount` wiring
-- **Derived management relationships** = Story 3.9 (from Primary, not Secondary)
-- **PopulationPort full cutover** still not claimed (3.9 / 4.x); Secondary read helpers alone do not complete cutover
+- **Derived management relationships** = **Story 3.9 (done)** — from Primary only; Secondary never a source
+- **PopulationPort full cutover** still not claimed (AR-IDENTITY / 4.x); derive APIs + adapter live in 3.9; default registry still fixture-backed
 - Profile Assignments section UI (Primary + Secondary display) = Epic 5 / UX-DR8
 - Effort %, billing, scheduling, matrix-org, Secondary approval workflow = explicit AR-SECONDARY non-goals
+
+## Deferred from: Story 3.9 derived management relationships (2026-07-18)
+
+- **FR-13 derivation landed** — `resolveTeamManagerAsOf` / `listManagedPersonsAsOf` / `deriveManagementEdgesAsOf` + provisional `AR_MANAGEMENT_ROLE_REGISTRY`; no editable management shadow table; no product manager API/UI
+- **Senior MVP rule documented:** `ROLE-SNR-MGR` scopes to Department parent of manager’s Team; full AR-ACCESS senior scope matrix still pending
+- **AR-ACCESS / AR-TEMPORAL** acting / interim / co-manager / reorganization winner policies still undefined — ambiguity remains fail-closed (`AMBIGUOUS_TEAM_MANAGER` / `AMBIGUOUS_MANAGEMENT_SCOPE`)
+- **Secondary `acting_manager` inventory** is explicitly **not** a management derivation source
+- **PopulationPort:** adapter `buildManagementRelationshipsFromDerivation` + seed Account username map for demo middle-manager available; **default `intersectPopulation` registry still fixture-backed** (`person:a1`, …) until AR-IDENTITY Person↔Account link + 4.x wiring — do not claim full cutover
+- Interactive org chart / hierarchy visualization = post-MVP addendum §14.2
+- Profile Assignments UI / headcount / Personnel Event append = Epic 4–5
 
 ## Deferred from: code review of 3-8-secondary-assignment-fidelity.md (2026-07-18)
 

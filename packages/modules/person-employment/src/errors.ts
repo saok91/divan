@@ -404,3 +404,40 @@ export const MSG_INVALID_SECONDARY_INTERVAL_FA =
 
 export const MSG_SECONDARY_REF_NOT_FOUND_FA =
   "مرجع مرتبط با تخصیص ثانویه یافت نشد.";
+
+/** Derived management relationship errors (Story 3.9 / FR-13). Clients match codes. */
+export type ManagementRelationshipErrorCode =
+  | "AMBIGUOUS_TEAM_MANAGER"
+  | "AMBIGUOUS_MANAGEMENT_SCOPE"
+  | "MANAGEMENT_ROLE_REGISTRY_INVALID"
+  | "SENIOR_MANAGER_POLICY_UNDEFINED"
+  | "ORG_UNIT_NOT_FOUND"
+  | "VALIDATION";
+
+export class ManagementRelationshipError extends Error {
+  readonly code: ManagementRelationshipErrorCode;
+  readonly messageFa: string;
+
+  constructor(
+    code: ManagementRelationshipErrorCode,
+    messageFa: string,
+    message?: string,
+  ) {
+    super(message ?? messageFa);
+    this.name = "ManagementRelationshipError";
+    this.code = code;
+    this.messageFa = messageFa;
+  }
+}
+
+export const MSG_AMBIGUOUS_TEAM_MANAGER_FA =
+  "بیش از یک مدیر میانی فعال برای این تیم وجود دارد. دسترسی تا رفع ابهام مجاز نیست.";
+
+export const MSG_AMBIGUOUS_MANAGEMENT_SCOPE_FA =
+  "دامنه مدیریتی مبهم است. دسترسی تا رفع ابهام مجاز نیست.";
+
+export const MSG_MANAGEMENT_ROLE_REGISTRY_INVALID_FA =
+  "فهرست نقش‌های مدیریتی نامعتبر است.";
+
+export const MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA =
+  "سیاست دامنه مدیر ارشد هنوز تعریف نشده است.";

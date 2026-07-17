@@ -3,9 +3,12 @@
  *
  * Fixture-backed until Epic 3/4 Person / Assignment projections exist.
  * Story 3.1 cutover target: subject id = Person UUID (`Person.id`).
- * Fixture ids (`person:a1`, …) remain until Assignment/Org projections
- * (Stories 3.5–3.9 / 4.x) — see person-employment `population-cutover.ts`
- * and deferred-work.md. Do not invent a parallel population checker.
+ * Fixture ids (`person:a1`, …) remain until Account↔Person (AR-IDENTITY) /
+ * event-backed wiring (4.x). Story 3.9 delivers Person-centric derive APIs +
+ * `buildManagementRelationshipsFromDerivation` adapter — default registry is
+ * still fixture-backed (honest cutover). See person-employment
+ * `population-cutover.ts` and deferred-work.md. Do not invent a parallel
+ * population checker.
  * Callers: after envelope allow (or as part of authorize path for demos).
  * Empty intersection → safe empty / omit — never invent out-of-scope rows.
  *

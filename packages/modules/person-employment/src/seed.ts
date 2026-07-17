@@ -1,5 +1,5 @@
 /**
- * Demo seed for Person + Employment + Data Dictionary + Org + Job refs + Primary + Secondary (3.1–3.8).
+ * Demo seed for Person + Employment + Data Dictionary + Org + Job refs + Primary + Secondary + Management (3.1–3.9).
  * Invoked from identity-access seedDevAccounts after access-admin fixtures.
  */
 
@@ -173,6 +173,45 @@ export const SEED_SECONDARY_ASSIGNMENT = {
   /** Second concurrent Secondary — different reason/type (multi concurrent proof). */
   concurrentReasonType: "cross_dept_support",
   concurrentStart: "2024-09-01",
+} as const;
+
+/**
+ * Demo management derivation fixtures (Story 3.9 / FR-13).
+ * Middle-manager + member on TEAM-DEMO; optional senior on same Team
+ * (scopes to Department parent). Role codes provisional until AR-ACCESS.
+ */
+export const SEED_MANAGEMENT_RELATIONSHIPS = {
+  middleManagerRole: {
+    code: "ROLE-MID-MGR",
+    nameFa: "مدیر میانی",
+    startDate: "2020-01-01",
+  },
+  seniorManagerRole: {
+    code: "ROLE-SNR-MGR",
+    nameFa: "مدیر ارشد",
+    startDate: "2020-01-01",
+  },
+  /** Individual contributor Role for managed member (reuse HR specialist). */
+  memberRoleCode: SEED_JOB_REFERENCES.role.code,
+  middleManagerPerson: {
+    personnelCode: "10002",
+    givenName: "مینا",
+    familyName: "مدیری",
+    mobilePhone: "09121234502",
+  },
+  seniorManagerPerson: {
+    personnelCode: "10003",
+    givenName: "سیامک",
+    familyName: "ارشدی",
+    mobilePhone: "09121234503",
+  },
+  /** Aligns with open Employment / Primary active start. */
+  activeStart: SEED_EMPLOYMENT_LIFECYCLE.activeStart,
+  /**
+   * Seed registry: middle-manager Person personnelCode → demo InternalAccount username.
+   * Used only by selfcheck / optional dual-run — not a permanent Person↔Account FK.
+   */
+  demoManagerAccountUsername: "manager",
 } as const;
 
 /**
@@ -1045,4 +1084,221 @@ export async function seedSecondaryAssignmentFixtures(
   db: PrismaClient,
 ): Promise<void> {
   await seedDemoSecondaryAssignments(db);
+}
+
+async function ensureManagementRoles(db: PrismaClient): Promise<{
+  middleRoleId: string;
+  seniorRoleId: string;
+}> {
+  const mid = SEED_MANAGEMENT_RELATIONSHIPS.middleManagerRole;
+  const snr = SEED_MANAGEMENT_RELATIONSHIPS.seniorManagerRole;
+
+  const middle = await ensureByCode(
+    async () => {
+      const row = await db.organizationalRole.findUnique({
+        where: { code: mid.code },
+      });
+      return row ? { id: row.id, code: row.code } : null;
+    },
+    async () => {
+      const created = await createOrganizationalRole(
+        {
+          code: mid.code,
+          nameFa: mid.nameFa,
+          startDate: mid.startDate,
+        },
+        db,
+      );
+      return { id: created.id, code: created.code };
+    },
+  );
+
+  const senior = await ensureByCode(
+    async () => {
+      const row = await db.organizationalRole.findUnique({
+        where: { code: snr.code },
+      });
+      return row ? { id: row.id, code: row.code } : null;
+    },
+    async () => {
+      const created = await createOrganizationalRole(
+        {
+          code: snr.code,
+          nameFa: snr.nameFa,
+          startDate: snr.startDate,
+        },
+        db,
+      );
+      return { id: created.id, code: created.code };
+    },
+  );
+
+  return { middleRoleId: middle.id, seniorRoleId: senior.id };
+}
+
+async function ensurePersonWithOpenEmployment(
+  db: PrismaClient,
+  spec: {
+    personnelCode: string;
+    givenName: string;
+    familyName: string;
+    mobilePhone: string;
+  },
+): Promise<{ personId: string; employmentId: string }> {
+  let person = await db.person.findUnique({
+    where: { personnelCode: spec.personnelCode },
+  });
+  if (!person) {
+    const created = await createPerson(
+      {
+        personnelCode: spec.personnelCode,
+        givenName: spec.givenName,
+        familyName: spec.familyName,
+        mobilePhone: spec.mobilePhone,
+      },
+      { accountId: "seed", correlationId: "seed-management-3.9" },
+      db,
+    );
+    person = await db.person.findUniqueOrThrow({ where: { id: created.id } });
+  }
+
+  const employments = await listEmploymentsForPerson(person.id, db);
+  let open = employments.find(
+    (e) =>
+      e.startDate === SEED_MANAGEMENT_RELATIONSHIPS.activeStart &&
+      e.endDateExclusive === null,
+  );
+  if (!open) {
+    open = await applyEmploymentProjection(
+      {
+        personId: person.id,
+        startDate: SEED_MANAGEMENT_RELATIONSHIPS.activeStart,
+        endDateExclusive: null,
+        collaborationType: SEED_EMPLOYMENT_LIFECYCLE.collaborationActive,
+      },
+      db,
+    );
+  }
+  return { personId: person.id, employmentId: open.id };
+}
+
+/**
+ * Seed middle-manager + senior-manager Persons with Primaries on TEAM-DEMO.
+ * Demo Person 10001 remains the managed IC member (ROLE-HR-SPEC).
+ * Idempotent when shape matches. Does not invent manager product APIs.
+ */
+export async function seedDemoManagementRelationships(
+  db: PrismaClient,
+): Promise<{
+  middleManagerPersonId: string;
+  seniorManagerPersonId: string;
+  memberPersonId: string;
+}> {
+  ensurePrimaryAssignmentHooksRegistered();
+  await seedDataDictionaryFixtures(db);
+  await seedPrimaryAssignmentFixtures(db);
+  await seedJobReferenceFixtures(db);
+
+  const { middleRoleId, seniorRoleId } = await ensureManagementRoles(db);
+
+  const team = await db.organizationalUnit.findUnique({
+    where: { code: SEED_ORGANIZATION_HIERARCHY.teamActive.code },
+  });
+  const title = await db.jobTitle.findUnique({
+    where: { code: SEED_JOB_REFERENCES.jobTitle.code },
+  });
+  const ladder = await db.ladder.findUnique({
+    where: { code: SEED_JOB_REFERENCES.ladder.code },
+  });
+  const grade = ladder
+    ? await db.grade.findUnique({
+        where: {
+          ladderId_code: {
+            ladderId: ladder.id,
+            code: SEED_JOB_REFERENCES.gradeLow.code,
+          },
+        },
+      })
+    : null;
+  const seniority = await db.seniority.findUnique({
+    where: { code: SEED_JOB_REFERENCES.seniority.code },
+  });
+
+  if (!team || !title || !ladder || !grade) {
+    throw new Error(
+      "seedDemoManagementRelationships: org/job-ref fixtures missing",
+    );
+  }
+
+  const mid = await ensurePersonWithOpenEmployment(
+    db,
+    SEED_MANAGEMENT_RELATIONSHIPS.middleManagerPerson,
+  );
+  const snr = await ensurePersonWithOpenEmployment(
+    db,
+    SEED_MANAGEMENT_RELATIONSHIPS.seniorManagerPerson,
+  );
+
+  const member = await db.person.findUnique({
+    where: { personnelCode: SEED_PERSON_IDENTITY.demoPersonnelCode },
+  });
+  if (!member) {
+    throw new Error(
+      "seedDemoManagementRelationships: demo member person missing",
+    );
+  }
+
+  async function ensureManagerPrimary(
+    employmentId: string,
+    organizationalRoleId: string,
+  ): Promise<void> {
+    const existing = await listPrimaryAssignmentsForEmployment(
+      employmentId,
+      db,
+    );
+    const match = existing.find(
+      (p) =>
+        p.endDateExclusive === null &&
+        p.startDate === SEED_MANAGEMENT_RELATIONSHIPS.activeStart &&
+        p.teamId === team!.id &&
+        p.organizationalRoleId === organizationalRoleId,
+    );
+    if (match) return;
+
+    // Clear wrong-shape Primaries for this Employment, then rewrite (atomic).
+    await db.$transaction(async (tx) => {
+      const client = tx as unknown as PrismaClient;
+      await client.primaryAssignment.deleteMany({ where: { employmentId } });
+      await applyPrimaryAssignmentProjection(
+        {
+          employmentId,
+          teamId: team!.id,
+          organizationalRoleId,
+          jobTitleId: title!.id,
+          ladderId: ladder!.id,
+          gradeId: grade!.id,
+          seniorityId: seniority?.id ?? null,
+          startDate: SEED_MANAGEMENT_RELATIONSHIPS.activeStart,
+          endDateExclusive: null,
+        },
+        client,
+      );
+    });
+  }
+
+  await ensureManagerPrimary(mid.employmentId, middleRoleId);
+  await ensureManagerPrimary(snr.employmentId, seniorRoleId);
+
+  return {
+    middleManagerPersonId: mid.personId,
+    seniorManagerPersonId: snr.personId,
+    memberPersonId: member.id,
+  };
+}
+
+/** Derived management relationship fixtures (Story 3.9). */
+export async function seedManagementRelationshipFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  await seedDemoManagementRelationships(db);
 }

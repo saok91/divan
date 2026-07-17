@@ -6,6 +6,7 @@
  * Story 3.6: Job reference concepts (FR-10) — Role / Title / Ladder / Grade / Seniority.
  * Story 3.7: Primary Assignment integrity (FR-11) — projection + exactly-one + Team/job facts.
  * Story 3.8: Secondary Assignment fidelity (FR-12) — dual-role projection; no headcount; inventory gate.
+ * Story 3.9: Derived management relationships (FR-13) — compute from Primary+org+Role; no editable shadow.
  * Start/Return/Terminate / Secondary create-change-end product flows = Epic 4 (4.5–4.8).
  */
 
@@ -99,6 +100,11 @@ export {
   MSG_SECONDARY_ALREADY_CLOSED_FA,
   MSG_INVALID_SECONDARY_INTERVAL_FA,
   MSG_SECONDARY_REF_NOT_FOUND_FA,
+  ManagementRelationshipError,
+  MSG_AMBIGUOUS_TEAM_MANAGER_FA,
+  MSG_AMBIGUOUS_MANAGEMENT_SCOPE_FA,
+  MSG_MANAGEMENT_ROLE_REGISTRY_INVALID_FA,
+  MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA,
 } from "./errors";
 
 export type {
@@ -109,6 +115,7 @@ export type {
   JobRefErrorCode,
   PrimaryAssignmentErrorCode,
   SecondaryAssignmentErrorCode,
+  ManagementRelationshipErrorCode,
 } from "./errors";
 
 export {
@@ -348,6 +355,45 @@ export type {
 } from "./secondary-assignment";
 
 export {
+  resolveTeamManagerAsOf,
+  listTeamMembersAsOf,
+  listManagedPersonsAsOf,
+  deriveManagementEdgesAsOf,
+  resolveSeniorManagerScopeOrgUnitAsOf,
+  buildManagementRelationshipsFromDerivation,
+} from "./management-relationship";
+
+export type {
+  TeamManagerAsOf,
+  ManagementEdge,
+  PopulationManagementRelationship,
+  ListTeamMembersOptions,
+} from "./management-relationship";
+
+export {
+  AR_MANAGEMENT_ROLE_REGISTRY,
+  assertManagementRoleRegistryValid,
+  isMiddleManagerRoleCode,
+  isSeniorManagerRoleCode,
+  isApprovedSeniorManagerTargetUnitType,
+  normalizeManagementRoleCode,
+} from "./management-role-registry";
+
+export type {
+  ArMiddleManagerRoleCode,
+  ArSeniorManagerRoleCode,
+} from "./management-role-registry";
+
+export {
+  assertValidAsOfDate,
+  intersectHalfOpenIntervals,
+  throwAmbiguousTeamManager,
+  throwAmbiguousManagementScope,
+} from "./management-relationship-invariants";
+
+export type { HalfOpenInterval } from "./management-relationship-invariants";
+
+export {
   EMPLOYMENT_MINIMUM_FACTS,
 } from "./employment-minimum-facts";
 
@@ -360,6 +406,7 @@ export {
   SEED_JOB_REFERENCES,
   SEED_PRIMARY_ASSIGNMENT,
   SEED_SECONDARY_ASSIGNMENT,
+  SEED_MANAGEMENT_RELATIONSHIPS,
   seedPersonIdentityFixtures,
   seedPersonPermissionFixtures,
   seedDemoPerson,
@@ -376,6 +423,8 @@ export {
   seedPrimaryAssignmentFixtures,
   seedDemoSecondaryAssignments,
   seedSecondaryAssignmentFixtures,
+  seedDemoManagementRelationships,
+  seedManagementRelationshipFixtures,
 } from "./seed";
 
 export {

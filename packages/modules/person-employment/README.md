@@ -53,12 +53,12 @@ Person and permitted history.
 ### PopulationPort cutover
 
 Fixture ids (`person:a1`, …) remain in `@divan/identity-access` until
-Fixture subject ids (`person:a1`, …) remain until management /
-events (3.9 / 4.x). **Target subject id = Person UUID.**
+events / AR-IDENTITY Account↔Person wiring (4.x). **Target subject id = Person UUID.**
 Primary Team membership helper (`resolveTeamMembershipAsOf`) is available (3.7);
-Secondary read helpers are available (3.8) —
-full PopulationPort cutover is **not** claimed complete. See `population-cutover.ts`
-and `deferred-work.md`.
+Secondary read helpers are available (3.8);
+management derive APIs + PopulationPort adapter are available (3.9) —
+default PopulationPort registry is **still fixture-backed** (honest cutover).
+See `population-cutover.ts` and `deferred-work.md`.
 
 ## Story 3.3 — Data-Dictionary-governed profile fields (FR-7)
 
@@ -219,6 +219,28 @@ in addition to Primary 3.7 hooks):
 
 Default: **no** tRPC / UI — prove via selfcheck.
 
+## Story 3.9 — Derived management relationships (FR-13)
+
+Pure derive/read from Primary Assignment + OrgUnit hierarchy + provisional
+management-role registry (`AR_MANAGEMENT_ROLE_REGISTRY`). **No** editable
+Manager / ReportingLine shadow table. **No** product set/edit manager APIs.
+
+- `resolveTeamManagerAsOf(teamId, asOf)` — unique middle-manager Primary on Team;
+  0 → `null`; >1 → `AMBIGUOUS_TEAM_MANAGER` (fail-closed). Team must be active
+  `TEAM` as-of; candidates require active Employment as-of (same as membership).
+- `listTeamMembersAsOf` / `listManagedPersonsAsOf` / `deriveManagementEdgesAsOf`
+  — ambiguity uses the **same typed fail-closed errors** on derive as on access
+  (no silent skip / invent-a-winner). Senior span with ambiguous Team →
+  `AMBIGUOUS_MANAGEMENT_SCOPE`.
+- Senior MVP rule: `ROLE-SNR-MGR` Primary on a TEAM scopes to that Team’s
+  **Department parent** subtree (pending AR-ACCESS matrix)
+- `buildManagementRelationshipsFromDerivation(edges, resolveAccountIdForPerson)` —
+  PopulationPort-compatible adapter; Account resolver injected (no Person↔Account FK);
+  duplicate manager+subject pairs collapsed
+- Secondary (`acting_manager` inventory) is **never** a management source
+
+Default: **no** tRPC / UI — prove via `selfcheck:management-relationships`.
+
 ### Selfchecks
 
 ```bash
@@ -229,4 +251,5 @@ pnpm selfcheck:organization-hierarchy
 pnpm selfcheck:job-reference
 pnpm selfcheck:primary-assignment
 pnpm selfcheck:secondary-assignment
+pnpm selfcheck:management-relationships
 ```
