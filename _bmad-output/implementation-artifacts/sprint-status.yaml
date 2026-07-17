@@ -1,5 +1,5 @@
 ﻿# generated: 2026-07-16
-# last_updated: 2026-07-18T02:45:00+03:30
+# last_updated: 2026-07-18T03:15:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-18T02:45:00+03:30
+last_updated: 2026-07-18T03:15:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -81,8 +81,8 @@ development_status:
   3-9-derived-management-relationships: done
   epic-3-retrospective: done
 
-  epic-4: backlog
-  4-1-append-only-event-store-attributable-event-record: backlog
+  epic-4: in-progress
+  4-1-append-only-event-store-attributable-event-record: done
   4-2-draft-finalization-conflict-classification: backlog
   4-3-scheduled-state-cancel-reverse-correction: backlog
   4-4-deterministic-ordering-recalculation: backlog
@@ -210,15 +210,18 @@ action_items:
   - epic: 3
     action: "Encode Transfer coverage-after-atomic-close+open + AR-TEMPORAL apply active-as-of into Story 4.1 / 4.5-4.8 Dev Notes"
     owner: "Amelia + Winston"
-    status: open
+    status: done
+    resolved_in: "4-1-append-only-event-store-attributable-event-record.md (Dev Notes Transfer + AR-TEMPORAL handoff; 4.5–4.8 still implement)"
   - epic: 3
     action: "Define PopulationPort default-registry cutover criteria (fixture to projection-backed) in early 4.x notes"
     owner: "Winston + Amelia"
-    status: open
+    status: done
+    resolved_in: "4-1-append-only-event-store-attributable-event-record.md (PopulationPort cutover criteria section)"
   - epic: 3
     action: "Add seed DoD snippet (FK shape + exact cardinality + $transaction) and BOM-safe sprint-status edits"
     owner: "Amelia + Paige"
-    status: open
+    status: done
+    resolved_in: "4-1-append-only-event-store-attributable-event-record.md (Seed / DoD snippet + Task 4 BOM rule)"
   - epic: 3
     action: "Keep AR-TEMPORAL / AR-SECONDARY / AR-ACCESS / AR-DATA / AR-IDENTITY fail-closed; do not invent in Epic 4"
     owner: "Mary + John"

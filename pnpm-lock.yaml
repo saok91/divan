@@ -188,6 +188,9 @@ importers:
 
   packages/kernel/event-store:
     dependencies:
+      '@divan/temporal-engine':
+        specifier: workspace:*
+        version: link:../temporal-engine
       pg:
         specifier: ^8.16.3
         version: 8.22.0

@@ -13,6 +13,7 @@
     "selfcheck": "tsx src/event-store.selfcheck.ts"
   },
   "dependencies": {
+    "@divan/temporal-engine": "workspace:*",
     "pg": "^8.16.3"
   },
   "devDependencies": {

@@ -13,13 +13,24 @@ pnpm --filter @divan/db exec node ./sql/apply.mjs
 
 # or with psql if installed
 psql "$DATABASE_URL" -f packages/db/sql/001_kernel_events.sql
+psql "$DATABASE_URL" -f packages/db/sql/003_business_event_attributable_fields.sql
 ```
 
-`apply.mjs` runs every `NNN_*.sql` file in lexical order inside a transaction per file.
+`apply.mjs` runs every `NNN_*.sql` file in lexical order inside a transaction per file (includes `003_business_event_attributable_fields.sql`).
 
 ## Conventions
 
 - Filename: `NNN_description.sql` (zero-padded sequence)
-- Migrations must be idempotent where practical (`IF NOT EXISTS`)
+- Migrations must be idempotent where practical (`IF NOT EXISTS` / constraint name guards)
 - Event log is **append-only** at the application API — do not add UPDATE/DELETE helpers in `@divan/event-store`
-- Access events (`event_class=access`) must never feed projections / derived state
+- DB trigger `kernel_events_append_only_trg` blocks UPDATE/DELETE (Story 4.1); `REVOKE` remains commented until app role model is clear
+
+### Business vs access column rules
+
+| `event_class` | Required / rules |
+| --- | --- |
+| `access` | `result` NOT NULL (`allow`/`deny`); business FR-14 columns (`event_type`, `person_id`, `effective_date`, `status`, `registered_at`, `registered_by`) stay NULL |
+| `business` | `event_type`, `person_id`, `effective_date`, `status`, `registered_at`, `registered_by` NOT NULL; `result` IS NULL; `employment_id` nullable until Draft/Start binds Employment |
+| Both | `effective_date` is DATE (business clock); `registered_at` / `finalized_at` are timestamptz — never overload Effective Date as registration time |
+
+Access events (`event_class=access`) must never feed projections / derived state. Projections are never source of truth (AD-2).

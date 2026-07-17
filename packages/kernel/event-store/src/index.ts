@@ -2,6 +2,28 @@ import { randomUUID } from "node:crypto";
 
 import type { Pool, PoolClient } from "pg";
 
+import {
+  appendBusinessEvent,
+  type AppendBusinessEventInput,
+  type AppendBusinessEventResult,
+  type BusinessEventStatus,
+  BusinessEventValidationError,
+  assertNoSensitiveEvidence,
+  assertValidBusinessEventType,
+} from "./business-event";
+
+export {
+  appendBusinessEvent,
+  BusinessEventValidationError,
+  assertNoSensitiveEvidence,
+  assertValidBusinessEventType,
+};
+export type {
+  AppendBusinessEventInput,
+  AppendBusinessEventResult,
+  BusinessEventStatus,
+};
+
 /** Queryable surface shared by Pool and PoolClient. */
 export type PgQueryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
@@ -64,24 +86,6 @@ export async function appendAccessEvent(
   );
 
   return { id };
-}
-
-/**
- * Typed hook for future business events. Not implemented in Story 2.1 —
- * temporal/projection consumers are out of scope. Throws if called.
- */
-export async function appendBusinessEvent(
-  _db: PgQueryable,
-  _input: {
-    correlationId: string;
-    operation: string;
-    scope?: AccessEventScope;
-    payload?: Record<string, unknown>;
-  },
-): Promise<never> {
-  throw new Error(
-    "appendBusinessEvent is not implemented — Story 2.1 ships access events only",
-  );
 }
 
 /**

@@ -1,3 +1,19 @@
+## Deferred from: code review of 4-1-append-only-event-store-attributable-event-record.md (2026-07-18)
+
+- `event-store.selfcheck` permanently inserts access + business fixture rows into `kernel_events` with no cleanup / isolation — same thin-selfcheck pattern as prior stories; isolate DB when Vitest/CI lands
+
+## Deferred from: Story 4.1 append-only event store / attributable event record (2026-07-18)
+
+- **Business attributable record landed** — `003_business_event_attributable_fields.sql` + real `appendBusinessEvent` (FR-14 columns, PascalCase type, evidence sanitizer, append-only trigger)
+- **Still 4.2+:** Draft edit/delete UI, finalization product flow, conflict classification
+- **Still 4.3+:** Scheduled / Cancel / Reverse / Correction writers and UX-DR10 badges
+- **Still 4.4+:** Deterministic same-day ordering + pg-boss recalc
+- **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp Operators flows (Transfer coverage-after-atomic-close+open + AR-TEMPORAL apply active-as-of remain fail-closed dispositions in 4.1 Dev Notes)
+- **Hash-chain tamper evidence (NFR-10 / AR-AUDIT)** still deferred
+- **AuthAttempt → access event migration** unchanged from Story 2.1 plan (keep writing AuthAttempt on login)
+- **PopulationPort default-registry cutover** — criteria encoded in `population-cutover.ts` + Story 4.1 Dev Notes; **not executed**; fixtures remain until all criteria met
+- DB `REVOKE UPDATE/DELETE` on `kernel_events` still commented (role model unclear); trigger hardening ships in 4.1
+
 ## Deferred from: code review of 3-9-derived-management-relationships.md (2026-07-18)
 
 - N+1 / O(teams×members) queries in `deriveManagementEdgesAsOf` / `listManagedPersonsAsOf` / `listTeamMembersAsOf` without batching or caching — acceptable for ~500 MVP; revisit under NFR-13 pressure

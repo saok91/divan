@@ -1,0 +1,890 @@
+diff --git a/_bmad-output/implementation-artifacts/deferred-work.md b/_bmad-output/implementation-artifacts/deferred-work.md
+index d46689e..1dbbd68 100644
+--- a/_bmad-output/implementation-artifacts/deferred-work.md
++++ b/_bmad-output/implementation-artifacts/deferred-work.md
+@@ -1,3 +1,15 @@
++## Deferred from: Story 4.1 append-only event store / attributable event record (2026-07-18)
++
++- **Business attributable record landed** — `003_business_event_attributable_fields.sql` + real `appendBusinessEvent` (FR-14 columns, PascalCase type, evidence sanitizer, append-only trigger)
++- **Still 4.2+:** Draft edit/delete UI, finalization product flow, conflict classification
++- **Still 4.3+:** Scheduled / Cancel / Reverse / Correction writers and UX-DR10 badges
++- **Still 4.4+:** Deterministic same-day ordering + pg-boss recalc
++- **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp Operators flows (Transfer coverage-after-atomic-close+open + AR-TEMPORAL apply active-as-of remain fail-closed dispositions in 4.1 Dev Notes)
++- **Hash-chain tamper evidence (NFR-10 / AR-AUDIT)** still deferred
++- **AuthAttempt → access event migration** unchanged from Story 2.1 plan (keep writing AuthAttempt on login)
++- **PopulationPort default-registry cutover** — criteria encoded in `population-cutover.ts` + Story 4.1 Dev Notes; **not executed**; fixtures remain until all criteria met
++- DB `REVOKE UPDATE/DELETE` on `kernel_events` still commented (role model unclear); trigger hardening ships in 4.1
++
+ ## Deferred from: code review of 3-9-derived-management-relationships.md (2026-07-18)
+ 
+ - N+1 / O(teams×members) queries in `deriveManagementEdgesAsOf` / `listManagedPersonsAsOf` / `listTeamMembersAsOf` without batching or caching — acceptable for ~500 MVP; revisit under NFR-13 pressure
+diff --git a/_bmad-output/implementation-artifacts/sprint-status.yaml b/_bmad-output/implementation-artifacts/sprint-status.yaml
+index 4ba02cb..5ce0e6b 100644
+--- a/_bmad-output/implementation-artifacts/sprint-status.yaml
++++ b/_bmad-output/implementation-artifacts/sprint-status.yaml
+@@ -1,5 +1,5 @@
+-﻿# generated: 2026-07-16
+-# last_updated: 2026-07-18T02:45:00+03:30
++# generated: 2026-07-16
++# last_updated: 2026-07-18T03:10:00+03:30
+ # project: divan
+ # project_key: NOKEY
+ # tracking_system: file-system
+@@ -41,7 +41,7 @@
+ # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+ 
+ generated: 2026-07-16
+-last_updated: 2026-07-18T02:45:00+03:30
++last_updated: 2026-07-18T03:10:00+03:30
+ project: divan
+ project_key: NOKEY
+ tracking_system: file-system
+@@ -81,8 +81,8 @@ development_status:
+   3-9-derived-management-relationships: done
+   epic-3-retrospective: done
+ 
+-  epic-4: backlog
+-  4-1-append-only-event-store-attributable-event-record: backlog
++  epic-4: in-progress
++  4-1-append-only-event-store-attributable-event-record: review
+   4-2-draft-finalization-conflict-classification: backlog
+   4-3-scheduled-state-cancel-reverse-correction: backlog
+   4-4-deterministic-ordering-recalculation: backlog
+@@ -210,15 +210,18 @@ action_items:
+   - epic: 3
+     action: "Encode Transfer coverage-after-atomic-close+open + AR-TEMPORAL apply active-as-of into Story 4.1 / 4.5-4.8 Dev Notes"
+     owner: "Amelia + Winston"
+-    status: open
++    status: done
++    resolved_in: "4-1-append-only-event-store-attributable-event-record.md (Dev Notes Transfer + AR-TEMPORAL handoff; 4.5–4.8 still implement)"
+   - epic: 3
+     action: "Define PopulationPort default-registry cutover criteria (fixture to projection-backed) in early 4.x notes"
+     owner: "Winston + Amelia"
+-    status: open
++    status: done
++    resolved_in: "4-1-append-only-event-store-attributable-event-record.md (PopulationPort cutover criteria section)"
+   - epic: 3
+     action: "Add seed DoD snippet (FK shape + exact cardinality + $transaction) and BOM-safe sprint-status edits"
+     owner: "Amelia + Paige"
+-    status: open
++    status: done
++    resolved_in: "4-1-append-only-event-store-attributable-event-record.md (Seed / DoD snippet + Task 4 BOM rule)"
+   - epic: 3
+     action: "Keep AR-TEMPORAL / AR-SECONDARY / AR-ACCESS / AR-DATA / AR-IDENTITY fail-closed; do not invent in Epic 4"
+     owner: "Mary + John"
+diff --git a/packages/db/sql/README.md b/packages/db/sql/README.md
+index a008dd7..9b2dddb 100644
+--- a/packages/db/sql/README.md
++++ b/packages/db/sql/README.md
+@@ -13,13 +13,24 @@ pnpm --filter @divan/db exec node ./sql/apply.mjs
+ 
+ # or with psql if installed
+ psql "$DATABASE_URL" -f packages/db/sql/001_kernel_events.sql
++psql "$DATABASE_URL" -f packages/db/sql/003_business_event_attributable_fields.sql
+ ```
+ 
+-`apply.mjs` runs every `NNN_*.sql` file in lexical order inside a transaction per file.
++`apply.mjs` runs every `NNN_*.sql` file in lexical order inside a transaction per file (includes `003_business_event_attributable_fields.sql`).
+ 
+ ## Conventions
+ 
+ - Filename: `NNN_description.sql` (zero-padded sequence)
+-- Migrations must be idempotent where practical (`IF NOT EXISTS`)
++- Migrations must be idempotent where practical (`IF NOT EXISTS` / constraint name guards)
+ - Event log is **append-only** at the application API — do not add UPDATE/DELETE helpers in `@divan/event-store`
+-- Access events (`event_class=access`) must never feed projections / derived state
++- DB trigger `kernel_events_append_only_trg` blocks UPDATE/DELETE (Story 4.1); `REVOKE` remains commented until app role model is clear
++
++### Business vs access column rules
++
++| `event_class` | Required / rules |
++| --- | --- |
++| `access` | `result` NOT NULL (`allow`/`deny`); business FR-14 columns (`event_type`, `person_id`, `effective_date`, `status`, `registered_at`, `registered_by`) stay NULL |
++| `business` | `event_type`, `person_id`, `effective_date`, `status`, `registered_at`, `registered_by` NOT NULL; `result` IS NULL; `employment_id` nullable until Draft/Start binds Employment |
++| Both | `effective_date` is DATE (business clock); `registered_at` / `finalized_at` are timestamptz — never overload Effective Date as registration time |
++
++Access events (`event_class=access`) must never feed projections / derived state. Projections are never source of truth (AD-2).
+diff --git a/packages/kernel/event-store/package.json b/packages/kernel/event-store/package.json
+index 53de8d7..d7d1432 100644
+--- a/packages/kernel/event-store/package.json
++++ b/packages/kernel/event-store/package.json
+@@ -13,6 +13,7 @@
+     "selfcheck": "tsx src/event-store.selfcheck.ts"
+   },
+   "dependencies": {
++    "@divan/temporal-engine": "workspace:*",
+     "pg": "^8.16.3"
+   },
+   "devDependencies": {
+diff --git a/packages/kernel/event-store/src/event-store.selfcheck.ts b/packages/kernel/event-store/src/event-store.selfcheck.ts
+index 98df956..b34ddea 100644
+--- a/packages/kernel/event-store/src/event-store.selfcheck.ts
++++ b/packages/kernel/event-store/src/event-store.selfcheck.ts
+@@ -1,7 +1,7 @@
+ /**
+- * Self-check for append-only access events (Story 2.1).
++ * Self-check for append-only access + business events (Story 4.1).
+  * Run: pnpm --filter @divan/event-store selfcheck
+- * Requires DATABASE_URL and applied sql/001_kernel_events.sql.
++ * Requires DATABASE_URL and applied sql/001…003 (via sql/apply.mjs).
+  */
+ import assert from "node:assert/strict";
+ import { randomUUID } from "node:crypto";
+@@ -11,7 +11,12 @@ import { fileURLToPath } from "node:url";
+ import { config as loadEnv } from "dotenv";
+ import pg from "pg";
+ 
+-import { appendAccessEvent, appendBusinessEvent, withTransaction } from "./index";
++import {
++  appendAccessEvent,
++  appendBusinessEvent,
++  BusinessEventValidationError,
++  withTransaction,
++} from "./index";
+ 
+ const rootEnv = resolve(
+   fileURLToPath(new URL(".", import.meta.url)),
+@@ -19,41 +24,192 @@ const rootEnv = resolve(
+ );
+ loadEnv({ path: rootEnv });
+ 
++/** Prefer SQL `::text` for DATE columns — JS Date can shift calendar day via TZ. */
++function dateOnlyFromDb(value: unknown): string {
++  if (typeof value === "string") {
++    return value.slice(0, 10);
++  }
++  if (value instanceof Date) {
++    const y = value.getFullYear();
++    const m = String(value.getMonth() + 1).padStart(2, "0");
++    const d = String(value.getDate()).padStart(2, "0");
++    return `${y}-${m}-${d}`;
++  }
++  throw new Error(`unexpected date value: ${String(value)}`);
++}
++
+ async function main() {
+   const url = process.env.DATABASE_URL?.trim();
+   assert.ok(url, "DATABASE_URL required");
+ 
+   const pool = new pg.Pool({ connectionString: url });
+   try {
++    // --- Access path still green ---
++    const accessCorrelationId = randomUUID();
++    const { id: accessId } = await withTransaction(pool, async (client) => {
++      return appendAccessEvent(client, {
++        correlationId: accessCorrelationId,
++        actorAccountId: null,
++        operation: "selfcheck.event_store",
++        scope: { fixture: true },
++        result: "deny",
++        reason: "selfcheck",
++      });
++    });
++
++    assert.ok(accessId);
++    const accessRows = await pool.query(
++      `SELECT event_class, result, operation, event_type, person_id, effective_date, status, registered_at
++       FROM kernel_events WHERE id = $1::uuid`,
++      [accessId],
++    );
++    assert.equal(accessRows.rows[0]?.event_class, "access");
++    assert.equal(accessRows.rows[0]?.result, "deny");
++    assert.equal(accessRows.rows[0]?.operation, "selfcheck.event_store");
++    assert.equal(accessRows.rows[0]?.event_type, null);
++    assert.equal(accessRows.rows[0]?.person_id, null);
++    assert.equal(accessRows.rows[0]?.effective_date, null);
++    assert.equal(accessRows.rows[0]?.status, null);
++    assert.equal(accessRows.rows[0]?.registered_at, null);
++
++    // --- Reject invalid event types ---
++    await assert.rejects(
++      () =>
++        appendBusinessEvent(pool, {
++          correlationId: randomUUID(),
++          eventType: "transfer_recorded",
++          personId: randomUUID(),
++          effectiveDate: "2026-07-01",
++          registeredBy: "clselfcheck000000000000001",
++        }),
++      (err: unknown) =>
++        err instanceof BusinessEventValidationError &&
++        err.code === "invalid_event_type",
++    );
++    await assert.rejects(
++      () =>
++        appendBusinessEvent(pool, {
++          correlationId: randomUUID(),
++          eventType: "foo",
++          personId: randomUUID(),
++          effectiveDate: "2026-07-01",
++          registeredBy: "clselfcheck000000000000001",
++        }),
++      (err: unknown) =>
++        err instanceof BusinessEventValidationError &&
++        err.code === "invalid_event_type",
++    );
++
++    // --- Reject sensitive evidence (fail-closed) ---
+     await assert.rejects(
+       () =>
+         appendBusinessEvent(pool, {
+           correlationId: randomUUID(),
+-          operation: "noop",
++          eventType: "TransferRecorded",
++          personId: randomUUID(),
++          effectiveDate: "2026-07-01",
++          registeredBy: "clselfcheck000000000000001",
++          afterEvidence: { amount: 1_000_000 },
+         }),
+-      /not implemented/,
++      (err: unknown) =>
++        err instanceof BusinessEventValidationError &&
++        err.code === "sensitive_evidence_forbidden",
+     );
+ 
++    // --- Business append with full attributable fields ---
++    const personId = randomUUID();
++    const registeredAt = new Date("2026-07-18T08:30:00.000Z");
++    const finalizedAt = new Date("2026-07-18T09:00:00.000Z");
++    const effectiveDate = "2026-07-01";
+     const correlationId = randomUUID();
+-    const { id } = await withTransaction(pool, async (client) => {
+-      return appendAccessEvent(client, {
++
++    const { id: businessId } = await withTransaction(pool, async (client) => {
++      return appendBusinessEvent(client, {
+         correlationId,
+-        actorAccountId: null,
+-        operation: "selfcheck.event_store",
+-        scope: { fixture: true },
+-        result: "deny",
+-        reason: "selfcheck",
++        eventType: "TransferRecorded",
++        personId,
++        employmentId: null, // Draft/Start may omit Employment binding
++        effectiveDate,
++        registeredBy: "clselfcheck000000000000001",
++        registeredAt,
++        status: "Draft",
++        reason: "selfcheck transferable scaffold",
++        referenceCode: "SC-4.1",
++        provenance: { source: "selfcheck", importBatch: null },
++        beforeEvidence: { teamId: "team-src" },
++        afterEvidence: { teamId: "team-dst" },
++        finalizedBy: "clselfcheck000000000000002",
++        finalizedAt,
+       });
+     });
+ 
+-    assert.ok(id);
+-    const { rows } = await pool.query(
+-      `SELECT event_class, result, operation FROM kernel_events WHERE id = $1::uuid`,
+-      [id],
++    assert.ok(businessId);
++    const biz = await pool.query(
++      `SELECT
++         event_class, result, operation, event_type, person_id, employment_id,
++         effective_date::text AS effective_date,
++         registered_at, registered_by, finalized_at, finalized_by,
++         status, reference_code, provenance, before_evidence, after_evidence,
++         actor_account_id, occurred_at,
++         pg_typeof(effective_date)::text AS effective_date_type,
++         pg_typeof(registered_at)::text AS registered_at_type,
++         pg_typeof(finalized_at)::text AS finalized_at_type
++       FROM kernel_events WHERE id = $1::uuid`,
++      [businessId],
++    );
++    const row = biz.rows[0];
++    assert.ok(row);
++    assert.equal(row.event_class, "business");
++    assert.equal(row.result, null);
++    assert.equal(row.event_type, "TransferRecorded");
++    assert.equal(row.operation, "TransferRecorded");
++    assert.equal(row.person_id, personId);
++    assert.equal(row.employment_id, null);
++    assert.equal(dateOnlyFromDb(row.effective_date), effectiveDate);
++    assert.equal(row.status, "Draft");
++    assert.equal(row.registered_by, "clselfcheck000000000000001");
++    assert.equal(row.actor_account_id, "clselfcheck000000000000001");
++    assert.equal(row.reference_code, "SC-4.1");
++    assert.equal(row.provenance?.source, "selfcheck");
++    assert.equal(row.before_evidence?.teamId, "team-src");
++    assert.equal(row.after_evidence?.teamId, "team-dst");
++
++    // Column roles: DATE vs timestamptz (Effective Date ≠ registration/finalization clocks)
++    assert.equal(row.effective_date_type, "date");
++    assert.match(String(row.registered_at_type), /timestamp with time zone/);
++    assert.match(String(row.finalized_at_type), /timestamp with time zone/);
++    assert.notEqual(
++      dateOnlyFromDb(row.effective_date),
++      new Date(row.registered_at).toISOString().slice(0, 10),
++    );
++    assert.ok(row.registered_at instanceof Date || typeof row.registered_at === "string");
++    assert.ok(row.finalized_at instanceof Date || typeof row.finalized_at === "string");
++    assert.notEqual(String(row.registered_at), String(row.effective_date));
++    assert.notEqual(String(row.finalized_at), String(row.effective_date));
++
++    // --- No UPDATE API; raw UPDATE blocked by append-only trigger ---
++    await assert.rejects(
++      () =>
++        pool.query(
++          `UPDATE kernel_events SET reason = 'tamper' WHERE id = $1::uuid`,
++          [businessId],
++        ),
++      (err: unknown) =>
++        err instanceof Error && /append-only/i.test(err.message),
++    );
++
++    // Confirm module surface has no update/delete business helpers
++    const mod = await import("./index");
++    assert.equal(
++      "updateBusinessEvent" in mod,
++      false,
++      "no updateBusinessEvent API",
++    );
++    assert.equal(
++      "deleteBusinessEvent" in mod,
++      false,
++      "no deleteBusinessEvent API",
+     );
+-    assert.equal(rows[0]?.event_class, "access");
+-    assert.equal(rows[0]?.result, "deny");
+-    assert.equal(rows[0]?.operation, "selfcheck.event_store");
+ 
+     console.log("event-store.selfcheck: ok");
+   } finally {
+diff --git a/packages/kernel/event-store/src/index.ts b/packages/kernel/event-store/src/index.ts
+index dff0b47..031561d 100644
+--- a/packages/kernel/event-store/src/index.ts
++++ b/packages/kernel/event-store/src/index.ts
+@@ -2,6 +2,28 @@ import { randomUUID } from "node:crypto";
+ 
+ import type { Pool, PoolClient } from "pg";
+ 
++import {
++  appendBusinessEvent,
++  type AppendBusinessEventInput,
++  type AppendBusinessEventResult,
++  type BusinessEventStatus,
++  BusinessEventValidationError,
++  assertNoSensitiveEvidence,
++  assertValidBusinessEventType,
++} from "./business-event";
++
++export {
++  appendBusinessEvent,
++  BusinessEventValidationError,
++  assertNoSensitiveEvidence,
++  assertValidBusinessEventType,
++};
++export type {
++  AppendBusinessEventInput,
++  AppendBusinessEventResult,
++  BusinessEventStatus,
++};
++
+ /** Queryable surface shared by Pool and PoolClient. */
+ export type PgQueryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
+ 
+@@ -66,24 +88,6 @@ export async function appendAccessEvent(
+   return { id };
+ }
+ 
+-/**
+- * Typed hook for future business events. Not implemented in Story 2.1 —
+- * temporal/projection consumers are out of scope. Throws if called.
+- */
+-export async function appendBusinessEvent(
+-  _db: PgQueryable,
+-  _input: {
+-    correlationId: string;
+-    operation: string;
+-    scope?: AccessEventScope;
+-    payload?: Record<string, unknown>;
+-  },
+-): Promise<never> {
+-  throw new Error(
+-    "appendBusinessEvent is not implemented — Story 2.1 ships access events only",
+-  );
+-}
+-
+ /**
+  * Run `fn` inside a single transaction on the given pool.
+  * Used by audit-envelope so decision + access append are atomic.
+diff --git a/packages/modules/person-employment/src/population-cutover.ts b/packages/modules/person-employment/src/population-cutover.ts
+index d2e919f..906c88a 100644
+--- a/packages/modules/person-employment/src/population-cutover.ts
++++ b/packages/modules/person-employment/src/population-cutover.ts
+@@ -1,5 +1,5 @@
+ /**
+- * PopulationPort cutover note (Story 3.1 / Epic 2 retro #4; updated Stories 3.5–3.9).
++ * PopulationPort cutover note (Story 3.1 / Epic 2 retro #4; updated Stories 3.5–3.9 / 4.1).
+  *
+  * OrgUnit projections exist (3.5). Primary Assignment read model +
+  * `resolveTeamMembershipAsOf` exist (3.7). Secondary Assignment read helpers
+@@ -9,11 +9,23 @@
+  * `buildManagementRelationshipsFromDerivation` adapter (Person→AccountId
+  * resolver injected — no permanent Person.accountId FK).
+  *
++ * Story 4.1 lands attributable business event store substrate only — does **not**
++ * execute PopulationPort default-registry cutover.
++ *
++ * **Cutover criteria (all required before switching default registry):**
++ * 1. Subject ids are Person UUIDs (`Person.id`) end-to-end for populations being authorized.
++ * 2. Team membership edges come from Primary Assignment as-of helpers (3.7+), not `person:a1` fixtures.
++ * 3. Management edges (if used) come from 3.9 derive/adapter with explicit Person→Account resolver.
++ * 4. Account↔Person linking policy is AR-IDENTITY-approved **or** an explicitly documented
++ *    provisional seed map scoped to demo — not a silent production FK.
++ * 5. This file + `deferred-work.md` updated in the same change; selfcheck proves at least one
++ *    non-fixture population path.
++ * 6. Until then: keep fixtures; do **not** claim authz population is “real workforce.”
++ *
+  * **Honesty:** default `intersectPopulation` registry in identity-access is
+  * still fixture-backed (`person:a1`, …). Derivation APIs live; full default
+  * PopulationPort registry replacement remains open until Account↔Person link
+- * policy (AR-IDENTITY) + event-backed wiring (4.x). Do **not** claim cutover
+- * complete.
++ * policy (AR-IDENTITY) + event-backed wiring. Do **not** claim cutover complete.
+  *
+  * Subject id target for the real port remains Person UUID (`Person.id`).
+  *
+@@ -24,4 +36,4 @@
+  */
+ 
+ export const POPULATION_SUBJECT_ID_TARGET =
+-  "Person.id (UUID) — OrgUnit live (3.5); Primary Team membership helper live (3.7); Secondary read helpers live (3.8); management derive APIs + adapter live (3.9); default PopulationPort registry still fixture-backed pending AR-IDENTITY / 4.x";
++  "Person.id (UUID) — OrgUnit live (3.5); Primary Team membership helper live (3.7); Secondary read helpers live (3.8); management derive APIs + adapter live (3.9); business event store attributable (4.1); default PopulationPort registry still fixture-backed pending AR-IDENTITY + cutover criteria";
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 6215f85..4e3e2ba 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -188,6 +188,9 @@ importers:
+ 
+   packages/kernel/event-store:
+     dependencies:
++      '@divan/temporal-engine':
++        specifier: workspace:*
++        version: link:../temporal-engine
+       pg:
+         specifier: ^8.16.3
+         version: 8.22.0
+diff --git a/packages/db/sql/003_business_event_attributable_fields.sql b/packages/db/sql/003_business_event_attributable_fields.sql
+new file mode 100644
+index 0000000..aea810f
+--- /dev/null
++++ b/packages/db/sql/003_business_event_attributable_fields.sql
+@@ -0,0 +1,159 @@
++-- Story 4.1: FR-14 attributable business event columns on kernel_events.
++-- Idempotent ALTER — do not edit applied 001/002 history.
++-- Business rows carry Person / Effective Date / registration / status / evidence.
++-- Access rows leave business columns NULL; access result CHECK unchanged.
++
++ALTER TABLE kernel_events
++  ADD COLUMN IF NOT EXISTS event_type TEXT,
++  ADD COLUMN IF NOT EXISTS person_id UUID,
++  ADD COLUMN IF NOT EXISTS employment_id UUID,
++  ADD COLUMN IF NOT EXISTS effective_date DATE,
++  ADD COLUMN IF NOT EXISTS registered_at TIMESTAMPTZ,
++  ADD COLUMN IF NOT EXISTS registered_by TEXT,
++  ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMPTZ,
++  ADD COLUMN IF NOT EXISTS finalized_by TEXT,
++  ADD COLUMN IF NOT EXISTS status TEXT,
++  ADD COLUMN IF NOT EXISTS reference_code TEXT,
++  ADD COLUMN IF NOT EXISTS provenance JSONB NOT NULL DEFAULT '{}'::jsonb,
++  ADD COLUMN IF NOT EXISTS before_evidence JSONB,
++  ADD COLUMN IF NOT EXISTS after_evidence JSONB,
++  -- Chain foreshadow for Story 4.3 (no product writers in 4.1)
++  ADD COLUMN IF NOT EXISTS corrects_event_id UUID,
++  ADD COLUMN IF NOT EXISTS cancels_event_id UUID,
++  ADD COLUMN IF NOT EXISTS reverses_event_id UUID,
++  ADD COLUMN IF NOT EXISTS supersedes_event_id UUID;
++
++COMMENT ON COLUMN kernel_events.event_type IS
++  'Personnel Event type (PascalCase past-tense). SoT for business type; required when event_class=business.';
++COMMENT ON COLUMN kernel_events.person_id IS
++  'Target Person UUID (application-level ref; no FK to Prisma Person in 4.1).';
++COMMENT ON COLUMN kernel_events.employment_id IS
++  'Applicable Employment UUID; NULL when Draft/Start has not bound Employment yet.';
++COMMENT ON COLUMN kernel_events.effective_date IS
++  'Business Effective Date (DATE only). Distinct from registered_at / finalized_at timestamptz.';
++COMMENT ON COLUMN kernel_events.registered_at IS
++  'Registration clock (timestamptz). Not Effective Date.';
++COMMENT ON COLUMN kernel_events.registered_by IS
++  'Registration actor InternalAccount id (TEXT cuid; aligns with actor_account_id).';
++COMMENT ON COLUMN kernel_events.finalized_at IS
++  'Finalization clock (timestamptz); NULL until Story 4.2 finalize.';
++COMMENT ON COLUMN kernel_events.finalized_by IS
++  'Finalization actor account id; NULL until Story 4.2.';
++COMMENT ON COLUMN kernel_events.status IS
++  'Lifecycle token: Draft | Scheduled | Effective | Cancelled | Reversed (transitions owned by 4.2/4.3).';
++COMMENT ON COLUMN kernel_events.reference_code IS
++  'Optional external/reference id (reason column remains separate).';
++COMMENT ON COLUMN kernel_events.provenance IS
++  'Source/import metadata JSON — no sensitive field values.';
++COMMENT ON COLUMN kernel_events.before_evidence IS
++  'Authorized reconstruction refs only — never compensation amounts / national ID.';
++COMMENT ON COLUMN kernel_events.after_evidence IS
++  'Authorized reconstruction refs only — never compensation amounts / national ID.';
++COMMENT ON COLUMN kernel_events.corrects_event_id IS
++  'Foreshadow Correction chain (4.3); nullable; no writer in 4.1.';
++COMMENT ON COLUMN kernel_events.cancels_event_id IS
++  'Foreshadow Cancel chain (4.3); nullable; no writer in 4.1.';
++COMMENT ON COLUMN kernel_events.reverses_event_id IS
++  'Foreshadow Reverse chain (4.3); nullable; no writer in 4.1.';
++COMMENT ON COLUMN kernel_events.supersedes_event_id IS
++  'Foreshadow supersede chain (4.3); nullable; no writer in 4.1.';
++
++-- Provisional status token set (transitions owned by 4.2/4.3).
++DO $$
++BEGIN
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_constraint WHERE conname = 'kernel_events_status_token_chk'
++  ) THEN
++    ALTER TABLE kernel_events
++      ADD CONSTRAINT kernel_events_status_token_chk CHECK (
++        status IS NULL
++        OR status IN ('Draft', 'Scheduled', 'Effective', 'Cancelled', 'Reversed')
++      );
++  END IF;
++END $$;
++
++-- Business rows require FR-14 attributable fields.
++DO $$
++BEGIN
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_constraint WHERE conname = 'kernel_events_business_required_chk'
++  ) THEN
++    ALTER TABLE kernel_events
++      ADD CONSTRAINT kernel_events_business_required_chk CHECK (
++        event_class <> 'business'
++        OR (
++          event_type IS NOT NULL
++          AND person_id IS NOT NULL
++          AND effective_date IS NOT NULL
++          AND status IS NOT NULL
++          AND registered_at IS NOT NULL
++          AND registered_by IS NOT NULL
++        )
++      );
++  END IF;
++END $$;
++
++-- Access-only result field must stay NULL on business rows.
++DO $$
++BEGIN
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_constraint WHERE conname = 'kernel_events_business_result_null_chk'
++  ) THEN
++    ALTER TABLE kernel_events
++      ADD CONSTRAINT kernel_events_business_result_null_chk CHECK (
++        event_class <> 'business' OR result IS NULL
++      );
++  END IF;
++END $$;
++
++-- Access rows keep business-required columns NULL (access CHECK on result unchanged).
++DO $$
++BEGIN
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_constraint WHERE conname = 'kernel_events_access_business_null_chk'
++  ) THEN
++    ALTER TABLE kernel_events
++      ADD CONSTRAINT kernel_events_access_business_null_chk CHECK (
++        event_class <> 'access'
++        OR (
++          event_type IS NULL
++          AND person_id IS NULL
++          AND effective_date IS NULL
++          AND status IS NULL
++          AND registered_at IS NULL
++          AND registered_by IS NULL
++        )
++      );
++  END IF;
++END $$;
++
++CREATE INDEX IF NOT EXISTS kernel_events_class_effective_date_idx
++  ON kernel_events (event_class, effective_date);
++
++CREATE INDEX IF NOT EXISTS kernel_events_person_effective_date_idx
++  ON kernel_events (person_id, effective_date);
++
++CREATE INDEX IF NOT EXISTS kernel_events_employment_id_idx
++  ON kernel_events (employment_id);
++
++-- Append-only hardening: block UPDATE/DELETE even for lab superusers.
++CREATE OR REPLACE FUNCTION kernel_events_forbid_mutation()
++RETURNS trigger
++LANGUAGE plpgsql
++AS $$
++BEGIN
++  RAISE EXCEPTION 'kernel_events is append-only: % not allowed', TG_OP
++    USING ERRCODE = 'integrity_constraint_violation';
++END;
++$$;
++
++DROP TRIGGER IF EXISTS kernel_events_append_only_trg ON kernel_events;
++CREATE TRIGGER kernel_events_append_only_trg
++  BEFORE UPDATE OR DELETE ON kernel_events
++  FOR EACH ROW
++  EXECUTE PROCEDURE kernel_events_forbid_mutation();
++
++-- REVOKE left commented — app role model unclear in lab (often table owner / superuser).
++-- When a non-owner app role exists:
++--   REVOKE UPDATE, DELETE ON kernel_events FROM PUBLIC;
++--   REVOKE UPDATE, DELETE ON kernel_events FROM <app_role>;
+diff --git a/packages/kernel/event-store/src/business-event.ts b/packages/kernel/event-store/src/business-event.ts
+new file mode 100644
+index 0000000..d29d2e6
+--- /dev/null
++++ b/packages/kernel/event-store/src/business-event.ts
+@@ -0,0 +1,249 @@
++import { randomUUID } from "node:crypto";
++
++import { parseDateOnly } from "@divan/temporal-engine";
++import type { Pool, PoolClient } from "pg";
++
++type PgQueryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
++
++/** Provisional lifecycle tokens — transitions owned by Stories 4.2 / 4.3. */
++export type BusinessEventStatus =
++  | "Draft"
++  | "Scheduled"
++  | "Effective"
++  | "Cancelled"
++  | "Reversed";
++
++/**
++ * Personnel Event type names: PascalCase, past-tense convention
++ * (e.g. `TransferRecorded`, `EmploymentStarted`). Application enforces
++ * PascalCase shape; past-tense is documented convention for authors.
++ */
++const EVENT_TYPE_PASCAL_RE = /^[A-Z][A-Za-z0-9]*$/;
++
++/** Obvious sensitive keys — fail closed rather than store. */
++const SENSITIVE_EVIDENCE_KEYS = new Set([
++  "amount",
++  "compensation",
++  "salary",
++  "baseSalary",
++  "base_salary",
++  "nationalId",
++  "national_id",
++  "ssn",
++  "iban",
++  "bankAccount",
++  "bank_account",
++  "accountNumber",
++  "account_number",
++  "password",
++  "secret",
++  "token",
++  "religion",
++  "health",
++]);
++
++export type AppendBusinessEventInput = {
++  correlationId: string;
++  /** PascalCase past-tense Personnel Event type (SoT in `event_type` column). */
++  eventType: string;
++  personId: string;
++  /**
++   * Applicable Employment. Nullable when Draft / Start has not bound
++   * Employment yet (FR-14); set once Employment is assigned.
++   */
++  employmentId?: string | null;
++  /** Business Effective Date as YYYY-MM-DD (DATE column — not timestamptz). */
++  effectiveDate: string;
++  /** Registration actor InternalAccount id (TEXT cuid). Dual-written to `actor_account_id`. */
++  registeredBy: string;
++  /** Registration clock; defaults to now. Mapped to `registered_at` and `occurred_at`. */
++  registeredAt?: Date;
++  /** Defaults to `Draft` for scaffolding inserts (product transitions = 4.2+). */
++  status?: BusinessEventStatus;
++  reason?: string;
++  referenceCode?: string;
++  provenance?: Record<string, unknown>;
++  /** Structural refs / codes only — never sensitive field values. */
++  beforeEvidence?: Record<string, unknown> | null;
++  afterEvidence?: Record<string, unknown> | null;
++  /** Allowed for column-role selfcheck; product finalize = Story 4.2. */
++  finalizedBy?: string | null;
++  finalizedAt?: Date | null;
++  correctsEventId?: string | null;
++  cancelsEventId?: string | null;
++  reversesEventId?: string | null;
++  supersedesEventId?: string | null;
++  scope?: Record<string, unknown>;
++  /** Non-sensitive structural payload only. */
++  payload?: Record<string, unknown>;
++};
++
++export type AppendBusinessEventResult = {
++  id: string;
++};
++
++export class BusinessEventValidationError extends Error {
++  readonly code: string;
++
++  constructor(code: string, message: string) {
++    super(message);
++    this.name = "BusinessEventValidationError";
++    this.code = code;
++  }
++}
++
++export function assertValidBusinessEventType(eventType: string): void {
++  if (typeof eventType !== "string" || !eventType.trim()) {
++    throw new BusinessEventValidationError(
++      "invalid_event_type",
++      "eventType is required (PascalCase past-tense, e.g. TransferRecorded)",
++    );
++  }
++  const trimmed = eventType.trim();
++  if (!EVENT_TYPE_PASCAL_RE.test(trimmed)) {
++    throw new BusinessEventValidationError(
++      "invalid_event_type",
++      `eventType must be PascalCase past-tense (rejected: ${JSON.stringify(trimmed)})`,
++    );
++  }
++}
++
++/**
++ * Reject objects that embed known sensitive keys (fail-closed).
++ * Evidence / provenance hold refs and codes only — never amounts or national IDs.
++ */
++export function assertNoSensitiveEvidence(
++  label: string,
++  value: Record<string, unknown> | null | undefined,
++): void {
++  if (value == null) return;
++  walkRejectSensitive(label, value, "");
++}
++
++function walkRejectSensitive(
++  label: string,
++  value: unknown,
++  path: string,
++): void {
++  if (value == null || typeof value !== "object") return;
++  if (Array.isArray(value)) {
++    value.forEach((item, i) =>
++      walkRejectSensitive(label, item, `${path}[${i}]`),
++    );
++    return;
++  }
++  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
++    const next = path ? `${path}.${key}` : key;
++    if (SENSITIVE_EVIDENCE_KEYS.has(key)) {
++      throw new BusinessEventValidationError(
++        "sensitive_evidence_forbidden",
++        `${label} must not include sensitive key ${JSON.stringify(key)} at ${next}`,
++      );
++    }
++    walkRejectSensitive(label, child, next);
++  }
++}
++
++/**
++ * Append an `event_class=business` Personnel Event row.
++ * Append-only — there is no updateBusinessEvent / deleteBusinessEvent.
++ */
++export async function appendBusinessEvent(
++  db: PgQueryable,
++  input: AppendBusinessEventInput,
++): Promise<AppendBusinessEventResult> {
++  assertValidBusinessEventType(input.eventType);
++  const eventType = input.eventType.trim();
++
++  const dateParsed = parseDateOnly(input.effectiveDate);
++  if (!dateParsed.ok) {
++    throw new BusinessEventValidationError(
++      "invalid_effective_date",
++      `effectiveDate must be YYYY-MM-DD date-only (${dateParsed.reason})`,
++    );
++  }
++
++  if (!input.personId?.trim()) {
++    throw new BusinessEventValidationError(
++      "invalid_person_id",
++      "personId is required",
++    );
++  }
++  if (!input.registeredBy?.trim()) {
++    throw new BusinessEventValidationError(
++      "invalid_registered_by",
++      "registeredBy is required",
++    );
++  }
++  if (!input.correlationId?.trim()) {
++    throw new BusinessEventValidationError(
++      "invalid_correlation_id",
++      "correlationId is required",
++    );
++  }
++
++  const status: BusinessEventStatus = input.status ?? "Draft";
++  const registeredAt = input.registeredAt ?? new Date();
++  const provenance = input.provenance ?? {};
++  const scope = input.scope ?? {};
++  const payload = input.payload ?? {};
++
++  assertNoSensitiveEvidence("provenance", provenance);
++  assertNoSensitiveEvidence("beforeEvidence", input.beforeEvidence);
++  assertNoSensitiveEvidence("afterEvidence", input.afterEvidence);
++  assertNoSensitiveEvidence("payload", payload);
++
++  const id = randomUUID();
++  const registeredBy = input.registeredBy.trim();
++
++  await db.query(
++    `INSERT INTO kernel_events (
++       id, event_class, correlation_id, actor_account_id, occurred_at,
++       operation, scope, result, reason, entity_type, entity_id, payload,
++       event_type, person_id, employment_id, effective_date,
++       registered_at, registered_by, finalized_at, finalized_by,
++       status, reference_code, provenance, before_evidence, after_evidence,
++       corrects_event_id, cancels_event_id, reverses_event_id, supersedes_event_id
++     ) VALUES (
++       $1::uuid, 'business', $2::uuid, $3, $4,
++       $5, $6::jsonb, NULL, $7, 'person', $8, $9::jsonb,
++       $10, $11::uuid, $12::uuid, $13::date,
++       $14, $15, $16, $17,
++       $18, $19, $20::jsonb, $21::jsonb, $22::jsonb,
++       $23::uuid, $24::uuid, $25::uuid, $26::uuid
++     )`,
++    [
++      id,
++      input.correlationId,
++      registeredBy,
++      registeredAt.toISOString(),
++      // operation NOT NULL: mirror event type; event_type column is SoT for type
++      eventType,
++      JSON.stringify(scope),
++      input.reason ?? null,
++      input.personId,
++      JSON.stringify(payload),
++      eventType,
++      input.personId,
++      input.employmentId ?? null,
++      dateParsed.value,
++      registeredAt.toISOString(),
++      registeredBy,
++      input.finalizedAt ? input.finalizedAt.toISOString() : null,
++      input.finalizedBy ?? null,
++      status,
++      input.referenceCode ?? null,
++      JSON.stringify(provenance),
++      input.beforeEvidence == null
++        ? null
++        : JSON.stringify(input.beforeEvidence),
++      input.afterEvidence == null ? null : JSON.stringify(input.afterEvidence),
++      input.correctsEventId ?? null,
++      input.cancelsEventId ?? null,
++      input.reversesEventId ?? null,
++      input.supersedesEventId ?? null,
++    ],
++  );
++
++  return { id };
++}
