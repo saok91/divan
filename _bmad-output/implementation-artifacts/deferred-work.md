@@ -165,8 +165,17 @@
 - **Start / Return / Termination** user flows + authoritative event append = Stories 4.5?4.6 (not this story)
 - **Concurrent multi-Employment policy exceptions** still AR-DATA ? fail-closed Persian reject remains
 - **Primary Assignment integrity** (exactly one active) = Story 3.7
-- **PopulationPort fixture ? Person UUID cutover** still waits on org/assignment (3.5?3.9 / 4.x)
-- Org hierarchy / Legal Entity / Team FKs on Employment = Story 3.5 (minimum-facts checklist documents Epic 4 finalization needs)
+- **PopulationPort fixture → Person UUID cutover** still waits on assignment (3.7–3.9 / 4.x); OrgUnit projections landed in 3.5
+- Org hierarchy tables / Legal Entity→Team master-data = **Story 3.5 (done)**; Employment/Assignment org FKs = Story 3.7 + Epic 4
+
+## Deferred from: Story 3.5 organization hierarchy management (2026-07-17)
+
+- **OrgUnit adjacency hierarchy landed** (LE→BU→Dept→Team; half-open validity; activate/deactivate without erase)
+- **AR-TEMPORAL / AR-HEADCOUNT disposition** for deactivation-with-members still open — fail-closed `DEACTIVATION_BLOCKED_DEPENDENCIES` remains
+- **Primary Assignment Team membership / Employment.orgUnitId** = Story 3.7 + Epic 4 (not this story)
+- **Job Role / Title / Ladder / Grade** = Story 3.6
+- **Interactive org chart / drag-drop reorg** remains non-goal / Could-Have
+- **PopulationPort full cutover** still waits on Assignment projections (3.7+/4.x); OrgUnit alone does not complete cutover
 
 ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
 

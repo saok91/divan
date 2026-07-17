@@ -42,7 +42,7 @@ export const EMPLOYMENT_MINIMUM_FACTS: readonly EmploymentMinimumFact[] = [
     fact: "Legal Entity → … → Team (Primary org)",
     ownerStory: "3.5",
     required: true,
-    notes: "Required at Epic 4 finalization — not live FKs in 3.2",
+    notes: "OrgUnit schema live (3.5); Primary Assignment Team membership still Epic 4 / Story 3.7 — no Employment.orgUnitId FK yet",
   },
   {
     fact: "Exactly one active Primary Assignment",

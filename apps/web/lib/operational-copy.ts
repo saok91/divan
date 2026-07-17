@@ -118,6 +118,18 @@ export const operationalCopy = {
     "فقط عناصر approve با فراداده کامل فعال می‌شوند؛ حضور در اکسل کافی نیست.",
   personDictionaryLoading: "در حال بارگذاری رجیستری…",
   personDictionaryError: "بارگذاری رجیستری فرهنگ‌داده ممکن نشد.",
+
+  /** Organization hierarchy (Story 3.5). */
+  orgListLoading: "در حال بارگذاری ساختار سازمان…",
+  orgListError: "بارگذاری ساختار سازمان ممکن نشد.",
+  orgListEmpty: "واحد سازمانی ثبت نشده. می‌توانید یک واحد ایجاد کنید.",
+  orgActionFailed: "عملیات ساختار سازمان انجام نشد.",
+  orgCodeRequired: "کد واحد سازمانی الزامی است.",
+  orgNameRequired: "نام فارسی واحد سازمانی الزامی است.",
+  orgStartRequired: "تاریخ شروع اعتبار الزامی است.",
+  orgParentRequired: "انتخاب والد برای این نوع واحد الزامی است.",
+  orgDeactivateEndRequired:
+    "برای غیرفعال‌سازی باید تاریخ پایان اعتبار مشخص شود.",
 } as const;
 
 /**

@@ -100,4 +100,24 @@ Person identity updates — those require Epic 4 temporal events (AD-2).
 pnpm selfcheck:person-identity
 pnpm selfcheck:employment-lifecycle
 pnpm selfcheck:data-dictionary
+pnpm selfcheck:organization-hierarchy
 ```
+
+## Story 3.5 — Organization hierarchy (FR-9)
+
+Single `OrganizationalUnit` adjacency table + `unitType` discriminant
+(LEGAL_ENTITY → BUSINESS_UNIT → DEPARTMENT → TEAM). Half-open validity;
+deactivate closes / flags inactive — **never hard-deletes**.
+
+**Not** `OrganizationalScope` (authz population boundary) — do not merge.
+
+Public product verbs: `createOrgUnit`, `activateOrgUnit`, `deactivateOrgUnit`,
+`updateOrgUnitIdentity`, optional `reparentOrgUnit` (fail-closed).
+
+Reads: `listOrgUnits`, `listChildren`, `getOrgUnitAsOf`, `getHierarchyAsOf`.
+
+**Do not** export Assignment verbs (`assignPersonToTeam`, `transferPrimary`, …).
+Primary Assignment Team membership = Story 3.7 + Epic 4.
+
+Deactivation dependency gate: `assertOrgUnitDeactivationAllowed` (+ hook
+registry). Full member/Reservation disposition = AR-TEMPORAL / AR-HEADCOUNT.

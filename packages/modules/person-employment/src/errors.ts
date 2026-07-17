@@ -138,3 +138,78 @@ export const PERSON_READ_PERMISSION = "person.read";
 export const PERSON_WRITE_PERMISSION = "person.write";
 export const PERSON_DATA_CATEGORY = "identity.person";
 export const NATIONAL_ID_DATA_CATEGORY = "identity.national_id";
+
+/** Org-unit master-data errors (Story 3.5 / FR-9). Clients match codes, not Persian substrings. */
+export type OrgUnitErrorCode =
+  | "ORG_UNIT_NOT_FOUND"
+  | "INVALID_PARENT_TYPE"
+  | "CHILD_OUTSIDE_PARENT_VALIDITY"
+  | "IMPOSSIBLE_REPARENT"
+  | "DEACTIVATION_BLOCKED_DEPENDENCIES"
+  | "DUPLICATE_ORG_CODE"
+  | "INVALID_ORG_INTERVAL"
+  | "VALIDATION"
+  | "SENTINEL_VALUE"
+  | "PERMISSION_DENIED"
+  | "BLOCKED_ORG_OPERATION";
+
+export class OrgUnitError extends Error {
+  readonly code: OrgUnitErrorCode;
+  readonly messageFa: string;
+
+  constructor(
+    code: OrgUnitErrorCode,
+    messageFa: string,
+    message?: string,
+  ) {
+    super(message ?? messageFa);
+    this.name = "OrgUnitError";
+    this.code = code;
+    this.messageFa = messageFa;
+  }
+}
+
+export const ORGANIZATION_READ_PERMISSION = "organization.read";
+export const ORGANIZATION_WRITE_PERMISSION = "organization.write";
+export const ORGANIZATION_DATA_CATEGORY = "organization.unit";
+
+export const MSG_ORG_UNIT_NOT_FOUND_FA = "واحد سازمانی یافت نشد.";
+
+export const MSG_INVALID_PARENT_TYPE_FA =
+  "نوع والد با نوع واحد سازگار نیست. سلسله‌مراتب باید حقوقی ← کسب‌وکار ← دپارتمان ← تیم باشد.";
+
+export const MSG_CHILD_OUTSIDE_PARENT_VALIDITY_FA =
+  "بازه اعتبار واحد فرزند باید داخل بازه اعتبار والد باشد.";
+
+export const MSG_IMPOSSIBLE_REPARENT_FA =
+  "جابه‌جایی والد در این بازه زمانی ممکن نیست.";
+
+export const MSG_DEACTIVATION_BLOCKED_DEPENDENCIES_FA =
+  "غیرفعال‌سازی به‌خاطر وابستگی‌های فعال مجاز نیست تا سیاست disposition تعیین شود.";
+
+export const MSG_DUPLICATE_ORG_CODE_FA =
+  "کد واحد سازمانی تکراری است. کد دیگری انتخاب کنید.";
+
+export const MSG_INVALID_ORG_INTERVAL_FA =
+  "بازه اعتبار واحد سازمانی نامعتبر است. تاریخ پایان باید بعد از تاریخ شروع باشد.";
+
+export const MSG_ORG_DEACTIVATE_END_REQUIRED_FA =
+  "برای غیرفعال‌سازی باید تاریخ پایان اعتبار مشخص شود.";
+
+export const MSG_INVALID_ORG_UNIT_TYPE_FA =
+  "نوع واحد سازمانی نامعتبر است. فقط حقوقی، کسب‌وکار، دپارتمان یا تیم مجاز است.";
+
+export const MSG_CORRUPT_ORG_UNIT_TYPE_FA =
+  "نوع واحد سازمانی در داده نامعتبر است. رکورد را بررسی کنید.";
+
+export const MSG_INACTIVE_PARENT_FA =
+  "نمی‌توان زیر واحد والد غیرفعال، واحد جدید ایجاد یا فعال کرد.";
+
+export const MSG_ORG_NAME_REQUIRED_FA = "نام فارسی واحد سازمانی الزامی است.";
+
+export const MSG_ORG_CODE_REQUIRED_FA = "کد واحد سازمانی الزامی است.";
+
+export const MSG_BLOCKED_ORG_OPERATION_FA =
+  "این عملیات سازمانی تا تعیین سیاست زمانی/ظرفیت مجاز نیست.";
+
+export const MSG_ORG_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";

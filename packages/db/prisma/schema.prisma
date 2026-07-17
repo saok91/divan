@@ -1,9 +1,10 @@
 // Prisma schema — identity projections (Story 1.4) + Person / Employment / DataElement (3.1–3.3)
-// + compensation-facts isolated schema (3.4 / AD-3).
+// + compensation-facts isolated schema (3.4 / AD-3) + OrganizationalUnit hierarchy (3.5 / FR-9).
 // Person is HR identity aggregate — distinct from HumanIdentity (login).
 // Employment is a projection (AD-2), not event-store truth. Assignment / event-store = Epic 3.7+ / Epic 4.
 // DataElement registry governs field enablement (FR-7) — values stay on Person columns for MVP approve set.
 // CompensationFact lives in PostgreSQL schema "compensation" — owned by @divan/compensation-facts only.
+// OrganizationalUnit (LE→BU→Dept→Team) is org master-data — NOT OrganizationalScope (authz population).
 // Kernel event-store tables use raw SQL under packages/db/sql/.
 
 generator client {
@@ -120,6 +121,36 @@ model Employment {
   updatedAt         DateTime  @updatedAt
 
   @@index([personId])
+  @@schema("public")
+}
+
+/// Org-unit master-data hierarchy (Story 3.5 / FR-9). Adjacency list + unitType discriminant.
+/// Shape: LEGAL_ENTITY → BUSINESS_UNIT → DEPARTMENT → TEAM. Not OrganizationalScope (authz).
+/// Half-open [startDate, endDateExclusive); deactivate closes interval — never hard-deletes.
+/// Primary Assignment Team membership = Story 3.7 + Epic 4 (no Employment FK here).
+model OrganizationalUnit {
+  id               String    @id @default(uuid(7))
+  /// Stable domain code — Latin-normalized uniqueness; display may use Persian digits.
+  code             String    @unique
+  nameFa           String
+  /// LEGAL_ENTITY | BUSINESS_UNIT | DEPARTMENT | TEAM
+  unitType         String
+  parentId         String?
+  parent           OrganizationalUnit?  @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children         OrganizationalUnit[] @relation("OrgUnitHierarchy")
+  /// Inclusive Effective interval start (date-only, Asia/Tehran).
+  startDate        DateTime  @db.Date
+  /// Exclusive end; null = open / currently unbounded.
+  endDateExclusive DateTime? @db.Date
+  /// Operational flag synced on activate/deactivate; as-of truth is the interval.
+  active           Boolean   @default(true)
+  /// Placeholder until authoritative temporal reorg process (Epic 4+).
+  sourceEventId    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([parentId])
+  @@index([unitType])
   @@schema("public")
 }
 

@@ -1,5 +1,5 @@
 /**
- * PermissionSet binding gate for Person APIs (Story 3.1).
+ * PermissionSet binding gate for Person + Organization APIs (Stories 3.1 / 3.5).
  * Envelope policy is 4-tuple only — assigned PermissionSet unlocks the API.
  */
 
@@ -7,6 +7,10 @@ import type { PrismaClient } from "@divan/db";
 
 import { getPersonDb } from "./db";
 import {
+  MSG_ORG_PERMISSION_REQUIRED_FA,
+  ORGANIZATION_READ_PERMISSION,
+  ORGANIZATION_WRITE_PERMISSION,
+  OrgUnitError,
   PERSON_READ_PERMISSION,
   PERSON_WRITE_PERMISSION,
   PersonIdentityError,
@@ -62,6 +66,42 @@ export async function assertActorHasPersonWrite(
       "PERMISSION_DENIED",
       MSG_PERSON_PERMISSION_REQUIRED_FA,
       "person_write_required",
+    );
+  }
+}
+
+export async function assertActorHasOrganizationRead(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    ORGANIZATION_READ_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new OrgUnitError(
+      "PERMISSION_DENIED",
+      MSG_ORG_PERMISSION_REQUIRED_FA,
+      "organization_read_required",
+    );
+  }
+}
+
+export async function assertActorHasOrganizationWrite(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    ORGANIZATION_WRITE_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new OrgUnitError(
+      "PERMISSION_DENIED",
+      MSG_ORG_PERMISSION_REQUIRED_FA,
+      "organization_write_required",
     );
   }
 }

@@ -27,6 +27,7 @@
     "selfcheck:person-identity": "pnpm --filter @divan/person-employment selfcheck:person-identity",
     "selfcheck:employment-lifecycle": "pnpm --filter @divan/person-employment selfcheck:employment-lifecycle",
     "selfcheck:data-dictionary": "pnpm --filter @divan/person-employment selfcheck:data-dictionary",
+    "selfcheck:organization-hierarchy": "pnpm --filter @divan/person-employment selfcheck:organization-hierarchy",
     "selfcheck:compensation-facts": "pnpm --filter @divan/compensation-facts selfcheck:compensation-facts"
   },
   "devDependencies": {

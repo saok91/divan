@@ -189,6 +189,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 3.5 — Organization hierarchy (coarse role is never an allow key)
+    {
+      permission: "organization.read",
+      dataCategory: "organization.unit",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "organization.write",
+      dataCategory: "organization.unit",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 
