@@ -1,5 +1,5 @@
-# generated: 2026-07-16
-# last_updated: 2026-07-18T02:35:00+03:30
+﻿# generated: 2026-07-16
+# last_updated: 2026-07-18T02:45:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-18T02:35:00+03:30
+last_updated: 2026-07-18T02:45:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -69,7 +69,7 @@ development_status:
   2-7-inference-resistant-bulk-retrieval-controls: done
   epic-2-retrospective: done
 
-  epic-3: in-progress
+  epic-3: done
   3-1-stable-person-identity: done
   3-2-employment-lifecycle-invariants: done
   3-3-data-dictionary-governed-profile-fields: done
@@ -79,7 +79,7 @@ development_status:
   3-7-primary-assignment-integrity: done
   3-8-secondary-assignment-fidelity: done
   3-9-derived-management-relationships: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   epic-4: backlog
   4-1-append-only-event-store-attributable-event-record: backlog
@@ -163,8 +163,8 @@ action_items:
   - epic: 1
     action: "Align story-file Status with sprint-status when marking done"
     owner: "Amelia"
-    status: open
-    note: "Encoded as Task 7 DoD reminder in 2.1 story; reaffirmed in Epic 2 retro — close when verified on Story 3.1"
+    status: done
+    resolved_in: "Epic 3 retro 2026-07-18 — verified 3-1…3-9 Status=done match sprint-status"
   - epic: 2
     action: "Mark epic-2 done in sprint-status (stories + retro complete)"
     owner: "Amelia"
@@ -173,7 +173,8 @@ action_items:
   - epic: 2
     action: "Enforce story-file Status ↔ sprint-status alignment on every done transition (close Epic 1 item 8)"
     owner: "Amelia"
-    status: open
+    status: done
+    resolved_in: "Epic 3 retro 2026-07-18 — verified 3-1…3-9; closes Epic 1 #8"
   - epic: 2
     action: "Encode Epic 3↔4 no temporary CRUD mutation sequencing into Story 3.1 create-story / Dev Notes"
     owner: "Amelia + John"
@@ -200,4 +201,33 @@ action_items:
   - epic: 2
     action: "Keep artifact/export reauth consumer contract mandatory for Stories 6.5 / 7.x"
     owner: "Paige + Winston"
+    status: open
+  - epic: 3
+    action: "Mark epic-3 done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-3-retro-2026-07-18.md + sprint-status epic-3/epic-3-retrospective"
+  - epic: 3
+    action: "Encode Transfer coverage-after-atomic-close+open + AR-TEMPORAL apply active-as-of into Story 4.1 / 4.5-4.8 Dev Notes"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 3
+    action: "Define PopulationPort default-registry cutover criteria (fixture to projection-backed) in early 4.x notes"
+    owner: "Winston + Amelia"
+    status: open
+  - epic: 3
+    action: "Add seed DoD snippet (FK shape + exact cardinality + $transaction) and BOM-safe sprint-status edits"
+    owner: "Amelia + Paige"
+    status: open
+  - epic: 3
+    action: "Keep AR-TEMPORAL / AR-SECONDARY / AR-ACCESS / AR-DATA / AR-IDENTITY fail-closed; do not invent in Epic 4"
+    owner: "Mary + John"
+    status: open
+  - epic: 3
+    action: "Prefer Vitest/ephemeral DB isolation when next quality opportunity lands"
+    owner: "Amelia"
+    status: open
+  - epic: 3
+    action: "Carry forward Epic 2 open items: InferenceBulkPort ops doc; sticky break-glass + fingerprint; artifact reauth for 6.5/7.x"
+    owner: "Winston / Amelia+Sally / Paige+Winston"
     status: open
