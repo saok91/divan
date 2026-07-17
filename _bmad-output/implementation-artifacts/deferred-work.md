@@ -153,6 +153,15 @@
 - **`identity.national_id` category** stays disabled until formal AR-DATA enablement
 - Full personnel search table / profile / timeline ? Epic 5; Employment mutations ? Epic 4
 
+## Deferred from: Story 3.2 employment lifecycle invariants (2026-07-17)
+
+- **Employment projection + invariants landed** (`applyEmploymentProjection` / `closeEmploymentProjection`; domain non-overlap + PG EXCLUDE; ?1 active as-of)
+- **Start / Return / Termination** user flows + authoritative event append = Stories 4.5?4.6 (not this story)
+- **Concurrent multi-Employment policy exceptions** still AR-DATA ? fail-closed Persian reject remains
+- **Primary Assignment integrity** (exactly one active) = Story 3.7
+- **PopulationPort fixture ? Person UUID cutover** still waits on org/assignment (3.5?3.9 / 4.x)
+- Org hierarchy / Legal Entity / Team FKs on Employment = Story 3.5 (minimum-facts checklist documents Epic 4 finalization needs)
+
 ## Deferred from: code review of 2-4-entitlement-lifecycle-grant-expiry-revocation-recertification.md (2026-07-17)
 
 - Empty `assignAccountAccessRoles` / `assignAccountScopes` (full wipe) bypasses the new mass-assign lifecycle gate ? pre-existing Story 2.3 full-replace semantics; only `length > 1` was gated in 2.4
@@ -179,10 +188,17 @@
 
 ## Deferred from: code review of 3-1-stable-person-identity.md (2026-07-17)
 
-- Envelope records allow before PermissionSet deny on Person procedures — governedProcedure 4-tuple allow/audit then handler PermissionSet gate; same layering as other governed routes
-- `identity-access` depends on `person-employment` for seed fixtures — monorepo seed orchestration; revisit module boundary if AD-3 ownership hardens
-- No optimistic concurrency / `updatedAt` precondition on `updatePersonIdentity` — last-write-wins acceptable for 3.1 thin maintain; add version check when concurrent HR editors matter
-- `mobilePhone` stored raw without digit/format normalization — Personnel Code/national ID only for 3.1; contact dictionary / format rules belong in Story 3.3
-- Blocked deep-link ops still pass envelope allow then domain FORBIDDEN — intentional deep-link surface for fail-closed Persian copy; quieter audit meta can wait
-- Domain `PersonRecord` always loads `nationalId`; omission only in `toPublicPerson` — tRPC public DTO is gated; tighten domain select when more in-process callers appear
-- Person PermissionSet checks ignore entitlement grant lifecycle (as-of / expiry / break-glass) — PermissionSet-only OK for 3.1 demo; deepen when Person joins full Epic 2 authz path
+- Envelope records allow before PermissionSet deny on Person procedures ? governedProcedure 4-tuple allow/audit then handler PermissionSet gate; same layering as other governed routes
+- `identity-access` depends on `person-employment` for seed fixtures ? monorepo seed orchestration; revisit module boundary if AD-3 ownership hardens
+- No optimistic concurrency / `updatedAt` precondition on `updatePersonIdentity` ? last-write-wins acceptable for 3.1 thin maintain; add version check when concurrent HR editors matter
+- `mobilePhone` stored raw without digit/format normalization ? Personnel Code/national ID only for 3.1; contact dictionary / format rules belong in Story 3.3
+- Blocked deep-link ops still pass envelope allow then domain FORBIDDEN ? intentional deep-link surface for fail-closed Persian copy; quieter audit meta can wait
+- Domain `PersonRecord` always loads `nationalId`; omission only in `toPublicPerson` ? tRPC public DTO is gated; tighten domain select when more in-process callers appear
+- Person PermissionSet checks ignore entitlement grant lifecycle (as-of / expiry / break-glass) ? PermissionSet-only OK for 3.1 demo; deepen when Person joins full Epic 2 authz path
+
+## Deferred from: code review of 3-2-employment-lifecycle-invariants.md (2026-07-17)
+
+- Domain check-then-act race maps concurrent second-open to `OVERLAPPING_EMPLOYMENT` via `23P01` rather than `CONCURRENT_EMPLOYMENT_FORBIDDEN` — EXCLUDE remains NFR-4 backstop; refine error mapping when Epic 4 writers need distinct codes under contention
+- `dateOnlyFromDb` via `toISOString().slice(0,10)` — same Person 3.1 DATE mapping; harden if non-UTC driver behavior appears
+- No DB `CHECK (endDateExclusive > startDate)` — domain `assertValidEmploymentInterval` remains mandatory; add CHECK if raw SQL writers become a threat
+- temporal-engine open-end sentinel `9999-12-31` vs PG unbounded `daterange` — engine pre-existing; revisit only if far-horizon intervals matter

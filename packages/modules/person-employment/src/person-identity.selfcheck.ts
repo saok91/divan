@@ -213,8 +213,8 @@ async function main() {
     });
   }
 
-  // AC #5 continuity — no delete-on-employment API
-  assertPersonSurvivesEmploymentEnd();
+  // AC #5 / FR-5 continuity — Person survives Employment end (no cascade API)
+  await assertPersonSurvivesEmploymentEnd(person.id, db);
   assert.equal(
     typeof (await import("./index")).createPerson,
     "function",

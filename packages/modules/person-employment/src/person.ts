@@ -495,10 +495,23 @@ export function matchReturn(
 }
 
 /**
- * Continuity invariant (AC #5): no API deletes Person when Employment ends.
- * Employment model is not in this story — this documents the contract.
+ * Continuity invariant (FR-5 / AC #3): ending Employment never deletes Person.
+ *
+ * Contract (schema + API):
+ * - Employment.personId → Person.id uses onDelete: Restrict (never Cascade / SetNull).
+ * - closeEmploymentProjection only sets endDateExclusive — no deletePerson path.
+ * - No public Start/Return/Terminate product verbs; projection close is test/Epic-4 surface.
  */
-export function assertPersonSurvivesEmploymentEnd(): void {
-  // No deletePerson / cascade-on-employment API exists by design.
-  void MSG_REQUIRED_FIELD_FA;
+export async function assertPersonSurvivesEmploymentEnd(
+  personId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const person = await getPersonById(personId, db);
+  if (!person) {
+    throw new PersonIdentityError(
+      "PERSON_NOT_FOUND",
+      MSG_PERSON_NOT_FOUND_FA,
+    );
+  }
+  // Person remains readable after any Employment close; FK Restrict blocks cascade delete.
 }

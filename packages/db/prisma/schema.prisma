@@ -1,6 +1,6 @@
-// Prisma schema — identity projections (Story 1.4) + Person master-data (Story 3.1).
+// Prisma schema — identity projections (Story 1.4) + Person / Employment projections (3.1–3.2).
 // Person is HR identity aggregate — distinct from HumanIdentity (login).
-// No Employment / Assignment / event-store ownership here (Epic 3.2+ / Epic 4).
+// Employment is a projection (AD-2), not event-store truth. Assignment / event-store = Epic 3.7+ / Epic 4.
 // Kernel event-store tables use raw SQL under packages/db/sql/.
 
 generator client {
@@ -37,7 +37,7 @@ model HumanIdentity {
 
 /// HR Person master-data projection (Story 3.1 / FR-5).
 /// UUID PK; Personnel Code is the domain identifier (@unique).
-/// Employment end must never cascade-delete Person (AC #5 invariant — no Employment FK here).
+/// Employment end must never cascade-delete Person (FR-5 — Restrict FK from Employment).
 model Person {
   id            String    @id @default(uuid(7))
   /// Canonical Latin digits for uniqueness; accept Persian/Arabic-Indic on input.
@@ -54,6 +54,29 @@ model Person {
   nationalId    String?   @unique
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  employments Employment[]
+}
+
+/// Employment period projection (Story 3.2 / FR-6). AD-2: not authoritative event truth.
+/// Half-open [startDate, endDateExclusive); null end = unbounded open.
+/// Non-overlap enforced in domain + PostgreSQL EXCLUDE (btree_gist) in migration SQL.
+model Employment {
+  id                String    @id @default(uuid(7))
+  personId          String
+  person            Person    @relation(fields: [personId], references: [id], onDelete: Restrict)
+  /// Inclusive Effective interval start (date-only).
+  startDate         DateTime  @db.Date
+  /// Exclusive end (AR-TEMPORAL); null = still open / active unbounded.
+  endDateExclusive  DateTime? @db.Date
+  /// Lean attribute — exact collaboration codes owned by AR-DATA.
+  collaborationType String?
+  /// Only meaningful when the interval is closed.
+  terminationReason String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([personId])
 }
 
 /// One internal account per human; one coarse role per account.

@@ -1,10 +1,14 @@
 /**
- * Demo seed for Person + person.read/write PermissionSets (Story 3.1).
+ * Demo seed for Person + Employment projections (Stories 3.1–3.2).
  * Invoked from identity-access seedDevAccounts after access-admin fixtures.
  */
 
 import type { PrismaClient } from "@divan/db";
 
+import {
+  applyEmploymentProjection,
+  listEmploymentsForPerson,
+} from "./employment";
 import {
   PERSON_READ_PERMISSION,
   PERSON_WRITE_PERMISSION,
@@ -19,6 +23,16 @@ export const SEED_PERSON_IDENTITY = {
   demoGivenName: "سارا",
   demoFamilyName: "محمدی",
   demoMobilePhone: "09121234567",
+} as const;
+
+/** Adjacent half-open intervals for demo Person 10001. */
+export const SEED_EMPLOYMENT_LIFECYCLE = {
+  historicalStart: "2020-01-01",
+  /** Exclusive end of historical = start of active (back-to-back OK). */
+  historicalEndExclusive: "2024-01-01",
+  activeStart: "2024-01-01",
+  collaborationHistorical: "contractor",
+  collaborationActive: "employee",
 } as const;
 
 /**
@@ -100,9 +114,82 @@ export async function seedDemoPerson(
   return { id: created.id, personnelCode: created.personnelCode };
 }
 
+function isAdjacentDemoSeedPair(
+  rows: Awaited<ReturnType<typeof listEmploymentsForPerson>>,
+): boolean {
+  const hist = rows.find(
+    (e) =>
+      e.startDate === SEED_EMPLOYMENT_LIFECYCLE.historicalStart &&
+      e.endDateExclusive === SEED_EMPLOYMENT_LIFECYCLE.historicalEndExclusive,
+  );
+  const open = rows.find(
+    (e) =>
+      e.startDate === SEED_EMPLOYMENT_LIFECYCLE.activeStart &&
+      e.endDateExclusive === null,
+  );
+  return Boolean(
+    hist && open && hist.endDateExclusive === open.startDate,
+  );
+}
+
+/**
+ * Seed closed historical + open active Employments for demo Person (adjacent).
+ * Idempotent when the adjacent seed pair is already present; repairs wrong shape.
+ */
+export async function seedDemoEmployments(
+  db: PrismaClient,
+): Promise<{ personId: string; employmentIds: string[] }> {
+  const person = await seedDemoPerson(db);
+  const existing = await listEmploymentsForPerson(person.id, db);
+  if (existing.length >= 2 && isAdjacentDemoSeedPair(existing)) {
+    return {
+      personId: person.id,
+      employmentIds: existing.map((e) => e.id),
+    };
+  }
+
+  // Clear partial or wrong-shape seed, then write clean adjacent pair.
+  if (existing.length > 0) {
+    await db.employment.deleteMany({ where: { personId: person.id } });
+  }
+
+  const historical = await applyEmploymentProjection(
+    {
+      personId: person.id,
+      startDate: SEED_EMPLOYMENT_LIFECYCLE.historicalStart,
+      endDateExclusive: SEED_EMPLOYMENT_LIFECYCLE.historicalEndExclusive,
+      collaborationType: SEED_EMPLOYMENT_LIFECYCLE.collaborationHistorical,
+      terminationReason: "contract_ended",
+    },
+    db,
+  );
+  const active = await applyEmploymentProjection(
+    {
+      personId: person.id,
+      startDate: SEED_EMPLOYMENT_LIFECYCLE.activeStart,
+      endDateExclusive: null,
+      collaborationType: SEED_EMPLOYMENT_LIFECYCLE.collaborationActive,
+    },
+    db,
+  );
+
+  return {
+    personId: person.id,
+    employmentIds: [historical.id, active.id],
+  };
+}
+
 export async function seedPersonIdentityFixtures(
   db: PrismaClient,
 ): Promise<void> {
   await seedPersonPermissionFixtures(db);
   await seedDemoPerson(db);
+}
+
+/** Person identity + Employment lifecycle fixtures (Stories 3.1–3.2). */
+export async function seedEmploymentLifecycleFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  await seedPersonIdentityFixtures(db);
+  await seedDemoEmployments(db);
 }
