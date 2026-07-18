@@ -9,9 +9,11 @@ import { getBusinessEventById } from "@divan/event-store";
 import { evaluateHeadcountCapacity } from "@divan/headcount";
 
 import { getPersonDb } from "./db";
+import { getBaselineBoundaryDate } from "./baseline-boundary";
 import {
   MSG_ANONYMIZED_RETURN_BLOCKED_FA,
   MSG_BASELINE_BOUNDARY_BLOCKED_FA,
+  MSG_BASELINE_BOUNDARY_INVALID_FA,
   MSG_BROKEN_CORRECTION_REF_FA,
   MSG_CORRECTION_CYCLE_FA,
   MSG_CORRECTION_SELF_REF_FA,
@@ -1373,15 +1375,33 @@ export async function classifyConflicts(
   // Disposition when baselineBoundaryDate unset: gate inactive until configured
   // (documented fail-closed — do not invent a default epoch). Drafts may set
   // payload.requireBaselineCheck=true to force block while config is absent.
-  const baseline = policy.baselineBoundaryDate?.trim() || null;
-  if (baseline) {
+  // When callers omit policy.baselineBoundaryDate, use shared env reader (4.10).
+  // Invalid env fails closed via blocking finding (never silent disable).
+  let baseline: string | null = null;
+  let baselineEnvInvalid = false;
+  if (policy.baselineBoundaryDate !== undefined) {
+    baseline = policy.baselineBoundaryDate?.trim() || null;
+  } else {
+    try {
+      baseline = getBaselineBoundaryDate();
+    } catch {
+      baselineEnvInvalid = true;
+      findings.push({
+        code: "BASELINE_BOUNDARY_INVALID",
+        severity: "blocking",
+        messageFa: MSG_BASELINE_BOUNDARY_INVALID_FA,
+      });
+    }
+  }
+  if (baselineEnvInvalid) {
+    // already recorded blocking finding
+  } else if (baseline) {
     const b = parseDateOnly(baseline);
     if (!b.ok) {
       findings.push({
         code: "BASELINE_BOUNDARY_INVALID",
         severity: "blocking",
-        messageFa:
-          "مرز Baseline نامعتبر است؛ نهایی‌سازی تا اصلاح پیکربندی مسدود است.",
+        messageFa: MSG_BASELINE_BOUNDARY_INVALID_FA,
       });
     } else if (draft.effectiveDate < b.value) {
       if (policy.allowPreBaselineOverride) {

@@ -1,7 +1,7 @@
 /**
- * Current Person state assembler (Story 4.9 / FR-25).
+ * Current / historical / planned Person state assembler (Stories 4.9–4.10 / FR-25 / FR-26).
  * Composes existing projection as-of helpers — does not replay the event log
- * and does not write a denormalized current-state table.
+ * and does not write a denormalized current-state or historical SoT table.
  */
 
 import type { CategoryRegistry } from "@divan/audit-envelope";
@@ -17,11 +17,20 @@ import {
   listChainLinksForEvents,
   type PgQueryable,
 } from "@divan/event-store";
-import { todayDateOnlyTehran } from "@divan/temporal-engine";
+import {
+  parseDateOnly,
+  todayDateOnlyTehran,
+} from "@divan/temporal-engine";
 
+import { getBaselineBoundaryDate } from "./baseline-boundary";
 import { getPersonDb } from "./db";
 import { getActiveEmploymentAsOf, type EmploymentRecord } from "./employment";
 import {
+  MSG_ASOF_INVALID_FA,
+  MSG_BASELINE_BOUNDARY_INVALID_FA,
+  MSG_BASELINE_DISCLOSURE_LIMITED_FA,
+  MSG_BASELINE_DISCLOSURE_UNCONFIGURED_FA,
+  MSG_BASELINE_DISCLOSURE_WITHIN_FA,
   MSG_PERSON_NOT_FOUND_FA,
   PersonIdentityError,
 } from "./errors";
@@ -61,6 +70,15 @@ export type ScheduledFutureChange = {
   resolvedStatus: Extract<ResolvedLifecycleStatus, "Scheduled">;
 };
 
+export type PersonViewSemantics = "current" | "historical" | "planned";
+
+export type BaselineDisclosure = {
+  configured: boolean;
+  boundaryDate: string | null;
+  limited: boolean;
+  messageFa: string;
+};
+
 export type CurrentPersonStateFreshnessCode =
   | "RECALCULATION_PENDING"
   | "RECALCULATION_FAILED"
@@ -75,13 +93,16 @@ export type CurrentPersonStateFreshnessBlock = {
 };
 
 /**
- * Shared DTO for profile / list / report consumers (FR-25).
+ * Shared DTO for profile / list / report consumers (FR-25 / FR-26).
  * Compensation keys are absent (not null) when the actor lacks compensation.read.
  */
 export type CurrentPersonState = {
   ok: true;
   asOf: string;
   personId: string;
+  /** current = today; historical = past as-of; planned = future as-of (never Effective). */
+  viewSemantics: PersonViewSemantics;
+  baselineDisclosure: BaselineDisclosure;
   person: Partial<PersonRecord>;
   employment: EmploymentRecord | null;
   primaryAssignment: PrimaryAssignmentRecord | null;
@@ -89,7 +110,17 @@ export type CurrentPersonState = {
   secondaryAssignments: SecondaryAssignmentRecord[];
   compensation?: Partial<CompensationFactRecord> | null;
   contractual?: Partial<CompensationFactRecord> | null;
+  /**
+   * Finalized events still pre-effect as of the view's evaluation date.
+   * For planned views: events with effectiveDate > requested asOf.
+   */
   scheduledChanges: ScheduledFutureChange[];
+  /**
+   * Planned channel (future as-of only): Finalized events with
+   * today < effectiveDate <= asOf that are still Scheduled as of today.
+   * Empty for current / historical views.
+   */
+  plannedChangesThroughAsOf: ScheduledFutureChange[];
 };
 
 export type GetCurrentPersonStateResult =
@@ -97,9 +128,14 @@ export type GetCurrentPersonStateResult =
   | CurrentPersonStateFreshnessBlock;
 
 export type GetCurrentPersonStateOptions = {
-  /** Defaults to today (Asia/Tehran date-only). */
+  /** Defaults to today (Asia/Tehran date-only). Must be date-only when provided. */
   asOf?: string;
   actorAuthz: CurrentPersonStateActorAuthz;
+  /**
+   * Override Baseline boundary for tests / explicit policy.
+   * When omitted, uses `getBaselineBoundaryDate()` (env).
+   */
+  baselineBoundaryDate?: string | null;
 };
 
 export type GetCurrentPersonStateDeps = {
@@ -139,14 +175,72 @@ function freshnessMessageFa(code: CurrentPersonStateFreshnessCode): string {
   return MSG_CURRENT_STATE_RECALC_STALE_FA;
 }
 
-/**
- * Lean planned-future channel — Finalized events still pre-effect as of `asOf`.
- * Cancelled / Reversed (via chain) and Drafts are excluded.
- */
-export async function listScheduledFutureChanges(
-  personId: string,
+export function buildBaselineDisclosure(
   asOf: string,
+  boundaryDate: string | null,
+): BaselineDisclosure {
+  if (!boundaryDate) {
+    return {
+      configured: false,
+      boundaryDate: null,
+      limited: false,
+      messageFa: MSG_BASELINE_DISCLOSURE_UNCONFIGURED_FA,
+    };
+  }
+  if (asOf < boundaryDate) {
+    return {
+      configured: true,
+      boundaryDate,
+      limited: true,
+      messageFa: MSG_BASELINE_DISCLOSURE_LIMITED_FA,
+    };
+  }
+  return {
+    configured: true,
+    boundaryDate,
+    limited: false,
+    messageFa: MSG_BASELINE_DISCLOSURE_WITHIN_FA,
+  };
+}
+
+function resolveViewSemantics(
+  asOf: string,
+  today: string,
+): PersonViewSemantics {
+  // Use captured `today` — do not re-call todayDateOnlyTehran/isFutureAsOf (midnight race).
+  if (asOf > today) return "planned";
+  if (asOf === today) return "current";
+  return "historical";
+}
+
+/** Parse optional Baseline override; unset/empty → null; invalid → fail-closed. */
+function resolveBaselineBoundaryOverride(
+  raw: string | null | undefined,
+): string | null {
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const parsed = parseDateOnly(trimmed);
+  if (!parsed.ok) {
+    throw new PersonIdentityError(
+      "VALIDATION",
+      MSG_BASELINE_BOUNDARY_INVALID_FA,
+      parsed.reason,
+    );
+  }
+  return parsed.value;
+}
+
+type ScheduledScanFilter = (args: {
+  effectiveDate: string;
+  resolved: ResolvedLifecycleStatus;
+}) => boolean;
+
+async function scanScheduledChanges(
+  personId: string,
+  evaluationAsOf: string,
   eventDb: PgQueryable,
+  include: ScheduledScanFilter,
 ): Promise<ScheduledFutureChange[]> {
   const events = await listBusinessEventsForPersonForApply(eventDb, personId, {
     limit: SCHEDULED_CHANGES_APPLY_LIMIT,
@@ -174,8 +268,15 @@ export async function listScheduledFutureChanges(
       reversals: [],
       corrections: [],
     };
-    const resolved = resolveLifecycleStatus(event, links, asOf);
-    if (resolved !== "Scheduled") continue;
+    const resolved = resolveLifecycleStatus(event, links, evaluationAsOf);
+    if (
+      !include({
+        effectiveDate: event.effectiveDate,
+        resolved,
+      })
+    ) {
+      continue;
+    }
     planned.push({
       id: event.id,
       eventType: event.eventType,
@@ -194,15 +295,86 @@ export async function listScheduledFutureChanges(
 }
 
 /**
- * Assemble current Person state from projection as-of helpers (FR-25).
+ * Lean planned-future channel — Finalized events still pre-effect as of `asOf`.
+ * Cancelled / Reversed (via chain) and Drafts are excluded.
+ */
+export async function listScheduledFutureChanges(
+  personId: string,
+  asOf: string,
+  eventDb: PgQueryable,
+): Promise<ScheduledFutureChange[]> {
+  return scanScheduledChanges(personId, asOf, eventDb, ({ resolved }) => {
+    return resolved === "Scheduled";
+  });
+}
+
+/**
+ * Future as-of planned channel: events between today (exclusive) and asOf (inclusive)
+ * that are still Scheduled when evaluated at today.
+ */
+export async function listPlannedChangesThroughAsOf(
+  personId: string,
+  today: string,
+  asOf: string,
+  eventDb: PgQueryable,
+): Promise<ScheduledFutureChange[]> {
+  return scanScheduledChanges(personId, today, eventDb, ({ effectiveDate, resolved }) => {
+    return (
+      resolved === "Scheduled" &&
+      effectiveDate > today &&
+      effectiveDate <= asOf
+    );
+  });
+}
+
+/**
+ * Events still Scheduled even at the future planned asOf (effectiveDate > asOf).
+ */
+export async function listRemainingScheduledAfterAsOf(
+  personId: string,
+  asOf: string,
+  eventDb: PgQueryable,
+): Promise<ScheduledFutureChange[]> {
+  return scanScheduledChanges(personId, asOf, eventDb, ({ effectiveDate, resolved }) => {
+    return resolved === "Scheduled" && effectiveDate > asOf;
+  });
+}
+
+/**
+ * Assemble Person state from projection as-of helpers (FR-25 / FR-26).
  * Fail-closed when recalculation is pending / failed / stale for the Person.
+ * Future asOf uses planned semantics — facts stay at today; never Effective label.
  */
 export async function getCurrentPersonState(
   personId: string,
   options: GetCurrentPersonStateOptions,
   deps: GetCurrentPersonStateDeps,
 ): Promise<GetCurrentPersonStateResult> {
-  const asOf = options.asOf ?? todayDateOnlyTehran();
+  const today = todayDateOnlyTehran();
+  let asOf: string;
+  if (options.asOf !== undefined) {
+    const parsed = parseDateOnly(options.asOf);
+    if (!parsed.ok) {
+      throw new PersonIdentityError(
+        "VALIDATION",
+        MSG_ASOF_INVALID_FA,
+        parsed.reason,
+      );
+    }
+    asOf = parsed.value;
+  } else {
+    asOf = today;
+  }
+
+  const viewSemantics = resolveViewSemantics(asOf, today);
+  const factsAsOf = viewSemantics === "planned" ? today : asOf;
+
+  const boundary =
+    options.baselineBoundaryDate !== undefined
+      ? resolveBaselineBoundaryOverride(options.baselineBoundaryDate)
+      : getBaselineBoundaryDate();
+  const baselineDisclosure = buildBaselineDisclosure(asOf, boundary);
+
   const personDb = deps.personDb ?? getPersonDb();
   const compensationDb = deps.compensationDb;
   const { eventDb } = deps;
@@ -236,48 +408,68 @@ export async function getCurrentPersonState(
     personDb,
   );
 
-  const employment = await getActiveEmploymentAsOf(personId, asOf, personDb);
+  const employment = await getActiveEmploymentAsOf(personId, factsAsOf, personDb);
   const primaryAssignment = employment
-    ? await getActivePrimaryAssignmentAsOf(employment.id, asOf, personDb)
+    ? await getActivePrimaryAssignmentAsOf(employment.id, factsAsOf, personDb)
     : null;
   const teamMembership = await resolveTeamMembershipAsOf(
     personId,
-    asOf,
+    factsAsOf,
     personDb,
   );
   const secondaryAssignments = await listActiveSecondaryAssignmentsAsOf(
     { personId },
-    asOf,
+    factsAsOf,
     personDb,
   );
 
-  const scheduledChanges = await listScheduledFutureChanges(
-    personId,
-    asOf,
-    eventDb,
-  );
+  let scheduledChanges: ScheduledFutureChange[];
+  let plannedChangesThroughAsOf: ScheduledFutureChange[];
+  if (viewSemantics === "planned") {
+    plannedChangesThroughAsOf = await listPlannedChangesThroughAsOf(
+      personId,
+      today,
+      asOf,
+      eventDb,
+    );
+    scheduledChanges = await listRemainingScheduledAfterAsOf(
+      personId,
+      asOf,
+      eventDb,
+    );
+  } else {
+    plannedChangesThroughAsOf = [];
+    scheduledChanges = await listScheduledFutureChanges(
+      personId,
+      asOf,
+      eventDb,
+    );
+  }
 
   const snapshot: CurrentPersonState = {
     ok: true,
     asOf,
     personId,
+    viewSemantics,
+    baselineDisclosure,
     person,
     employment,
     primaryAssignment,
     teamMembership,
     secondaryAssignments,
     scheduledChanges,
+    plannedChangesThroughAsOf,
   };
 
   if (actorAuthz.hasCompensationRead) {
     const compensationRaw = await getCompensationAsOf(
       personId,
-      asOf,
+      factsAsOf,
       compensationDb,
     );
     const contractualRaw = await getContractualAsOf(
       personId,
-      asOf,
+      factsAsOf,
       compensationDb,
     );
     snapshot.compensation = compensationRaw
@@ -299,12 +491,18 @@ export async function getCurrentPersonState(
 
 /**
  * Comparable current facts for dual-consumer equality (ignore Date wall-clock).
+ * Strips viewSemantics / baselineDisclosure metadata — assert those separately.
  * Callers must pass identical (personId, asOf, authz) results.
  */
 export function currentPersonStateFactsForCompare(
   state: CurrentPersonState,
 ): unknown {
-  const { ok: _ok, ...rest } = state;
+  const {
+    ok: _ok,
+    viewSemantics: _viewSemantics,
+    baselineDisclosure: _baselineDisclosure,
+    ...rest
+  } = state;
   return JSON.parse(
     JSON.stringify(rest, (_key, value) => {
       if (value instanceof Date) return value.toISOString();

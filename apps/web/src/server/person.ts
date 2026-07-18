@@ -17,6 +17,7 @@ import {
   NATIONAL_ID_DATA_CATEGORY,
   PersonIdentityError,
   DataDictionaryError,
+  MSG_ASOF_INVALID_FA,
   MSG_BLOCKED_IDENTITY_OPERATION_FA,
   assertActorHasPersonRead,
   assertActorHasPersonWrite,
@@ -37,6 +38,7 @@ import {
   updatePersonIdentity,
   type PersonProfileFieldKey,
 } from "@divan/person-employment";
+import { parseDateOnly } from "@divan/temporal-engine";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -234,12 +236,31 @@ export const personRouter = createTRPCRouter({
     }),
 
   /**
-   * Shared current Person state (Story 4.9 / FR-25).
+   * Shared Person state (Stories 4.9–4.10 / FR-25 / FR-26).
+   * Optional asOf: date-only YYYY-MM-DD (Tehran). Future → planned semantics.
    * Assembler lives in @divan/person-employment; compensation omit inside module.
    */
   getCurrentState: governedProcedure
     .meta({ ...personReadMeta, operation: "person.current_state" })
-    .input(z.object({ personId: z.string().min(1) }))
+    .input(
+      z.object({
+        personId: z.string().min(1),
+        asOf: z
+          .string()
+          .min(1)
+          .optional()
+          .superRefine((val, ctx) => {
+            if (val === undefined) return;
+            const parsed = parseDateOnly(val);
+            if (!parsed.ok) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: MSG_ASOF_INVALID_FA,
+              });
+            }
+          }),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       await requirePersonRead(ctx.session.accountId);
       try {
@@ -253,6 +274,7 @@ export const personRouter = createTRPCRouter({
         return await getCurrentPersonState(
           input.personId,
           {
+            asOf: input.asOf,
             actorAuthz: {
               allowedCategories,
               categories: DEV_DEMO_CATEGORIES,

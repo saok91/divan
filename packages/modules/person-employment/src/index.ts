@@ -136,6 +136,11 @@ export {
   MSG_MISSING_PERSONNEL_CODE_FA,
   MSG_ANONYMIZED_RETURN_BLOCKED_FA,
   MSG_BASELINE_BOUNDARY_BLOCKED_FA,
+  MSG_BASELINE_BOUNDARY_INVALID_FA,
+  MSG_ASOF_INVALID_FA,
+  MSG_BASELINE_DISCLOSURE_LIMITED_FA,
+  MSG_BASELINE_DISCLOSURE_UNCONFIGURED_FA,
+  MSG_BASELINE_DISCLOSURE_WITHIN_FA,
   MSG_RISK_TIER_PENDING_REVIEW_FA,
   MSG_EVENT_NOT_FOUND_FA,
   MSG_CANCEL_REASON_REQUIRED_FA,
@@ -495,6 +500,9 @@ export {
 export {
   getCurrentPersonState,
   listScheduledFutureChanges,
+  listPlannedChangesThroughAsOf,
+  listRemainingScheduledAfterAsOf,
+  buildBaselineDisclosure,
   currentPersonStateFactsForCompare,
   MSG_CURRENT_STATE_RECALC_PENDING_FA,
   MSG_CURRENT_STATE_RECALC_FAILED_FA,
@@ -504,6 +512,7 @@ export {
 } from "./current-person-state";
 
 export type {
+  BaselineDisclosure,
   CurrentPersonState,
   CurrentPersonStateActorAuthz,
   CurrentPersonStateFreshnessBlock,
@@ -511,8 +520,14 @@ export type {
   GetCurrentPersonStateDeps,
   GetCurrentPersonStateOptions,
   GetCurrentPersonStateResult,
+  PersonViewSemantics,
   ScheduledFutureChange,
 } from "./current-person-state";
+
+export {
+  getBaselineBoundaryDate,
+  BASELINE_BOUNDARY_ENV,
+} from "./baseline-boundary";
 
 export { POPULATION_SUBJECT_ID_TARGET } from "./population-cutover";
 

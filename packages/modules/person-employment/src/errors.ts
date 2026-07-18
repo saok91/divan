@@ -560,6 +560,26 @@ export const MSG_ANONYMIZED_RETURN_BLOCKED_FA =
 export const MSG_BASELINE_BOUNDARY_BLOCKED_FA =
   "تاریخ مؤثر قبل از مرز Baseline است و بدون Override مجاز نیست.";
 
+/** Misconfigured Baseline boundary env / override — fail-closed (Story 4.10). */
+export const MSG_BASELINE_BOUNDARY_INVALID_FA =
+  "مرز Baseline نامعتبر است؛ تا اصلاح پیکربندی، خواندن و نهایی‌سازی مسدود است.";
+
+/** Read-side as-of validation (Story 4.10) — distinct from write Override copy. */
+export const MSG_ASOF_INVALID_FA =
+  "تاریخ مبنا باید فقط تاریخ (YYYY-MM-DD) باشد؛ برچسب زمانی پذیرفته نمی‌شود.";
+
+/** Read-side Baseline disclosure when asOf is before configured boundary. */
+export const MSG_BASELINE_DISCLOSURE_LIMITED_FA =
+  "تاریخ مبنا پیش از مرز Baseline است؛ بازسازی تاریخچه با محدودیت ارائه‌شده و ممکن است کامل نباشد.";
+
+/** Read-side honesty when Baseline boundary is not configured. */
+export const MSG_BASELINE_DISCLOSURE_UNCONFIGURED_FA =
+  "مرز Baseline پیکربندی نشده است؛ حد بازسازی‌پذیر تاریخچه مشخص نیست.";
+
+/** Read-side when asOf is on/after configured Baseline boundary. */
+export const MSG_BASELINE_DISCLOSURE_WITHIN_FA =
+  "تاریخ مبنا در محدودهٔ بازسازی‌پذیر پس از مرز Baseline است.";
+
 export const MSG_IRRECONCILABLE_ORDERING_FA =
   "ترتیب رویدادهای هم‌روز قابل سازگاری نیست؛ نهایی‌سازی تا رفع تعارض مسدود است.";
 

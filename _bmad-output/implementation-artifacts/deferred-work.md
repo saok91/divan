@@ -1,16 +1,31 @@
+## Deferred from: code review of 4-10-historical-person-reconstruction.md (2026-07-19)
+
+- Planned as-of path runs two sequential `scanScheduledChanges` passes (`listPlannedChangesThroughAsOf` + `listRemainingScheduledAfterAsOf`) — Cancel/Reverse between scans can omit a change from both channels; same torn-sequential-read / TOCTOU class already deferred from 4.9 assembler reads
+
+## Deferred from: Story 4.10 historical person reconstruction (2026-07-19)
+
+- **Historical / as-of Person reconstruction landed** — `parseDateOnly` validation; `viewSemantics` current|historical|planned; future as-of planned path (facts @ today + `plannedChangesThroughAsOf`); `baselineDisclosure` via shared `getBaselineBoundaryDate`; optional `asOf` on `person.getCurrentState`; Jalali foreshadow; extended `current-person-state.selfcheck`
+- **Still 4.11:** Historical organization & headcount reconstruction (FR-27)
+- **Still 4.12–4.14 / FR-30 remainder:** Full Headcount Approval / Matching / Reservation expiry UI / Override catalogue; durable reservation for Scheduled Start
+- **Still Epic 5:** Full profile / search / timeline / report catalogue as-of consumers
+- **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+- **AR-DATA:** Production enablement/masking of compensation category still open (`DEV_DEMO_CATEGORIES` on tRPC)
+- **FR-39 / FR-47:** Baseline migration provenance UI and full temporal as-of authz matrix remain open
+
 ## Deferred from: code review of 4-9-current-person-state-projection.md (2026-07-19)
 
 - tRPC `getCurrentState` hardcodes `DEV_DEMO_CATEGORIES` (compensation category never enabled) — same AR-DATA / person-router pattern; production enablement still open
 - Assembler sequential projection reads without shared snapshot/transaction — torn Employment/Primary/Team possible mid-finalize; pre-existing as-of read pattern
 - Module-scoped `createPgPool` (`currentStatePool`) instead of shared event-store pool — matches other web server modules
 - Recalc status can flip after freshness check (TOCTOU) — same class as torn reads
-- No `asOf` date-only validation on assembler options — product path defaults to Tehran today; tRPC does not expose `asOf`
+- ~~No `asOf` date-only validation on assembler options~~ — **closed in 4.10** (`parseDateOnly` + product `asOf`)
 - Optional foreshadow: non-UUID personId + raw tRPC error message — same loose id input as `person.getById`
 
 ## Deferred from: Story 4.9 current person state projection (2026-07-19)
 
 - **Current-state assembler landed** — `getCurrentPersonState` composes projection as-of helpers + `scheduledChanges` + fail-closed recalc; shared DTO; thin `person.getCurrentState` tRPC; optional `/personnel` foreshadow; `current-person-state.selfcheck`
-- **Still 4.10–4.11:** Historical Person reconstruction / as-of UI / Baseline disclosure; historical org/headcount reconstruction
+- **4.10 landed:** Historical Person reconstruction / as-of UI / Baseline disclosure (see Story 4.10 deferred block above)
+- **Still 4.11:** Historical org/headcount reconstruction
 - **Still 4.12–4.14 / FR-30 remainder:** Full Headcount Approval / Matching / Reservation expiry UI / Override catalogue; durable reservation for Scheduled Start
 - **AD-6 cross-connection / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
 - **AR-DATA:** Production enablement/masking of compensation category still open

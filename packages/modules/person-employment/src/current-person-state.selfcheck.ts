@@ -30,6 +30,7 @@ import { todayDateOnlyTehran } from "@divan/temporal-engine";
 
 import {
   PERSON_DATA_CATEGORY,
+  BASELINE_BOUNDARY_ENV,
   cancelPersonnelEvent,
   clearRecalculationStatus,
   closeEmploymentProjection,
@@ -40,13 +41,13 @@ import {
   createPerson,
   currentPersonStateFactsForCompare,
   finalizeDraft,
+  getBaselineBoundaryDate,
   getCurrentPersonState,
   getPersonDb,
   listEmploymentsForPerson,
   markRecalculationFailed,
   markRecalculationPending,
   markRecalculationStale,
-  priorDateOnly,
   resetProjectionRefreshHook,
   seedPersonnelEventPermissionFixtures,
   seedPrimaryAssignmentFixtures,
@@ -151,7 +152,10 @@ async function main() {
 
     const suffix = randomUUID().slice(0, 8);
     const today = todayDateOnlyTehran();
-    const startEd = priorDateOnly(today);
+    const startEd = addDays(today, -10);
+    const xferEd = addDays(today, -5);
+    const histAfterXfer = addDays(today, -2);
+    const midFuture = addDays(today, 20);
     const future = addDays(today, 45);
     const categories = authzCategoriesWithCompensation();
     const ordinaryAuthz = {
@@ -256,10 +260,13 @@ async function main() {
     );
     assert.equal(afterStart.ok, true);
     if (!afterStart.ok) throw new Error("unreachable");
+    assert.equal(afterStart.viewSemantics, "current");
+    assert.equal(afterStart.baselineDisclosure.configured, false);
     assert.ok(afterStart.employment);
     assert.ok(afterStart.primaryAssignment);
     assert.equal(afterStart.teamMembership?.teamId, sourceTeam.id);
     assert.equal(afterStart.primaryAssignment.jobTitleId, jobRefs.jobTitleId);
+    assert.equal(afterStart.plannedChangesThroughAsOf.length, 0);
     assert.equal(
       Object.prototype.hasOwnProperty.call(afterStart, "compensation"),
       false,
@@ -268,6 +275,112 @@ async function main() {
       Object.prototype.hasOwnProperty.call(afterStart, "contractual"),
       false,
     );
+
+    // --- 1b. Invalid asOf rejected fail-closed ---
+    await assert.rejects(
+      () =>
+        getCurrentPersonState(
+          person.id,
+          {
+            asOf: `${today}T12:00:00Z`,
+            actorAuthz: ordinaryAuthz,
+          },
+          { eventDb: pool, personDb: db, compensationDb: compDb },
+        ),
+      (err: unknown) => {
+        assert.ok(
+          err !== null &&
+            typeof err === "object" &&
+            "messageFa" in err &&
+            "code" in err,
+        );
+        const pe = err as { code: string; messageFa: string };
+        assert.equal(pe.code, "VALIDATION");
+        assert.match(pe.messageFa, /تاریخ مبنا/);
+        return true;
+      },
+    );
+
+    // --- 1c. Baseline disclosure: unset honesty + limited when configured ---
+    assert.equal(getBaselineBoundaryDate({}), null);
+    assert.equal(
+      getBaselineBoundaryDate({ [BASELINE_BOUNDARY_ENV]: "2020-01-01" }),
+      "2020-01-01",
+    );
+    assert.throws(
+      () =>
+        getBaselineBoundaryDate({
+          [BASELINE_BOUNDARY_ENV]: "not-a-date",
+        }),
+      (err: unknown) => {
+        assert.ok(
+          err !== null &&
+            typeof err === "object" &&
+            "code" in err &&
+            "messageFa" in err,
+        );
+        const pe = err as { code: string; messageFa: string };
+        assert.equal(pe.code, "VALIDATION");
+        assert.match(pe.messageFa, /Baseline/);
+        return true;
+      },
+    );
+    await assert.rejects(
+      () =>
+        getCurrentPersonState(
+          person.id,
+          {
+            asOf: today,
+            actorAuthz: ordinaryAuthz,
+            baselineBoundaryDate: "not-a-date",
+          },
+          { eventDb: pool, personDb: db, compensationDb: compDb },
+        ),
+      (err: unknown) => {
+        assert.ok(
+          err !== null &&
+            typeof err === "object" &&
+            "code" in err &&
+            "messageFa" in err,
+        );
+        const pe = err as { code: string; messageFa: string };
+        assert.equal(pe.code, "VALIDATION");
+        assert.match(pe.messageFa, /Baseline/);
+        return true;
+      },
+    );
+
+    const histAsOf = startEd;
+    const limited = await getCurrentPersonState(
+      person.id,
+      {
+        asOf: histAsOf,
+        actorAuthz: ordinaryAuthz,
+        baselineBoundaryDate: today,
+      },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    assert.equal(limited.ok, true);
+    if (!limited.ok) throw new Error("unreachable");
+    assert.equal(limited.viewSemantics, "historical");
+    assert.equal(limited.baselineDisclosure.configured, true);
+    assert.equal(limited.baselineDisclosure.limited, true);
+    assert.equal(limited.baselineDisclosure.boundaryDate, today);
+    assert.ok(limited.baselineDisclosure.messageFa.length > 0);
+
+    const within = await getCurrentPersonState(
+      person.id,
+      {
+        asOf: today,
+        actorAuthz: ordinaryAuthz,
+        baselineBoundaryDate: startEd,
+      },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    assert.equal(within.ok, true);
+    if (!within.ok) throw new Error("unreachable");
+    assert.equal(within.baselineDisclosure.configured, true);
+    assert.equal(within.baselineDisclosure.limited, false);
 
     // --- 2. Dual-consumer equality ---
     async function profileConsumer() {
@@ -440,13 +553,13 @@ async function main() {
       false,
     );
 
-    // --- 5. Effective Transfer → Team updated ---
+    // --- 5. Effective Transfer (past) → Team updated ---
     const effXferDraft = await createDraft(
       {
         personId: person.id,
         employmentId: afterStart.employment!.id,
         eventType: "TransferRecorded",
-        effectiveDate: today,
+        effectiveDate: xferEd,
         payload: {
           teamId: destTeam.id,
           ...jobRefs,
@@ -482,6 +595,136 @@ async function main() {
       afterEffXfer.scheduledChanges.some((r) => r.eventType === "TransferRecorded"),
       false,
     );
+
+    // --- 5b. Historical as-of after Effective Transfer → destination Team ---
+    const historicalBeforeXfer = await getCurrentPersonState(
+      person.id,
+      { asOf: startEd, actorAuthz: ordinaryAuthz },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    assert.equal(historicalBeforeXfer.ok, true);
+    if (!historicalBeforeXfer.ok) throw new Error("unreachable");
+    assert.equal(historicalBeforeXfer.viewSemantics, "historical");
+    assert.equal(historicalBeforeXfer.teamMembership?.teamId, sourceTeam.id);
+
+    const historicalAfterXfer = await getCurrentPersonState(
+      person.id,
+      { asOf: histAfterXfer, actorAuthz: ordinaryAuthz },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    assert.equal(historicalAfterXfer.ok, true);
+    if (!historicalAfterXfer.ok) throw new Error("unreachable");
+    assert.equal(historicalAfterXfer.viewSemantics, "historical");
+    assert.equal(historicalAfterXfer.teamMembership?.teamId, destTeam.id);
+
+    // Dual-consumer equality at same historical asOf
+    const histA = await getCurrentPersonState(
+      person.id,
+      { asOf: histAfterXfer, actorAuthz: ordinaryAuthz },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    const histB = await getCurrentPersonState(
+      person.id,
+      { asOf: histAfterXfer, actorAuthz: ordinaryAuthz },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    assert.equal(histA.ok, true);
+    assert.equal(histB.ok, true);
+    if (histA.ok && histB.ok) {
+      assert.deepEqual(
+        currentPersonStateFactsForCompare(histA),
+        currentPersonStateFactsForCompare(histB),
+      );
+      assert.equal(histA.viewSemantics, histB.viewSemantics);
+      assert.deepEqual(histA.baselineDisclosure, histB.baselineDisclosure);
+    }
+
+    // --- 5c. Schedule future Transfer → planned as-of keeps today Team ---
+    const plannedXferDraft = await createDraft(
+      {
+        personId: person.id,
+        employmentId: afterStart.employment!.id,
+        eventType: "TransferRecorded",
+        effectiveDate: future,
+        payload: {
+          teamId: sourceTeam.id,
+          ...jobRefs,
+          capacitySlotId: sourceSlotId,
+        },
+      },
+      { accountId: operator },
+      db,
+    );
+    const plannedXferFin = await finalizeDraft(
+      {
+        draftId: plannedXferDraft.id,
+        actorId: operator,
+        expectedVersion: plannedXferDraft.version,
+        idempotencyKey: `cps-xfer-planned-${suffix}`,
+      },
+      pool,
+      db,
+    );
+    assert.equal(plannedXferFin.outcome, "finalized");
+    assert.ok(plannedXferFin.outcome === "finalized" && plannedXferFin.eventId);
+    await clearRecalculationStatus(pool, person.id);
+
+    // Mid-future asOf: Transfer still only in remaining scheduledChanges
+    const plannedMid = await getCurrentPersonState(
+      person.id,
+      { asOf: midFuture, actorAuthz: ordinaryAuthz },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    assert.equal(plannedMid.ok, true);
+    if (!plannedMid.ok) throw new Error("unreachable");
+    assert.equal(plannedMid.viewSemantics, "planned");
+    assert.equal(plannedMid.teamMembership?.teamId, destTeam.id);
+    assert.equal(plannedMid.plannedChangesThroughAsOf.length, 0);
+    const remainingXfer = plannedMid.scheduledChanges.find(
+      (r) => r.eventType === "TransferRecorded",
+    );
+    assert.ok(remainingXfer);
+    assert.equal(remainingXfer.id, plannedXferFin.eventId);
+    assert.equal(remainingXfer.resolvedStatus, "Scheduled");
+
+    const plannedView = await getCurrentPersonState(
+      person.id,
+      { asOf: future, actorAuthz: ordinaryAuthz },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    assert.equal(plannedView.ok, true);
+    if (!plannedView.ok) throw new Error("unreachable");
+    assert.equal(plannedView.viewSemantics, "planned");
+    // Facts stay at today (dest after Effective Transfer) — not torn future Primary
+    assert.equal(plannedView.teamMembership?.teamId, destTeam.id);
+    assert.equal(plannedView.asOf, future);
+    const plannedXferRow = plannedView.plannedChangesThroughAsOf.find(
+      (r) => r.eventType === "TransferRecorded",
+    );
+    assert.ok(plannedXferRow);
+    assert.equal(plannedXferRow.resolvedStatus, "Scheduled");
+    assert.equal(plannedXferRow.id, plannedXferFin.eventId);
+    assert.equal(plannedView.scheduledChanges.length, 0);
+    // Never label Effective for planned view
+    assert.notEqual(plannedView.viewSemantics, "current");
+    assert.equal(plannedView.viewSemantics, "planned");
+    for (const row of [
+      ...plannedView.plannedChangesThroughAsOf,
+      ...plannedView.scheduledChanges,
+    ]) {
+      assert.equal(row.resolvedStatus, "Scheduled");
+    }
+    await cancelPersonnelEvent(
+      plannedXferFin.eventId,
+      {
+        actorId: admin,
+        reason: "selfcheck cancel planned transfer",
+        idempotencyKey: `cps-cancel-planned-${suffix}`,
+      },
+      pool,
+      db,
+    );
+    await clearRecalculationStatus(pool, person.id);
 
     // --- 6. Compensation + contractual as-of visible with read; omitted without ---
     const employmentId = (await listEmploymentsForPerson(person.id, db))[0]!.id;
@@ -570,24 +813,74 @@ async function main() {
     await clearRecalculationStatus(pool, person.id);
 
     // --- 8. Closed Employment/Primary → no active as-of (terminated shape) ---
-    const termEd = addDays(today, 1);
-    assert.ok(afterEffXfer.primaryAssignment);
-    await closePrimaryAssignmentProjection(
-      afterEffXfer.primaryAssignment.id,
-      termEd,
+    // Dedicated past-started person: Transfer-opened Primary starts today and
+    // cannot close with endExclusive <= today (interval invariant).
+    const termPerson = await createPerson(
+      {
+        personnelCode: `T9${suffix.slice(0, 6)}`,
+        givenName: "آزمایش",
+        familyName: "خاتمه‌یافته",
+        mobilePhone: "09124900002",
+      },
+      { accountId: operator, correlationId: `sc-cps-term-${suffix}` },
       db,
     );
-    await closeEmploymentProjection(employmentId, termEd, db, {
+    const termStartDraft = await createDraft(
+      {
+        personId: termPerson.id,
+        eventType: "EmploymentStarted",
+        effectiveDate: startEd,
+        payload: {
+          collaborationType: SEED_EMPLOYMENT_LIFECYCLE.collaborationActive,
+          teamId: sourceTeam.id,
+          ...jobRefs,
+          capacitySlotId: sourceSlotId,
+        },
+      },
+      { accountId: operator },
+      db,
+    );
+    const termStartFin = await finalizeDraft(
+      {
+        draftId: termStartDraft.id,
+        actorId: operator,
+        expectedVersion: termStartDraft.version,
+        idempotencyKey: `cps-term-start-${suffix}`,
+      },
+      pool,
+      db,
+    );
+    assert.equal(termStartFin.outcome, "finalized");
+    await clearRecalculationStatus(pool, termPerson.id);
+
+    const termState = await getCurrentPersonState(
+      termPerson.id,
+      { asOf: today, actorAuthz: ordinaryAuthz },
+      { eventDb: pool, personDb: db, compensationDb: compDb },
+    );
+    assert.equal(termState.ok, true);
+    if (!termState.ok) throw new Error("unreachable");
+    assert.ok(termState.primaryAssignment);
+    const termEmploymentId = (await listEmploymentsForPerson(termPerson.id, db))[0]!
+      .id;
+
+    await closePrimaryAssignmentProjection(
+      termState.primaryAssignment.id,
+      today,
+      db,
+    );
+    await closeEmploymentProjection(termEmploymentId, today, db, {
       terminationReason: "resignation",
     });
 
     const afterTerm = await getCurrentPersonState(
-      person.id,
-      { asOf: termEd, actorAuthz: ordinaryAuthz },
+      termPerson.id,
+      { asOf: today, actorAuthz: ordinaryAuthz },
       { eventDb: pool, personDb: db, compensationDb: compDb },
     );
     assert.equal(afterTerm.ok, true);
     if (!afterTerm.ok) throw new Error("unreachable");
+    assert.equal(afterTerm.viewSemantics, "current");
     assert.equal(afterTerm.employment, null);
     assert.equal(afterTerm.primaryAssignment, null);
     assert.equal(afterTerm.teamMembership, null);

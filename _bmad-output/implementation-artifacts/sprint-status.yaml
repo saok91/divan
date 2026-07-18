@@ -1,5 +1,5 @@
-# generated: 2026-07-16
-# last_updated: 2026-07-19T00:35:00+03:30
+﻿# generated: 2026-07-16
+# last_updated: 2026-07-19T01:15:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-19T00:35:00+03:30
+last_updated: 2026-07-19T01:15:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -91,7 +91,7 @@ development_status:
   4-7-team-transfer-with-atomic-capacity-movement: done
   4-8-job-level-contract-compensation-change-events: done
   4-9-current-person-state-projection: done
-  4-10-historical-person-reconstruction: backlog
+  4-10-historical-person-reconstruction: done
   4-11-historical-organization-headcount-reconstruction: backlog
   4-12-headcount-approval-lifecycle: backlog
   4-13-universal-coverage-matching-exemptions: backlog

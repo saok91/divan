@@ -237,19 +237,34 @@ function DayGrid({
   );
 }
 
+export type JalaliDatePickerHandle = {
+  /**
+   * Flush any typed draft into `onChange`.
+   * Returns `{ ok: false }` when the draft is invalid (caller should block submit).
+   * On success, `value` is the committed Gregorian date-only (or undefined if cleared).
+   */
+  commit: () => { ok: true; value: string | undefined } | { ok: false };
+};
+
 /**
  * Effective Date control — date-only Jalali entry + popover calendar.
  */
-export function JalaliDatePicker({
-  id,
-  "aria-label": ariaLabel,
-  value,
-  onChange,
-  disabled,
-  className,
-  error,
-  helperText = "فقط تاریخ مؤثر (بدون ساعت)",
-}: JalaliDatePickerProps) {
+export const JalaliDatePicker = React.forwardRef<
+  JalaliDatePickerHandle,
+  JalaliDatePickerProps
+>(function JalaliDatePicker(
+  {
+    id,
+    "aria-label": ariaLabel,
+    value,
+    onChange,
+    disabled,
+    className,
+    error,
+    helperText = "فقط تاریخ مؤثر (بدون ساعت)",
+  },
+  ref,
+) {
   const autoId = React.useId();
   const fieldId = id ?? autoId;
   const errorId = `${fieldId}-error`;
@@ -280,29 +295,43 @@ export function JalaliDatePicker({
       .filter(Boolean)
       .join(" ") || undefined;
 
-  const commitTyped = (raw: string) => {
+  const commitTyped = (raw: string): string | undefined | false => {
     const trimmed = raw.trim();
     if (!trimmed) {
       setInvalid(false);
       setDraft(null);
       onChange?.(undefined);
-      return;
+      return undefined;
     }
     const j = parseJalaliInput(trimmed);
     if (!j) {
       setInvalid(true);
-      return;
+      return false;
     }
     const g = jalaliToGregorian(j);
     if (!g) {
       setInvalid(true);
-      return;
+      return false;
     }
     setInvalid(false);
     setDraft(null);
     setView(j);
-    onChange?.(formatGregorianDateOnly(g));
+    const formatted = formatGregorianDateOnly(g);
+    onChange?.(formatted);
+    return formatted;
   };
+
+  React.useImperativeHandle(ref, () => ({
+    commit: () => {
+      if (draft === null) {
+        if (invalid) return { ok: false };
+        return { ok: true, value };
+      }
+      const result = commitTyped(display);
+      if (result === false) return { ok: false };
+      return { ok: true, value: result };
+    },
+  }));
 
   const selectDay = (j: JalaliDateOnly) => {
     const g = jalaliToGregorian(j);
@@ -387,7 +416,7 @@ export function JalaliDatePicker({
       ) : null}
     </div>
   );
-}
+});
 
 /**
  * Registration / finalization control — date + time, visually distinct from Effective Date.
