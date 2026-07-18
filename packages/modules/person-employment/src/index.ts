@@ -8,6 +8,7 @@
  * Story 3.8: Secondary Assignment fidelity (FR-12) — dual-role projection; no headcount; inventory gate.
  * Story 3.9: Derived management relationships (FR-13) — compute from Primary+org+Role; no editable shadow.
  * Story 4.2: Draft working store + finalize/conflict substrate (FR-15 / FR-19 / AD-6).
+ * Story 4.3: Scheduled semantics + Cancel / Reverse / Correction (FR-16 / FR-17).
  * Start/Return/Terminate / Secondary create-change-end product flows = Epic 4 (4.5–4.8).
  */
 
@@ -108,6 +109,9 @@ export {
   MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA,
   PERSONNEL_EVENT_DRAFT_PERMISSION,
   PERSONNEL_EVENT_FINALIZE_PERMISSION,
+  PERSONNEL_EVENT_CANCEL_PERMISSION,
+  PERSONNEL_EVENT_REVERSE_PERMISSION,
+  PERSONNEL_EVENT_CORRECT_PERMISSION,
   PERSONNEL_EVENT_DATA_CATEGORY,
   PersonnelEventError,
   MSG_DRAFT_NOT_FOUND_FA,
@@ -127,6 +131,18 @@ export {
   MSG_HEADCOUNT_CHECK_BLOCKED_FA,
   MSG_BASELINE_BOUNDARY_BLOCKED_FA,
   MSG_RISK_TIER_PENDING_REVIEW_FA,
+  MSG_EVENT_NOT_FOUND_FA,
+  MSG_CANCEL_REASON_REQUIRED_FA,
+  MSG_REVERSE_REASON_REQUIRED_FA,
+  MSG_CORRECTION_REASON_REQUIRED_FA,
+  MSG_CANCEL_WRONG_STATE_FA,
+  MSG_CANCEL_AFTER_EFFECT_FA,
+  MSG_REVERSE_WRONG_STATE_FA,
+  MSG_CORRECTION_WRONG_STATE_FA,
+  MSG_FINALIZE_LIFECYCLE_CHAIN_FORBIDDEN_FA,
+  MSG_CORRECTION_SELF_REF_FA,
+  MSG_CORRECTION_CYCLE_FA,
+  MSG_BROKEN_CORRECTION_REF_FA,
 } from "./errors";
 
 export type {
@@ -461,6 +477,10 @@ export {
   assertActorHasJobReferenceWrite,
   assertActorHasPersonnelEventDraft,
   assertActorHasPersonnelEventFinalize,
+  assertActorHasPersonnelEventCancel,
+  assertActorHasPersonnelEventReverse,
+  assertActorHasPersonnelEventCorrect,
+  getPersonnelEventLifecycleCaps,
   MSG_PERSON_PERMISSION_REQUIRED_FA,
 } from "./permissions";
 
@@ -531,3 +551,28 @@ export type {
   ProjectionRefreshContext,
   ProjectionRefreshHook,
 } from "./personnel-event-projection-hook";
+
+export {
+  evaluationStatusAsOf,
+  isPreEffectAsOf,
+  resolveLifecycleStatus,
+  loadEventWithResolvedStatus,
+  detectCorrectionCycle,
+} from "./personnel-event-resolve";
+
+export type {
+  ResolvedLifecycleStatus,
+  EventChainLinks,
+} from "./personnel-event-resolve";
+
+export {
+  cancelPersonnelEvent,
+  reversePersonnelEvent,
+  correctPersonnelEvent,
+} from "./personnel-event-lifecycle";
+
+export type {
+  LifecycleActorInput,
+  LifecycleResult,
+  CorrectPersonnelEventInput,
+} from "./personnel-event-lifecycle";

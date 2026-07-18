@@ -28,6 +28,10 @@ export function SensitiveConfirmationDialog({
   blockedReason,
   onConfirm,
   busy = false,
+  reasonRequired = false,
+  reason = "",
+  onReasonChange,
+  reasonLabel = "دلیل",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,13 +44,25 @@ export function SensitiveConfirmationDialog({
   blockedReason?: string;
   onConfirm: () => void | Promise<void>;
   busy?: boolean;
+  /** Lifecycle Cancel/Reverse/Correction — mandatory reason (UX-DR14). */
+  reasonRequired?: boolean;
+  reason?: string;
+  onReasonChange?: (value: string) => void;
+  reasonLabel?: string;
 }) {
   const titleId = React.useId();
   const descId = React.useId();
+  const reasonId = React.useId();
+  const reasonMissing = reasonRequired && !reason.trim();
+  const disabled = busy || confirmDisabled || reasonMissing;
 
   React.useEffect(() => {
     if (open) {
       const t = window.setTimeout(() => {
+        if (reasonRequired) {
+          document.getElementById(reasonId)?.focus();
+          return;
+        }
         const btn = document.querySelector<HTMLButtonElement>(
           '[data-confirm-primary="true"]',
         );
@@ -54,7 +70,7 @@ export function SensitiveConfirmationDialog({
       }, 0);
       return () => window.clearTimeout(t);
     }
-  }, [open]);
+  }, [open, reasonRequired, reasonId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,6 +89,21 @@ export function SensitiveConfirmationDialog({
 
         <div className="space-y-3 text-sm text-foreground" role="region" aria-label="پیامد">
           {consequence}
+          {reasonRequired ? (
+            <label className="block space-y-1" htmlFor={reasonId}>
+              <span className="text-label-medium">
+                {reasonLabel} <span className="text-destructive">*</span>
+              </span>
+              <textarea
+                id={reasonId}
+                className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={reason}
+                onChange={(e) => onReasonChange?.(e.target.value)}
+                required
+                aria-required="true"
+              />
+            </label>
+          ) : null}
           {blockedReason ? (
             <p role="alert" className="text-destructive">
               {blockedReason}
@@ -93,8 +124,8 @@ export function SensitiveConfirmationDialog({
             type="button"
             variant="primary"
             data-confirm-primary="true"
-            disabled={busy || confirmDisabled}
-            aria-disabled={busy || confirmDisabled}
+            disabled={disabled}
+            aria-disabled={disabled}
             onClick={() => {
               void onConfirm();
             }}

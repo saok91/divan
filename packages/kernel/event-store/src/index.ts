@@ -4,8 +4,14 @@ import type { Pool, PoolClient } from "pg";
 
 import {
   appendBusinessEvent,
+  getBusinessEventById,
+  lockBusinessEventForUpdate,
+  listChainLinksForEvent,
+  listChainLinksForEvents,
+  listBusinessEventsForPerson,
   type AppendBusinessEventInput,
   type AppendBusinessEventResult,
+  type BusinessEventRecord,
   type BusinessEventStatus,
   BusinessEventValidationError,
   assertNoSensitiveEvidence,
@@ -14,6 +20,11 @@ import {
 
 export {
   appendBusinessEvent,
+  getBusinessEventById,
+  lockBusinessEventForUpdate,
+  listChainLinksForEvent,
+  listChainLinksForEvents,
+  listBusinessEventsForPerson,
   BusinessEventValidationError,
   assertNoSensitiveEvidence,
   assertValidBusinessEventType,
@@ -21,6 +32,7 @@ export {
 export type {
   AppendBusinessEventInput,
   AppendBusinessEventResult,
+  BusinessEventRecord,
   BusinessEventStatus,
 };
 

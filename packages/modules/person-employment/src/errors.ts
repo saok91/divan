@@ -442,7 +442,7 @@ export const MSG_MANAGEMENT_ROLE_REGISTRY_INVALID_FA =
 export const MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA =
   "سیاست دامنه مدیر ارشد هنوز تعریف نشده است.";
 
-/** Personnel Event Draft / finalize errors (Story 4.2 / FR-15 / FR-19). Clients match codes. */
+/** Personnel Event Draft / finalize / lifecycle errors (Stories 4.2–4.3). Clients match codes. */
 export type PersonnelEventErrorCode =
   | "DRAFT_NOT_FOUND"
   | "DRAFT_NOT_EDITABLE"
@@ -458,12 +458,21 @@ export type PersonnelEventErrorCode =
   | "INVALID_EFFECTIVE_DATE"
   | "PERSON_NOT_FOUND"
   | "EMPLOYMENT_NOT_FOUND"
+  | "EVENT_NOT_FOUND"
   | "VALIDATION"
   | "SENSITIVE_PAYLOAD"
   | "PERMISSION_DENIED"
   | "HEADCOUNT_CHECK_BLOCKED"
   | "BASELINE_BOUNDARY_BLOCKED"
-  | "RISK_TIER_PENDING_REVIEW";
+  | "RISK_TIER_PENDING_REVIEW"
+  | "REASON_REQUIRED"
+  | "CANCEL_WRONG_STATE"
+  | "CANCEL_AFTER_EFFECT"
+  | "REVERSE_WRONG_STATE"
+  | "CORRECTION_WRONG_STATE"
+  | "CORRECTION_SELF_REF"
+  | "CORRECTION_CYCLE"
+  | "BROKEN_CORRECTION_REF";
 
 export class PersonnelEventError extends Error {
   readonly code: PersonnelEventErrorCode;
@@ -483,6 +492,9 @@ export class PersonnelEventError extends Error {
 
 export const PERSONNEL_EVENT_DRAFT_PERMISSION = "personnel_event.draft";
 export const PERSONNEL_EVENT_FINALIZE_PERMISSION = "personnel_event.finalize";
+export const PERSONNEL_EVENT_CANCEL_PERMISSION = "personnel_event.cancel";
+export const PERSONNEL_EVENT_REVERSE_PERMISSION = "personnel_event.reverse";
+export const PERSONNEL_EVENT_CORRECT_PERMISSION = "personnel_event.correct";
 export const PERSONNEL_EVENT_DATA_CATEGORY = "identity.person";
 
 export const MSG_DRAFT_NOT_FOUND_FA = "پیش‌نویس رویداد یافت نشد.";
@@ -532,3 +544,38 @@ export const MSG_BASELINE_BOUNDARY_BLOCKED_FA =
 
 export const MSG_RISK_TIER_PENDING_REVIEW_FA =
   "این نوع رویداد نیازمند پیش‌تأیید سطح ریسک است و هنوز به‌صورت معتبر ثبت نمی‌شود.";
+
+export const MSG_EVENT_NOT_FOUND_FA = "رویداد پرسنلی یافت نشد.";
+
+export const MSG_CANCEL_REASON_REQUIRED_FA =
+  "برای لغو رویداد، ثبت دلیل الزامی است.";
+
+export const MSG_REVERSE_REASON_REQUIRED_FA =
+  "برای بازگشت رویداد، ثبت دلیل الزامی است.";
+
+export const MSG_CORRECTION_REASON_REQUIRED_FA =
+  "برای اصلاح رویداد، ثبت دلیل الزامی است.";
+
+export const MSG_CANCEL_WRONG_STATE_FA =
+  "فقط رویداد زمان‌بندی‌شده (پیش از اثر) قابل لغو است.";
+
+export const MSG_CANCEL_AFTER_EFFECT_FA =
+  "اثر این رویداد اعمال شده است؛ لغو مجاز نیست. از بازگشت یا اصلاح استفاده کنید.";
+
+export const MSG_REVERSE_WRONG_STATE_FA =
+  "فقط رویداد مؤثر (پس از اثر و بدون خنثی‌سازی قبلی) قابل بازگشت است.";
+
+export const MSG_CORRECTION_WRONG_STATE_FA =
+  "هدف اصلاح باید یک رویداد معتبر باشد؛ وضعیت فعلی برای اصلاح مجاز نیست.";
+
+export const MSG_FINALIZE_LIFECYCLE_CHAIN_FORBIDDEN_FA =
+  "لغو و بازگشت فقط از مسیر چرخهٔ رویداد مجاز است؛ در نهایی‌سازی پیش‌نویس قرار ندهید.";
+
+export const MSG_CORRECTION_SELF_REF_FA =
+  "رویداد نمی‌تواند خودش را اصلاح کند؛ ارجاع خودارجاع مسدود است.";
+
+export const MSG_CORRECTION_CYCLE_FA =
+  "زنجیره اصلاح چرخه‌ای است؛ ثبت مسدود شد.";
+
+export const MSG_BROKEN_CORRECTION_REF_FA =
+  "ارجاع اصلاح/لغو/بازگشت نامعتبر یا یافت‌نشده است؛ عملیات مسدود است.";

@@ -39,6 +39,20 @@
   --break-glass-banner-foreground: #1864ab;
   --break-glass-banner-border: #006fff;
 
+  /* UX-DR10 status badges — light pairs */
+  --status-badge-scheduled-bg: #e7f5ff;
+  --status-badge-scheduled-fg: #1864ab;
+  --status-badge-effective-bg: #d3f9d8;
+  --status-badge-effective-fg: #2b8a3e;
+  --status-badge-cancelled-bg: #f1f3f5;
+  --status-badge-cancelled-fg: #495057;
+  --status-badge-reversed-bg: #f1f3f5;
+  --status-badge-reversed-fg: #495057;
+  --status-badge-draft-bg: #fff9db;
+  --status-badge-draft-fg: #e67700;
+  --status-badge-override-bg: #fff3bf;
+  --status-badge-override-fg: #862e00;
+
   /* Spacing + radius (DESIGN.md) */
   --chrome-height: 56px;
   --banner-stack-height: 0px;
@@ -83,6 +97,20 @@
   --break-glass-banner-background: #1a3a5c;
   --break-glass-banner-foreground: #a5d8ff;
   --break-glass-banner-border: #4d9fff;
+
+  /* UX-DR10 status badges — dark pairs (never light tints on dark canvas) */
+  --status-badge-scheduled-bg: #1a3a5c;
+  --status-badge-scheduled-fg: #a5d8ff;
+  --status-badge-effective-bg: #1b3d2f;
+  --status-badge-effective-fg: #8ce99a;
+  --status-badge-cancelled-bg: #2e2e32;
+  --status-badge-cancelled-fg: #ced4da;
+  --status-badge-reversed-bg: #2e2e32;
+  --status-badge-reversed-fg: #ced4da;
+  --status-badge-draft-bg: #3d3200;
+  --status-badge-draft-fg: #ffe066;
+  --status-badge-override-bg: #3d1a2e;
+  --status-badge-override-fg: #ffb3d1;
 }
 
 @theme inline {
@@ -286,6 +314,33 @@
 
   .animate-toast-slide {
     animation: divan-toast-slide-in 0.2s ease-out;
+  }
+
+  /* UX-DR10 status-badge-* tokens */
+  .status-badge-scheduled {
+    background-color: var(--status-badge-scheduled-bg);
+    color: var(--status-badge-scheduled-fg);
+  }
+  .status-badge-effective {
+    background-color: var(--status-badge-effective-bg);
+    color: var(--status-badge-effective-fg);
+  }
+  .status-badge-cancelled {
+    background-color: var(--status-badge-cancelled-bg);
+    color: var(--status-badge-cancelled-fg);
+  }
+  .status-badge-reversed {
+    background-color: var(--status-badge-reversed-bg);
+    color: var(--status-badge-reversed-fg);
+  }
+  .status-badge-draft {
+    background-color: var(--status-badge-draft-bg);
+    color: var(--status-badge-draft-fg);
+  }
+  .status-badge-override {
+    background-color: var(--status-badge-override-bg);
+    color: var(--status-badge-override-fg);
+    border: 1px solid var(--accent);
   }
 
   @media (prefers-reduced-motion: reduce) {

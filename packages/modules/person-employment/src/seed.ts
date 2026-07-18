@@ -17,8 +17,11 @@ import {
   ORGANIZATION_WRITE_PERMISSION,
   PERSON_READ_PERMISSION,
   PERSON_WRITE_PERMISSION,
+  PERSONNEL_EVENT_CANCEL_PERMISSION,
+  PERSONNEL_EVENT_CORRECT_PERMISSION,
   PERSONNEL_EVENT_DRAFT_PERMISSION,
   PERSONNEL_EVENT_FINALIZE_PERMISSION,
+  PERSONNEL_EVENT_REVERSE_PERMISSION,
 } from "./errors";
 import {
   createGrade,
@@ -269,16 +272,21 @@ export async function seedPersonPermissionFixtures(
   }
 }
 
-/** Story 4.2 — personnel_event.draft / finalize for HR Operator/Admin demo sets. */
+/** Story 4.2–4.3 — personnel_event.draft / finalize (+ lifecycle Admin). */
 export const SEED_PERSONNEL_EVENT = {
   permissionSetName: "personnel-event",
   roleCode: "personnel_event_operator",
   roleLabelFa: "اپراتور رویداد پرسنلی",
+  /** Admin-only Cancel / Reverse / Correction (epic voice = HR Admin). */
+  lifecyclePermissionSetName: "personnel-event-lifecycle",
+  lifecycleRoleCode: "personnel_event_lifecycle_admin",
+  lifecycleRoleLabelFa: "مدیر چرخه رویداد پرسنلی",
 } as const;
 
 /**
  * Bind personnel_event.draft + personnel_event.finalize into a PermissionSet
  * and attach to hr.admin / hr.operator. Idempotent.
+ * Cancel / Reverse / Correction bind Admin-only via lifecycle set.
  */
 export async function seedPersonnelEventPermissionFixtures(
   db: PrismaClient,
@@ -329,6 +337,58 @@ export async function seedPersonnelEventPermissionFixtures(
       create: {
         accountId: account.id,
         accessRoleId: role.id,
+      },
+      update: {},
+    });
+  }
+
+  // Story 4.3 — Cancel / Reverse / Correction: HR Admin only
+  const lifecycleSet = await db.permissionSet.upsert({
+    where: { name: SEED_PERSONNEL_EVENT.lifecyclePermissionSetName },
+    create: {
+      name: SEED_PERSONNEL_EVENT.lifecyclePermissionSetName,
+      permissions: [
+        PERSONNEL_EVENT_CANCEL_PERMISSION,
+        PERSONNEL_EVENT_REVERSE_PERMISSION,
+        PERSONNEL_EVENT_CORRECT_PERMISSION,
+      ],
+    },
+    update: {
+      permissions: [
+        PERSONNEL_EVENT_CANCEL_PERMISSION,
+        PERSONNEL_EVENT_REVERSE_PERMISSION,
+        PERSONNEL_EVENT_CORRECT_PERMISSION,
+      ],
+    },
+  });
+
+  const lifecycleRole = await db.accessRole.upsert({
+    where: { code: SEED_PERSONNEL_EVENT.lifecycleRoleCode },
+    create: {
+      code: SEED_PERSONNEL_EVENT.lifecycleRoleCode,
+      labelFa: SEED_PERSONNEL_EVENT.lifecycleRoleLabelFa,
+      permissionSetId: lifecycleSet.id,
+    },
+    update: {
+      labelFa: SEED_PERSONNEL_EVENT.lifecycleRoleLabelFa,
+      permissionSetId: lifecycleSet.id,
+    },
+  });
+
+  const admin = await db.internalAccount.findUnique({
+    where: { username: "hr.admin" },
+  });
+  if (admin) {
+    await db.accountAccessRole.upsert({
+      where: {
+        accountId_accessRoleId: {
+          accountId: admin.id,
+          accessRoleId: lifecycleRole.id,
+        },
+      },
+      create: {
+        accountId: admin.id,
+        accessRoleId: lifecycleRole.id,
       },
       update: {},
     });

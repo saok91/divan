@@ -4,20 +4,36 @@
  */
 
 import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
-import type { PoolClient, PrismaClient } from "@divan/db";
+import { createPgPool, type Pool, type PoolClient, type PrismaClient } from "@divan/db";
+import { getBusinessEventById } from "@divan/event-store";
 
 import { getPersonDb } from "./db";
 import {
   MSG_BASELINE_BOUNDARY_BLOCKED_FA,
+  MSG_BROKEN_CORRECTION_REF_FA,
+  MSG_CORRECTION_CYCLE_FA,
+  MSG_CORRECTION_SELF_REF_FA,
   MSG_HEADCOUNT_CHECK_BLOCKED_FA,
   MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
   MSG_PERSON_NOT_FOUND_FA,
   PersonnelEventError,
 } from "./errors";
 import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
+import { detectCorrectionCycle } from "./personnel-event-resolve";
 import { isEmploymentActiveAsOf } from "./employment";
 import { getGradeById } from "./job-reference";
 import { JobRefError } from "./errors";
+
+/** Lazy read pool for conflict existence checks outside a finalize txn. */
+let conflictReadPool: Pool | null = null;
+
+function getConflictReadPool(): Pool | null {
+  if (conflictReadPool) return conflictReadPool;
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) return null;
+  conflictReadPool = createPgPool(url);
+  return conflictReadPool;
+}
 
 /**
  * PG `@db.Date` → YYYY-MM-DD via UTC calendar components (never local-TZ shift).
@@ -308,7 +324,7 @@ export async function classifyConflicts(
     return findings;
   }
 
-  // Broken correction refs (if draft carries them)
+  // Broken correction / chain refs — existence + cycle/self-ref (Story 4.3)
   for (const key of [
     "correctsEventId",
     "cancelsEventId",
@@ -316,18 +332,84 @@ export async function classifyConflicts(
   ] as const) {
     const ref = draft.payload[key];
     if (typeof ref === "string" && ref.trim()) {
-      // Application-level UUID shape check; existence validated when event-store lookup lands (4.3)
+      const targetId = ref.trim();
       const uuidOk =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-          ref.trim(),
+          targetId,
         );
       if (!uuidOk) {
         findings.push({
           code: "BROKEN_CORRECTION_REF",
           severity: "blocking",
-          messageFa:
-            "ارجاع اصلاح/لغو/بازگشت نامعتبر است؛ نهایی‌سازی مسدود است.",
+          messageFa: MSG_BROKEN_CORRECTION_REF_FA,
         });
+        continue;
+      }
+
+      const reader = opts.client ?? getConflictReadPool();
+      if (!reader) {
+        // Fail-closed: cannot prove target exists without a DB reader.
+        findings.push({
+          code: "BROKEN_CORRECTION_REF",
+          severity: "blocking",
+          messageFa: MSG_BROKEN_CORRECTION_REF_FA,
+        });
+        continue;
+      }
+
+      const target = await getBusinessEventById(reader, targetId);
+      if (!target) {
+        findings.push({
+          code: "BROKEN_CORRECTION_REF",
+          severity: "blocking",
+          messageFa: MSG_BROKEN_CORRECTION_REF_FA,
+        });
+        continue;
+      }
+
+      if (key === "correctsEventId") {
+        // Self-ref: draft cannot correct itself via payload id equal to a
+        // known finalizedEventId, or target correcting back to draft id.
+        if (
+          draft.finalizedEventId &&
+          targetId === draft.finalizedEventId
+        ) {
+          findings.push({
+            code: "CORRECTION_SELF_REF",
+            severity: "blocking",
+            messageFa: MSG_CORRECTION_SELF_REF_FA,
+          });
+          continue;
+        }
+        const fromId = draft.finalizedEventId ?? draft.id;
+        if (fromId === targetId) {
+          findings.push({
+            code: "CORRECTION_SELF_REF",
+            severity: "blocking",
+            messageFa: MSG_CORRECTION_SELF_REF_FA,
+          });
+          continue;
+        }
+        const cycle = await detectCorrectionCycle(reader, fromId, targetId);
+        if (cycle === "self_ref") {
+          findings.push({
+            code: "CORRECTION_SELF_REF",
+            severity: "blocking",
+            messageFa: MSG_CORRECTION_SELF_REF_FA,
+          });
+        } else if (cycle === "cycle") {
+          findings.push({
+            code: "CORRECTION_CYCLE",
+            severity: "blocking",
+            messageFa: MSG_CORRECTION_CYCLE_FA,
+          });
+        } else if (cycle === "missing_target") {
+          findings.push({
+            code: "BROKEN_CORRECTION_REF",
+            severity: "blocking",
+            messageFa: MSG_BROKEN_CORRECTION_REF_FA,
+          });
+        }
       }
     }
   }

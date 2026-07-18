@@ -55,6 +55,11 @@ type PlatformStatusContextValue = PlatformStatus & {
   isBreakGlassLive: boolean;
   /** Finalize blocked while authz-changed modal is active (Story 2.6). */
   isFinalizeBlockedByAuthzChange: boolean;
+  /**
+   * Mid-session authz change blocks sensitive mutations (finalize + lifecycle)
+   * until the operator acknowledges — same spirit, separate from finalize permission.
+   */
+  isMutationBlockedByAuthzChange: boolean;
 };
 
 const PlatformStatusContext =
@@ -192,6 +197,7 @@ export function PlatformStatusProvider({
 
   const isBreakGlassLive = isGrantLive(breakGlass, nowMs);
   const isFinalizeBlockedByAuthzChange = authzChanged;
+  const isMutationBlockedByAuthzChange = authzChanged;
   const isGoldCtaBlocked =
     blockingStale || recalculationPending || isFinalizeBlockedByAuthzChange;
 
@@ -233,6 +239,7 @@ export function PlatformStatusProvider({
       isGoldCtaBlocked,
       isBreakGlassLive,
       isFinalizeBlockedByAuthzChange,
+      isMutationBlockedByAuthzChange,
     }),
     [
       recalculationPending,
@@ -250,6 +257,7 @@ export function PlatformStatusProvider({
       isGoldCtaBlocked,
       isBreakGlassLive,
       isFinalizeBlockedByAuthzChange,
+      isMutationBlockedByAuthzChange,
     ],
   );
 

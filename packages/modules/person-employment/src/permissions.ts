@@ -20,6 +20,9 @@ import {
   PERSON_WRITE_PERMISSION,
   PERSONNEL_EVENT_DRAFT_PERMISSION,
   PERSONNEL_EVENT_FINALIZE_PERMISSION,
+  PERSONNEL_EVENT_CANCEL_PERMISSION,
+  PERSONNEL_EVENT_REVERSE_PERMISSION,
+  PERSONNEL_EVENT_CORRECT_PERMISSION,
   PersonIdentityError,
   PersonnelEventError,
 } from "./errors";
@@ -184,4 +187,71 @@ export async function assertActorHasPersonnelEventFinalize(
       "personnel_event_finalize_required",
     );
   }
+}
+
+export async function assertActorHasPersonnelEventCancel(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    PERSONNEL_EVENT_CANCEL_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new PersonnelEventError(
+      "PERMISSION_DENIED",
+      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+      "personnel_event_cancel_required",
+    );
+  }
+}
+
+export async function assertActorHasPersonnelEventReverse(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    PERSONNEL_EVENT_REVERSE_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new PersonnelEventError(
+      "PERMISSION_DENIED",
+      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+      "personnel_event_reverse_required",
+    );
+  }
+}
+
+export async function assertActorHasPersonnelEventCorrect(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    PERSONNEL_EVENT_CORRECT_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new PersonnelEventError(
+      "PERMISSION_DENIED",
+      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+      "personnel_event_correct_required",
+    );
+  }
+}
+
+/** Non-throwing caps for UI gating (server still enforces on mutate). */
+export async function getPersonnelEventLifecycleCaps(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<{ cancel: boolean; reverse: boolean; correct: boolean }> {
+  const [cancel, reverse, correct] = await Promise.all([
+    actorHoldsPermission(accountId, PERSONNEL_EVENT_CANCEL_PERMISSION, db),
+    actorHoldsPermission(accountId, PERSONNEL_EVENT_REVERSE_PERMISSION, db),
+    actorHoldsPermission(accountId, PERSONNEL_EVENT_CORRECT_PERMISSION, db),
+  ]);
+  return { cancel, reverse, correct };
 }

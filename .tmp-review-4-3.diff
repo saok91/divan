@@ -1,0 +1,2656 @@
+﻿diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+index c4cedf5..2db2669 100644
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@ -39,6 +39,20 @@
+   --break-glass-banner-foreground: #1864ab;
+   --break-glass-banner-border: #006fff;
+ 
++  /* UX-DR10 status badges ΓÇö light pairs */
++  --status-badge-scheduled-bg: #e7f5ff;
++  --status-badge-scheduled-fg: #1864ab;
++  --status-badge-effective-bg: #d3f9d8;
++  --status-badge-effective-fg: #2b8a3e;
++  --status-badge-cancelled-bg: #f1f3f5;
++  --status-badge-cancelled-fg: #495057;
++  --status-badge-reversed-bg: #f1f3f5;
++  --status-badge-reversed-fg: #495057;
++  --status-badge-draft-bg: #fff9db;
++  --status-badge-draft-fg: #e67700;
++  --status-badge-override-bg: #fff3bf;
++  --status-badge-override-fg: #862e00;
++
+   /* Spacing + radius (DESIGN.md) */
+   --chrome-height: 56px;
+   --banner-stack-height: 0px;
+@@ -83,6 +97,20 @@
+   --break-glass-banner-background: #1a3a5c;
+   --break-glass-banner-foreground: #a5d8ff;
+   --break-glass-banner-border: #4d9fff;
++
++  /* UX-DR10 status badges ΓÇö dark pairs (never light tints on dark canvas) */
++  --status-badge-scheduled-bg: #1a3a5c;
++  --status-badge-scheduled-fg: #a5d8ff;
++  --status-badge-effective-bg: #1b3d2f;
++  --status-badge-effective-fg: #8ce99a;
++  --status-badge-cancelled-bg: #2e2e32;
++  --status-badge-cancelled-fg: #ced4da;
++  --status-badge-reversed-bg: #2e2e32;
++  --status-badge-reversed-fg: #ced4da;
++  --status-badge-draft-bg: #3d3200;
++  --status-badge-draft-fg: #ffe066;
++  --status-badge-override-bg: #3d3200;
++  --status-badge-override-fg: #ffe066;
+ }
+ 
+ @theme inline {
+@@ -288,6 +316,33 @@
+     animation: divan-toast-slide-in 0.2s ease-out;
+   }
+ 
++  /* UX-DR10 status-badge-* tokens */
++  .status-badge-scheduled {
++    background-color: var(--status-badge-scheduled-bg);
++    color: var(--status-badge-scheduled-fg);
++  }
++  .status-badge-effective {
++    background-color: var(--status-badge-effective-bg);
++    color: var(--status-badge-effective-fg);
++  }
++  .status-badge-cancelled {
++    background-color: var(--status-badge-cancelled-bg);
++    color: var(--status-badge-cancelled-fg);
++  }
++  .status-badge-reversed {
++    background-color: var(--status-badge-reversed-bg);
++    color: var(--status-badge-reversed-fg);
++  }
++  .status-badge-draft {
++    background-color: var(--status-badge-draft-bg);
++    color: var(--status-badge-draft-fg);
++  }
++  .status-badge-override {
++    background-color: var(--status-badge-override-bg);
++    color: var(--status-badge-override-fg);
++    border: 1px solid var(--accent);
++  }
++
+   @media (prefers-reduced-motion: reduce) {
+     .animate-skeleton-shimmer::after {
+       animation: none;
+diff --git a/apps/web/components/personnel/personnel-event-form.tsx b/apps/web/components/personnel/personnel-event-form.tsx
+index 2f4883b..de13788 100644
+--- a/apps/web/components/personnel/personnel-event-form.tsx
++++ b/apps/web/components/personnel/personnel-event-form.tsx
+@@ -7,6 +7,10 @@ import {
+   ConflictList,
+   SensitiveConfirmationDialog,
+ } from "@/components/personnel/sensitive-confirmation-dialog";
++import {
++  StatusBadge,
++  type StatusBadgeKind,
++} from "@/components/personnel/status-badge";
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+ import { usePlatformStatus } from "@/components/platform-status-provider";
+@@ -20,9 +24,11 @@ type Conflict = {
+   requiresAck?: boolean;
+ };
+ 
++type LifecycleOp = "cancel" | "reverse" | "correct";
++
+ /**
+- * Minimal ┘ü╪▒┘à ╪▒┘ê█î╪»╪º╪» (UX-DR11) ΓÇö Story 4.2.
+- * Save draft Γëá Finalize. Authoritative events are not editable here.
++ * Minimal ┘ü╪▒┘à ╪▒┘ê█î╪»╪º╪» (UX-DR11) ΓÇö Stories 4.2ΓÇô4.3.
++ * Save draft Γëá Finalize. Lifecycle Cancel/Reverse/Correct append-only.
+  */
+ export function PersonnelEventForm() {
+   const formId = React.useId();
+@@ -47,14 +53,29 @@ export function PersonnelEventForm() {
+   const [confirmOpen, setConfirmOpen] = React.useState(false);
+   const [dirty, setDirty] = React.useState(false);
+ 
++  const [lifecycleOp, setLifecycleOp] = React.useState<LifecycleOp | null>(
++    null,
++  );
++  const [lifecycleEventId, setLifecycleEventId] = React.useState<string | null>(
++    null,
++  );
++  const [lifecycleReason, setLifecycleReason] = React.useState("");
++
+   const createMut = api.personnelEvent.draftCreate.useMutation();
+   const updateMut = api.personnelEvent.draftUpdate.useMutation();
+   const deleteMut = api.personnelEvent.draftDelete.useMutation();
+   const finalizeMut = api.personnelEvent.finalize.useMutation();
++  const cancelMut = api.personnelEvent.cancel.useMutation();
++  const reverseMut = api.personnelEvent.reverse.useMutation();
++  const correctMut = api.personnelEvent.correct.useMutation();
+   const evaluateQuery = api.personnelEvent.evaluate.useQuery(
+     { draftId: draftId! },
+     { enabled: Boolean(draftId) && confirmOpen },
+   );
++  const eventsQuery = api.personnelEvent.listForPerson.useQuery(
++    { personId: personId.trim(), limit: 20 },
++    { enabled: Boolean(personId.trim()) },
++  );
+ 
+   React.useEffect(() => {
+     setDemoDraftOpen(Boolean(draftId) || dirty);
+@@ -169,6 +190,7 @@ export function PersonnelEventForm() {
+         setDemoDraftOpen(false);
+         setConfirmOpen(false);
+         setConflicts([]);
++        void eventsQuery.refetch();
+       } else if (result.outcome === "pending_review") {
+         setStatusMsg(result.messageFa);
+         setVersion(result.draft.version);
+@@ -204,6 +226,62 @@ export function PersonnelEventForm() {
+     }
+   }
+ 
++  function openLifecycle(op: LifecycleOp, eventId: string) {
++    setLifecycleOp(op);
++    setLifecycleEventId(eventId);
++    setLifecycleReason("");
++    setErrorMsg(null);
++  }
++
++  async function onLifecycleConfirm() {
++    if (!lifecycleOp || !lifecycleEventId || !lifecycleReason.trim()) return;
++    if (isFinalizeBlockedByAuthzChange) return;
++    setErrorMsg(null);
++    try {
++      const input = {
++        eventId: lifecycleEventId,
++        reason: lifecycleReason.trim(),
++        idempotencyKey: `ui-${lifecycleOp}-${lifecycleEventId}`,
++      };
++      if (lifecycleOp === "cancel") {
++        const r = await cancelMut.mutateAsync(input);
++        setStatusMsg(
++          `┘ä╪║┘ê ╪½╪¿╪¬ ╪┤╪»: ${r.neutralizingEventId} (┘ê╪╢╪╣█î╪¬ ╪¡┘äΓÇî╪┤╪»┘ç: ┘ä╪║┘ê╪┤╪»┘ç)`,
++        );
++      } else if (lifecycleOp === "reverse") {
++        const r = await reverseMut.mutateAsync(input);
++        setStatusMsg(
++          `╪¿╪º╪▓┌»╪┤╪¬ ╪½╪¿╪¬ ╪┤╪»: ${r.neutralizingEventId} (┘ê╪╢╪╣█î╪¬ ╪¡┘äΓÇî╪┤╪»┘ç: ╪¿╪º╪▓┌»╪┤╪¬ΓÇî╪«┘ê╪▒╪»┘ç)`,
++        );
++      } else {
++        const r = await correctMut.mutateAsync(input);
++        setStatusMsg(
++          `╪º╪╡┘ä╪º╪¡ ╪½╪¿╪¬ ╪┤╪»: ${r.neutralizingEventId} ΓÇö ╪º╪╡┘ä ╪¬╪º╪▒█î╪«┌å┘ç ╪¡┘ü╪╕ ┘à█îΓÇî╪┤┘ê╪»`,
++        );
++      }
++      setLifecycleOp(null);
++      setLifecycleEventId(null);
++      setLifecycleReason("");
++      void eventsQuery.refetch();
++    } catch (err) {
++      const msg =
++        err && typeof err === "object" && "message" in err
++          ? String((err as { message: unknown }).message)
++          : "╪╣┘à┘ä█î╪º╪¬ ┌å╪▒╪«┘ç ╪▒┘ê█î╪»╪º╪» ┘å╪º┘à┘ê┘ü┘é ╪¿┘ê╪».";
++      setErrorMsg(msg);
++    }
++  }
++
++  const lifecycleBusy =
++    cancelMut.isPending || reverseMut.isPending || correctMut.isPending;
++
++  const lifecycleTitle =
++    lifecycleOp === "cancel"
++      ? "╪¬╪ú█î█î╪» ┘ä╪║┘ê ╪▒┘ê█î╪»╪º╪»"
++      : lifecycleOp === "reverse"
++        ? "╪¬╪ú█î█î╪» ╪¿╪º╪▓┌»╪┤╪¬ ╪▒┘ê█î╪»╪º╪»"
++        : "╪¬╪ú█î█î╪» ╪º╪╡┘ä╪º╪¡ ╪▒┘ê█î╪»╪º╪»";
++
+   return (
+     <section
+       className="mx-auto max-w-4xl space-y-6"
+@@ -215,7 +293,7 @@ export function PersonnelEventForm() {
+         </h2>
+         <p className="text-body text-muted-foreground">
+           ╪░╪«█î╪▒┘ç ┘╛█î╪┤ΓÇî┘å┘ê█î╪│ ┘ê╪╢╪╣█î╪¬ ┘ü╪╣┘ä█î ╪▒╪º ╪¬╪║█î█î╪▒ ┘å┘à█îΓÇî╪»┘ç╪». ┘å┘ç╪º█î█îΓÇî╪│╪º╪▓█î ╪▒┘ê█î╪»╪º╪» ┘à╪╣╪¬╪¿╪▒
+-          ┘à█îΓÇî╪│╪º╪▓╪».
++          ┘à█îΓÇî╪│╪º╪▓╪». ┘ä╪║┘ê/╪¿╪º╪▓┌»╪┤╪¬/╪º╪╡┘ä╪º╪¡ ╪º╪╡┘ä ╪▒╪º ┘╛╪º┌⌐ ┘å┘à█îΓÇî┌⌐┘å╪».
+         </p>
+       </header>
+ 
+@@ -380,6 +458,91 @@ export function PersonnelEventForm() {
+         </footer>
+       </form>
+ 
++      {personId.trim() ? (
++        <section
++          className="space-y-3 border-t border-border pt-6"
++          aria-labelledby={`${formId}-events`}
++        >
++          <h3 id={`${formId}-events`} className="text-label-medium">
++            ╪▒┘ê█î╪»╪º╪»┘ç╪º█î ┘à╪╣╪¬╪¿╪▒ (┘å┘à╪º█î╪┤ ┘ê╪╢╪╣█î╪¬ ╪¡┘äΓÇî╪┤╪»┘ç)
++          </h3>
++          <p className="text-xs text-muted-foreground">
++            ╪▓┘à╪º┘åΓÇî╪¿┘å╪»█îΓÇî╪┤╪»┘ç ╪¬╪º ╪¬╪º╪▒█î╪« ┘à╪ñ╪½╪▒ ┘ê╪╢╪╣█î╪¬ ┘ü╪╣┘ä█î ╪▒╪º ╪¬╪║█î█î╪▒ ┘å┘à█îΓÇî╪»┘ç╪». ╪¼╪»┘ê┘ä ╪▓┘à╪º┘å█î
++            ┌⌐╪º┘à┘ä ╪»╪▒ Epic █╡.█│.
++          </p>
++          {eventsQuery.isLoading ? (
++            <p role="status">╪»╪▒ ╪¡╪º┘ä ╪¿╪º╪▒┌»╪░╪º╪▒█îΓÇª</p>
++          ) : (eventsQuery.data?.length ?? 0) === 0 ? (
++            <p className="text-sm text-muted-foreground">╪▒┘ê█î╪»╪º╪»█î ╪½╪¿╪¬ ┘å╪┤╪»┘ç ╪º╪│╪¬.</p>
++          ) : (
++            <ul className="space-y-3" role="list">
++              {eventsQuery.data?.map((row) => {
++                const badge = row.resolvedStatus as StatusBadgeKind;
++                const showCancel = row.resolvedStatus === "Scheduled";
++                const showReverse = row.resolvedStatus === "Effective";
++                const showCorrect =
++                  row.resolvedStatus === "Scheduled" ||
++                  row.resolvedStatus === "Effective";
++                return (
++                  <li
++                    key={row.event.id}
++                    className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3"
++                  >
++                    <div className="space-y-1">
++                      <div className="flex flex-wrap items-center gap-2">
++                        <StatusBadge status={badge} />
++                        <span className="text-sm font-medium" dir="ltr">
++                          {row.event.eventType}
++                        </span>
++                      </div>
++                      <p className="text-xs text-muted-foreground" dir="ltr">
++                        {row.event.id.slice(0, 8)}ΓÇª ┬╖ ┘à╪ñ╪½╪▒{" "}
++                        {row.event.effectiveDate}
++                      </p>
++                    </div>
++                    <div className="flex flex-wrap gap-1">
++                      {showCancel ? (
++                        <Button
++                          type="button"
++                          variant="outline"
++                          size="sm"
++                          disabled={isFinalizeBlockedByAuthzChange}
++                          onClick={() => openLifecycle("cancel", row.event.id)}
++                        >
++                          ┘ä╪║┘ê
++                        </Button>
++                      ) : null}
++                      {showReverse ? (
++                        <Button
++                          type="button"
++                          variant="outline"
++                          size="sm"
++                          disabled={isFinalizeBlockedByAuthzChange}
++                          onClick={() => openLifecycle("reverse", row.event.id)}
++                        >
++                          ╪¿╪º╪▓┌»╪┤╪¬
++                        </Button>
++                      ) : null}
++                      {showCorrect ? (
++                        <Button
++                          type="button"
++                          variant="outline"
++                          size="sm"
++                          disabled={isFinalizeBlockedByAuthzChange}
++                          onClick={() => openLifecycle("correct", row.event.id)}
++                        >
++                          ╪º╪╡┘ä╪º╪¡
++                        </Button>
++                      ) : null}
++                    </div>
++                  </li>
++                );
++              })}
++            </ul>
++          )}
++        </section>
++      ) : null}
++
+       <SensitiveConfirmationDialog
+         open={confirmOpen}
+         onOpenChange={setConfirmOpen}
+@@ -415,6 +578,40 @@ export function PersonnelEventForm() {
+         busy={finalizeMut.isPending}
+         onConfirm={onFinalizeConfirm}
+       />
++
++      <SensitiveConfirmationDialog
++        open={Boolean(lifecycleOp && lifecycleEventId)}
++        onOpenChange={(open) => {
++          if (!open) {
++            setLifecycleOp(null);
++            setLifecycleEventId(null);
++            setLifecycleReason("");
++          }
++        }}
++        title={lifecycleTitle}
++        confirmLabel="╪½╪¿╪¬"
++        consequence={
++          <div className="space-y-2">
++            <p>
++              ╪º█î┘å ╪▒┘ê█î╪»╪º╪» ╪¬╪º╪▒█î╪«┌å┘ç ╪▒╪º ┘╛╪º┌⌐ ┘å┘à█îΓÇî┌⌐┘å╪»╪¢ ╪º╪╡┘ä╪º╪¡ ┘à╪▒╪¬╪¿╪╖ ╪½╪¿╪¬ ┘à█îΓÇî╪┤┘ê╪».
++            </p>
++            <p className="text-muted-foreground" dir="ltr">
++              ┘ç╪»┘ü: {lifecycleEventId}
++            </p>
++          </div>
++        }
++        reasonRequired
++        reason={lifecycleReason}
++        onReasonChange={setLifecycleReason}
++        confirmDisabled={isFinalizeBlockedByAuthzChange || lifecycleBusy}
++        blockedReason={
++          isFinalizeBlockedByAuthzChange
++            ? "╪╣┘à┘ä█î╪º╪¬ ╪¬╪º ╪¬╪ú█î█î╪» ╪¬╪║█î█î╪▒ ╪»╪│╪¬╪▒╪│█î ┘à┘à┌⌐┘å ┘å█î╪│╪¬."
++            : undefined
++        }
++        busy={lifecycleBusy}
++        onConfirm={onLifecycleConfirm}
++      />
+     </section>
+   );
+ }
+diff --git a/apps/web/components/personnel/sensitive-confirmation-dialog.tsx b/apps/web/components/personnel/sensitive-confirmation-dialog.tsx
+index db0c436..b6532a8 100644
+--- a/apps/web/components/personnel/sensitive-confirmation-dialog.tsx
++++ b/apps/web/components/personnel/sensitive-confirmation-dialog.tsx
+@@ -28,6 +28,10 @@ export function SensitiveConfirmationDialog({
+   blockedReason,
+   onConfirm,
+   busy = false,
++  reasonRequired = false,
++  reason = "",
++  onReasonChange,
++  reasonLabel = "╪»┘ä█î┘ä",
+ }: {
+   open: boolean;
+   onOpenChange: (open: boolean) => void;
+@@ -40,13 +44,25 @@ export function SensitiveConfirmationDialog({
+   blockedReason?: string;
+   onConfirm: () => void | Promise<void>;
+   busy?: boolean;
++  /** Lifecycle Cancel/Reverse/Correction ΓÇö mandatory reason (UX-DR14). */
++  reasonRequired?: boolean;
++  reason?: string;
++  onReasonChange?: (value: string) => void;
++  reasonLabel?: string;
+ }) {
+   const titleId = React.useId();
+   const descId = React.useId();
++  const reasonId = React.useId();
++  const reasonMissing = reasonRequired && !reason.trim();
++  const disabled = busy || confirmDisabled || reasonMissing;
+ 
+   React.useEffect(() => {
+     if (open) {
+       const t = window.setTimeout(() => {
++        if (reasonRequired) {
++          document.getElementById(reasonId)?.focus();
++          return;
++        }
+         const btn = document.querySelector<HTMLButtonElement>(
+           '[data-confirm-primary="true"]',
+         );
+@@ -54,7 +70,7 @@ export function SensitiveConfirmationDialog({
+       }, 0);
+       return () => window.clearTimeout(t);
+     }
+-  }, [open]);
++  }, [open, reasonRequired, reasonId]);
+ 
+   return (
+     <Dialog open={open} onOpenChange={onOpenChange}>
+@@ -73,6 +89,21 @@ export function SensitiveConfirmationDialog({
+ 
+         <div className="space-y-3 text-sm text-foreground" role="region" aria-label="┘╛█î╪º┘à╪»">
+           {consequence}
++          {reasonRequired ? (
++            <label className="block space-y-1" htmlFor={reasonId}>
++              <span className="text-label-medium">
++                {reasonLabel} <span className="text-destructive">*</span>
++              </span>
++              <textarea
++                id={reasonId}
++                className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
++                value={reason}
++                onChange={(e) => onReasonChange?.(e.target.value)}
++                required
++                aria-required="true"
++              />
++            </label>
++          ) : null}
+           {blockedReason ? (
+             <p role="alert" className="text-destructive">
+               {blockedReason}
+@@ -93,8 +124,8 @@ export function SensitiveConfirmationDialog({
+             type="button"
+             variant="primary"
+             data-confirm-primary="true"
+-            disabled={busy || confirmDisabled}
+-            aria-disabled={busy || confirmDisabled}
++            disabled={disabled}
++            aria-disabled={disabled}
+             onClick={() => {
+               void onConfirm();
+             }}
+diff --git a/apps/web/src/server/personnel-event.ts b/apps/web/src/server/personnel-event.ts
+index 076f9df..99fdd47 100644
+--- a/apps/web/src/server/personnel-event.ts
++++ b/apps/web/src/server/personnel-event.ts
+@@ -1,23 +1,37 @@
+ /**
+- * Personnel Event Draft / finalize router (Story 4.2 / FR-15 / FR-19).
++ * Personnel Event Draft / finalize / lifecycle router (Stories 4.2ΓÇô4.3).
+  * Coarse role unlocks nav only ΓÇö mutations require PermissionSet bindings.
+  */
+ import { createPgPool, type Pool } from "@divan/db";
+ import {
++  PERSONNEL_EVENT_CANCEL_PERMISSION,
++  PERSONNEL_EVENT_CORRECT_PERMISSION,
+   PERSONNEL_EVENT_DATA_CATEGORY,
+   PERSONNEL_EVENT_DRAFT_PERMISSION,
+   PERSONNEL_EVENT_FINALIZE_PERMISSION,
++  PERSONNEL_EVENT_REVERSE_PERMISSION,
+   PersonnelEventError,
++  assertActorHasPersonnelEventCancel,
++  assertActorHasPersonnelEventCorrect,
+   assertActorHasPersonnelEventDraft,
+   assertActorHasPersonnelEventFinalize,
++  assertActorHasPersonnelEventReverse,
++  cancelPersonnelEvent,
++  correctPersonnelEvent,
+   createDraft,
+   deleteDraft,
+   evaluateDraftForFinalize,
+   finalizeDraft,
+   getDraft,
+   listOpenDraftsForPerson,
++  loadEventWithResolvedStatus,
++  reversePersonnelEvent,
+   updateDraft,
+ } from "@divan/person-employment";
++import {
++  getBusinessEventById,
++  listBusinessEventsForPerson,
++} from "@divan/event-store";
+ import { TRPCError } from "@trpc/server";
+ import { z } from "zod";
+ 
+@@ -47,6 +61,30 @@ const finalizeMeta = {
+   sensitive: false as const,
+ };
+ 
++const cancelMeta = {
++  permission: PERSONNEL_EVENT_CANCEL_PERMISSION,
++  dataCategory: PERSONNEL_EVENT_DATA_CATEGORY,
++  action: "write" as const,
++  organizationalScope: "org:selfcheck",
++  sensitive: false as const,
++};
++
++const reverseMeta = {
++  permission: PERSONNEL_EVENT_REVERSE_PERMISSION,
++  dataCategory: PERSONNEL_EVENT_DATA_CATEGORY,
++  action: "write" as const,
++  organizationalScope: "org:selfcheck",
++  sensitive: false as const,
++};
++
++const correctMeta = {
++  permission: PERSONNEL_EVENT_CORRECT_PERMISSION,
++  dataCategory: PERSONNEL_EVENT_DATA_CATEGORY,
++  action: "write" as const,
++  organizationalScope: "org:selfcheck",
++  sensitive: false as const,
++};
++
+ let finalizePool: Pool | null = null;
+ 
+ function getFinalizePool(): Pool {
+@@ -64,7 +102,11 @@ function getFinalizePool(): Pool {
+ 
+ function mapPersonnelEventError(err: unknown): never {
+   if (err instanceof PersonnelEventError) {
+-    if (err.code === "DRAFT_NOT_FOUND" || err.code === "PERSON_NOT_FOUND") {
++    if (
++      err.code === "DRAFT_NOT_FOUND" ||
++      err.code === "PERSON_NOT_FOUND" ||
++      err.code === "EVENT_NOT_FOUND"
++    ) {
+       throw new TRPCError({
+         code: "NOT_FOUND",
+         message: err.messageFa,
+@@ -99,6 +141,7 @@ function mapPersonnelEventError(err: unknown): never {
+ }
+ 
+ const payloadSchema = z.record(z.string(), z.unknown()).optional();
++const reasonSchema = z.string().min(1, "╪»┘ä█î┘ä ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬");
+ 
+ export const personnelEventRouter = createTRPCRouter({
+   draftCreate: governedProcedure
+@@ -250,4 +293,173 @@ export const personnelEventRouter = createTRPCRouter({
+         mapPersonnelEventError(err);
+       }
+     }),
++
++  get: governedProcedure
++    .meta({ ...draftReadMeta, operation: "personnel_event.get" })
++    .input(z.object({ eventId: z.string().min(1) }))
++    .query(async ({ ctx, input }) => {
++      try {
++        await assertActorHasPersonnelEventDraft(ctx.session.accountId);
++        const event = await getBusinessEventById(
++          getFinalizePool(),
++          input.eventId,
++        );
++        if (!event) {
++          throw new PersonnelEventError(
++            "EVENT_NOT_FOUND",
++            "╪▒┘ê█î╪»╪º╪» ┘╛╪▒╪│┘å┘ä█î █î╪º┘ü╪¬ ┘å╪┤╪».",
++          );
++        }
++        return event;
++      } catch (err) {
++        mapPersonnelEventError(err);
++      }
++    }),
++
++  resolve: governedProcedure
++    .meta({ ...draftReadMeta, operation: "personnel_event.resolve" })
++    .input(z.object({ eventId: z.string().min(1) }))
++    .query(async ({ ctx, input }) => {
++      try {
++        await assertActorHasPersonnelEventDraft(ctx.session.accountId);
++        const resolved = await loadEventWithResolvedStatus(
++          getFinalizePool(),
++          input.eventId,
++        );
++        if (!resolved) {
++          throw new PersonnelEventError(
++            "EVENT_NOT_FOUND",
++            "╪▒┘ê█î╪»╪º╪» ┘╛╪▒╪│┘å┘ä█î █î╪º┘ü╪¬ ┘å╪┤╪».",
++          );
++        }
++        return {
++          event: resolved.event,
++          resolvedStatus: resolved.resolvedStatus,
++          links: {
++            cancellations: resolved.links.cancellations.map((e) => e.id),
++            reversals: resolved.links.reversals.map((e) => e.id),
++            corrections: resolved.links.corrections.map((e) => e.id),
++          },
++        };
++      } catch (err) {
++        mapPersonnelEventError(err);
++      }
++    }),
++
++  listForPerson: governedProcedure
++    .meta({ ...draftReadMeta, operation: "personnel_event.list_for_person" })
++    .input(
++      z.object({
++        personId: z.string().min(1),
++        limit: z.number().int().positive().max(100).optional(),
++      }),
++    )
++    .query(async ({ ctx, input }) => {
++      try {
++        await assertActorHasPersonnelEventDraft(ctx.session.accountId);
++        const events = await listBusinessEventsForPerson(
++          getFinalizePool(),
++          input.personId,
++          { limit: input.limit },
++        );
++        const withResolved = await Promise.all(
++          events.map(async (event) => {
++            const resolved = await loadEventWithResolvedStatus(
++              getFinalizePool(),
++              event.id,
++            );
++            return {
++              event,
++              resolvedStatus: resolved?.resolvedStatus ?? event.status,
++            };
++          }),
++        );
++        return withResolved;
++      } catch (err) {
++        mapPersonnelEventError(err);
++      }
++    }),
++
++  cancel: governedProcedure
++    .meta({ ...cancelMeta, operation: "personnel_event.cancel" })
++    .input(
++      z.object({
++        eventId: z.string().min(1),
++        reason: reasonSchema,
++        idempotencyKey: z.string().optional(),
++      }),
++    )
++    .mutation(async ({ ctx, input }) => {
++      try {
++        await assertActorHasPersonnelEventCancel(ctx.session.accountId);
++        return await cancelPersonnelEvent(
++          input.eventId,
++          {
++            actorId: ctx.session.accountId,
++            correlationId: ctx.correlationId,
++            reason: input.reason,
++            idempotencyKey: input.idempotencyKey,
++          },
++          getFinalizePool(),
++        );
++      } catch (err) {
++        mapPersonnelEventError(err);
++      }
++    }),
++
++  reverse: governedProcedure
++    .meta({ ...reverseMeta, operation: "personnel_event.reverse" })
++    .input(
++      z.object({
++        eventId: z.string().min(1),
++        reason: reasonSchema,
++        idempotencyKey: z.string().optional(),
++      }),
++    )
++    .mutation(async ({ ctx, input }) => {
++      try {
++        await assertActorHasPersonnelEventReverse(ctx.session.accountId);
++        return await reversePersonnelEvent(
++          input.eventId,
++          {
++            actorId: ctx.session.accountId,
++            correlationId: ctx.correlationId,
++            reason: input.reason,
++            idempotencyKey: input.idempotencyKey,
++          },
++          getFinalizePool(),
++        );
++      } catch (err) {
++        mapPersonnelEventError(err);
++      }
++    }),
++
++  correct: governedProcedure
++    .meta({ ...correctMeta, operation: "personnel_event.correct" })
++    .input(
++      z.object({
++        eventId: z.string().min(1),
++        reason: reasonSchema,
++        idempotencyKey: z.string().optional(),
++        correctionPayload: payloadSchema,
++      }),
++    )
++    .mutation(async ({ ctx, input }) => {
++      try {
++        await assertActorHasPersonnelEventCorrect(ctx.session.accountId);
++        return await correctPersonnelEvent(
++          input.eventId,
++          {
++            actorId: ctx.session.accountId,
++            correlationId: ctx.correlationId,
++            reason: input.reason,
++            idempotencyKey: input.idempotencyKey,
++            correctionPayload: input.correctionPayload,
++          },
++          getFinalizePool(),
++        );
++      } catch (err) {
++        mapPersonnelEventError(err);
++      }
++    }),
+ });
+diff --git a/packages/kernel/event-store/src/business-event.ts b/packages/kernel/event-store/src/business-event.ts
+index f873a39..7ed2042 100644
+--- a/packages/kernel/event-store/src/business-event.ts
++++ b/packages/kernel/event-store/src/business-event.ts
+@@ -357,3 +357,184 @@ export async function appendBusinessEvent(
+ 
+   return { id };
+ }
++
++/** Business event row shape for thin reads (Story 4.3). */
++export type BusinessEventRecord = {
++  id: string;
++  eventType: string;
++  personId: string;
++  employmentId: string | null;
++  effectiveDate: string;
++  status: BusinessEventStatus;
++  registeredBy: string;
++  registeredAt: Date;
++  finalizedBy: string | null;
++  finalizedAt: Date | null;
++  reason: string | null;
++  correctsEventId: string | null;
++  cancelsEventId: string | null;
++  reversesEventId: string | null;
++  supersedesEventId: string | null;
++  payload: Record<string, unknown>;
++  correlationId: string;
++};
++
++type KernelBusinessRow = {
++  id: string;
++  event_type: string;
++  person_id: string;
++  employment_id: string | null;
++  effective_date: Date | string;
++  status: string;
++  registered_by: string;
++  registered_at: Date;
++  finalized_by: string | null;
++  finalized_at: Date | null;
++  reason: string | null;
++  corrects_event_id: string | null;
++  cancels_event_id: string | null;
++  reverses_event_id: string | null;
++  supersedes_event_id: string | null;
++  payload: unknown;
++  correlation_id: string;
++};
++
++function dateOnlyFromPg(value: Date | string): string {
++  if (typeof value === "string") {
++    // DATE drivers may return 'YYYY-MM-DD' already
++    return value.slice(0, 10);
++  }
++  const y = value.getUTCFullYear();
++  const m = String(value.getUTCMonth() + 1).padStart(2, "0");
++  const day = String(value.getUTCDate()).padStart(2, "0");
++  return `${y}-${m}-${day}`;
++}
++
++function asRecord(value: unknown): Record<string, unknown> {
++  if (value && typeof value === "object" && !Array.isArray(value)) {
++    return value as Record<string, unknown>;
++  }
++  return {};
++}
++
++function mapBusinessRow(row: KernelBusinessRow): BusinessEventRecord {
++  const status = row.status as BusinessEventStatus;
++  return {
++    id: row.id,
++    eventType: row.event_type,
++    personId: row.person_id,
++    employmentId: row.employment_id,
++    effectiveDate: dateOnlyFromPg(row.effective_date),
++    status,
++    registeredBy: row.registered_by,
++    registeredAt: row.registered_at,
++    finalizedBy: row.finalized_by,
++    finalizedAt: row.finalized_at,
++    reason: row.reason,
++    correctsEventId: row.corrects_event_id,
++    cancelsEventId: row.cancels_event_id,
++    reversesEventId: row.reverses_event_id,
++    supersedesEventId: row.supersedes_event_id,
++    payload: asRecord(row.payload),
++    correlationId: row.correlation_id,
++  };
++}
++
++const BUSINESS_SELECT = `
++  id, event_type, person_id, employment_id, effective_date, status,
++  registered_by, registered_at, finalized_by, finalized_at, reason,
++  corrects_event_id, cancels_event_id, reverses_event_id, supersedes_event_id,
++  payload, correlation_id
++`;
++
++/**
++ * Load one business event by id (no lock).
++ * Returns null when missing or not `event_class=business`.
++ */
++export async function getBusinessEventById(
++  db: PgQueryable,
++  eventId: string,
++): Promise<BusinessEventRecord | null> {
++  assertUuid("eventId", "invalid_event_id", eventId.trim());
++  const result = await db.query<KernelBusinessRow>(
++    `SELECT ${BUSINESS_SELECT}
++     FROM kernel_events
++     WHERE id = $1::uuid AND event_class = 'business'`,
++    [eventId.trim()],
++  );
++  const row = result.rows[0];
++  return row ? mapBusinessRow(row) : null;
++}
++
++/**
++ * Lock a business event row for Cancel/Reverse race decisions (`FOR UPDATE`).
++ */
++export async function lockBusinessEventForUpdate(
++  db: PgQueryable,
++  eventId: string,
++): Promise<BusinessEventRecord | null> {
++  assertUuid("eventId", "invalid_event_id", eventId.trim());
++  const result = await db.query<KernelBusinessRow>(
++    `SELECT ${BUSINESS_SELECT}
++     FROM kernel_events
++     WHERE id = $1::uuid AND event_class = 'business'
++     FOR UPDATE`,
++    [eventId.trim()],
++  );
++  const row = result.rows[0];
++  return row ? mapBusinessRow(row) : null;
++}
++
++/** Children that cancel / reverse / correct a target event. */
++export async function listChainLinksForEvent(
++  db: PgQueryable,
++  targetEventId: string,
++): Promise<{
++  cancellations: BusinessEventRecord[];
++  reversals: BusinessEventRecord[];
++  corrections: BusinessEventRecord[];
++}> {
++  assertUuid("targetEventId", "invalid_event_id", targetEventId.trim());
++  const id = targetEventId.trim();
++  const cancels = await db.query<KernelBusinessRow>(
++    `SELECT ${BUSINESS_SELECT} FROM kernel_events
++     WHERE event_class = 'business' AND cancels_event_id = $1::uuid
++     ORDER BY registered_at ASC, id ASC`,
++    [id],
++  );
++  const reverses = await db.query<KernelBusinessRow>(
++    `SELECT ${BUSINESS_SELECT} FROM kernel_events
++     WHERE event_class = 'business' AND reverses_event_id = $1::uuid
++     ORDER BY registered_at ASC, id ASC`,
++    [id],
++  );
++  const corrects = await db.query<KernelBusinessRow>(
++    `SELECT ${BUSINESS_SELECT} FROM kernel_events
++     WHERE event_class = 'business' AND corrects_event_id = $1::uuid
++     ORDER BY registered_at ASC, id ASC`,
++    [id],
++  );
++  return {
++    cancellations: cancels.rows.map(mapBusinessRow),
++    reversals: reverses.rows.map(mapBusinessRow),
++    corrections: corrects.rows.map(mapBusinessRow),
++  };
++}
++
++/** Authoritative business events for a person (excludes pure Draft storage rows). */
++export async function listBusinessEventsForPerson(
++  db: PgQueryable,
++  personId: string,
++  opts: { limit?: number } = {},
++): Promise<BusinessEventRecord[]> {
++  assertUuid("personId", "invalid_person_id", personId.trim());
++  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
++  const result = await db.query<KernelBusinessRow>(
++    `SELECT ${BUSINESS_SELECT} FROM kernel_events
++     WHERE event_class = 'business' AND person_id = $1::uuid
++     ORDER BY effective_date DESC, registered_at DESC, id DESC
++     LIMIT $2`,
++    [personId.trim(), limit],
++  );
++  return result.rows.map(mapBusinessRow);
++}
+diff --git a/packages/kernel/event-store/src/index.ts b/packages/kernel/event-store/src/index.ts
+index 031561d..7188383 100644
+--- a/packages/kernel/event-store/src/index.ts
++++ b/packages/kernel/event-store/src/index.ts
+@@ -4,8 +4,13 @@ import type { Pool, PoolClient } from "pg";
+ 
+ import {
+   appendBusinessEvent,
++  getBusinessEventById,
++  lockBusinessEventForUpdate,
++  listChainLinksForEvent,
++  listBusinessEventsForPerson,
+   type AppendBusinessEventInput,
+   type AppendBusinessEventResult,
++  type BusinessEventRecord,
+   type BusinessEventStatus,
+   BusinessEventValidationError,
+   assertNoSensitiveEvidence,
+@@ -14,6 +19,10 @@ import {
+ 
+ export {
+   appendBusinessEvent,
++  getBusinessEventById,
++  lockBusinessEventForUpdate,
++  listChainLinksForEvent,
++  listBusinessEventsForPerson,
+   BusinessEventValidationError,
+   assertNoSensitiveEvidence,
+   assertValidBusinessEventType,
+@@ -21,6 +30,7 @@ export {
+ export type {
+   AppendBusinessEventInput,
+   AppendBusinessEventResult,
++  BusinessEventRecord,
+   BusinessEventStatus,
+ };
+ 
+diff --git a/packages/modules/person-employment/package.json b/packages/modules/person-employment/package.json
+index 99df00a..36d9042 100644
+--- a/packages/modules/person-employment/package.json
++++ b/packages/modules/person-employment/package.json
+@@ -18,7 +18,8 @@
+     "selfcheck:primary-assignment": "tsx src/primary-assignment.selfcheck.ts",
+     "selfcheck:secondary-assignment": "tsx src/secondary-assignment.selfcheck.ts",
+     "selfcheck:management-relationships": "tsx src/management-relationship.selfcheck.ts",
+-    "selfcheck:personnel-event-draft": "tsx src/personnel-event-draft.selfcheck.ts"
++    "selfcheck:personnel-event-draft": "tsx src/personnel-event-draft.selfcheck.ts",
++    "selfcheck:personnel-event-lifecycle": "tsx src/personnel-event-lifecycle.selfcheck.ts"
+   },
+   "devDependencies": {
+     "dotenv": "^17.4.2",
+diff --git a/packages/modules/person-employment/src/errors.ts b/packages/modules/person-employment/src/errors.ts
+index da9d040..3a236e0 100644
+--- a/packages/modules/person-employment/src/errors.ts
++++ b/packages/modules/person-employment/src/errors.ts
+@@ -442,7 +442,7 @@ export const MSG_MANAGEMENT_ROLE_REGISTRY_INVALID_FA =
+ export const MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA =
+   "╪│█î╪º╪│╪¬ ╪»╪º┘à┘å┘ç ┘à╪»█î╪▒ ╪º╪▒╪┤╪» ┘ç┘å┘ê╪▓ ╪¬╪╣╪▒█î┘ü ┘å╪┤╪»┘ç ╪º╪│╪¬.";
+ 
+-/** Personnel Event Draft / finalize errors (Story 4.2 / FR-15 / FR-19). Clients match codes. */
++/** Personnel Event Draft / finalize / lifecycle errors (Stories 4.2ΓÇô4.3). Clients match codes. */
+ export type PersonnelEventErrorCode =
+   | "DRAFT_NOT_FOUND"
+   | "DRAFT_NOT_EDITABLE"
+@@ -458,12 +458,21 @@ export type PersonnelEventErrorCode =
+   | "INVALID_EFFECTIVE_DATE"
+   | "PERSON_NOT_FOUND"
+   | "EMPLOYMENT_NOT_FOUND"
++  | "EVENT_NOT_FOUND"
+   | "VALIDATION"
+   | "SENSITIVE_PAYLOAD"
+   | "PERMISSION_DENIED"
+   | "HEADCOUNT_CHECK_BLOCKED"
+   | "BASELINE_BOUNDARY_BLOCKED"
+-  | "RISK_TIER_PENDING_REVIEW";
++  | "RISK_TIER_PENDING_REVIEW"
++  | "REASON_REQUIRED"
++  | "CANCEL_WRONG_STATE"
++  | "CANCEL_AFTER_EFFECT"
++  | "REVERSE_WRONG_STATE"
++  | "CORRECTION_WRONG_STATE"
++  | "CORRECTION_SELF_REF"
++  | "CORRECTION_CYCLE"
++  | "BROKEN_CORRECTION_REF";
+ 
+ export class PersonnelEventError extends Error {
+   readonly code: PersonnelEventErrorCode;
+@@ -483,6 +492,9 @@ export class PersonnelEventError extends Error {
+ 
+ export const PERSONNEL_EVENT_DRAFT_PERMISSION = "personnel_event.draft";
+ export const PERSONNEL_EVENT_FINALIZE_PERMISSION = "personnel_event.finalize";
++export const PERSONNEL_EVENT_CANCEL_PERMISSION = "personnel_event.cancel";
++export const PERSONNEL_EVENT_REVERSE_PERMISSION = "personnel_event.reverse";
++export const PERSONNEL_EVENT_CORRECT_PERMISSION = "personnel_event.correct";
+ export const PERSONNEL_EVENT_DATA_CATEGORY = "identity.person";
+ 
+ export const MSG_DRAFT_NOT_FOUND_FA = "┘╛█î╪┤ΓÇî┘å┘ê█î╪│ ╪▒┘ê█î╪»╪º╪» █î╪º┘ü╪¬ ┘å╪┤╪».";
+@@ -532,3 +544,35 @@ export const MSG_BASELINE_BOUNDARY_BLOCKED_FA =
+ 
+ export const MSG_RISK_TIER_PENDING_REVIEW_FA =
+   "╪º█î┘å ┘å┘ê╪╣ ╪▒┘ê█î╪»╪º╪» ┘å█î╪º╪▓┘à┘å╪» ┘╛█î╪┤ΓÇî╪¬╪ú█î█î╪» ╪│╪╖╪¡ ╪▒█î╪│┌⌐ ╪º╪│╪¬ ┘ê ┘ç┘å┘ê╪▓ ╪¿┘çΓÇî╪╡┘ê╪▒╪¬ ┘à╪╣╪¬╪¿╪▒ ╪½╪¿╪¬ ┘å┘à█îΓÇî╪┤┘ê╪».";
++
++export const MSG_EVENT_NOT_FOUND_FA = "╪▒┘ê█î╪»╪º╪» ┘╛╪▒╪│┘å┘ä█î █î╪º┘ü╪¬ ┘å╪┤╪».";
++
++export const MSG_CANCEL_REASON_REQUIRED_FA =
++  "╪¿╪▒╪º█î ┘ä╪║┘ê ╪▒┘ê█î╪»╪º╪»╪î ╪½╪¿╪¬ ╪»┘ä█î┘ä ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬.";
++
++export const MSG_REVERSE_REASON_REQUIRED_FA =
++  "╪¿╪▒╪º█î ╪¿╪º╪▓┌»╪┤╪¬ ╪▒┘ê█î╪»╪º╪»╪î ╪½╪¿╪¬ ╪»┘ä█î┘ä ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬.";
++
++export const MSG_CORRECTION_REASON_REQUIRED_FA =
++  "╪¿╪▒╪º█î ╪º╪╡┘ä╪º╪¡ ╪▒┘ê█î╪»╪º╪»╪î ╪½╪¿╪¬ ╪»┘ä█î┘ä ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬.";
++
++export const MSG_CANCEL_WRONG_STATE_FA =
++  "┘ü┘é╪╖ ╪▒┘ê█î╪»╪º╪» ╪▓┘à╪º┘åΓÇî╪¿┘å╪»█îΓÇî╪┤╪»┘ç (┘╛█î╪┤ ╪º╪▓ ╪º╪½╪▒) ┘é╪º╪¿┘ä ┘ä╪║┘ê ╪º╪│╪¬.";
++
++export const MSG_CANCEL_AFTER_EFFECT_FA =
++  "╪º╪½╪▒ ╪º█î┘å ╪▒┘ê█î╪»╪º╪» ╪º╪╣┘à╪º┘ä ╪┤╪»┘ç ╪º╪│╪¬╪¢ ┘ä╪║┘ê ┘à╪¼╪º╪▓ ┘å█î╪│╪¬. ╪º╪▓ ╪¿╪º╪▓┌»╪┤╪¬ █î╪º ╪º╪╡┘ä╪º╪¡ ╪º╪│╪¬┘ü╪º╪»┘ç ┌⌐┘å█î╪».";
++
++export const MSG_REVERSE_WRONG_STATE_FA =
++  "┘ü┘é╪╖ ╪▒┘ê█î╪»╪º╪» ┘à╪ñ╪½╪▒ (┘╛╪│ ╪º╪▓ ╪º╪½╪▒ ┘ê ╪¿╪»┘ê┘å ╪«┘å╪½█îΓÇî╪│╪º╪▓█î ┘é╪¿┘ä█î) ┘é╪º╪¿┘ä ╪¿╪º╪▓┌»╪┤╪¬ ╪º╪│╪¬.";
++
++export const MSG_CORRECTION_WRONG_STATE_FA =
++  "┘ç╪»┘ü ╪º╪╡┘ä╪º╪¡ ╪¿╪º█î╪» █î┌⌐ ╪▒┘ê█î╪»╪º╪» ┘à╪╣╪¬╪¿╪▒ ╪¿╪º╪┤╪»╪¢ ┘ê╪╢╪╣█î╪¬ ┘ü╪╣┘ä█î ╪¿╪▒╪º█î ╪º╪╡┘ä╪º╪¡ ┘à╪¼╪º╪▓ ┘å█î╪│╪¬.";
++
++export const MSG_CORRECTION_SELF_REF_FA =
++  "╪▒┘ê█î╪»╪º╪» ┘å┘à█îΓÇî╪¬┘ê╪º┘å╪» ╪«┘ê╪»╪┤ ╪▒╪º ╪º╪╡┘ä╪º╪¡ ┌⌐┘å╪»╪¢ ╪º╪▒╪¼╪º╪╣ ╪«┘ê╪»╪º╪▒╪¼╪º╪╣ ┘à╪│╪»┘ê╪» ╪º╪│╪¬.";
++
++export const MSG_CORRECTION_CYCLE_FA =
++  "╪▓┘å╪¼█î╪▒┘ç ╪º╪╡┘ä╪º╪¡ ┌å╪▒╪«┘çΓÇî╪º█î ╪º╪│╪¬╪¢ ╪½╪¿╪¬ ┘à╪│╪»┘ê╪» ╪┤╪».";
++
++export const MSG_BROKEN_CORRECTION_REF_FA =
++  "╪º╪▒╪¼╪º╪╣ ╪º╪╡┘ä╪º╪¡/┘ä╪║┘ê/╪¿╪º╪▓┌»╪┤╪¬ ┘å╪º┘à╪╣╪¬╪¿╪▒ █î╪º █î╪º┘ü╪¬ΓÇî┘å╪┤╪»┘ç ╪º╪│╪¬╪¢ ╪╣┘à┘ä█î╪º╪¬ ┘à╪│╪»┘ê╪» ╪º╪│╪¬.";
+diff --git a/packages/modules/person-employment/src/index.ts b/packages/modules/person-employment/src/index.ts
+index d8106e2..c641580 100644
+--- a/packages/modules/person-employment/src/index.ts
++++ b/packages/modules/person-employment/src/index.ts
+@@ -8,6 +8,7 @@
+  * Story 3.8: Secondary Assignment fidelity (FR-12) ΓÇö dual-role projection; no headcount; inventory gate.
+  * Story 3.9: Derived management relationships (FR-13) ΓÇö compute from Primary+org+Role; no editable shadow.
+  * Story 4.2: Draft working store + finalize/conflict substrate (FR-15 / FR-19 / AD-6).
++ * Story 4.3: Scheduled semantics + Cancel / Reverse / Correction (FR-16 / FR-17).
+  * Start/Return/Terminate / Secondary create-change-end product flows = Epic 4 (4.5ΓÇô4.8).
+  */
+ 
+@@ -108,6 +109,9 @@ export {
+   MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA,
+   PERSONNEL_EVENT_DRAFT_PERMISSION,
+   PERSONNEL_EVENT_FINALIZE_PERMISSION,
++  PERSONNEL_EVENT_CANCEL_PERMISSION,
++  PERSONNEL_EVENT_REVERSE_PERMISSION,
++  PERSONNEL_EVENT_CORRECT_PERMISSION,
+   PERSONNEL_EVENT_DATA_CATEGORY,
+   PersonnelEventError,
+   MSG_DRAFT_NOT_FOUND_FA,
+@@ -127,6 +131,17 @@ export {
+   MSG_HEADCOUNT_CHECK_BLOCKED_FA,
+   MSG_BASELINE_BOUNDARY_BLOCKED_FA,
+   MSG_RISK_TIER_PENDING_REVIEW_FA,
++  MSG_EVENT_NOT_FOUND_FA,
++  MSG_CANCEL_REASON_REQUIRED_FA,
++  MSG_REVERSE_REASON_REQUIRED_FA,
++  MSG_CORRECTION_REASON_REQUIRED_FA,
++  MSG_CANCEL_WRONG_STATE_FA,
++  MSG_CANCEL_AFTER_EFFECT_FA,
++  MSG_REVERSE_WRONG_STATE_FA,
++  MSG_CORRECTION_WRONG_STATE_FA,
++  MSG_CORRECTION_SELF_REF_FA,
++  MSG_CORRECTION_CYCLE_FA,
++  MSG_BROKEN_CORRECTION_REF_FA,
+ } from "./errors";
+ 
+ export type {
+@@ -461,6 +476,9 @@ export {
+   assertActorHasJobReferenceWrite,
+   assertActorHasPersonnelEventDraft,
+   assertActorHasPersonnelEventFinalize,
++  assertActorHasPersonnelEventCancel,
++  assertActorHasPersonnelEventReverse,
++  assertActorHasPersonnelEventCorrect,
+   MSG_PERSON_PERMISSION_REQUIRED_FA,
+ } from "./permissions";
+ 
+@@ -531,3 +549,28 @@ export type {
+   ProjectionRefreshContext,
+   ProjectionRefreshHook,
+ } from "./personnel-event-projection-hook";
++
++export {
++  evaluationStatusAsOf,
++  isPreEffectAsOf,
++  resolveLifecycleStatus,
++  loadEventWithResolvedStatus,
++  detectCorrectionCycle,
++} from "./personnel-event-resolve";
++
++export type {
++  ResolvedLifecycleStatus,
++  EventChainLinks,
++} from "./personnel-event-resolve";
++
++export {
++  cancelPersonnelEvent,
++  reversePersonnelEvent,
++  correctPersonnelEvent,
++} from "./personnel-event-lifecycle";
++
++export type {
++  LifecycleActorInput,
++  LifecycleResult,
++  CorrectPersonnelEventInput,
++} from "./personnel-event-lifecycle";
+diff --git a/packages/modules/person-employment/src/permissions.ts b/packages/modules/person-employment/src/permissions.ts
+index 9639430..47bafb5 100644
+--- a/packages/modules/person-employment/src/permissions.ts
++++ b/packages/modules/person-employment/src/permissions.ts
+@@ -20,6 +20,9 @@ import {
+   PERSON_WRITE_PERMISSION,
+   PERSONNEL_EVENT_DRAFT_PERMISSION,
+   PERSONNEL_EVENT_FINALIZE_PERMISSION,
++  PERSONNEL_EVENT_CANCEL_PERMISSION,
++  PERSONNEL_EVENT_REVERSE_PERMISSION,
++  PERSONNEL_EVENT_CORRECT_PERMISSION,
+   PersonIdentityError,
+   PersonnelEventError,
+ } from "./errors";
+@@ -185,3 +188,57 @@ export async function assertActorHasPersonnelEventFinalize(
+     );
+   }
+ }
++
++export async function assertActorHasPersonnelEventCancel(
++  accountId: string,
++  db: PrismaClient = getPersonDb(),
++): Promise<void> {
++  const has = await actorHoldsPermission(
++    accountId,
++    PERSONNEL_EVENT_CANCEL_PERMISSION,
++    db,
++  );
++  if (!has) {
++    throw new PersonnelEventError(
++      "PERMISSION_DENIED",
++      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
++      "personnel_event_cancel_required",
++    );
++  }
++}
++
++export async function assertActorHasPersonnelEventReverse(
++  accountId: string,
++  db: PrismaClient = getPersonDb(),
++): Promise<void> {
++  const has = await actorHoldsPermission(
++    accountId,
++    PERSONNEL_EVENT_REVERSE_PERMISSION,
++    db,
++  );
++  if (!has) {
++    throw new PersonnelEventError(
++      "PERMISSION_DENIED",
++      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
++      "personnel_event_reverse_required",
++    );
++  }
++}
++
++export async function assertActorHasPersonnelEventCorrect(
++  accountId: string,
++  db: PrismaClient = getPersonDb(),
++): Promise<void> {
++  const has = await actorHoldsPermission(
++    accountId,
++    PERSONNEL_EVENT_CORRECT_PERMISSION,
++    db,
++  );
++  if (!has) {
++    throw new PersonnelEventError(
++      "PERMISSION_DENIED",
++      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
++      "personnel_event_correct_required",
++    );
++  }
++}
+diff --git a/packages/modules/person-employment/src/personnel-event-conflicts.ts b/packages/modules/person-employment/src/personnel-event-conflicts.ts
+index 6038762..709c1f9 100644
+--- a/packages/modules/person-employment/src/personnel-event-conflicts.ts
++++ b/packages/modules/person-employment/src/personnel-event-conflicts.ts
+@@ -4,21 +4,37 @@
+  */
+ 
+ import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
+-import type { PoolClient, PrismaClient } from "@divan/db";
++import { createPgPool, type Pool, type PoolClient, type PrismaClient } from "@divan/db";
++import { getBusinessEventById } from "@divan/event-store";
+ 
+ import { getPersonDb } from "./db";
+ import {
+   MSG_BASELINE_BOUNDARY_BLOCKED_FA,
++  MSG_BROKEN_CORRECTION_REF_FA,
++  MSG_CORRECTION_CYCLE_FA,
++  MSG_CORRECTION_SELF_REF_FA,
+   MSG_HEADCOUNT_CHECK_BLOCKED_FA,
+   MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
+   MSG_PERSON_NOT_FOUND_FA,
+   PersonnelEventError,
+ } from "./errors";
+ import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
++import { detectCorrectionCycle } from "./personnel-event-resolve";
+ import { isEmploymentActiveAsOf } from "./employment";
+ import { getGradeById } from "./job-reference";
+ import { JobRefError } from "./errors";
+ 
++/** Lazy read pool for conflict existence checks outside a finalize txn. */
++let conflictReadPool: Pool | null = null;
++
++function getConflictReadPool(): Pool | null {
++  if (conflictReadPool) return conflictReadPool;
++  const url = process.env.DATABASE_URL?.trim();
++  if (!url) return null;
++  conflictReadPool = createPgPool(url);
++  return conflictReadPool;
++}
++
+ /**
+  * PG `@db.Date` ΓåÆ YYYY-MM-DD via UTC calendar components (never local-TZ shift).
+  * Prefer this over `toISOString().slice(0,10)` when drivers return non-UTC midnights.
+@@ -308,7 +324,7 @@ export async function classifyConflicts(
+     return findings;
+   }
+ 
+-  // Broken correction refs (if draft carries them)
++  // Broken correction / chain refs ΓÇö existence + cycle/self-ref (Story 4.3)
+   for (const key of [
+     "correctsEventId",
+     "cancelsEventId",
+@@ -316,18 +332,80 @@ export async function classifyConflicts(
+   ] as const) {
+     const ref = draft.payload[key];
+     if (typeof ref === "string" && ref.trim()) {
+-      // Application-level UUID shape check; existence validated when event-store lookup lands (4.3)
++      const targetId = ref.trim();
+       const uuidOk =
+         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+-          ref.trim(),
++          targetId,
+         );
+       if (!uuidOk) {
+         findings.push({
+           code: "BROKEN_CORRECTION_REF",
+           severity: "blocking",
+-          messageFa:
+-            "╪º╪▒╪¼╪º╪╣ ╪º╪╡┘ä╪º╪¡/┘ä╪║┘ê/╪¿╪º╪▓┌»╪┤╪¬ ┘å╪º┘à╪╣╪¬╪¿╪▒ ╪º╪│╪¬╪¢ ┘å┘ç╪º█î█îΓÇî╪│╪º╪▓█î ┘à╪│╪»┘ê╪» ╪º╪│╪¬.",
++          messageFa: MSG_BROKEN_CORRECTION_REF_FA,
+         });
++        continue;
++      }
++
++      const reader = opts.client ?? getConflictReadPool();
++      if (!reader) {
++        // No DATABASE_URL ΓÇö shape-only (fail-open on existence is unacceptable
++        // for finalize; finalize always supplies client).
++        continue;
++      }
++
++      const target = await getBusinessEventById(reader, targetId);
++      if (!target) {
++        findings.push({
++          code: "BROKEN_CORRECTION_REF",
++          severity: "blocking",
++          messageFa: MSG_BROKEN_CORRECTION_REF_FA,
++        });
++        continue;
++      }
++
++      if (key === "correctsEventId") {
++        // Self-ref: draft cannot correct itself via payload id equal to a
++        // known finalizedEventId, or target correcting back to draft id.
++        if (
++          draft.finalizedEventId &&
++          targetId === draft.finalizedEventId
++        ) {
++          findings.push({
++            code: "CORRECTION_SELF_REF",
++            severity: "blocking",
++            messageFa: MSG_CORRECTION_SELF_REF_FA,
++          });
++          continue;
++        }
++        const fromId = draft.finalizedEventId ?? draft.id;
++        if (fromId === targetId) {
++          findings.push({
++            code: "CORRECTION_SELF_REF",
++            severity: "blocking",
++            messageFa: MSG_CORRECTION_SELF_REF_FA,
++          });
++          continue;
++        }
++        const cycle = await detectCorrectionCycle(reader, fromId, targetId);
++        if (cycle === "self_ref") {
++          findings.push({
++            code: "CORRECTION_SELF_REF",
++            severity: "blocking",
++            messageFa: MSG_CORRECTION_SELF_REF_FA,
++          });
++        } else if (cycle === "cycle") {
++          findings.push({
++            code: "CORRECTION_CYCLE",
++            severity: "blocking",
++            messageFa: MSG_CORRECTION_CYCLE_FA,
++          });
++        } else if (cycle === "missing_target") {
++          findings.push({
++            code: "BROKEN_CORRECTION_REF",
++            severity: "blocking",
++            messageFa: MSG_BROKEN_CORRECTION_REF_FA,
++          });
++        }
+       }
+     }
+   }
+diff --git a/packages/modules/person-employment/src/personnel-event-finalize.ts b/packages/modules/person-employment/src/personnel-event-finalize.ts
+index 3ead585..41d9ecd 100644
+--- a/packages/modules/person-employment/src/personnel-event-finalize.ts
++++ b/packages/modules/person-employment/src/personnel-event-finalize.ts
+@@ -522,6 +522,23 @@ export async function finalizeDraft(
+ 
+     let eventId: string;
+     try {
++      const correctsEventId =
++        typeof draft.payload.correctsEventId === "string"
++          ? draft.payload.correctsEventId
++          : null;
++      const cancelsEventId =
++        typeof draft.payload.cancelsEventId === "string"
++          ? draft.payload.cancelsEventId
++          : null;
++      const reversesEventId =
++        typeof draft.payload.reversesEventId === "string"
++          ? draft.payload.reversesEventId
++          : null;
++      const supersedesEventId =
++        typeof draft.payload.supersedesEventId === "string"
++          ? draft.payload.supersedesEventId
++          : null;
++
+       const appended = await appendBusinessEvent(client, {
+         correlationId,
+         eventType: draft.eventType,
+@@ -533,6 +550,10 @@ export async function finalizeDraft(
+         status,
+         finalizedBy: input.actorId,
+         finalizedAt,
++        correctsEventId,
++        cancelsEventId,
++        reversesEventId,
++        supersedesEventId,
+         payload: {
+           ...draft.payload,
+           draftId: draft.id,
+@@ -626,6 +647,8 @@ export async function finalizeDraft(
+       draft,
+       eventId: eventId!,
+       eventType: draft.eventType,
++      // FR-16: Scheduled must not alter current projections
++      applyToCurrentProjection: status === "Effective",
+     };
+     await runProjectionRefreshHook(hookCtx);
+ 
+diff --git a/packages/modules/person-employment/src/personnel-event-projection-hook.ts b/packages/modules/person-employment/src/personnel-event-projection-hook.ts
+index 71d8737..b15220c 100644
+--- a/packages/modules/person-employment/src/personnel-event-projection-hook.ts
++++ b/packages/modules/person-employment/src/personnel-event-projection-hook.ts
+@@ -1,6 +1,9 @@
+ /**
+- * AD-6 projection refresh hook ΓÇö runs inside the same DB txn as finalize append.
++ * AD-6 projection refresh hook ΓÇö runs inside the same DB txn as finalize / lifecycle append.
+  * Scaffold event types may no-op domain projectors but the seam must be invoked.
++ *
++ * FR-16: Scheduled events must not mutate current projections (applyToCurrentProjection=false).
++ * Domain Employment/Reservation effects remain stubs until Stories 4.5ΓÇô4.8 / 4.14.
+  */
+ 
+ import { AsyncLocalStorage } from "node:async_hooks";
+@@ -11,9 +14,18 @@ import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
+ 
+ export type ProjectionRefreshContext = {
+   client: PoolClient;
+-  draft: PersonnelEventDraftRecord;
++  /** Present for Draft finalize; absent for Cancel/Reverse/Correction. */
++  draft?: PersonnelEventDraftRecord | null;
+   eventId: string;
+   eventType: string;
++  /** Lifecycle op when Cancel / Reverse / Correction (Story 4.3). */
++  lifecycleOp?: "cancel" | "reverse" | "correct";
++  targetEventId?: string;
++  /**
++   * When false, hook records invocation but must not apply current-state domain
++   * effects (Scheduled finalize / Cancel of Scheduled).
++   */
++  applyToCurrentProjection?: boolean;
+   /** Set by hook implementations / tests to prove invocation. */
+   invoked?: { eventId: string; eventType: string };
+ };
+@@ -25,6 +37,8 @@ export type ProjectionRefreshHook = (
+ /**
+  * Default scaffold hook: records invocation on ctx for AD-6 selfcheck proof.
+  * Production domain effects = Stories 4.5ΓÇô4.8.
++ * When `applyToCurrentProjection === false`, still records invocation but
++ * performs no current-state mutation (FR-16 Scheduled discipline).
+  */
+ export async function defaultProjectionRefreshHook(
+   ctx: ProjectionRefreshContext,
+@@ -32,6 +46,13 @@ export async function defaultProjectionRefreshHook(
+   ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
+   void ctx.client;
+   void ctx.draft;
++  void ctx.lifecycleOp;
++  void ctx.targetEventId;
++  // Explicit no-op for Scheduled / Cancel-of-Scheduled ΓÇö domain stubs later.
++  if (ctx.applyToCurrentProjection === false) {
++    return;
++  }
++  // Effective reverse/correct/finalize: domain projectors still absent (stub).
+ }
+ 
+ /** Per-finalize capture ΓÇö avoids cross-request leakage under concurrency. */
+diff --git a/packages/modules/person-employment/src/seed.ts b/packages/modules/person-employment/src/seed.ts
+index 48c2282..fc95d07 100644
+--- a/packages/modules/person-employment/src/seed.ts
++++ b/packages/modules/person-employment/src/seed.ts
+@@ -17,8 +17,11 @@ import {
+   ORGANIZATION_WRITE_PERMISSION,
+   PERSON_READ_PERMISSION,
+   PERSON_WRITE_PERMISSION,
++  PERSONNEL_EVENT_CANCEL_PERMISSION,
++  PERSONNEL_EVENT_CORRECT_PERMISSION,
+   PERSONNEL_EVENT_DRAFT_PERMISSION,
+   PERSONNEL_EVENT_FINALIZE_PERMISSION,
++  PERSONNEL_EVENT_REVERSE_PERMISSION,
+ } from "./errors";
+ import {
+   createGrade,
+@@ -269,16 +272,21 @@ export async function seedPersonPermissionFixtures(
+   }
+ }
+ 
+-/** Story 4.2 ΓÇö personnel_event.draft / finalize for HR Operator/Admin demo sets. */
++/** Story 4.2ΓÇô4.3 ΓÇö personnel_event.draft / finalize (+ lifecycle Admin). */
+ export const SEED_PERSONNEL_EVENT = {
+   permissionSetName: "personnel-event",
+   roleCode: "personnel_event_operator",
+   roleLabelFa: "╪º┘╛╪▒╪º╪¬┘ê╪▒ ╪▒┘ê█î╪»╪º╪» ┘╛╪▒╪│┘å┘ä█î",
++  /** Admin-only Cancel / Reverse / Correction (epic voice = HR Admin). */
++  lifecyclePermissionSetName: "personnel-event-lifecycle",
++  lifecycleRoleCode: "personnel_event_lifecycle_admin",
++  lifecycleRoleLabelFa: "┘à╪»█î╪▒ ┌å╪▒╪«┘ç ╪▒┘ê█î╪»╪º╪» ┘╛╪▒╪│┘å┘ä█î",
+ } as const;
+ 
+ /**
+  * Bind personnel_event.draft + personnel_event.finalize into a PermissionSet
+  * and attach to hr.admin / hr.operator. Idempotent.
++ * Cancel / Reverse / Correction bind Admin-only via lifecycle set.
+  */
+ export async function seedPersonnelEventPermissionFixtures(
+   db: PrismaClient,
+@@ -333,6 +341,58 @@ export async function seedPersonnelEventPermissionFixtures(
+       update: {},
+     });
+   }
++
++  // Story 4.3 ΓÇö Cancel / Reverse / Correction: HR Admin only
++  const lifecycleSet = await db.permissionSet.upsert({
++    where: { name: SEED_PERSONNEL_EVENT.lifecyclePermissionSetName },
++    create: {
++      name: SEED_PERSONNEL_EVENT.lifecyclePermissionSetName,
++      permissions: [
++        PERSONNEL_EVENT_CANCEL_PERMISSION,
++        PERSONNEL_EVENT_REVERSE_PERMISSION,
++        PERSONNEL_EVENT_CORRECT_PERMISSION,
++      ],
++    },
++    update: {
++      permissions: [
++        PERSONNEL_EVENT_CANCEL_PERMISSION,
++        PERSONNEL_EVENT_REVERSE_PERMISSION,
++        PERSONNEL_EVENT_CORRECT_PERMISSION,
++      ],
++    },
++  });
++
++  const lifecycleRole = await db.accessRole.upsert({
++    where: { code: SEED_PERSONNEL_EVENT.lifecycleRoleCode },
++    create: {
++      code: SEED_PERSONNEL_EVENT.lifecycleRoleCode,
++      labelFa: SEED_PERSONNEL_EVENT.lifecycleRoleLabelFa,
++      permissionSetId: lifecycleSet.id,
++    },
++    update: {
++      labelFa: SEED_PERSONNEL_EVENT.lifecycleRoleLabelFa,
++      permissionSetId: lifecycleSet.id,
++    },
++  });
++
++  const admin = await db.internalAccount.findUnique({
++    where: { username: "hr.admin" },
++  });
++  if (admin) {
++    await db.accountAccessRole.upsert({
++      where: {
++        accountId_accessRoleId: {
++          accountId: admin.id,
++          accessRoleId: lifecycleRole.id,
++        },
++      },
++      create: {
++        accountId: admin.id,
++        accessRoleId: lifecycleRole.id,
++      },
++      update: {},
++    });
++  }
+ }
+ 
+ /**
+diff --git a/apps/web/components/personnel/status-badge.tsx b/apps/web/components/personnel/status-badge.tsx
+new file mode 100644
+index 0000000..6f8167d
+--- /dev/null
++++ b/apps/web/components/personnel/status-badge.tsx
+@@ -0,0 +1,62 @@
++"use client";
++
++import { cn } from "@/lib/utils";
++
++export type StatusBadgeKind =
++  | "Scheduled"
++  | "Effective"
++  | "Cancelled"
++  | "Reversed"
++  | "Draft"
++  | "Override";
++
++const LABELS_FA: Record<StatusBadgeKind, string> = {
++  Scheduled: "╪▓┘à╪º┘åΓÇî╪¿┘å╪»█îΓÇî╪┤╪»┘ç",
++  Effective: "┘à╪ñ╪½╪▒",
++  Cancelled: "┘ä╪║┘ê╪┤╪»┘ç",
++  Reversed: "╪¿╪º╪▓┌»╪┤╪¬ΓÇî╪«┘ê╪▒╪»┘ç",
++  Draft: "┘╛█î╪┤ΓÇî┘å┘ê█î╪│",
++  Override: "Override",
++};
++
++const TOKEN_CLASS: Record<StatusBadgeKind, string> = {
++  Scheduled: "status-badge-scheduled",
++  Effective: "status-badge-effective",
++  Cancelled: "status-badge-cancelled",
++  Reversed: "status-badge-reversed",
++  Draft: "status-badge-draft",
++  Override: "status-badge-override",
++};
++
++/**
++ * UX-DR10 status badge ΓÇö pill; badge text is the sole status announcement.
++ * Decorative dot is aria-hidden.
++ */
++export function StatusBadge({
++  status,
++  className,
++}: {
++  status: StatusBadgeKind;
++  className?: string;
++}) {
++  const label = LABELS_FA[status];
++  return (
++    <span
++      className={cn(
++        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
++        TOKEN_CLASS[status],
++        className,
++      )}
++    >
++      <span
++        className="size-1.5 shrink-0 rounded-full bg-current opacity-70"
++        aria-hidden="true"
++      />
++      {label}
++    </span>
++  );
++}
++
++export function statusBadgeLabelFa(status: StatusBadgeKind): string {
++  return LABELS_FA[status];
++}
+diff --git a/packages/db/sql/004_business_event_chain_indexes.sql b/packages/db/sql/004_business_event_chain_indexes.sql
+new file mode 100644
+index 0000000..b1bfd74
+--- /dev/null
++++ b/packages/db/sql/004_business_event_chain_indexes.sql
+@@ -0,0 +1,18 @@
++-- Story 4.3: optional indexes on business event chain columns.
++-- Idempotent ΓÇö do not edit applied 001ΓÇô003 history.
++
++CREATE INDEX IF NOT EXISTS kernel_events_cancels_event_id_idx
++  ON kernel_events (cancels_event_id)
++  WHERE cancels_event_id IS NOT NULL;
++
++CREATE INDEX IF NOT EXISTS kernel_events_reverses_event_id_idx
++  ON kernel_events (reverses_event_id)
++  WHERE reverses_event_id IS NOT NULL;
++
++CREATE INDEX IF NOT EXISTS kernel_events_corrects_event_id_idx
++  ON kernel_events (corrects_event_id)
++  WHERE corrects_event_id IS NOT NULL;
++
++CREATE INDEX IF NOT EXISTS kernel_events_person_effective_idx
++  ON kernel_events (person_id, effective_date DESC)
++  WHERE event_class = 'business';
+diff --git a/packages/modules/person-employment/src/personnel-event-lifecycle.selfcheck.ts b/packages/modules/person-employment/src/personnel-event-lifecycle.selfcheck.ts
+new file mode 100644
+index 0000000..1768019
+--- /dev/null
++++ b/packages/modules/person-employment/src/personnel-event-lifecycle.selfcheck.ts
+@@ -0,0 +1,383 @@
++/**
++ * Personnel Event lifecycle selfcheck (Story 4.3 / FR-16 / FR-17 / AD-6).
++ * Run: pnpm --filter @divan/person-employment selfcheck:personnel-event-lifecycle
++ * Requires DATABASE_URL, migrated kernel_events + Draft, seeded accounts.
++ */
++import assert from "node:assert/strict";
++import { randomUUID } from "node:crypto";
++import { resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import { config as loadEnv } from "dotenv";
++
++import { createPgPool } from "@divan/db";
++import {
++  getBusinessEventById,
++} from "@divan/event-store";
++import { todayDateOnlyTehran } from "@divan/temporal-engine";
++
++import {
++  PersonnelEventError,
++  cancelPersonnelEvent,
++  correctPersonnelEvent,
++  createDraft,
++  evaluationStatusAsOf,
++  finalizeDraft,
++  getPersonDb,
++  loadEventWithResolvedStatus,
++  resetProjectionRefreshHook,
++  resolveLifecycleStatus,
++  reversePersonnelEvent,
++  seedPersonIdentityFixtures,
++  seedPersonnelEventPermissionFixtures,
++  setProjectionRefreshHook,
++  SEED_PERSON_IDENTITY,
++} from "./index";
++import { listChainLinksForEvent } from "@divan/event-store";
++
++const rootEnv = resolve(
++  fileURLToPath(new URL(".", import.meta.url)),
++  "../../../../.env",
++);
++loadEnv({ path: rootEnv });
++
++function futureDate(daysAhead: number): string {
++  const today = todayDateOnlyTehran();
++  const parts = today.split("-").map(Number);
++  const y = parts[0]!;
++  const m = parts[1]!;
++  const d = parts[2]!;
++  const dt = new Date(Date.UTC(y, m - 1, d + daysAhead));
++  const yy = dt.getUTCFullYear();
++  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
++  const dd = String(dt.getUTCDate()).padStart(2, "0");
++  return `${yy}-${mm}-${dd}`;
++}
++
++function pastDate(daysBack: number): string {
++  return futureDate(-daysBack);
++}
++
++async function main() {
++  const url = process.env.DATABASE_URL?.trim();
++  assert.ok(url, "DATABASE_URL required");
++
++  const db = getPersonDb();
++  const pool = createPgPool(url);
++  await seedPersonIdentityFixtures(db);
++  await seedPersonnelEventPermissionFixtures(db);
++
++  const demo = await db.person.findUnique({
++    where: { personnelCode: SEED_PERSON_IDENTITY.demoPersonnelCode },
++  });
++  assert.ok(demo, "demo person required");
++
++  const admin =
++    (await db.internalAccount.findUnique({ where: { username: "hr.admin" } }))
++      ?.id ?? null;
++  assert.ok(admin, "hr.admin account required for lifecycle permissions");
++
++  let hookCalls = 0;
++  let lastApply: boolean | undefined;
++  setProjectionRefreshHook(async (ctx) => {
++    hookCalls += 1;
++    lastApply = ctx.applyToCurrentProjection;
++    ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
++  });
++
++  try {
++    // --- Finalize future ΓåÆ Scheduled; hook must NOT apply current projection ---
++    hookCalls = 0;
++    const futureDraft = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: futureDate(30),
++        payload: { note: "future-scheduled" },
++      },
++      { accountId: admin },
++      db,
++    );
++    const futureFin = await finalizeDraft(
++      {
++        draftId: futureDraft.id,
++        actorId: admin,
++        idempotencyKey: `sc-future-${futureDraft.id}`,
++      },
++      pool,
++      db,
++    );
++    assert.equal(futureFin.outcome, "finalized");
++    if (futureFin.outcome !== "finalized") throw new Error("unreachable");
++    assert.equal(futureFin.status, "Scheduled");
++    assert.equal(hookCalls, 1);
++    assert.equal(lastApply, false, "Scheduled must not apply current projection");
++
++    const futureEvt = await getBusinessEventById(pool, futureFin.eventId);
++    assert.ok(futureEvt);
++    assert.equal(futureEvt!.status, "Scheduled");
++
++    // --- Cancel Scheduled ---
++    hookCalls = 0;
++    const cancel1 = await cancelPersonnelEvent(
++      futureFin.eventId,
++      { actorId: admin, reason: "┘ä╪║┘ê ╪¬╪│╪¬ selfcheck" },
++      pool,
++      db,
++    );
++    assert.equal(cancel1.resolvedStatus, "Cancelled");
++    assert.equal(cancel1.idempotentReplay, false);
++    assert.equal(hookCalls, 1);
++    assert.equal(lastApply, false);
++
++    const afterCancel = await loadEventWithResolvedStatus(
++      pool,
++      futureFin.eventId,
++    );
++    assert.ok(afterCancel);
++    assert.equal(afterCancel!.resolvedStatus, "Cancelled");
++    // Original row untouched
++    const origAfterCancel = await getBusinessEventById(pool, futureFin.eventId);
++    assert.equal(origAfterCancel!.status, "Scheduled");
++
++    // Idempotent Cancel
++    const cancel2 = await cancelPersonnelEvent(
++      futureFin.eventId,
++      { actorId: admin, reason: "╪»┘ê╪¿╪º╪▒┘ç" },
++      pool,
++      db,
++    );
++    assert.equal(cancel2.idempotentReplay, true);
++    assert.equal(cancel2.neutralizingEventId, cancel1.neutralizingEventId);
++
++    const links = await listChainLinksForEvent(pool, futureFin.eventId);
++    assert.equal(links.cancellations.length, 1, "exact cardinality 1 Cancel");
++
++    // Cancel without reason
++    await assert.rejects(
++      () =>
++        cancelPersonnelEvent(
++          futureFin.eventId,
++          { actorId: admin, reason: "   " },
++          pool,
++          db,
++        ),
++      (err: unknown) =>
++        err instanceof PersonnelEventError && err.code === "REASON_REQUIRED",
++    );
++
++    // --- Finalize past ΓåÆ Effective; Reverse ---
++    hookCalls = 0;
++    const pastDraft = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: pastDate(5),
++        payload: { note: "past-effective" },
++      },
++      { accountId: admin },
++      db,
++    );
++    const pastFin = await finalizeDraft(
++      {
++        draftId: pastDraft.id,
++        actorId: admin,
++        idempotencyKey: `sc-past-${pastDraft.id}`,
++      },
++      pool,
++      db,
++    );
++    assert.equal(pastFin.outcome, "finalized");
++    if (pastFin.outcome !== "finalized") throw new Error("unreachable");
++    assert.equal(pastFin.status, "Effective");
++    assert.equal(lastApply, true);
++
++    // Cancel after effect ΓåÆ reject
++    await assert.rejects(
++      () =>
++        cancelPersonnelEvent(
++          pastFin.eventId,
++          { actorId: admin, reason: "┘å╪¿╪º█î╪» ┘à╪¼╪º╪▓ ╪¿╪º╪┤╪»" },
++          pool,
++          db,
++        ),
++      (err: unknown) =>
++        err instanceof PersonnelEventError &&
++        (err.code === "CANCEL_AFTER_EFFECT" ||
++          err.code === "CANCEL_WRONG_STATE"),
++    );
++
++    hookCalls = 0;
++    const rev = await reversePersonnelEvent(
++      pastFin.eventId,
++      { actorId: admin, reason: "╪¿╪º╪▓┌»╪┤╪¬ ╪¬╪│╪¬" },
++      pool,
++      db,
++    );
++    assert.equal(rev.resolvedStatus, "Reversed");
++    assert.equal(hookCalls, 1);
++    const origAfterRev = await getBusinessEventById(pool, pastFin.eventId);
++    assert.equal(origAfterRev!.status, "Effective");
++
++    // --- Correction link + self-ref/cycle ---
++    const baseDraft = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: pastDate(2),
++        payload: { note: "correction-target" },
++      },
++      { accountId: admin },
++      db,
++    );
++    const baseFin = await finalizeDraft(
++      {
++        draftId: baseDraft.id,
++        actorId: admin,
++        idempotencyKey: `sc-corr-base-${baseDraft.id}`,
++      },
++      pool,
++      db,
++    );
++    assert.equal(baseFin.outcome, "finalized");
++    if (baseFin.outcome !== "finalized") throw new Error("unreachable");
++
++    const corr = await correctPersonnelEvent(
++      baseFin.eventId,
++      {
++        actorId: admin,
++        reason: "╪º╪╡┘ä╪º╪¡ ┘ê╪º┘é╪╣█î╪¬",
++        idempotencyKey: `sc-corr-${baseFin.eventId}`,
++        correctionPayload: { note: "fixed" },
++      },
++      pool,
++      db,
++    );
++    assert.ok(corr.neutralizingEventId);
++    const corrEvt = await getBusinessEventById(pool, corr.neutralizingEventId);
++    assert.equal(corrEvt!.correctsEventId, baseFin.eventId);
++
++    // Self-ref reject
++    await assert.rejects(
++      () =>
++        correctPersonnelEvent(
++          baseFin.eventId,
++          {
++            actorId: admin,
++            reason: "self",
++            prospectiveEventId: baseFin.eventId,
++          },
++          pool,
++          db,
++        ),
++      (err: unknown) =>
++        err instanceof PersonnelEventError && err.code === "CORRECTION_SELF_REF",
++    );
++
++    // Broken target
++    await assert.rejects(
++      () =>
++        correctPersonnelEvent(
++          randomUUID(),
++          { actorId: admin, reason: "missing" },
++          pool,
++          db,
++        ),
++      (err: unknown) =>
++        err instanceof PersonnelEventError && err.code === "EVENT_NOT_FOUND",
++    );
++
++    // --- Cancel Γåö effect exclusive: future Scheduled with asOf after effective ---
++    const raceDraft = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: futureDate(10),
++        payload: { note: "race" },
++      },
++      { accountId: admin },
++      db,
++    );
++    const raceFin = await finalizeDraft(
++      {
++        draftId: raceDraft.id,
++        actorId: admin,
++        idempotencyKey: `sc-race-${raceDraft.id}`,
++      },
++      pool,
++      db,
++    );
++    assert.equal(raceFin.outcome, "finalized");
++    if (raceFin.outcome !== "finalized") throw new Error("unreachable");
++    assert.equal(raceFin.status, "Scheduled");
++
++    // Simulate effect won via asOfDate past the effective date
++    await assert.rejects(
++      () =>
++        cancelPersonnelEvent(
++          raceFin.eventId,
++          {
++            actorId: admin,
++            reason: "╪»█î╪▒ ╪┤╪»┘ç",
++            asOfDate: futureDate(11),
++          },
++          pool,
++          db,
++        ),
++      (err: unknown) =>
++        err instanceof PersonnelEventError && err.code === "CANCEL_AFTER_EFFECT",
++    );
++
++    // Cancel still wins when still pre-effect
++    const raceCancel = await cancelPersonnelEvent(
++      raceFin.eventId,
++      { actorId: admin, reason: "╪¿┘çΓÇî┘à┘ê┘é╪╣", asOfDate: todayDateOnlyTehran() },
++      pool,
++      db,
++    );
++    assert.equal(raceCancel.resolvedStatus, "Cancelled");
++
++    // Append-only: UPDATE original still fails
++    await assert.rejects(
++      () =>
++        pool.query(
++          `UPDATE kernel_events SET status = 'Cancelled' WHERE id = $1::uuid`,
++          [raceFin.eventId],
++        ),
++      (err: unknown) => {
++        const msg = err instanceof Error ? err.message : String(err);
++        return /append.?only|kernel_events/i.test(msg);
++      },
++    );
++
++    // evaluation helper
++    assert.equal(
++      evaluationStatusAsOf(
++        { status: "Scheduled", effectiveDate: pastDate(1) },
++        todayDateOnlyTehran(),
++      ),
++      "Effective",
++    );
++
++    // resolveLifecycleStatus with empty links
++    const resolved = resolveLifecycleStatus(
++      futureEvt!,
++      { cancellations: [], reversals: [], corrections: [] },
++      todayDateOnlyTehran(),
++    );
++    assert.ok(
++      resolved === "Scheduled" || resolved === "Effective",
++      "display status derived",
++    );
++
++    console.log("personnel-event-lifecycle selfcheck: OK");
++  } finally {
++    resetProjectionRefreshHook();
++    await pool.end();
++  }
++}
++
++main().catch((err) => {
++  console.error(err);
++  process.exit(1);
++});
+diff --git a/packages/modules/person-employment/src/personnel-event-lifecycle.ts b/packages/modules/person-employment/src/personnel-event-lifecycle.ts
+new file mode 100644
+index 0000000..cf55181
+--- /dev/null
++++ b/packages/modules/person-employment/src/personnel-event-lifecycle.ts
+@@ -0,0 +1,526 @@
++/**
++ * Cancel / Reverse / Correction writers (Story 4.3 / FR-16 / FR-17 / AD-6).
++ * Append-only neutralization ΓÇö originals are never UPDATE'd.
++ */
++
++import { randomUUID } from "node:crypto";
++
++import {
++  appendBusinessEvent,
++  BusinessEventValidationError,
++  lockBusinessEventForUpdate,
++  listChainLinksForEvent,
++  withTransaction,
++  type BusinessEventRecord,
++} from "@divan/event-store";
++import { todayDateOnlyTehran } from "@divan/temporal-engine";
++import type { Pool, PrismaClient } from "@divan/db";
++
++import { getPersonDb } from "./db";
++import {
++  MSG_CANCEL_AFTER_EFFECT_FA,
++  MSG_CANCEL_REASON_REQUIRED_FA,
++  MSG_CANCEL_WRONG_STATE_FA,
++  MSG_CORRECTION_CYCLE_FA,
++  MSG_CORRECTION_REASON_REQUIRED_FA,
++  MSG_CORRECTION_SELF_REF_FA,
++  MSG_CORRECTION_WRONG_STATE_FA,
++  MSG_EVENT_NOT_FOUND_FA,
++  MSG_REVERSE_REASON_REQUIRED_FA,
++  MSG_REVERSE_WRONG_STATE_FA,
++  MSG_BROKEN_CORRECTION_REF_FA,
++  PersonnelEventError,
++} from "./errors";
++import {
++  detectCorrectionCycle,
++  evaluationStatusAsOf,
++  isPreEffectAsOf,
++  resolveLifecycleStatus,
++} from "./personnel-event-resolve";
++import {
++  getProjectionRefreshHook,
++  runProjectionRefreshHook,
++  runWithProjectionRefreshHook,
++  type ProjectionRefreshContext,
++  type ProjectionRefreshHook,
++} from "./personnel-event-projection-hook";
++import {
++  assertActorHasPersonnelEventCancel,
++  assertActorHasPersonnelEventCorrect,
++  assertActorHasPersonnelEventReverse,
++} from "./permissions";
++
++export type LifecycleActorInput = {
++  actorId: string;
++  correlationId?: string;
++  reason: string;
++  idempotencyKey?: string;
++  /** Override as-of for tests (Asia/Tehran date-only). */
++  asOfDate?: string;
++  projectionRefreshHook?: ProjectionRefreshHook;
++};
++
++export type LifecycleResult = {
++  neutralizingEventId: string;
++  targetEventId: string;
++  resolvedStatus: "Cancelled" | "Reversed" | "Effective" | "Scheduled";
++  projectionHookInvoked: boolean;
++  idempotentReplay: boolean;
++};
++
++function requireReason(reason: string | undefined, messageFa: string): string {
++  const trimmed = reason?.trim() ?? "";
++  if (!trimmed) {
++    throw new PersonnelEventError("REASON_REQUIRED", messageFa);
++  }
++  return trimmed;
++}
++
++function mapKernelError(err: unknown): never {
++  if (err instanceof BusinessEventValidationError) {
++    if (err.code === "sensitive_evidence_forbidden") {
++      throw new PersonnelEventError(
++        "SENSITIVE_PAYLOAD",
++        "╪┤┘ê╪º┘ç╪» █î╪º ┘à╪¡┘à┘ê┘ä┘ç ┘å╪¿╪º█î╪» ╪¡╪º┘ê█î ╪»╪º╪»┘ç┘ö ╪¡╪│╪º╪│ ╪¿╪º╪┤╪».",
++        err.code,
++      );
++    }
++    throw new PersonnelEventError(
++      "VALIDATION",
++      "╪º╪╣╪¬╪¿╪º╪▒╪│┘å╪¼█î ╪▒┘ê█î╪»╪º╪» ┌⌐╪│╪¿ΓÇî┘ê┌⌐╪º╪▒ ┘å╪º┘à┘ê┘ü┘é ╪¿┘ê╪».",
++      err.code,
++    );
++  }
++  throw err;
++}
++
++async function findExistingNeutralizer(
++  client: Parameters<typeof listChainLinksForEvent>[0],
++  targetId: string,
++  kind: "cancel" | "reverse",
++): Promise<BusinessEventRecord | null> {
++  const links = await listChainLinksForEvent(client, targetId);
++  const list = kind === "cancel" ? links.cancellations : links.reversals;
++  return list[0] ?? null;
++}
++
++async function findExistingCorrection(
++  client: Parameters<typeof listChainLinksForEvent>[0],
++  targetId: string,
++  idempotencyKey: string | undefined,
++): Promise<BusinessEventRecord | null> {
++  const links = await listChainLinksForEvent(client, targetId);
++  if (!idempotencyKey?.trim()) {
++    return links.corrections[0] ?? null;
++  }
++  const key = idempotencyKey.trim();
++  return (
++    links.corrections.find(
++      (c) =>
++        typeof c.payload.idempotencyKey === "string" &&
++        c.payload.idempotencyKey === key,
++    ) ?? null
++  );
++}
++
++/**
++ * Cancel a Scheduled (pre-effect) event.
++ * Atomic CancelΓåöeffect race: lock target ΓåÆ re-evaluate as-of ΓåÆ one winner.
++ */
++export async function cancelPersonnelEvent(
++  targetEventId: string,
++  input: LifecycleActorInput,
++  pool: Pool,
++  db: PrismaClient = getPersonDb(),
++): Promise<LifecycleResult> {
++  await assertActorHasPersonnelEventCancel(input.actorId, db);
++  const reason = requireReason(input.reason, MSG_CANCEL_REASON_REQUIRED_FA);
++  const correlationId = input.correlationId?.trim() || randomUUID();
++  const asOf = input.asOfDate?.trim() || todayDateOnlyTehran();
++  const hook =
++    input.projectionRefreshHook ?? getProjectionRefreshHook();
++
++  return runWithProjectionRefreshHook(hook, () =>
++    withTransaction(pool, async (client) => {
++      const target = await lockBusinessEventForUpdate(client, targetEventId);
++      if (!target) {
++        throw new PersonnelEventError("EVENT_NOT_FOUND", MSG_EVENT_NOT_FOUND_FA);
++      }
++
++      const existing = await findExistingNeutralizer(
++        client,
++        target.id,
++        "cancel",
++      );
++      if (existing) {
++        return {
++          neutralizingEventId: existing.id,
++          targetEventId: target.id,
++          resolvedStatus: "Cancelled" as const,
++          projectionHookInvoked: false,
++          idempotentReplay: true,
++        };
++      }
++
++      const alreadyReversed = await findExistingNeutralizer(
++        client,
++        target.id,
++        "reverse",
++      );
++      if (alreadyReversed) {
++        throw new PersonnelEventError(
++          "CANCEL_WRONG_STATE",
++          MSG_CANCEL_WRONG_STATE_FA,
++        );
++      }
++
++      // Effect already won (evaluation-by-date) ΓåÆ reject Cancel; guide to Reverse
++      if (!isPreEffectAsOf(target, asOf)) {
++        throw new PersonnelEventError(
++          "CANCEL_AFTER_EFFECT",
++          MSG_CANCEL_AFTER_EFFECT_FA,
++        );
++      }
++
++      // Storage must be authoritative Scheduled (or Effective token that still
++      // evaluates pre-effect ΓÇö only Scheduled is Cancel-eligible per Gate).
++      if (target.status !== "Scheduled") {
++        throw new PersonnelEventError(
++          "CANCEL_WRONG_STATE",
++          MSG_CANCEL_WRONG_STATE_FA,
++        );
++      }
++
++      let eventId: string;
++      try {
++        const appended = await appendBusinessEvent(client, {
++          correlationId,
++          eventType: "EventCancelled",
++          personId: target.personId,
++          employmentId: target.employmentId,
++          effectiveDate: target.effectiveDate,
++          registeredBy: input.actorId,
++          status: "Cancelled",
++          reason,
++          cancelsEventId: target.id,
++          finalizedBy: input.actorId,
++          finalizedAt: new Date(),
++          payload: {
++            targetEventId: target.id,
++            targetEventType: target.eventType,
++            ...(input.idempotencyKey?.trim()
++              ? { idempotencyKey: input.idempotencyKey.trim() }
++              : {}),
++          },
++          provenance: {
++            source: "personnel_event_cancel",
++            asOfDate: asOf,
++          },
++          scope: { source: "personnel_event_cancel" },
++        });
++        eventId = appended.id;
++      } catch (err) {
++        mapKernelError(err);
++      }
++
++      const hookCtx: ProjectionRefreshContext = {
++        client,
++        eventId: eventId!,
++        eventType: "EventCancelled",
++        lifecycleOp: "cancel",
++        targetEventId: target.id,
++        // Cancel of Scheduled: no current-projection side effect
++        applyToCurrentProjection: false,
++      };
++      await runProjectionRefreshHook(hookCtx);
++
++      return {
++        neutralizingEventId: eventId!,
++        targetEventId: target.id,
++        resolvedStatus: "Cancelled" as const,
++        projectionHookInvoked: Boolean(hookCtx.invoked),
++        idempotentReplay: false,
++      };
++    }),
++  );
++}
++
++/**
++ * Reverse an Effective (post-effect) event.
++ */
++export async function reversePersonnelEvent(
++  targetEventId: string,
++  input: LifecycleActorInput,
++  pool: Pool,
++  db: PrismaClient = getPersonDb(),
++): Promise<LifecycleResult> {
++  await assertActorHasPersonnelEventReverse(input.actorId, db);
++  const reason = requireReason(input.reason, MSG_REVERSE_REASON_REQUIRED_FA);
++  const correlationId = input.correlationId?.trim() || randomUUID();
++  const asOf = input.asOfDate?.trim() || todayDateOnlyTehran();
++  const hook =
++    input.projectionRefreshHook ?? getProjectionRefreshHook();
++
++  return runWithProjectionRefreshHook(hook, () =>
++    withTransaction(pool, async (client) => {
++      const target = await lockBusinessEventForUpdate(client, targetEventId);
++      if (!target) {
++        throw new PersonnelEventError("EVENT_NOT_FOUND", MSG_EVENT_NOT_FOUND_FA);
++      }
++
++      const existing = await findExistingNeutralizer(
++        client,
++        target.id,
++        "reverse",
++      );
++      if (existing) {
++        return {
++          neutralizingEventId: existing.id,
++          targetEventId: target.id,
++          resolvedStatus: "Reversed" as const,
++          projectionHookInvoked: false,
++          idempotentReplay: true,
++        };
++      }
++
++      const alreadyCancelled = await findExistingNeutralizer(
++        client,
++        target.id,
++        "cancel",
++      );
++      if (alreadyCancelled) {
++        throw new PersonnelEventError(
++          "REVERSE_WRONG_STATE",
++          MSG_REVERSE_WRONG_STATE_FA,
++        );
++      }
++
++      const evalStatus = evaluationStatusAsOf(target, asOf);
++      if (evalStatus !== "Effective") {
++        throw new PersonnelEventError(
++          "REVERSE_WRONG_STATE",
++          MSG_REVERSE_WRONG_STATE_FA,
++        );
++      }
++
++      let eventId: string;
++      try {
++        const appended = await appendBusinessEvent(client, {
++          correlationId,
++          eventType: "EventReversed",
++          personId: target.personId,
++          employmentId: target.employmentId,
++          effectiveDate: target.effectiveDate,
++          registeredBy: input.actorId,
++          status: "Reversed",
++          reason,
++          reversesEventId: target.id,
++          finalizedBy: input.actorId,
++          finalizedAt: new Date(),
++          payload: {
++            targetEventId: target.id,
++            targetEventType: target.eventType,
++            ...(input.idempotencyKey?.trim()
++              ? { idempotencyKey: input.idempotencyKey.trim() }
++              : {}),
++          },
++          provenance: {
++            source: "personnel_event_reverse",
++            asOfDate: asOf,
++          },
++          scope: { source: "personnel_event_reverse" },
++        });
++        eventId = appended.id;
++      } catch (err) {
++        mapKernelError(err);
++      }
++
++      const hookCtx: ProjectionRefreshContext = {
++        client,
++        eventId: eventId!,
++        eventType: "EventReversed",
++        lifecycleOp: "reverse",
++        targetEventId: target.id,
++        // Compensating reverse of Effective ΓÇö hook invoked; domain stub until 4.5+
++        applyToCurrentProjection: true,
++      };
++      await runProjectionRefreshHook(hookCtx);
++
++      return {
++        neutralizingEventId: eventId!,
++        targetEventId: target.id,
++        resolvedStatus: "Reversed" as const,
++        projectionHookInvoked: Boolean(hookCtx.invoked),
++        idempotentReplay: false,
++      };
++    }),
++  );
++}
++
++export type CorrectPersonnelEventInput = LifecycleActorInput & {
++  /** Optional replacement payload (structural refs only). */
++  correctionPayload?: Record<string, unknown>;
++  /** Optional supersedes link (replacement event id already known ΓÇö rare). */
++  supersedesEventId?: string | null;
++  /**
++   * Prospective id for cycle check when the correcting row is not yet inserted.
++   * Defaults to a fresh UUID (self-ref / cycle walk uses this as fromId).
++   */
++  prospectiveEventId?: string;
++};
++
++/**
++ * Correction: append EventCorrected linking corrects_event_id ΓåÆ target.
++ * Originals preserved; self-ref / cycles blocked.
++ */
++export async function correctPersonnelEvent(
++  targetEventId: string,
++  input: CorrectPersonnelEventInput,
++  pool: Pool,
++  db: PrismaClient = getPersonDb(),
++): Promise<LifecycleResult> {
++  await assertActorHasPersonnelEventCorrect(input.actorId, db);
++  const reason = requireReason(
++    input.reason,
++    MSG_CORRECTION_REASON_REQUIRED_FA,
++  );
++  const correlationId = input.correlationId?.trim() || randomUUID();
++  const asOf = input.asOfDate?.trim() || todayDateOnlyTehran();
++  const hook =
++    input.projectionRefreshHook ?? getProjectionRefreshHook();
++  const prospectiveId = input.prospectiveEventId?.trim() || randomUUID();
++
++  return runWithProjectionRefreshHook(hook, () =>
++    withTransaction(pool, async (client) => {
++      const target = await lockBusinessEventForUpdate(client, targetEventId);
++      if (!target) {
++        throw new PersonnelEventError("EVENT_NOT_FOUND", MSG_EVENT_NOT_FOUND_FA);
++      }
++
++      const existing = await findExistingCorrection(
++        client,
++        target.id,
++        input.idempotencyKey,
++      );
++      if (existing && input.idempotencyKey?.trim()) {
++        const links = await listChainLinksForEvent(client, target.id);
++        return {
++          neutralizingEventId: existing.id,
++          targetEventId: target.id,
++          resolvedStatus: resolveLifecycleStatus(target, links, asOf) as
++            | "Cancelled"
++            | "Reversed"
++            | "Effective"
++            | "Scheduled",
++          projectionHookInvoked: false,
++          idempotentReplay: true,
++        };
++      }
++
++      // Target must be authoritative (Scheduled or Effective), not Draft /
++      // already a pure neutralization row without domain substance.
++      const evalStatus = evaluationStatusAsOf(target, asOf);
++      if (
++        target.status === "Draft" ||
++        target.eventType === "EventCancelled" ||
++        target.eventType === "EventReversed"
++      ) {
++        throw new PersonnelEventError(
++          "CORRECTION_WRONG_STATE",
++          MSG_CORRECTION_WRONG_STATE_FA,
++        );
++      }
++      if (evalStatus !== "Scheduled" && evalStatus !== "Effective") {
++        throw new PersonnelEventError(
++          "CORRECTION_WRONG_STATE",
++          MSG_CORRECTION_WRONG_STATE_FA,
++        );
++      }
++
++      if (prospectiveId === target.id) {
++        throw new PersonnelEventError(
++          "CORRECTION_SELF_REF",
++          MSG_CORRECTION_SELF_REF_FA,
++        );
++      }
++
++      const cycleProblem = await detectCorrectionCycle(
++        client,
++        prospectiveId,
++        target.id,
++      );
++      if (cycleProblem === "self_ref") {
++        throw new PersonnelEventError(
++          "CORRECTION_SELF_REF",
++          MSG_CORRECTION_SELF_REF_FA,
++        );
++      }
++      if (cycleProblem === "cycle") {
++        throw new PersonnelEventError(
++          "CORRECTION_CYCLE",
++          MSG_CORRECTION_CYCLE_FA,
++        );
++      }
++      if (cycleProblem === "missing_target") {
++        throw new PersonnelEventError(
++          "BROKEN_CORRECTION_REF",
++          MSG_BROKEN_CORRECTION_REF_FA,
++        );
++      }
++
++      const corrPayload = input.correctionPayload ?? {};
++      let eventId: string;
++      try {
++        const appended = await appendBusinessEvent(client, {
++          correlationId,
++          eventType: "EventCorrected",
++          personId: target.personId,
++          employmentId: target.employmentId,
++          effectiveDate: target.effectiveDate,
++          registeredBy: input.actorId,
++          // Correction replacement row is authoritative at same evaluation status
++          status: evalStatus === "Scheduled" ? "Scheduled" : "Effective",
++          reason,
++          correctsEventId: target.id,
++          supersedesEventId: input.supersedesEventId ?? null,
++          finalizedBy: input.actorId,
++          finalizedAt: new Date(),
++          payload: {
++            targetEventId: target.id,
++            targetEventType: target.eventType,
++            ...corrPayload,
++            ...(input.idempotencyKey?.trim()
++              ? { idempotencyKey: input.idempotencyKey.trim() }
++              : {}),
++          },
++          provenance: {
++            source: "personnel_event_correct",
++            asOfDate: asOf,
++          },
++          scope: { source: "personnel_event_correct" },
++        });
++        eventId = appended.id;
++      } catch (err) {
++        mapKernelError(err);
++      }
++
++      const hookCtx: ProjectionRefreshContext = {
++        client,
++        eventId: eventId!,
++        eventType: "EventCorrected",
++        lifecycleOp: "correct",
++        targetEventId: target.id,
++        applyToCurrentProjection: evalStatus === "Effective",
++      };
++      await runProjectionRefreshHook(hookCtx);
++
++      return {
++        neutralizingEventId: eventId!,
++        targetEventId: target.id,
++        resolvedStatus: evalStatus as "Effective" | "Scheduled",
++        projectionHookInvoked: Boolean(hookCtx.invoked),
++        idempotentReplay: false,
++      };
++    }),
++  );
++}
+diff --git a/packages/modules/person-employment/src/personnel-event-resolve.ts b/packages/modules/person-employment/src/personnel-event-resolve.ts
+new file mode 100644
+index 0000000..c42ea26
+--- /dev/null
++++ b/packages/modules/person-employment/src/personnel-event-resolve.ts
+@@ -0,0 +1,119 @@
++/**
++ * Resolved lifecycle status + chain helpers (Story 4.3 / FR-16 / FR-17).
++ * Storage tokens on originals stay attributable; display status is derived.
++ */
++
++import type { BusinessEventRecord, BusinessEventStatus } from "@divan/event-store";
++import {
++  getBusinessEventById,
++  listChainLinksForEvent,
++  type PgQueryable,
++} from "@divan/event-store";
++import { todayDateOnlyTehran } from "@divan/temporal-engine";
++
++/** Display lifecycle ΓÇö derived, never an in-place rewrite of the original row. */
++export type ResolvedLifecycleStatus = BusinessEventStatus;
++
++export type EventChainLinks = {
++  cancellations: BusinessEventRecord[];
++  reversals: BusinessEventRecord[];
++  corrections: BusinessEventRecord[];
++};
++
++/**
++ * Evaluation-by-date: storage Scheduled whose Effective Date has been reached
++ * is treated as Effective for readers until Story 4.4 recalc mutates nothing.
++ */
++export function evaluationStatusAsOf(
++  event: Pick<BusinessEventRecord, "status" | "effectiveDate">,
++  asOfDate: string = todayDateOnlyTehran(),
++): BusinessEventStatus {
++  if (event.status === "Draft") return "Draft";
++  if (event.status === "Cancelled" || event.status === "Reversed") {
++    return event.status;
++  }
++  if (event.status === "Scheduled" && event.effectiveDate <= asOfDate) {
++    return "Effective";
++  }
++  return event.status;
++}
++
++/**
++ * Whether the event is still pre-effect (Cancel-eligible) as of date.
++ * Neutralizing children are checked by callers via resolveLifecycleStatus.
++ */
++export function isPreEffectAsOf(
++  event: Pick<BusinessEventRecord, "status" | "effectiveDate">,
++  asOfDate: string = todayDateOnlyTehran(),
++): boolean {
++  return evaluationStatusAsOf(event, asOfDate) === "Scheduled";
++}
++
++/**
++ * Derive display status from storage + neutralizing/correcting children.
++ * Convention: Cancel/Reverse rows themselves carry status Cancelled/Reversed;
++ * originals keep Scheduled|Effective; resolved Cancelled/Reversed wins for UI.
++ */
++export function resolveLifecycleStatus(
++  event: BusinessEventRecord,
++  links: EventChainLinks,
++  asOfDate: string = todayDateOnlyTehran(),
++): ResolvedLifecycleStatus {
++  if (links.cancellations.length > 0) return "Cancelled";
++  if (links.reversals.length > 0) return "Reversed";
++  // Correction does not erase the original ΓÇö original stays Scheduled|Effective
++  // for attributable history; resolved display follows evaluation-by-date.
++  // Deterministic stub: when a correction exists, original remains visible as
++  // its evaluation status; callers surface correction links separately.
++  return evaluationStatusAsOf(event, asOfDate);
++}
++
++export async function loadEventWithResolvedStatus(
++  db: PgQueryable,
++  eventId: string,
++  asOfDate: string = todayDateOnlyTehran(),
++): Promise<{
++  event: BusinessEventRecord;
++  links: EventChainLinks;
++  resolvedStatus: ResolvedLifecycleStatus;
++} | null> {
++  const event = await getBusinessEventById(db, eventId);
++  if (!event) return null;
++  const links = await listChainLinksForEvent(db, eventId);
++  return {
++    event,
++    links,
++    resolvedStatus: resolveLifecycleStatus(event, links, asOfDate),
++  };
++}
++
++/**
++ * Walk corrects_event_id chain looking for self-ref / cycles.
++ * Returns the first problem code or null when acyclic.
++ */
++export async function detectCorrectionCycle(
++  db: PgQueryable,
++  /** New edge: fromId corrects toId (fromId may be prospective / not yet stored). */
++  fromId: string,
++  toId: string,
++): Promise<"self_ref" | "cycle" | "missing_target" | null> {
++  if (fromId === toId) return "self_ref";
++
++  const target = await getBusinessEventById(db, toId);
++  if (!target) return "missing_target";
++
++  const seen = new Set<string>([fromId]);
++  let current: string | null = toId;
++  let depth = 0;
++  const MAX = 64;
++  while (current) {
++    if (seen.has(current)) return "cycle";
++    seen.add(current);
++    depth += 1;
++    if (depth > MAX) return "cycle";
++    const row = await getBusinessEventById(db, current);
++    if (!row) return "missing_target";
++    current = row.correctsEventId;
++  }
++  return null;
++}

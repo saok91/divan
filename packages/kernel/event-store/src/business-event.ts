@@ -357,3 +357,264 @@ export async function appendBusinessEvent(
 
   return { id };
 }
+
+/** Business event row shape for thin reads (Story 4.3). */
+export type BusinessEventRecord = {
+  id: string;
+  eventType: string;
+  personId: string;
+  employmentId: string | null;
+  effectiveDate: string;
+  status: BusinessEventStatus;
+  registeredBy: string;
+  registeredAt: Date;
+  finalizedBy: string | null;
+  finalizedAt: Date | null;
+  reason: string | null;
+  correctsEventId: string | null;
+  cancelsEventId: string | null;
+  reversesEventId: string | null;
+  supersedesEventId: string | null;
+  payload: Record<string, unknown>;
+  correlationId: string;
+};
+
+type KernelBusinessRow = {
+  id: string;
+  event_type: string;
+  person_id: string;
+  employment_id: string | null;
+  effective_date: Date | string;
+  status: string;
+  registered_by: string;
+  registered_at: Date;
+  finalized_by: string | null;
+  finalized_at: Date | null;
+  reason: string | null;
+  corrects_event_id: string | null;
+  cancels_event_id: string | null;
+  reverses_event_id: string | null;
+  supersedes_event_id: string | null;
+  payload: unknown;
+  correlation_id: string;
+};
+
+function dateOnlyFromPg(value: Date | string): string {
+  if (typeof value === "string") {
+    // DATE drivers may return 'YYYY-MM-DD' already
+    return value.slice(0, 10);
+  }
+  const y = value.getUTCFullYear();
+  const m = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+function mapBusinessRow(row: KernelBusinessRow): BusinessEventRecord {
+  const status = row.status as BusinessEventStatus;
+  return {
+    id: row.id,
+    eventType: row.event_type,
+    personId: row.person_id,
+    employmentId: row.employment_id,
+    effectiveDate: dateOnlyFromPg(row.effective_date),
+    status,
+    registeredBy: row.registered_by,
+    registeredAt: row.registered_at,
+    finalizedBy: row.finalized_by,
+    finalizedAt: row.finalized_at,
+    reason: row.reason,
+    correctsEventId: row.corrects_event_id,
+    cancelsEventId: row.cancels_event_id,
+    reversesEventId: row.reverses_event_id,
+    supersedesEventId: row.supersedes_event_id,
+    payload: asRecord(row.payload),
+    correlationId: row.correlation_id,
+  };
+}
+
+const BUSINESS_SELECT = `
+  id, event_type, person_id, employment_id, effective_date, status,
+  registered_by, registered_at, finalized_by, finalized_at, reason,
+  corrects_event_id, cancels_event_id, reverses_event_id, supersedes_event_id,
+  payload, correlation_id
+`;
+
+/**
+ * Load one business event by id (no lock).
+ * Returns null when missing or not `event_class=business`.
+ */
+export async function getBusinessEventById(
+  db: PgQueryable,
+  eventId: string,
+): Promise<BusinessEventRecord | null> {
+  assertUuid("eventId", "invalid_event_id", eventId.trim());
+  const result = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT}
+     FROM kernel_events
+     WHERE id = $1::uuid AND event_class = 'business'`,
+    [eventId.trim()],
+  );
+  const row = result.rows[0];
+  return row ? mapBusinessRow(row) : null;
+}
+
+/**
+ * Lock a business event row for Cancel/Reverse race decisions (`FOR UPDATE`).
+ */
+export async function lockBusinessEventForUpdate(
+  db: PgQueryable,
+  eventId: string,
+): Promise<BusinessEventRecord | null> {
+  assertUuid("eventId", "invalid_event_id", eventId.trim());
+  const result = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT}
+     FROM kernel_events
+     WHERE id = $1::uuid AND event_class = 'business'
+     FOR UPDATE`,
+    [eventId.trim()],
+  );
+  const row = result.rows[0];
+  return row ? mapBusinessRow(row) : null;
+}
+
+/** Children that cancel / reverse / correct a target event. */
+export async function listChainLinksForEvent(
+  db: PgQueryable,
+  targetEventId: string,
+): Promise<{
+  cancellations: BusinessEventRecord[];
+  reversals: BusinessEventRecord[];
+  corrections: BusinessEventRecord[];
+}> {
+  assertUuid("targetEventId", "invalid_event_id", targetEventId.trim());
+  const id = targetEventId.trim();
+  const cancels = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND cancels_event_id = $1::uuid
+     ORDER BY registered_at ASC, id ASC`,
+    [id],
+  );
+  const reverses = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND reverses_event_id = $1::uuid
+     ORDER BY registered_at ASC, id ASC`,
+    [id],
+  );
+  const corrects = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND corrects_event_id = $1::uuid
+     ORDER BY registered_at ASC, id ASC`,
+    [id],
+  );
+  return {
+    cancellations: cancels.rows.map(mapBusinessRow),
+    reversals: reverses.rows.map(mapBusinessRow),
+    corrections: corrects.rows.map(mapBusinessRow),
+  };
+}
+
+/**
+ * Batch chain links for many targets (avoids N×3 queries on list screens).
+ * Keys are target event ids; missing targets get empty link lists.
+ */
+export async function listChainLinksForEvents(
+  db: PgQueryable,
+  targetEventIds: string[],
+): Promise<
+  Map<
+    string,
+    {
+      cancellations: BusinessEventRecord[];
+      reversals: BusinessEventRecord[];
+      corrections: BusinessEventRecord[];
+    }
+  >
+> {
+  const unique = [
+    ...new Set(
+      targetEventIds.map((id) => id.trim()).filter((id) => id.length > 0),
+    ),
+  ];
+  const empty = (): {
+    cancellations: BusinessEventRecord[];
+    reversals: BusinessEventRecord[];
+    corrections: BusinessEventRecord[];
+  } => ({ cancellations: [], reversals: [], corrections: [] });
+  const map = new Map<string, ReturnType<typeof empty>>();
+  for (const id of unique) {
+    assertUuid("targetEventId", "invalid_event_id", id);
+    map.set(id, empty());
+  }
+  if (unique.length === 0) return map;
+
+  const cancels = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND cancels_event_id = ANY($1::uuid[])
+     ORDER BY registered_at ASC, id ASC`,
+    [unique],
+  );
+  const reverses = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND reverses_event_id = ANY($1::uuid[])
+     ORDER BY registered_at ASC, id ASC`,
+    [unique],
+  );
+  const corrects = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND corrects_event_id = ANY($1::uuid[])
+     ORDER BY registered_at ASC, id ASC`,
+    [unique],
+  );
+
+  for (const row of cancels.rows) {
+    const mapped = mapBusinessRow(row);
+    const key = mapped.cancelsEventId;
+    if (!key) continue;
+    const bucket = map.get(key) ?? empty();
+    bucket.cancellations.push(mapped);
+    map.set(key, bucket);
+  }
+  for (const row of reverses.rows) {
+    const mapped = mapBusinessRow(row);
+    const key = mapped.reversesEventId;
+    if (!key) continue;
+    const bucket = map.get(key) ?? empty();
+    bucket.reversals.push(mapped);
+    map.set(key, bucket);
+  }
+  for (const row of corrects.rows) {
+    const mapped = mapBusinessRow(row);
+    const key = mapped.correctsEventId;
+    if (!key) continue;
+    const bucket = map.get(key) ?? empty();
+    bucket.corrections.push(mapped);
+    map.set(key, bucket);
+  }
+  return map;
+}
+
+/** Authoritative business events for a person (excludes pure Draft storage rows). */
+export async function listBusinessEventsForPerson(
+  db: PgQueryable,
+  personId: string,
+  opts: { limit?: number } = {},
+): Promise<BusinessEventRecord[]> {
+  assertUuid("personId", "invalid_person_id", personId.trim());
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+  const result = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND person_id = $1::uuid
+     ORDER BY effective_date DESC, registered_at DESC, id DESC
+     LIMIT $2`,
+    [personId.trim(), limit],
+  );
+  return result.rows.map(mapBusinessRow);
+}

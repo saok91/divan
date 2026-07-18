@@ -25,6 +25,7 @@ import {
   MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
   MSG_FINALIZE_STALE_SNAPSHOT_FA,
   MSG_FINALIZE_WARNING_ACK_REQUIRED_FA,
+  MSG_FINALIZE_LIFECYCLE_CHAIN_FORBIDDEN_FA,
   MSG_RISK_TIER_PENDING_REVIEW_FA,
   PersonnelEventError,
 } from "./errors";
@@ -522,6 +523,27 @@ export async function finalizeDraft(
 
     let eventId: string;
     try {
+      const correctsEventId =
+        typeof draft.payload.correctsEventId === "string"
+          ? draft.payload.correctsEventId
+          : null;
+      // Cancel / Reverse must go through lifecycle writers — never finalize.
+      if (
+        (typeof draft.payload.cancelsEventId === "string" &&
+          draft.payload.cancelsEventId.trim()) ||
+        (typeof draft.payload.reversesEventId === "string" &&
+          draft.payload.reversesEventId.trim())
+      ) {
+        throw new PersonnelEventError(
+          "FINALIZE_BLOCKED",
+          MSG_FINALIZE_LIFECYCLE_CHAIN_FORBIDDEN_FA,
+        );
+      }
+      const supersedesEventId =
+        typeof draft.payload.supersedesEventId === "string"
+          ? draft.payload.supersedesEventId
+          : null;
+
       const appended = await appendBusinessEvent(client, {
         correlationId,
         eventType: draft.eventType,
@@ -533,6 +555,10 @@ export async function finalizeDraft(
         status,
         finalizedBy: input.actorId,
         finalizedAt,
+        correctsEventId,
+        cancelsEventId: null,
+        reversesEventId: null,
+        supersedesEventId,
         payload: {
           ...draft.payload,
           draftId: draft.id,
@@ -626,6 +652,8 @@ export async function finalizeDraft(
       draft,
       eventId: eventId!,
       eventType: draft.eventType,
+      // FR-16: Scheduled must not alter current projections
+      applyToCurrentProjection: status === "Effective",
     };
     await runProjectionRefreshHook(hookCtx);
 
