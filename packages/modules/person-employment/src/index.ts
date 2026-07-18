@@ -563,6 +563,29 @@ export type {
 } from "./personnel-event-termination";
 
 export {
+  TRANSFER_EVENT_TYPES,
+  PRODUCT_TRANSFER_EVENT_TYPE,
+  NON_PRODUCT_TRANSFER_EVENT_TYPE,
+  parseTransferPayload,
+  isTransferNoop,
+  isTransferEffectUnapplied,
+  applyTransferProjections,
+  applyTransferScheduledReserve,
+  compensateTransferApply,
+  undoTransferApply,
+  releaseTransferReservationOnCancel,
+  findIncompatibleFutureEventsForTransfer,
+  incompatibleTransferFutureToConflict,
+} from "./personnel-event-transfer";
+
+export type {
+  TransferPayloadFacts,
+  MissingTransferFact,
+  TransferApplyResult,
+  TransferIncompatibleFutureEvent,
+} from "./personnel-event-transfer";
+
+export {
   finalizeDraft,
   evaluateDraftForFinalize,
   inferRiskTiers,

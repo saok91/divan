@@ -198,7 +198,10 @@ export async function findIncompatibleFutureEvents(
     excludeEventId?: string | null;
   },
 ): Promise<IncompatibleFutureEvent[]> {
-  const startReturnTypes = [...START_RETURN_EVENT_TYPES];
+  const startReturnTypes = [
+    ...START_RETURN_EVENT_TYPES,
+    "TransferRecorded",
+  ];
   const rows = await client.query<{
     id: string;
     event_type: string;

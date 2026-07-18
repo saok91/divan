@@ -61,6 +61,7 @@ import {
 } from "./personnel-event-recalc";
 import { compensateOrphanStartReturnProjections } from "./personnel-event-start-return";
 import { compensateTerminationApply } from "./personnel-event-termination";
+import { compensateTransferApply } from "./personnel-event-transfer";
 
 export type RiskTierKind =
   | "termination"
@@ -808,6 +809,21 @@ export async function finalizeDraft(
           releaseEventId: eventId!,
           didRelease: hookCtx.terminationApply.didRelease,
           didCloseEmployment: hookCtx.terminationApply.didCloseEmployment,
+        });
+      }
+      if (hookCtx.transferApply && !hookCtx.transferApply.reservedOnly) {
+        await compensateTransferApply({
+          client,
+          employmentId: hookCtx.transferApply.employmentId,
+          endDateExclusive: hookCtx.transferApply.endDateExclusive,
+          sourcePrimaryId: hookCtx.transferApply.sourcePrimaryId,
+          previousSourceEnd: hookCtx.transferApply.previousSourceEnd,
+          destinationPrimaryId: hookCtx.transferApply.destinationPrimaryId,
+          transferEventId: eventId!,
+          didCloseSource: hookCtx.transferApply.didCloseSource,
+          didOpenDest: hookCtx.transferApply.didOpenDest,
+          didReleaseSource: hookCtx.transferApply.didReleaseSource,
+          didMoveDestCapacity: hookCtx.transferApply.didMoveDestCapacity,
         });
       }
       throw err;

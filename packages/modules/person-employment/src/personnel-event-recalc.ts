@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import {
   listBusinessEventsForPersonForApply,
+  listChainLinksForEvents,
   type BusinessEventRecord,
 } from "@divan/event-store";
 import {
@@ -20,6 +21,7 @@ import {
   runProjectionRefreshHook,
   type ProjectionRefreshContext,
 } from "./personnel-event-projection-hook";
+import { evaluationStatusAsOf } from "./personnel-event-resolve";
 
 /** Domain-prefixed queue name (architecture Consistency Conventions). */
 export const TEMPORAL_RECALCULATE_QUEUE = "temporal.recalculate" as const;
@@ -460,20 +462,44 @@ export async function runHistoricalRecalculation(
       return { applied: 0, skipped: true };
     }
 
+    const chainById = await listChainLinksForEvents(
+      client,
+      ordered.map((e) => e.id),
+    );
+
+    let applied = 0;
     for (const event of ordered) {
+      const links = chainById.get(event.id);
+      if (
+        links &&
+        (links.cancellations.length > 0 || links.reversals.length > 0)
+      ) {
+        continue;
+      }
+      if (
+        event.eventType === "EventCancelled" ||
+        event.eventType === "EventReversed" ||
+        event.eventType === "EventCorrected"
+      ) {
+        continue;
+      }
+
+      const asOf = todayDateOnlyTehran();
       const hookCtx: ProjectionRefreshContext = {
         client,
         eventId: event.id,
         eventType: event.eventType,
-        // Historical rebuild: apply domain projectors for Effective events only.
-        // Scheduled / Cancelled / Reversed must not mutate current projections (FR-16).
-        applyToCurrentProjection: event.status === "Effective",
+        // Evaluation-by-date: storage-Scheduled with ED ≤ asOf applies as Effective (UJ-1 / 4.7).
+        // Do NOT UPDATE kernel status — storage may remain Scheduled (4.3).
+        applyToCurrentProjection:
+          evaluationStatusAsOf(event, asOf) === "Effective",
       };
       await runProjectionRefreshHook(hookCtx);
+      applied += 1;
     }
     await clearRecalculationStatus(client, payload.personId, payload.generation);
     if (release) await client.query("COMMIT");
-    return { applied: ordered.length, skipped: false };
+    return { applied, skipped: false };
   } catch (err) {
     if (release) {
       try {

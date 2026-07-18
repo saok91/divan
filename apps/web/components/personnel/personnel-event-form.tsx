@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
+import { HeadcountCapacityPanel } from "@/components/personnel/headcount-capacity-panel";
 import {
   ConflictList,
   SensitiveConfirmationDialog,
@@ -34,6 +35,7 @@ const EVENT_TYPE_OPTIONS = [
     value: "EmploymentTerminated",
     labelFa: "خاتمه همکاری (EmploymentTerminated)",
   },
+  { value: "TransferRecorded", labelFa: "انتقال (TransferRecorded)" },
 ] as const;
 
 function isStartReturnType(eventType: string): boolean {
@@ -44,6 +46,10 @@ function isStartReturnType(eventType: string): boolean {
 
 function isTerminationType(eventType: string): boolean {
   return eventType === "EmploymentTerminated";
+}
+
+function isTransferType(eventType: string): boolean {
+  return eventType === "TransferRecorded";
 }
 
 type LifecycleOp = "cancel" | "reverse" | "correct";
@@ -138,6 +144,38 @@ export function PersonnelEventForm() {
   const canReverse = lifecycleCapsQuery.data?.reverse === true;
   const canCorrect = lifecycleCapsQuery.data?.correct === true;
 
+  const capacityQuery = api.personnelEvent.headcountCapacity.useQuery(
+    {
+      teamId: teamId.trim(),
+      effectiveDate: effectiveDate.trim(),
+      jobTitleId: jobTitleId.trim() || undefined,
+      ladderId: ladderId.trim() || undefined,
+      gradeId: gradeId.trim() || undefined,
+    },
+    {
+      enabled:
+        isTransferType(eventType) &&
+        Boolean(teamId.trim()) &&
+        Boolean(effectiveDate.trim()) &&
+        /^[0-9a-f-]{36}$/i.test(teamId.trim()),
+    },
+  );
+
+  const sourcePrimaryQuery = api.personnelEvent.sourcePrimarySummary.useQuery(
+    {
+      employmentId: employmentId.trim(),
+      asOfDate: effectiveDate.trim(),
+    },
+    {
+      enabled:
+        isTransferType(eventType) &&
+        Boolean(employmentId.trim()) &&
+        Boolean(effectiveDate.trim()) &&
+        /^[0-9a-f-]{36}$/i.test(employmentId.trim()) &&
+        /^\d{4}-\d{2}-\d{2}$/.test(effectiveDate.trim()),
+    },
+  );
+
   React.useEffect(() => {
     setDemoDraftOpen(Boolean(draftId) || dirty);
   }, [draftId, dirty, setDemoDraftOpen]);
@@ -150,6 +188,18 @@ export function PersonnelEventForm() {
           ? { employmentId: employmentId.trim() }
           : {}),
       };
+    }
+    if (isTransferType(eventType)) {
+      const payload: Record<string, unknown> = {
+        teamId: teamId.trim(),
+        organizationalRoleId: organizationalRoleId.trim(),
+        jobTitleId: jobTitleId.trim(),
+        ladderId: ladderId.trim(),
+        gradeId: gradeId.trim(),
+      };
+      if (seniorityId.trim()) payload.seniorityId = seniorityId.trim();
+      if (employmentId.trim()) payload.employmentId = employmentId.trim();
+      return payload;
     }
     if (!isStartReturnType(eventType)) return {};
     const payload: Record<string, unknown> = {
@@ -204,6 +254,24 @@ export function PersonnelEventForm() {
         }
         if (!terminationReason.trim()) {
           setErrorMsg("برای خاتمه، کد دلیل خاتمه الزامی است.");
+          return false;
+        }
+      }
+      if (isTransferType(eventType)) {
+        if (!employmentId.trim()) {
+          setErrorMsg("برای انتقال، شناسه همکاری باز الزامی است.");
+          return false;
+        }
+        if (
+          !teamId.trim() ||
+          !organizationalRoleId.trim() ||
+          !jobTitleId.trim() ||
+          !ladderId.trim() ||
+          !gradeId.trim()
+        ) {
+          setErrorMsg(
+            "برای انتقال، تیم مقصد، نقش، عنوان شغلی، لدر و گرید الزامی است.",
+          );
           return false;
         }
       }
@@ -461,7 +529,7 @@ export function PersonnelEventForm() {
           <label className="block space-y-1">
             <span className="text-label-medium">
               شناسه همکاری
-              {isTerminationType(eventType) ? (
+              {isTerminationType(eventType) || isTransferType(eventType) ? (
                 <span className="text-destructive"> *</span>
               ) : (
                 " (اختیاری)"
@@ -472,8 +540,14 @@ export function PersonnelEventForm() {
               onChange={(e) => setEmploymentId(e.target.value)}
               dir="ltr"
               autoComplete="off"
-              required={isTerminationType(eventType)}
-              aria-required={isTerminationType(eventType) || undefined}
+              required={
+                isTerminationType(eventType) || isTransferType(eventType)
+              }
+              aria-required={
+                isTerminationType(eventType) || isTransferType(eventType)
+                  ? true
+                  : undefined
+              }
             />
           </label>
         </fieldset>
@@ -614,6 +688,124 @@ export function PersonnelEventForm() {
                 نمونه‌ها: contract_ended، resignation، dismissal
               </span>
             </label>
+          </fieldset>
+        ) : null}
+
+        {isTransferType(eventType) ? (
+          <fieldset className="space-y-3">
+            <legend className="text-label-medium">
+              واقعیت‌های انتقال (مقصد)
+            </legend>
+            <p className="text-xs text-muted-foreground">
+              شناسه همکاری باز را بالا وارد کنید. مقصد باید با انتصاب اولیه فعلی
+              متفاوت باشد. ظرفیت مقصد قبل از نهایی‌سازی نمایش داده می‌شود.
+            </p>
+            {sourcePrimaryQuery.isFetching ? (
+              <p className="text-sm text-muted-foreground" role="status">
+                در حال بارگذاری انتصاب اولیه مبدأ…
+              </p>
+            ) : sourcePrimaryQuery.data ? (
+              <div
+                className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                role="region"
+                aria-label="خلاصه انتصاب اولیه مبدأ"
+              >
+                <p className="text-label-medium mb-2">انتصاب اولیه فعلی (مبدأ)</p>
+                <dl className="grid gap-1 text-xs">
+                  <div className="flex gap-2">
+                    <dt className="text-muted-foreground shrink-0">تیم</dt>
+                    <dd className="font-mono truncate" dir="ltr">
+                      {sourcePrimaryQuery.data.teamId}
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="text-muted-foreground shrink-0">عنوان</dt>
+                    <dd className="font-mono truncate" dir="ltr">
+                      {sourcePrimaryQuery.data.jobTitleId}
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="text-muted-foreground shrink-0">لدر / گرید</dt>
+                    <dd className="font-mono truncate" dir="ltr">
+                      {sourcePrimaryQuery.data.ladderId.slice(0, 8)}… /{" "}
+                      {sourcePrimaryQuery.data.gradeId.slice(0, 8)}…
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="text-muted-foreground shrink-0">شروع</dt>
+                    <dd className="tabular-nums" dir="ltr">
+                      {sourcePrimaryQuery.data.startDate}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : employmentId.trim() &&
+              /^[0-9a-f-]{36}$/i.test(employmentId.trim()) ? (
+              <p className="text-sm text-muted-foreground" role="status">
+                انتصاب اولیه مبدأ برای این همکاری در تاریخ مؤثر یافت نشد.
+              </p>
+            ) : null}
+            {(
+              [
+                ["teamId", "شناسه تیم مقصد", teamId, setTeamId],
+                [
+                  "organizationalRoleId",
+                  "شناسه نقش سازمانی مقصد",
+                  organizationalRoleId,
+                  setOrganizationalRoleId,
+                ],
+                [
+                  "jobTitleId",
+                  "شناسه عنوان شغلی مقصد",
+                  jobTitleId,
+                  setJobTitleId,
+                ],
+                ["ladderId", "شناسه لدر مقصد", ladderId, setLadderId],
+                ["gradeId", "شناسه گرید مقصد", gradeId, setGradeId],
+                [
+                  "seniorityId",
+                  "شناسه ارشدیت مقصد (اختیاری)",
+                  seniorityId,
+                  setSeniorityId,
+                ],
+              ] as const
+            ).map(([key, label, value, setter]) => (
+              <label key={key} className="block space-y-1">
+                <span className="text-label-medium" id={`${formId}-xfer-${key}`}>
+                  {label}
+                  {key !== "seniorityId" ? (
+                    <span className="text-destructive"> *</span>
+                  ) : null}
+                </span>
+                <Input
+                  value={value}
+                  onChange={(e) => {
+                    setter(e.target.value);
+                    setDirty(true);
+                  }}
+                  required={key !== "seniorityId"}
+                  dir="ltr"
+                  aria-labelledby={`${formId}-xfer-${key}`}
+                  autoComplete="off"
+                />
+              </label>
+            ))}
+            <HeadcountCapacityPanel
+              used={capacityQuery.data?.used ?? 0}
+              reserved={capacityQuery.data?.reserved ?? 0}
+              free={capacityQuery.data?.free ?? 0}
+              slotFound={
+                capacityQuery.isFetched
+                  ? Boolean(capacityQuery.data?.slotId)
+                  : true
+              }
+              loading={capacityQuery.isFetching}
+              errorFa={
+                capacityQuery.isError
+                  ? "خواندن ظرفیت مقصد ناموفق بود."
+                  : null
+              }
+            />
           </fieldset>
         ) : null}
 

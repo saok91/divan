@@ -1,5 +1,5 @@
 /**
- * Narrow headcount capacity port (Stories 4.5–4.6 / FR-20 / FR-31 boundary).
+ * Narrow headcount capacity port (Stories 4.5–4.7 / FR-20 / FR-30 / FR-31 boundary).
  * NOT Approval lifecycle, Matching matrix, Reservation expiry, or Override catalogue.
  */
 
@@ -21,6 +21,12 @@ export const MSG_HEADCOUNT_RELEASE_FAILED_FA =
 
 export const MSG_HEADCOUNT_RELEASE_AMBIGUOUS_FA =
   "هدف آزادسازی ظرفیت مبهم یا ناموجود است؛ نهایی‌سازی مسدود است.";
+
+export const MSG_HEADCOUNT_RESERVE_FAILED_FA =
+  "رزرو ظرفیت نیروی انسانی ناموفق بود؛ نهایی‌سازی مسدود است.";
+
+export const MSG_HEADCOUNT_RESERVATION_RELEASE_FAILED_FA =
+  "آزادسازی رزرو ظرفیت نیروی انسانی ناموفق بود.";
 
 export type CapacityCheckInput = {
   teamId: string;
@@ -129,6 +135,45 @@ export async function ensureHeadcountCapacitySchema(
     CREATE INDEX IF NOT EXISTS headcount_capacity_consumption_release_event_idx
       ON headcount_capacity_consumption (release_event_id)
       WHERE release_event_id IS NOT NULL
+  `);
+  await db.query(`
+    ALTER TABLE headcount_capacity_slot
+      ADD COLUMN IF NOT EXISTS reserved_units INTEGER NOT NULL DEFAULT 0
+  `);
+  await db.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'headcount_capacity_slot_reserved_units_check'
+      ) THEN
+        ALTER TABLE headcount_capacity_slot
+          ADD CONSTRAINT headcount_capacity_slot_reserved_units_check
+          CHECK (reserved_units >= 0);
+      END IF;
+    END $$
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS headcount_capacity_reservation (
+      id              UUID PRIMARY KEY,
+      slot_id         UUID NOT NULL REFERENCES headcount_capacity_slot(id) ON DELETE RESTRICT,
+      event_id        UUID NOT NULL,
+      person_id       UUID NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'reserved'
+                        CHECK (status IN ('reserved', 'released', 'converted')),
+      reserved_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (event_id)
+    )
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS headcount_capacity_reservation_slot_idx
+      ON headcount_capacity_reservation (slot_id)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS headcount_capacity_reservation_status_idx
+      ON headcount_capacity_reservation (status)
+      WHERE status = 'reserved'
   `);
 }
 
@@ -264,6 +309,7 @@ function dateInSlot(
 /**
  * Consume one free unit and link to authoritative event (same txn as finalize).
  * Idempotent on event_id — retry finalize / recalc replay safe.
+ * Locks slot row (FOR UPDATE) so concurrent last-unit consumes cannot both succeed (NFR4).
  */
 export async function consumeHeadcountCapacity(
   db: PoolClient,
@@ -275,6 +321,11 @@ export async function consumeHeadcountCapacity(
     [input.eventId],
   );
   if (existing.length > 0) return;
+
+  await db.query(
+    `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
+    [input.slotId],
+  );
 
   const upd = await db.query(
     `UPDATE headcount_capacity_slot
@@ -549,3 +600,370 @@ export async function seedDemoHeadcountCapacity(
 
   return { slotId, teamId: team.id };
 }
+
+export type ReserveCapacityInput = {
+  slotId: string;
+  eventId: string;
+  personId: string;
+};
+
+/**
+ * Reserve one free unit for a Scheduled Transfer (FR-30).
+ * Idempotent on event_id. Locks slot FOR UPDATE (NFR4).
+ */
+export async function reserveHeadcountCapacity(
+  db: PoolClient,
+  input: ReserveCapacityInput,
+): Promise<{ reserved: boolean; slotId: string }> {
+  const existing = await query<{ id: string; slot_id: string; status: string }>(
+    db,
+    `SELECT id, slot_id, status FROM headcount_capacity_reservation
+     WHERE event_id = $1::uuid`,
+    [input.eventId],
+  );
+  if (existing[0]) {
+    if (existing[0].status === "reserved" || existing[0].status === "converted") {
+      return { reserved: false, slotId: existing[0].slot_id };
+    }
+    // previously released — re-reserve below (rare Cancel-then-re-finalize with same event id impossible)
+  }
+
+  await db.query(
+    `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
+    [input.slotId],
+  );
+
+  const upd = await db.query(
+    `UPDATE headcount_capacity_slot
+     SET free_units = free_units - 1,
+         reserved_units = reserved_units + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1::uuid AND free_units > 0
+     RETURNING id`,
+    [input.slotId],
+  );
+  if (upd.rowCount === 0) {
+    throw new Error(MSG_HEADCOUNT_RESERVE_FAILED_FA);
+  }
+
+  if (existing[0]?.status === "released") {
+    await db.query(
+      `UPDATE headcount_capacity_reservation
+       SET status = 'reserved',
+           slot_id = $2::uuid,
+           person_id = $3::uuid,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE event_id = $1::uuid`,
+      [input.eventId, input.slotId, input.personId],
+    );
+  } else {
+    await db.query(
+      `INSERT INTO headcount_capacity_reservation
+         (id, slot_id, event_id, person_id, status)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'reserved')`,
+      [randomUUID(), input.slotId, input.eventId, input.personId],
+    );
+  }
+
+  return { reserved: true, slotId: input.slotId };
+}
+
+/**
+ * Release a Transfer reservation (Cancel of Scheduled Transfer).
+ * Idempotent on event_id — already released / converted → no-op or fail closed for converted.
+ */
+export async function releaseHeadcountReservation(
+  db: PoolClient,
+  eventId: string,
+): Promise<{ released: boolean; slotId: string | null }> {
+  const rows = await query<{
+    id: string;
+    slot_id: string;
+    status: string;
+  }>(
+    db,
+    `SELECT id, slot_id, status FROM headcount_capacity_reservation
+     WHERE event_id = $1::uuid`,
+    [eventId],
+  );
+  const row = rows[0];
+  if (!row) {
+    return { released: false, slotId: null };
+  }
+  if (row.status === "released") {
+    return { released: false, slotId: row.slot_id };
+  }
+  if (row.status === "converted") {
+    // Already consumed — Cancel of post-effect Transfer is Reverse path, not reservation release
+    return { released: false, slotId: row.slot_id };
+  }
+
+  await db.query(
+    `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
+    [row.slot_id],
+  );
+
+  const mark = await db.query(
+    `UPDATE headcount_capacity_reservation
+     SET status = 'released', updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1::uuid AND status = 'reserved'
+     RETURNING id`,
+    [row.id],
+  );
+  if (mark.rowCount === 0) {
+    return { released: false, slotId: row.slot_id };
+  }
+
+  const slotUpd = await db.query(
+    `UPDATE headcount_capacity_slot
+     SET free_units = free_units + 1,
+         reserved_units = GREATEST(reserved_units - 1, 0),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1::uuid
+     RETURNING id`,
+    [row.slot_id],
+  );
+  if (slotUpd.rowCount === 0) {
+    throw new Error(MSG_HEADCOUNT_RESERVATION_RELEASE_FAILED_FA);
+  }
+
+  return { released: true, slotId: row.slot_id };
+}
+
+/**
+ * Convert an active reservation into a consumption (Effective Transfer after Scheduled reserve).
+ * Idempotent: already converted / already has consumption for event_id → no-op.
+ */
+export async function convertReservationToConsumption(
+  db: PoolClient,
+  input: { eventId: string; personId: string },
+): Promise<{ converted: boolean; slotId: string | null }> {
+  const consumption = await query<{ id: string; slot_id: string }>(
+    db,
+    `SELECT id, slot_id FROM headcount_capacity_consumption WHERE event_id = $1::uuid`,
+    [input.eventId],
+  );
+  if (consumption[0]) {
+    return { converted: false, slotId: consumption[0].slot_id };
+  }
+
+  const rows = await query<{
+    id: string;
+    slot_id: string;
+    status: string;
+  }>(
+    db,
+    `SELECT id, slot_id, status FROM headcount_capacity_reservation
+     WHERE event_id = $1::uuid`,
+    [input.eventId],
+  );
+  const row = rows[0];
+  if (!row || row.status !== "reserved") {
+    return { converted: false, slotId: row?.slot_id ?? null };
+  }
+
+  await db.query(
+    `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
+    [row.slot_id],
+  );
+
+  const mark = await db.query(
+    `UPDATE headcount_capacity_reservation
+     SET status = 'converted', updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1::uuid AND status = 'reserved'
+     RETURNING id`,
+    [row.id],
+  );
+  if (mark.rowCount === 0) {
+    const again = await query<{ id: string; slot_id: string }>(
+      db,
+      `SELECT id, slot_id FROM headcount_capacity_consumption WHERE event_id = $1::uuid`,
+      [input.eventId],
+    );
+    if (again[0]) return { converted: false, slotId: again[0].slot_id };
+    throw new Error(MSG_HEADCOUNT_RESERVE_FAILED_FA);
+  }
+
+  await db.query(
+    `UPDATE headcount_capacity_slot
+     SET reserved_units = GREATEST(reserved_units - 1, 0),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1::uuid`,
+    [row.slot_id],
+  );
+
+  await db.query(
+    `INSERT INTO headcount_capacity_consumption (id, slot_id, event_id, person_id)
+     VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
+    [randomUUID(), row.slot_id, input.eventId, input.personId],
+  );
+
+  return { converted: true, slotId: row.slot_id };
+}
+
+/**
+ * Best-effort undo of destination capacity taken by Transfer event_id
+ * (fresh consume or converted reservation).
+ */
+export async function undoTransferDestinationCapacity(
+  db: PoolClient,
+  eventId: string,
+): Promise<void> {
+  try {
+    const consumption = await query<{ id: string; slot_id: string }>(
+      db,
+      `SELECT id, slot_id FROM headcount_capacity_consumption
+       WHERE event_id = $1::uuid AND release_event_id IS NULL`,
+      [eventId],
+    );
+    const c = consumption[0];
+    if (!c) return;
+
+    const reservation = await query<{ id: string; status: string }>(
+      db,
+      `SELECT id, status FROM headcount_capacity_reservation WHERE event_id = $1::uuid`,
+      [eventId],
+    );
+    const wasConverted = reservation[0]?.status === "converted";
+
+    await db.query(
+      `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
+      [c.slot_id],
+    );
+
+    await db.query(
+      `DELETE FROM headcount_capacity_consumption WHERE id = $1::uuid`,
+      [c.id],
+    );
+
+    if (wasConverted) {
+      await db.query(
+        `UPDATE headcount_capacity_slot
+         SET reserved_units = reserved_units + 1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1::uuid`,
+        [c.slot_id],
+      );
+      await db.query(
+        `UPDATE headcount_capacity_reservation
+         SET status = 'reserved', updated_at = CURRENT_TIMESTAMP
+         WHERE event_id = $1::uuid`,
+        [eventId],
+      );
+    } else {
+      await db.query(
+        `UPDATE headcount_capacity_slot
+         SET free_units = free_units + 1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1::uuid`,
+        [c.slot_id],
+      );
+    }
+  } catch {
+    // Best-effort
+  }
+}
+
+export type CapacityPanelInput = {
+  teamId: string;
+  jobTitleId?: string;
+  ladderId?: string;
+  gradeId?: string;
+  effectiveDate: string;
+  preferredSlotId?: string | null;
+};
+
+export type CapacityPanelResult = {
+  used: number;
+  reserved: number;
+  free: number;
+  slotId: string | null;
+};
+
+/**
+ * Aggregate used / reserved / free for destination Team(+title) panel (UX-DR13).
+ */
+export async function readHeadcountCapacityPanel(
+  db: Queryable,
+  input: CapacityPanelInput,
+): Promise<CapacityPanelResult> {
+  await ensureHeadcountCapacitySchema(db);
+
+  let slotId: string | null = null;
+  let free = 0;
+  let reserved = 0;
+
+  if (input.preferredSlotId?.trim()) {
+    const preferred = await query<{
+      id: string;
+      team_id: string;
+      job_title_id: string | null;
+      ladder_id: string | null;
+      grade_id: string | null;
+      start_date: Date | string;
+      end_date_exclusive: Date | string | null;
+      free_units: number;
+      reserved_units: number;
+    }>(
+      db,
+      `SELECT id, team_id, job_title_id, ladder_id, grade_id,
+              start_date, end_date_exclusive, free_units, reserved_units
+       FROM headcount_capacity_slot
+       WHERE id = $1::uuid`,
+      [input.preferredSlotId.trim()],
+    );
+    const slot = preferred[0];
+    if (
+      slot &&
+      slot.team_id === input.teamId &&
+      slotMatchesRefs(slot, input) &&
+      dateInSlot(slot, input.effectiveDate)
+    ) {
+      slotId = slot.id;
+      free = Number(slot.free_units);
+      reserved = Number(slot.reserved_units);
+    }
+  }
+
+  if (!slotId) {
+    const rows = await query<{
+      id: string;
+      job_title_id: string | null;
+      ladder_id: string | null;
+      grade_id: string | null;
+      free_units: number;
+      reserved_units: number;
+    }>(
+      db,
+      `SELECT id, job_title_id, ladder_id, grade_id, free_units, reserved_units
+       FROM headcount_capacity_slot
+       WHERE team_id = $1::uuid
+         AND start_date <= $2::date
+         AND (end_date_exclusive IS NULL OR end_date_exclusive > $2::date)
+       ORDER BY start_date ASC, id ASC`,
+      [input.teamId, input.effectiveDate],
+    );
+    for (const row of rows) {
+      if (slotMatchesRefs(row, input)) {
+        slotId = row.id;
+        free = Number(row.free_units);
+        reserved = Number(row.reserved_units);
+        break;
+      }
+    }
+  }
+
+  let used = 0;
+  if (slotId) {
+    const usedRows = await query<{ c: string }>(
+      db,
+      `SELECT COUNT(*)::text AS c FROM headcount_capacity_consumption
+       WHERE slot_id = $1::uuid AND release_event_id IS NULL`,
+      [slotId],
+    );
+    used = Number(usedRows[0]?.c ?? 0);
+  }
+
+  return { used, reserved, free, slotId };
+}
+

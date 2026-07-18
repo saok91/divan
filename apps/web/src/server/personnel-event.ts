@@ -3,6 +3,7 @@
  * Coarse role unlocks nav only — mutations require PermissionSet bindings.
  */
 import { createPgPool, type Pool } from "@divan/db";
+import { readHeadcountCapacityPanel } from "@divan/headcount";
 import {
   PERSONNEL_EVENT_CANCEL_PERMISSION,
   PERSONNEL_EVENT_CORRECT_PERMISSION,
@@ -22,6 +23,7 @@ import {
   deleteDraft,
   evaluateDraftForFinalize,
   finalizeDraft,
+  getActivePrimaryAssignmentAsOf,
   getDraft,
   getPersonnelEventLifecycleCaps,
   listOpenDraftsForPerson,
@@ -522,5 +524,60 @@ export const personnelEventRouter = createTRPCRouter({
       } catch (err) {
         mapPersonnelEventError(err);
       }
+    }),
+
+  /** UX-DR13 — destination capacity panel for Transfer form. */
+  headcountCapacity: governedProcedure
+    .meta({ ...draftReadMeta, operation: "personnel_event.headcount_capacity" })
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        jobTitleId: z.string().uuid().optional(),
+        ladderId: z.string().uuid().optional(),
+        gradeId: z.string().uuid().optional(),
+        preferredSlotId: z.string().uuid().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertActorHasPersonnelEventDraft(ctx.session.accountId);
+      const pool = await readyFinalizePool();
+      return await readHeadcountCapacityPanel(pool, {
+        teamId: input.teamId,
+        jobTitleId: input.jobTitleId,
+        ladderId: input.ladderId,
+        gradeId: input.gradeId,
+        effectiveDate: input.effectiveDate,
+        preferredSlotId: input.preferredSlotId,
+      });
+    }),
+
+  /** UJ-1 — current source Primary summary for Transfer form. */
+  sourcePrimarySummary: governedProcedure
+    .meta({ ...draftReadMeta, operation: "personnel_event.source_primary_summary" })
+    .input(
+      z.object({
+        employmentId: z.string().uuid(),
+        asOfDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertActorHasPersonnelEventDraft(ctx.session.accountId);
+      const primary = await getActivePrimaryAssignmentAsOf(
+        input.employmentId,
+        input.asOfDate,
+      );
+      if (!primary) return null;
+      return {
+        id: primary.id,
+        teamId: primary.teamId,
+        organizationalRoleId: primary.organizationalRoleId,
+        jobTitleId: primary.jobTitleId,
+        ladderId: primary.ladderId,
+        gradeId: primary.gradeId,
+        seniorityId: primary.seniorityId,
+        startDate: primary.startDate,
+        endDateExclusive: primary.endDateExclusive,
+      };
     }),
 });

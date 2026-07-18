@@ -44,6 +44,16 @@ import {
   parseTerminationPayload,
   priorDateOnly,
 } from "./personnel-event-termination";
+import {
+  NON_PRODUCT_TRANSFER_EVENT_TYPE,
+  TRANSFER_EVENT_TYPES,
+  findIncompatibleFutureEventsForTransfer,
+  incompatibleTransferFutureToConflict,
+  isTransferNoop,
+  parseTransferPayload,
+  transferFactsAsStartFacts,
+} from "./personnel-event-transfer";
+import { getActivePrimaryAssignmentAsOf } from "./primary-assignment";
 
 /** Lazy read pool for conflict existence checks outside a finalize txn. */
 let conflictReadPool: Pool | null = null;
@@ -122,7 +132,7 @@ export type BuildSnapshotInput = {
 
 /**
  * Event types that consume headcount.
- * Start/Return use the narrow capacity port (4.5); Transfer stubs remain fail-closed.
+ * Start/Return/Transfer use the narrow capacity port (4.5–4.7); TeamTransferRecorded stays fail-closed.
  */
 export const HEADCOUNT_CONSUMING_EVENT_TYPES = new Set([
   "EmploymentStarted",
@@ -132,8 +142,11 @@ export const HEADCOUNT_CONSUMING_EVENT_TYPES = new Set([
   "HeadcountConsumed",
 ]);
 
-/** Start/Return — capacity evaluated via @divan/headcount port (not unconditional stub). */
-export const HEADCOUNT_CAPACITY_PORT_EVENT_TYPES = START_RETURN_EVENT_TYPES;
+/** Start/Return/Transfer — capacity evaluated via @divan/headcount port (not unconditional stub). */
+export const HEADCOUNT_CAPACITY_PORT_EVENT_TYPES = new Set([
+  ...START_RETURN_EVENT_TYPES,
+  "TransferRecorded",
+]);
 
 /**
  * Warning allow-list — only these codes may proceed with acknowledgement.
@@ -355,6 +368,17 @@ export async function classifyConflicts(
       code: "INVALID_EFFECTIVE_DATE",
       severity: "blocking",
       messageFa: MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
+    });
+    return findings;
+  }
+
+  // Non-product Transfer alias — fail closed
+  if (draft.eventType === NON_PRODUCT_TRANSFER_EVENT_TYPE) {
+    findings.push({
+      code: "NON_PRODUCT_EVENT_TYPE",
+      severity: "blocking",
+      messageFa:
+        "نوع TeamTransferRecorded محصول نیست؛ از TransferRecorded استفاده کنید.",
     });
     return findings;
   }
@@ -746,6 +770,111 @@ export async function classifyConflicts(
     }
   }
 
+  // Transfer — open Employment + open Primary + destination facts + no-op + peers (FR-22)
+  if (TRANSFER_EVENT_TYPES.has(draft.eventType)) {
+    const { facts, missing } = parseTransferPayload(draft.payload);
+    for (const m of missing) {
+      findings.push({
+        code: m.code,
+        severity: "blocking",
+        messageFa: m.messageFa,
+      });
+    }
+
+    const targetEmpId =
+      draft.employmentId?.trim() || facts?.employmentId?.trim() || null;
+
+    if (!targetEmpId) {
+      findings.push({
+        code: "MISSING_EMPLOYMENT",
+        severity: "blocking",
+        messageFa:
+          "شناسه همکاری باز برای انتقال الزامی است؛ نهایی‌سازی مسدود است.",
+      });
+    } else {
+      const emp = await getEmploymentById(targetEmpId, db);
+      if (!emp) {
+        findings.push({
+          code: "EMPLOYMENT_REF_MISSING",
+          severity: "blocking",
+          messageFa:
+            "سابقه همکاری پیوست‌شده یافت نشد؛ نهایی‌سازی مسدود است.",
+        });
+      } else if (emp.personId !== draft.personId) {
+        findings.push({
+          code: "EMPLOYMENT_PERSON_MISMATCH",
+          severity: "blocking",
+          messageFa:
+            "همکاری هدف متعلق به این فرد نیست؛ نهایی‌سازی مسدود است.",
+        });
+      } else if (!isEmploymentActiveAsOf(emp, draft.effectiveDate)) {
+        findings.push({
+          code: "EMPLOYMENT_NOT_ACTIVE",
+          severity: "blocking",
+          messageFa:
+            "همکاری در تاریخ مؤثر انتقال فعال نیست؛ نهایی‌سازی مسدود است.",
+        });
+      } else {
+        const sourcePrimary = await getActivePrimaryAssignmentAsOf(
+          targetEmpId,
+          draft.effectiveDate,
+          db,
+        );
+        if (!sourcePrimary) {
+          findings.push({
+            code: "MISSING_SOURCE_PRIMARY",
+            severity: "blocking",
+            messageFa:
+              "انتصاب اولیه مبدأ برای انتقال یافت نشد؛ نهایی‌سازی مسدود است.",
+          });
+        } else if (facts && isTransferNoop(sourcePrimary, facts)) {
+          findings.push({
+            code: "TRANSFER_NOOP",
+            severity: "blocking",
+            messageFa:
+              "مقصد با انتصاب اولیه فعلی یکسان است؛ انتقال بی‌اثر مجاز نیست.",
+          });
+        }
+
+        if (facts) {
+          const inactive = await findInactiveRefConflicts(
+            transferFactsAsStartFacts(facts),
+            draft.effectiveDate,
+            db,
+          );
+          for (const f of inactive) {
+            findings.push({
+              code: f.code,
+              severity: "blocking",
+              messageFa: f.messageFa,
+            });
+          }
+        }
+
+        const reader = opts.client ?? getConflictReadPool();
+        if (!reader) {
+          findings.push({
+            code: "INCOMPATIBLE_FUTURE_EVENTS",
+            severity: "blocking",
+            messageFa:
+              "امکان بررسی رویدادهای آینده ناسازگار وجود ندارد؛ نهایی‌سازی مسدود است.",
+          });
+        } else {
+          const future = await findIncompatibleFutureEventsForTransfer(reader, {
+            personId: draft.personId,
+            employmentId: targetEmpId,
+            transferEffectiveDate: draft.effectiveDate,
+            excludeEventId: draft.finalizedEventId,
+          });
+          const conflict = incompatibleTransferFutureToConflict(future);
+          if (conflict) {
+            findings.push(conflict);
+          }
+        }
+      }
+    }
+  }
+
   // Ladder–Grade invalid
   if (snapshot.refs.ladderId && snapshot.refs.gradeId) {
     try {
@@ -774,9 +903,13 @@ export async function classifyConflicts(
     }
   }
 
-  // Headcount — Start/Return use capacity port; other consuming types stay stub-blocked
+  // Headcount — Start/Return/Transfer use capacity port; other consuming types stay stub-blocked
   if (HEADCOUNT_CAPACITY_PORT_EVENT_TYPES.has(draft.eventType)) {
-    const { facts } = parseStartReturnPayload(draft.payload);
+    const isTransfer = TRANSFER_EVENT_TYPES.has(draft.eventType);
+    const parsed = isTransfer
+      ? parseTransferPayload(draft.payload)
+      : parseStartReturnPayload(draft.payload);
+    const facts = parsed.facts;
     if (facts) {
       const reader = opts.client ?? getConflictReadPool();
       if (!reader) {
@@ -796,6 +929,9 @@ export async function classifyConflicts(
         });
         const conflict = capacityResultToConflict(capacity);
         if (conflict) {
+          // Transfer: capacity missing is blocking (no Override catalogue in 4.7) unless
+          // existing Start Override seam already applies — keep same warning+Override as Start
+          // for Operator/Admin path consistency when Override is provided.
           findings.push({
             code: conflict.code,
             severity: conflict.severity,
@@ -804,7 +940,6 @@ export async function classifyConflicts(
             requiresAck: conflict.requiresAck,
           });
         } else if (capacity.outcome === "compatible") {
-          // Stash resolved slot into payload for consume on Effective apply
           draft.payload = {
             ...draft.payload,
             capacitySlotId: capacity.slotId,

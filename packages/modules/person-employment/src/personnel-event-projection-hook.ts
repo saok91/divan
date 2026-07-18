@@ -1,14 +1,17 @@
 /**
  * AD-6 projection refresh hook — runs inside the same DB txn as finalize / lifecycle append.
  *
- * FR-16: Scheduled events must not mutate current projections (applyToCurrentProjection=false).
+ * FR-16: Scheduled events must not mutate current projections (applyToCurrentProjection=false),
+ * except Transfer destination capacity reserve (reserve ≠ Primary mutation).
  * Story 4.5: Effective Start/Return → Employment + Primary projectors (+ capacity consume).
  * Story 4.6: Effective Termination → close Assignments + Employment + capacity release.
+ * Story 4.7: Transfer Scheduled reserve / Effective atomic Primary move + capacity.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import type { PoolClient } from "@divan/db";
+import { getBusinessEventById } from "@divan/event-store";
 
 import { getPersonDb } from "./db";
 import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
@@ -23,6 +26,14 @@ import {
   applyTerminationProjections,
   compensateTerminationApply,
 } from "./personnel-event-termination";
+import {
+  TRANSFER_EVENT_TYPES,
+  applyTransferProjections,
+  applyTransferScheduledReserve,
+  compensateTransferApply,
+  releaseTransferReservationOnCancel,
+  undoTransferApply,
+} from "./personnel-event-transfer";
 
 export type ProjectionRefreshContext = {
   client: PoolClient;
@@ -35,12 +46,12 @@ export type ProjectionRefreshContext = {
   targetEventId?: string;
   /**
    * When false, hook records invocation but must not apply current-state domain
-   * effects (Scheduled finalize / Cancel of Scheduled).
+   * effects (Scheduled finalize / Cancel of Scheduled) — except Transfer reserve.
    */
   applyToCurrentProjection?: boolean;
   /** Set by hook implementations / tests to prove invocation. */
   invoked?: { eventId: string; eventType: string };
-  /** Filled when Start/Return/Termination touched an Employment. */
+  /** Filled when Start/Return/Termination/Transfer touched an Employment. */
   appliedEmploymentId?: string;
   /** Set when this hook invocation newly created a Primary (for orphan compensate). */
   createdStartReturnPrimaryId?: string;
@@ -53,6 +64,19 @@ export type ProjectionRefreshContext = {
     didRelease: boolean;
     didCloseEmployment: boolean;
   };
+  /** Set when Transfer applied (for post-hook orphan compensate). */
+  transferApply?: {
+    employmentId: string;
+    endDateExclusive: string;
+    sourcePrimaryId: string | null;
+    previousSourceEnd: string | null;
+    destinationPrimaryId: string | null;
+    didCloseSource: boolean;
+    didOpenDest: boolean;
+    didReleaseSource: boolean;
+    didMoveDestCapacity: boolean;
+    reservedOnly: boolean;
+  };
 };
 
 export type ProjectionRefreshHook = (
@@ -60,18 +84,63 @@ export type ProjectionRefreshHook = (
 ) => Promise<void>;
 
 /**
- * Default production hook: records invocation; on Effective Start/Return / Termination
- * applies domain projectors. When `applyToCurrentProjection === false`, still records
- * invocation but performs no current-state mutation (FR-16 Scheduled discipline).
+ * Default production hook: records invocation; on Effective Start/Return / Termination /
+ * Transfer applies domain projectors. When `applyToCurrentProjection === false`,
+ * Scheduled Transfer still reserves destination capacity; Cancel of Transfer releases it.
  */
 export async function defaultProjectionRefreshHook(
   ctx: ProjectionRefreshContext,
 ): Promise<void> {
   ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
-  void ctx.lifecycleOp;
-  void ctx.targetEventId;
 
   if (ctx.applyToCurrentProjection === false) {
+    // Cancel of Scheduled Transfer → release reservation
+    if (ctx.lifecycleOp === "cancel" && ctx.targetEventId) {
+      const target = await getBusinessEventById(ctx.client, ctx.targetEventId);
+      if (target && TRANSFER_EVENT_TYPES.has(target.eventType)) {
+        await releaseTransferReservationOnCancel(ctx.client, ctx.targetEventId);
+        ctx.transferApply = {
+          employmentId: target.employmentId ?? "",
+          endDateExclusive: target.effectiveDate,
+          sourcePrimaryId: null,
+          previousSourceEnd: null,
+          destinationPrimaryId: null,
+          didCloseSource: false,
+          didOpenDest: false,
+          didReleaseSource: false,
+          didMoveDestCapacity: false,
+          reservedOnly: true,
+        };
+      }
+      return;
+    }
+
+    // Scheduled Transfer finalize → reserve only (no Primary mutation)
+    if (TRANSFER_EVENT_TYPES.has(ctx.eventType)) {
+      const result = await applyTransferScheduledReserve(ctx, getPersonDb());
+      ctx.appliedEmploymentId = result.employmentId || undefined;
+      ctx.transferApply = {
+        employmentId: result.employmentId,
+        endDateExclusive: result.endDateExclusive,
+        sourcePrimaryId: null,
+        previousSourceEnd: null,
+        destinationPrimaryId: null,
+        didCloseSource: false,
+        didOpenDest: false,
+        didReleaseSource: false,
+        didMoveDestCapacity: false,
+        reservedOnly: true,
+      };
+    }
+    return;
+  }
+
+  // Reverse of Transfer → undo Primaries / capacity / reservation
+  if (ctx.lifecycleOp === "reverse" && ctx.targetEventId) {
+    const target = await getBusinessEventById(ctx.client, ctx.targetEventId);
+    if (target && TRANSFER_EVENT_TYPES.has(target.eventType)) {
+      await undoTransferApply(ctx.client, target, getPersonDb());
+    }
     return;
   }
 
@@ -95,8 +164,28 @@ export async function defaultProjectionRefreshHook(
     return;
   }
 
+  if (TRANSFER_EVENT_TYPES.has(ctx.eventType)) {
+    const result = await applyTransferProjections(ctx, getPersonDb());
+    ctx.appliedEmploymentId = result.employmentId;
+    if (result.mutated || result.didMoveDestCapacity || result.didReleaseSource) {
+      ctx.transferApply = {
+        employmentId: result.employmentId,
+        endDateExclusive: result.endDateExclusive,
+        sourcePrimaryId: result.sourcePrimaryId,
+        previousSourceEnd: result.previousSourceEnd,
+        destinationPrimaryId: result.destinationPrimaryId,
+        didCloseSource: result.didCloseSource,
+        didOpenDest: result.didOpenDest,
+        didReleaseSource: result.didReleaseSource,
+        didMoveDestCapacity: result.didMoveDestCapacity,
+        reservedOnly: false,
+      };
+    }
+    return;
+  }
+
   if (!START_RETURN_EVENT_TYPES.has(ctx.eventType)) {
-    // Transfer / job-comp / scaffold — later stories or no-op
+    // Scaffold / job-comp — later stories or no-op
     return;
   }
 
@@ -167,4 +256,4 @@ export async function runProjectionRefreshHook(
   }
 }
 
-export { compensateTerminationApply };
+export { compensateTerminationApply, compensateTransferApply };

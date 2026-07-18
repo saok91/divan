@@ -55,6 +55,10 @@ import {
   assertActorHasPersonnelEventCorrect,
   assertActorHasPersonnelEventReverse,
 } from "./permissions";
+import {
+  TRANSFER_EVENT_TYPES,
+  isTransferEffectUnapplied,
+} from "./personnel-event-transfer";
 
 export type LifecycleActorInput = {
   actorId: string;
@@ -182,12 +186,21 @@ export async function cancelPersonnelEvent(
         );
       }
 
-      // Effect already won (evaluation-by-date) → reject Cancel; guide to Reverse
+      // Effect already won (evaluation-by-date) → reject Cancel; guide to Reverse.
+      // Exception (4.7 review): Transfer still storage-Scheduled with only a
+      // destination reservation (Primaries not yet opened) remains Cancel-eligible
+      // so the reservation can be released (AC #6).
       if (!isPreEffectAsOf(target, asOf)) {
-        throw new PersonnelEventError(
-          "CANCEL_AFTER_EFFECT",
-          MSG_CANCEL_AFTER_EFFECT_FA,
-        );
+        const transferReservedOnly =
+          TRANSFER_EVENT_TYPES.has(target.eventType) &&
+          target.status === "Scheduled" &&
+          (await isTransferEffectUnapplied(target.id, db));
+        if (!transferReservedOnly) {
+          throw new PersonnelEventError(
+            "CANCEL_AFTER_EFFECT",
+            MSG_CANCEL_AFTER_EFFECT_FA,
+          );
+        }
       }
 
       // Storage must be authoritative Scheduled (or Effective token that still
@@ -353,7 +366,7 @@ export async function reversePersonnelEvent(
         eventType: "EventReversed",
         lifecycleOp: "reverse",
         targetEventId: target.id,
-        // Compensating reverse of Effective — hook invoked; domain stub until 4.5+
+        // Compensating reverse of Effective — Transfer undoes via undoTransferApply
         applyToCurrentProjection: true,
       };
       await runProjectionRefreshHook(hookCtx);

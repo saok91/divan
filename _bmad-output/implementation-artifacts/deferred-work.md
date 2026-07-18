@@ -1,3 +1,17 @@
+## Deferred from: code review of 4-7-team-transfer-with-atomic-capacity-movement.md (2026-07-18)
+
+- Prisma Primary projectors vs PoolClient finalize txn (AD-6) — Transfer `compensateTransferApply` wired; single-connection projector SQL still hardening (same as 4.5/4.6)
+- `evaluateHeadcountCapacity` pre-lock TOCTOU — conflict/UI read unlocked; mutate paths still `FOR UPDATE`; same Start/Return pattern
+
+## Deferred from: Story 4.7 team transfer with atomic capacity movement (2026-07-18)
+
+- **Transfer Operator landed** — `TransferRecorded` via Draft→Finalize→AD-6 hook; Scheduled destination `reserveHeadcountCapacity` (FR-30); Effective atomic Primary close+open + coverage-after + source release / dest convert-or-consume; Cancel releases reservation; `TRANSFER_NOOP`; evaluation-by-date recalc apply (`evaluationStatusAsOf`); `headcount-capacity-panel` + form Transfer fieldset; `personnel-event-transfer.selfcheck`
+- **Still 4.8:** Job/level/contract/compensation change Operators
+- **Still 4.9–4.11:** Current/historical person & org reconstruction products
+- **Still 4.12–4.14 / FR-30 remainder:** Full Headcount Approval / Matching / Reservation expiry UI / Override catalogue; durable reservation for Scheduled Start (Transfer reserve only in 4.7)
+- **AD-6 cross-connection:** Prisma Primary projectors vs PoolClient finalize — Transfer compensate wired; single-connection projector SQL still hardening
+- **Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+
 ## Deferred from: code review of 4-6-termination-events.md (2026-07-18)
 
 - Prisma Employment/Assignment projectors use `getPersonDb()` while finalize append/release run on `PoolClient` txn — same AD-6 cross-connection pattern as 4.5; compensate exists but perfect single-connection projector SQL remains hardening
@@ -6,9 +20,9 @@
 ## Deferred from: Story 4.6 termination events (2026-07-18)
 
 - **Termination Operator landed** — `EmploymentTerminated` via Draft→Finalize→AD-6 hook; close Primary→Secondary→Employment(+lean `terminationReason`); narrow `releaseHeadcountCapacity` (idempotent on release_event_id); incompatible future Scheduled peers block until explicit Cancel; Scheduled Termination FR-16 no-op; UI Termination fields + confirm; `TERMINATION_PRODUCT_RISK_TIERS` from web finalize; `personnel-event-termination.selfcheck`
-- **Still 4.7–4.8:** Transfer atomic capacity / job-level / contract-comp Operators
+- **Still 4.8:** Job/level/contract/comp Operators
 - **Still 4.9–4.11:** Current/historical person & org reconstruction products
-- **Still 4.12–4.14 / FR-30:** Full Headcount Approval / Matching / Reservation expiry / Override catalogue; durable reservation for Scheduled Termination; FR-30 remainder unchanged
+- **Still 4.12–4.14 / FR-30:** Full Headcount Approval / Matching / Reservation expiry / Override catalogue; durable reservation for Scheduled Termination; FR-30 Start durable reserve remainder unchanged
 - **AR-ACCESS / AR-DATA:** Full termination risk-tier matrix and frozen termination-reason catalogue remain open — lean codes + minimal authorize config only
 - **PG DATE / session-TZ:** Draft/Employment/Assignment writers now use noon-UTC `dateOnlyToDb`; kernel `appendBusinessEvent` effective_date path may still off-by-one under Asia/Tehran — harden event-store DATE binding when next quality opportunity lands
 - **Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
@@ -22,10 +36,11 @@
 
 - **Start / Return Operators landed** — `EmploymentStarted` / `EmploymentReturned` via Draft→Finalize→AD-6 hook; `applyEmploymentProjection` + `applyPrimaryAssignmentProjection` (`sourceEventId`); narrow `@divan/headcount` capacity port (evaluate/consume/seed); minimum facts + inactive-ref + overlap + anonymized Return fail-closed; UI form Start/Return fields + Override reason; `personnel-event-start-return.selfcheck`
 - **4.6 landed:** Termination Operator (see Story 4.6 deferred block above)
-- **Still 4.7–4.8:** Transfer atomic capacity / job-level / contract-comp Operators
+- **4.7 landed:** Transfer Operator (see Story 4.7 deferred block above)
+- **Still 4.8:** Job-level / contract-comp Operators
 - **Still 4.9–4.11:** Current/historical person & org reconstruction products
-- **Still 4.12–4.14 / FR-30:** Full Headcount Approval lifecycle, Matching matrix, Reservation expiry/exceptions, Override catalogue UI; durable reservation for Scheduled future Start (minimal port write deferred — capacity check only today)
-- **AD-6 cross-connection note:** Employment/Primary projectors use Prisma while finalize txn is `PoolClient` — **4.5 review patch:** orphan compensate on consume/post-hook failure (`compensateOrphanStartReturnProjections`); **4.6:** `compensateTerminationApply` for close/release; perfect single-connection projector SQL remains a hardening opportunity
+- **Still 4.12–4.14 / FR-30:** Full Headcount Approval lifecycle, Matching matrix, Reservation expiry/exceptions, Override catalogue UI; durable reservation for Scheduled future Start (minimal port write deferred — capacity check only today; Transfer reserve landed in 4.7)
+- **AD-6 cross-connection note:** Employment/Primary projectors use Prisma while finalize txn is `PoolClient` — **4.5 review patch:** orphan compensate on consume/post-hook failure (`compensateOrphanStartReturnProjections`); **4.6:** `compensateTerminationApply` for close/release; **4.7:** `compensateTransferApply`; perfect single-connection projector SQL remains a hardening opportunity
 - **Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
 
 ## Deferred from: code review of 4-4-deterministic-ordering-recalculation.md (2026-07-18)
