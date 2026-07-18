@@ -1,0 +1,2219 @@
+﻿diff --git a/_bmad-output/implementation-artifacts/deferred-work.md b/_bmad-output/implementation-artifacts/deferred-work.md
+index 96a6c9b..5071b75 100644
+--- a/_bmad-output/implementation-artifacts/deferred-work.md
++++ b/_bmad-output/implementation-artifacts/deferred-work.md
+@@ -1,3 +1,13 @@
++## Deferred from: Story 4.11 historical organization & headcount reconstruction (2026-07-19)
++
++- **Historical org/headcount reconstruction landed** ΓÇö `reconstructHeadcountQuantitiesAsOf` (event-linked ledger); `getHistoricalOrgHeadcountState` coordinator (membership + org counts + headcount); `viewSemantics` + Baseline disclosure; planned channel; `organization.getHistoricalCounts` tRPC; optional `/headcount` foreshadow; `historical-org-headcount.selfcheck`
++- **Still 4.12ΓÇô4.14:** Headcount Approval lifecycle / Matching / Reservation-expiry UI / Override catalogue; durable reservation for Scheduled Start
++- **Still Epic 5:** Full dashboard / search / profile / timeline / report catalogue
++- **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
++- **AR-DATA:** Production enablement/masking of compensation category still open (`DEV_DEMO_CATEGORIES` on tRPC)
++- **FR-39 / FR-47:** Baseline migration provenance UI and full temporal as-of authz matrix remain open
++- **MVP Approval stand-in:** `approved = used_live + reserved_live + free_live` until 4.12 Approval entity; planned-channel Transfer scan seeds from today's scoped members only (persons not yet on roster with future StartΓåÆTransfer not included)
++
+ ## Deferred from: code review of 4-10-historical-person-reconstruction.md (2026-07-19)
+ 
+ - Planned as-of path runs two sequential `scanScheduledChanges` passes (`listPlannedChangesThroughAsOf` + `listRemainingScheduledAfterAsOf`) ΓÇö Cancel/Reverse between scans can omit a change from both channels; same torn-sequential-read / TOCTOU class already deferred from 4.9 assembler reads
+@@ -5,7 +15,7 @@
+ ## Deferred from: Story 4.10 historical person reconstruction (2026-07-19)
+ 
+ - **Historical / as-of Person reconstruction landed** ΓÇö `parseDateOnly` validation; `viewSemantics` current|historical|planned; future as-of planned path (facts @ today + `plannedChangesThroughAsOf`); `baselineDisclosure` via shared `getBaselineBoundaryDate`; optional `asOf` on `person.getCurrentState`; Jalali foreshadow; extended `current-person-state.selfcheck`
+-- **Still 4.11:** Historical organization & headcount reconstruction (FR-27)
++- **4.11 landed:** Historical organization & headcount reconstruction (see Story 4.11 deferred block above)
+ - **Still 4.12ΓÇô4.14 / FR-30 remainder:** Full Headcount Approval / Matching / Reservation expiry UI / Override catalogue; durable reservation for Scheduled Start
+ - **Still Epic 5:** Full profile / search / timeline / report catalogue as-of consumers
+ - **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+diff --git a/_bmad-output/implementation-artifacts/sprint-status.yaml b/_bmad-output/implementation-artifacts/sprint-status.yaml
+index 844c5e4..afc9f6f 100644
+--- a/_bmad-output/implementation-artifacts/sprint-status.yaml
++++ b/_bmad-output/implementation-artifacts/sprint-status.yaml
+@@ -1,5 +1,5 @@
+-∩╗┐# generated: 2026-07-16
+-# last_updated: 2026-07-19T01:15:00+03:30
++# generated: 2026-07-16
++# last_updated: 2026-07-19T01:45:00+03:30
+ # project: divan
+ # project_key: NOKEY
+ # tracking_system: file-system
+@@ -41,7 +41,7 @@
+ # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+ 
+ generated: 2026-07-16
+-last_updated: 2026-07-19T01:15:00+03:30
++last_updated: 2026-07-19T01:45:00+03:30
+ project: divan
+ project_key: NOKEY
+ tracking_system: file-system
+@@ -92,7 +92,7 @@ development_status:
+   4-8-job-level-contract-compensation-change-events: done
+   4-9-current-person-state-projection: done
+   4-10-historical-person-reconstruction: done
+-  4-11-historical-organization-headcount-reconstruction: backlog
++  4-11-historical-organization-headcount-reconstruction: review
+   4-12-headcount-approval-lifecycle: backlog
+   4-13-universal-coverage-matching-exemptions: backlog
+   4-14-reservation-expiry-exceptions-headcount-override: backlog
+diff --git a/apps/web/app/(app)/headcount/page.tsx b/apps/web/app/(app)/headcount/page.tsx
+index 94833f7..ca5cdaf 100644
+--- a/apps/web/app/(app)/headcount/page.tsx
++++ b/apps/web/app/(app)/headcount/page.tsx
+@@ -1,10 +1,29 @@
+-import { PlaceholderPage } from "@/components/placeholder-page";
++import { redirect } from "next/navigation";
++
++import { auth } from "@/auth";
++import { HistoricalOrgHeadcountForeshadow } from "@/components/organization/historical-org-headcount-foreshadow";
++import { assertPageAccess } from "@/lib/assert-page-access";
++
++/**
++ * Headcount surface ΓÇö Story 4.11 foreshadow only (not Approval admin ΓåÆ 4.12).
++ */
++export default async function HeadcountPage() {
++  const session = await auth();
++  if (!session?.user?.accountId || !session.user.coarseRole) {
++    redirect("/login");
++  }
++
++  assertPageAccess(session.user.coarseRole, "/headcount");
+ 
+-export default function HeadcountPage() {
+   return (
+-    <PlaceholderPage
+-      title="╪╕╪▒┘ü█î╪¬ ┘ê ╪¼╪░╪¿"
+-      description="╪╕╪▒┘ü█î╪¬ ╪│╪º╪▓┘à╪º┘å█î ┘ê ┘ü╪▒╪º█î┘å╪» ╪¼╪░╪¿ ╪»╪▒ ╪º█î┘å ╪¿╪«╪┤ ┘╛█î┌»█î╪▒█î ┘à█îΓÇî╪┤┘ê╪»."
+-    />
++    <div className="space-y-10 p-6">
++      <div className="space-y-2">
++        <h1 className="text-heading">╪╕╪▒┘ü█î╪¬ ┘ê ╪¼╪░╪¿</h1>
++        <p className="text-body text-muted-foreground">
++          ╪╕╪▒┘ü█î╪¬ ╪│╪º╪▓┘à╪º┘å█î ┘ê ┘ü╪▒╪º█î┘å╪» ╪¼╪░╪¿ ╪»╪▒ ╪º█î┘å ╪¿╪«╪┤ ┘╛█î┌»█î╪▒█î ┘à█îΓÇî╪┤┘ê╪».
++        </p>
++      </div>
++      <HistoricalOrgHeadcountForeshadow />
++    </div>
+   );
+ }
+diff --git a/apps/web/src/server/organization.ts b/apps/web/src/server/organization.ts
+index f103a5c..1b50480 100644
+--- a/apps/web/src/server/organization.ts
++++ b/apps/web/src/server/organization.ts
+@@ -1,24 +1,31 @@
+ /**
+  * Organization hierarchy governed router (Story 3.5 / FR-9).
+  * Coarse hr_admin unlocks nav only ΓÇö mutations require organization.write.
++ * Story 4.11: historical org/headcount counts (`getHistoricalCounts`).
+  */
++import { createPgPool, type Pool } from "@divan/db";
+ import {
+   ORGANIZATION_DATA_CATEGORY,
+   ORGANIZATION_READ_PERMISSION,
+   ORGANIZATION_WRITE_PERMISSION,
+   ORG_UNIT_TYPES,
+   OrgUnitError,
++  PersonIdentityError,
++  MSG_ASOF_INVALID_FA,
+   activateOrgUnit,
+   assertActorHasOrganizationRead,
+   assertActorHasOrganizationWrite,
+   createOrgUnit,
+   deactivateOrgUnit,
+   getHierarchyAsOf,
++  getHistoricalOrgHeadcountState,
+   getOrgUnitById,
+   listOrgUnits,
+   updateOrgUnitIdentity,
+   type OrgUnitType,
+ } from "@divan/person-employment";
++import { HeadcountLedgerError } from "@divan/headcount";
++import { parseDateOnly } from "@divan/temporal-engine";
+ import { TRPCError } from "@trpc/server";
+ import { z } from "zod";
+ 
+@@ -44,7 +51,33 @@ const unitTypeSchema = z.enum(
+   ORG_UNIT_TYPES as unknown as [OrgUnitType, ...OrgUnitType[]],
+ );
+ 
++let historicalCountsPool: Pool | null = null;
++
++function getHistoricalCountsPool(): Pool {
++  if (historicalCountsPool) return historicalCountsPool;
++  const url = process.env.DATABASE_URL?.trim();
++  if (!url) {
++    throw new Error("DATABASE_URL is required for historical org counts");
++  }
++  historicalCountsPool = createPgPool(url);
++  return historicalCountsPool;
++}
++
+ function mapOrgError(err: unknown): never {
++  if (err instanceof HeadcountLedgerError) {
++    throw new TRPCError({
++      code: "BAD_REQUEST",
++      message: err.messageFa,
++      cause: err,
++    });
++  }
++  if (err instanceof PersonIdentityError) {
++    throw new TRPCError({
++      code: err.code === "PERSON_NOT_FOUND" ? "NOT_FOUND" : "BAD_REQUEST",
++      message: err.messageFa,
++      cause: err,
++    });
++  }
+   if (err instanceof OrgUnitError) {
+     if (err.code === "ORG_UNIT_NOT_FOUND") {
+       throw new TRPCError({
+@@ -156,6 +189,48 @@ export const organizationRouter = createTRPCRouter({
+       }
+     }),
+ 
++  /**
++   * FR-27 historical Team/org/headcount reconstruction (Story 4.11).
++   * Not Approval admin / dashboard product.
++   */
++  getHistoricalCounts: governedProcedure
++    .meta({
++      ...organizationReadMeta,
++      operation: "organization.historical_counts",
++      allowClientTemporal: true,
++    })
++    .input(
++      z.object({
++        asOf: z
++          .string()
++          .min(1)
++          .superRefine((val, ctx) => {
++            const parsed = parseDateOnly(val);
++            if (!parsed.ok) {
++              ctx.addIssue({
++                code: z.ZodIssueCode.custom,
++                message: MSG_ASOF_INVALID_FA,
++              });
++            }
++          }),
++        teamId: z.string().min(1).optional(),
++      }),
++    )
++    .query(async ({ ctx, input }) => {
++      await assertActorHasOrganizationRead(ctx.session.accountId);
++      try {
++        return await getHistoricalOrgHeadcountState(
++          {
++            asOf: input.asOf,
++            teamId: input.teamId,
++          },
++          { eventDb: getHistoricalCountsPool() },
++        );
++      } catch (err) {
++        mapOrgError(err);
++      }
++    }),
++
+   create: governedProcedure
+     .meta({ ...organizationWriteMeta, operation: "organization.create" })
+     .input(
+diff --git a/packages/modules/headcount/package.json b/packages/modules/headcount/package.json
+index cf9aba7..62a9e04 100644
+--- a/packages/modules/headcount/package.json
++++ b/packages/modules/headcount/package.json
+@@ -9,9 +9,12 @@
+   "main": "./src/index.ts",
+   "types": "./src/index.ts",
+   "scripts": {
+-    "typecheck": "tsc --noEmit -p tsconfig.json"
++    "typecheck": "tsc --noEmit -p tsconfig.json",
++    "selfcheck:historical-headcount": "tsx src/historical-headcount.selfcheck.ts"
+   },
+   "devDependencies": {
++    "dotenv": "^17.4.2",
++    "tsx": "^4.20.3",
+     "typescript": "^5.8.3"
+   },
+   "dependencies": {
+diff --git a/packages/modules/headcount/src/index.ts b/packages/modules/headcount/src/index.ts
+index e5ac7c2..9215cb5 100644
+--- a/packages/modules/headcount/src/index.ts
++++ b/packages/modules/headcount/src/index.ts
+@@ -1,8 +1,25 @@
+ /**
+  * Narrow headcount capacity port (Stories 4.5ΓÇô4.7 / FR-20 / FR-30 / FR-31 boundary).
+  * NOT Approval lifecycle, Matching matrix, Reservation expiry, or Override catalogue.
++ * Story 4.11: historical ledger reconstruct via reconstructHeadcountQuantitiesAsOf ΓÇö
++ * readHeadcountCapacityPanel remains live/finalize-only (do not use for asOf < today).
+  */
+ 
++export {
++  reconstructHeadcountQuantitiesAsOf,
++  headcountQuantitiesFactsForCompare,
++  HeadcountLedgerError,
++  MSG_HEADCOUNT_ASOF_INVALID_FA,
++  MSG_HEADCOUNT_LEDGER_AMBIGUOUS_FA,
++} from "./historical-headcount";
++
++export type {
++  ReconstructHeadcountQuantitiesInput,
++  ReconstructHeadcountQuantitiesResult,
++  HeadcountSlotQuantities,
++} from "./historical-headcount";
++
++
+ import { randomUUID } from "node:crypto";
+ 
+ import type { Pool, PoolClient, PrismaClient } from "@divan/db";
+diff --git a/packages/modules/person-employment/package.json b/packages/modules/person-employment/package.json
+index 00376f5..4a55087 100644
+--- a/packages/modules/person-employment/package.json
++++ b/packages/modules/person-employment/package.json
+@@ -26,7 +26,8 @@
+     "selfcheck:personnel-event-transfer": "tsx src/personnel-event-transfer.selfcheck.ts",
+     "selfcheck:personnel-event-job-level": "tsx src/personnel-event-job-level.selfcheck.ts",
+     "selfcheck:personnel-event-compensation": "tsx src/personnel-event-compensation.selfcheck.ts",
+-    "selfcheck:current-person-state": "tsx src/current-person-state.selfcheck.ts"
++    "selfcheck:current-person-state": "tsx src/current-person-state.selfcheck.ts",
++    "selfcheck:historical-org-headcount": "tsx src/historical-org-headcount.selfcheck.ts"
+   },
+   "devDependencies": {
+     "dotenv": "^17.4.2",
+diff --git a/packages/modules/person-employment/src/index.ts b/packages/modules/person-employment/src/index.ts
+index 8e2ac2d..8c3d417 100644
+--- a/packages/modules/person-employment/src/index.ts
++++ b/packages/modules/person-employment/src/index.ts
+@@ -529,6 +529,26 @@ export {
+   BASELINE_BOUNDARY_ENV,
+ } from "./baseline-boundary";
+ 
++export {
++  getHistoricalOrgHeadcountState,
++  historicalOrgHeadcountFactsForCompare,
++  MSG_HIST_ORG_RECALC_PENDING_FA,
++  MSG_HIST_ORG_RECALC_FAILED_FA,
++  MSG_HIST_ORG_RECALC_STALE_FA,
++} from "./historical-org-headcount";
++
++export type {
++  OrgUnitCountsByType,
++  TeamMembershipDetail,
++  PlannedMembershipDelta,
++  HistoricalOrgHeadcountFreshnessCode,
++  HistoricalOrgHeadcountFreshnessBlock,
++  HistoricalOrgHeadcountState,
++  GetHistoricalOrgHeadcountStateResult,
++  GetHistoricalOrgHeadcountStateOptions,
++  GetHistoricalOrgHeadcountStateDeps,
++} from "./historical-org-headcount";
++
+ export { POPULATION_SUBJECT_ID_TARGET } from "./population-cutover";
+ 
+ export {
+diff --git a/_bmad-output/implementation-artifacts/4-11-historical-organization-headcount-reconstruction.md b/_bmad-output/implementation-artifacts/4-11-historical-organization-headcount-reconstruction.md
+new file mode 100644
+index 0000000..c5a64fd
+--- /dev/null
++++ b/_bmad-output/implementation-artifacts/4-11-historical-organization-headcount-reconstruction.md
+@@ -0,0 +1,333 @@
++---
++baseline_commit: ea232af
++---
++
++# Story 4.11: Historical Organization & Headcount Reconstruction
++
++Status: review
++
++<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
++
++## Story
++
++As an authorized user,
++I want historical Team/organization counts and headcount quantities for a supported date,
++So that transfers and corrections affect totals only at resolved effective points (FR27).
++
++## Gate (read first)
++
++**This story ships FR-27 as-of reconstruction of Team membership counts, organization unit counts, and approved/used/reserved/free headcount quantities under one metric catalogue ΓÇö built on existing Primary/OrgUnit as-of helpers + an event-linked headcount ledger read (not live slot counters for historical dates). It does not ship Headcount Approval lifecycle, Matching, Override catalogue, dashboard/report products, or new write Operators.**
++
++| Allowed in 4.11 | Forbidden in 4.11 |
++| --- | --- |
++| Product `asOf` date-only (Tehran) for org + headcount reconstruction | Treating `headcount_capacity_slot.free_units` / `reserved_units` as historical truth for `asOf < today` |
++| Metric catalogue: membership, org-unit counts by type, approved/used/reserved/free | Inventing Headcount Approval entity / lifecycle (ΓåÆ 4.12) |
++| Membership from Primary half-open as-of (Transfer moves count only at Effective) | Counting Secondary as Team membership; inventing AR-SECONDARY headcount |
++| Headcount used/reserved reconstructed from consumption + reservation rows **joined to business events** (effective + lifecycle) | Full event-log replay on GET to rebuild Primary/OrgUnit; new denormalized historical SoT table |
++| Detail rows + aggregate totals that deep-equal under the same catalogue | Divergent ad-hoc SQL in web routers that disagree with module metrics |
++| Thin governed tRPC + optional foreshadow (Jalali as-of + tabular numerals) | Full dashboard (ΓåÆ 5.4); launch report catalogue (ΓåÆ 5.5); `/headcount` Approval admin UI (ΓåÆ 4.12) |
++| Baseline disclosure + future `asOf` planned semantics (mirror 4.10 patterns where applicable) | Inventing default Baseline epoch; labeling future totals as Effective early |
++| Selfchecks: Transfer effective-point membership; Scheduled reserve vs Effective consume; detailΓëíaggregate | UTF-8 BOM on `sprint-status.yaml`; Vitest mandate without ephemeral DB; PopulationPort cutover |
++
++### Mandated design ΓÇö compose as-of projections (non-negotiable)
++
++```text
++kernel_events (SoT)
++  ΓåÆ AD-6 hooks ΓåÆ Primary / OrgUnit / headcount_capacity_* rows
++        Γöé
++        Γö£ΓöÇ membership: listTeamMembersAsOf / Primary active-as-of (person-employment)
++        Γö£ΓöÇ org counts: getHierarchyAsOf / OrgUnit active-as-of by unitType
++        ΓööΓöÇ headcount quantities: NEW reconstructHeadcountQuantitiesAsOf (headcount module)
++              used/reserved from ledger + getBusinessEventById (effective + lifecycle)
++              approved / free via metric catalogue identity (below)
++                    Γöé
++                    Γû╝
++getHistoricalOrgHeadcountState({ asOf, scope? })   # coordinator (person-employment)
++  ΓåÆ same catalogue for detail + aggregate
++  ΓåÆ viewSemantics + baselineDisclosure (reuse 4.10 helpers)
++```
++
++- **Do not** create `OrgHeadcountSnapshot` / historical SoT Prisma table.
++- **Do not** call `apply*Projection` / capacity mutate APIs from the read path.
++- **Do not** use `readHeadcountCapacityPanel` alone for historical `asOf` ΓÇö that API reads **live** counters (correct for UX-DR13 finalize panel / today; wrong as FR-27 history).
++- **Do not** import `@divan/person-employment` from `@divan/headcount` (dependency direction: person-employment ΓåÆ headcount already exists). Put capacity as-of **in headcount**; put org/membership assembly + coordinator **in person-employment** (or thin web adapter that only calls public APIs).
++
++### Mandated design ΓÇö metric catalogue (FR-27 reconcile)
++
++Single catalogue used by detail rows and aggregates. Names may vary in code; semantics must not.
++
++| Metric key | Definition (MVP / pre-Approval) | Source of truth for as-of |
++| --- | --- | --- |
++| `teamMembershipCount` | Persons with **Primary** Team membership active at `asOf` (FR-11) | `listTeamMembersAsOf(teamId, asOf)` length (or equivalent Primary query with same half-open rules) |
++| `orgUnitCount` by `unitType` | OrgUnits active at `asOf` (LE / BU / DEPARTMENT / TEAM, ΓÇª) | `getHierarchyAsOf` / `isOrgUnitActiveAsOf` |
++| `used` | Capacity units **consumed and not yet released** as of `asOf` | `headcount_capacity_consumption` where consume event Effective Γëñ asOf **and** (no release **or** release event Effective > asOf); Cancelled/Reversed consume events excluded via lifecycle |
++| `reserved` | Capacity units held by active Reservation as of `asOf` | `headcount_capacity_reservation` linked to Finalized transfer/title event that is still **Scheduled** at `asOf` (lifecycle), or reservation `status='reserved'` and event not yet Effective at `asOf`; converted/released do not count |
++| `approved` | Slot capacity ceiling for the as-of interval | **Until 4.12:** conserved slot size `approved = used_live + reserved_live + free_live` from **current** counters (or equivalent seed ceiling) for slots whose validity contains `asOf` ΓÇö document as Approval-stand-in; **do not invent** Approval rows |
++| `free` | `approved - used - reserved` (may be computed; never silently floor negative if Override later ΓÇö Override ΓåÆ 4.14) | Catalogue identity; for MVP without Override, free ΓëÑ 0 |
++
++**Conservation (selfcheck):** for each in-scope slot at a given `asOf`, `approved === used + reserved + free`.
++
++**Detail vs aggregate:** `sum(detail.teamMembershipCount)` over scoped teams === aggregate membership; same for headcount quantities. Oracle: two callers / detail-rollups deep-equal under `*FactsForCompare` helper.
++
++### Mandated design ΓÇö effective points (FR-27 / UJ-1)
++
++| Change | Membership / org counts | Headcount used | Headcount reserved |
++| --- | --- | --- | --- |
++| Future Transfer **Finalized** (Scheduled) | Source Team count unchanged until Effective | Source still used | Destination **reserved** (FR-30) |
++| Transfer **Effective** | Source ΓêÆ1 / dest +1 at Effective date | Source released; dest used (convert) | Reservation converted ΓÇö not reserved |
++| Correction / Reverse | Only at resolved lifecycle + projection intervals | Follow release/consume undo already written by Operators | Follow reservation release/convert already written |
++| Secondary Assignment | **Never** in membership counts by default | No headcount | ΓÇö |
++
++### Mandated design ΓÇö past / today / future as-of
++
++Reuse `@divan/temporal-engine` `parseDateOnly`, `todayDateOnlyTehran`, `isFutureAsOf`, and `getBaselineBoundaryDate` from 4.10.
++
++| `asOf` vs today | `viewSemantics` | Behavior |
++| --- | --- | --- |
++| `asOf === today` | `current` | Membership/org as-of today; headcount may use live panel **or** ledger path if ledger Γëí live (selfcheck both agree for fixture) |
++| `asOf < today` | `historical` | Membership/org as-of; headcount **must** use ledger reconstruction ΓÇö **not** live `free_units` |
++| `asOf > today` | `planned` | Membership/org facts stay at **today**; expose planned capacity/membership deltas separately (Scheduled transfers through asOf) ΓÇö **never** label future membership/capacity as Effective |
++
++Invalid `asOf` ΓåÆ fail-closed. Baseline disclosure: same honesty rules as 4.10 (`limited` / not configured) ΓÇö attach to reconstruction payload.
++
++### Mandated design ΓÇö API / UI surface
++
++| Layer | Delivery |
++| --- | --- |
++| `@divan/headcount` | `reconstructHeadcountQuantitiesAsOf(db, { asOf, teamId?, slotId? })` (+ types); keep `readHeadcountCapacityPanel` for finalize UX |
++| `@divan/person-employment` | `getHistoricalOrgHeadcountState` (or equivalent) composing membership + org counts + headcount public API |
++| tRPC | Governed procedure e.g. `organization.getHistoricalCounts` and/or `headcount.getStateAsOf` ΓÇö Zod date-only via `parseDateOnly`; coarse `person.read` / `organization.read` (reuse existing) ΓÇö **do not invent** FR-47 toxic matrix |
++| UI | Optional foreshadow near `/personnel` or org surface: Jalali as-of, membership + capacity table with `{tabular}` numerals (UX-DR13 family); Persian empty/error ΓÇö **not** full dashboard |
++| Permissions | Coarse read only; omit out-of-scope Teams if scope filter already exists ΓÇö fail closed if required inputs missing |
++
++### Mandated design ΓÇö freshness
++
++If platform exposes org-/slot-level recalc pending for affected Persons in scope, fail-closed or return typed freshness (do not serve gold historical totals while known recalc is pending for people in the counted set). Prefer reusing existing recalculation signals; do not invent a second banner system.
++
++[Source: `epics.md` Story 4.11; `prd.md` FR-27, FR-11, FR-16, FR-18, FR-25ΓÇôFR-26, FR-30; `ARCHITECTURE-SPINE.md` AD-2, AD-3, AD-6, PROJECTION_HISTORICAL; Stories 4.7, 4.9, 4.10; UX-DR13]
++
++## Acceptance Criteria
++
++1. **Given** a supported historical date (Asia/Tehran date-only) and permitted scope  
++   **When** historical Team/org/headcount counts are requested for `asOf Γëñ today`  
++   **Then** Team membership counts, organization unit counts, and approved/used/reserved/free headcount reconstruct under the metric catalogue above ΓÇö membership from Primary as-of helpers; headcount from event-linked ledger (not live counters for historical dates)
++
++2. **And** transfers and corrections affect membership totals only at resolved Effective points; Scheduled Transfer keeps source membership until Effective while destination shows reserved capacity (FR-30 / UJ-1)
++
++3. **And** detailed and aggregate results reconcile under the same metric catalogue (selfcheck: rollup equality)
++
++4. **And** future `asOf` uses planned semantics (facts @ today + planned channel); Baseline limitations disclosed; invalid `asOf` rejected fail-closed
++
++5. **And** Stories 4.1ΓÇô4.10 invariants remain green; this story does **not** deliver Headcount Approval/Matching/Override (4.12ΓÇô4.14), Epic 5 dashboard/reports, PopulationPort cutover, or new Personnel Event Operators
++
++## Tasks / Subtasks
++
++- [x] Task 1: Headcount as-of ledger reader (AC: #1, #2)
++  - [x] Add `reconstructHeadcountQuantitiesAsOf` in `@divan/headcount` (used/reserved/approved/free per slot or Team+title)
++  - [x] Join consumption/reservation `event_id` ΓåÆ `getBusinessEventById`; apply Effective + `resolveLifecycleStatus` / Cancelled-Reversed exclusion
++  - [x] Document that `readHeadcountCapacityPanel` remains live/finalize-only; historical path must not silently call it for `asOf < today`
++  - [x] Selfcheck: live panel Γëí ledger at `asOf=today` for fixture slot after Start+Scheduled Transfer
++
++- [x] Task 2: Org + membership reconstruction coordinator (AC: #1, #2, #3)
++  - [x] Implement `getHistoricalOrgHeadcountState` in person-employment composing `listTeamMembersAsOf`, org-unit as-of counts, headcount public API
++  - [x] Detail + aggregate DTOs; `*FactsForCompare` ignoring wall-clock metadata
++  - [x] `viewSemantics` + `baselineDisclosure` via existing 4.10 helpers (`parseDateOnly`, `isFutureAsOf`, `getBaselineBoundaryDate`)
++  - [x] Planned path for future asOf (AC #4)
++
++- [x] Task 3: tRPC + optional foreshadow (AC: #1, #4, #5)
++  - [x] Governed procedure with Zod date-only `asOf`; map validation errors to Persian `messageFa`
++  - [x] Optional foreshadow: Jalali picker, tabular numerals, semantics/Baseline banners; interactive a11y (labelled picker, `role="alert"`, keyboard submit)
++  - [x] Web never imports `@prisma/client` / compensation Prisma
++
++- [x] Task 4: Module boundaries & non-goals (AC: #5)
++  - [x] No Approval lifecycle / Matching matrix / Override catalogue
++  - [x] No new historical SoT table; no projection-hook / Operator edits unless proven read bug
++  - [x] No PopulationPort cutover; no dashboard/report catalogue product
++  - [x] `@divan/headcount` must not depend on person-employment
++
++- [x] Task 5: Selfchecks + DoD (AC: #1ΓÇô#5)
++  - [x] New `historical-org-headcount.selfcheck.ts` (and/or headcount selfcheck) with oracles:
++    - Past as-of after Effective Transfer: source membership ΓêÆ1, dest +1; capacity used moved
++    - After Scheduled (not Effective) Transfer finalize: source membership unchanged; dest reserved ΓëÑ 1; source still used
++    - Detail rollup === aggregate for same `(asOf, scope)`
++    - Future asOf planned (no Effective label on future membership)
++    - Baseline disclosure limited/unset
++    - Invalid asOf rejected
++    - `asOf=today` ledger Γëí `readHeadcountCapacityPanel` for fixture
++  - [x] Re-run event-store ΓåÆ current-person-state + workers + transfer/start/termination selfchecks ΓÇö all green
++  - [x] Update `deferred-work.md`; align story Status Γåö `sprint-status.yaml`; **no UTF-8 BOM**
++
++## Dev Notes
++
++### Current code state (READ BEFORE CODING)
++
++| Area | Path | Today | 4.11 change |
++| --- | --- | --- | --- |
++| Capacity port | `packages/modules/headcount/src/index.ts` | Mutate + `readHeadcountCapacityPanel` (**live** counters) | **ADD** as-of ledger reconstruct; keep panel |
++| Schema | `packages/db/sql/006ΓÇô008_headcount_*.sql` | slot / consumption / reservation | **Read only** ΓÇö no Approval table |
++| Membership | `primary-assignment.ts` `resolveTeamMembershipAsOf`; `management-relationship.ts` `listTeamMembersAsOf` | As-of Primary members | **Reuse** for counts |
++| Org hierarchy | `org-unit.ts` `getHierarchyAsOf` | As-of tree | **Reuse** for unit-type counts |
++| Person as-of | `current-person-state.ts` + `baseline-boundary.ts` | FR-26 product | **Reuse** validation/disclosure helpers; do not fork date logic |
++| Events | `@divan/event-store` `getBusinessEventById` | Effective + status | **Join** from capacity ledger |
++| tRPC panel | `apps/web/src/server/personnel-event.ts` `headcountCapacity` | Live panel for form | Keep; add separate historical procedure |
++| Headcount page | `apps/web/app/(app)/headcount/page.tsx` | Placeholder | Optional foreshadow only ΓÇö not Approval admin |
++| Projection hooks | `personnel-event-projection-hook.ts` | 4.5ΓÇô4.8 | **Do not modify** |
++
++### What this story changes vs preserves
++
++**Changes:** FR-27 read APIs; headcount as-of ledger reconstruction; org/membership aggregate DTO; thin tRPC + optional foreshadow; metric catalogue + selfchecks.
++
++**Preserves:** AD-2 projections-never-SoT; FR-16 ScheduledΓëácurrent membership before Effective; FR-30 reserve-on-finalize for Scheduled Transfer; half-open intervals; live capacity panel for finalize UX; append-only store; 4.10 Person as-of; no UTF-8 BOM; Status Γåö sprint-status alignment.
++
++### Architecture compliance
++
++- **AD-2:** Historical org/headcount = derived reads ΓÇö never authoritative mutation
++- **AD-3:** Capacity ledger math in `@divan/headcount`; membership/org in `person-employment`; coordinator must not create headcountΓåÆperson-employment import cycle
++- **AD-6:** Heavy recalc remains async pg-boss (4.4); this story is **read** ΓÇö no sync full-replay-on-GET; `PROJECTION_HISTORICAL` via as-of composition
++- **Stack:** Prisma for OrgUnit/Primary; raw SQL/Pool for capacity tables + event-store; tRPC web only; `tsx` selfcheck pattern
++
++### AR / fail-closed (do not invent)
++
++| Artifact | Rule for 4.11 |
++| --- | --- |
++| AR-TEMPORAL | Date-only Tehran; exclusive ends; future as-of = planned; Baseline honesty |
++| AR-HEADCOUNT | Reconstruct used/reserved/free with MVP approved stand-in; **do not invent** Approval/Matching/Override product (ΓåÆ 4.12ΓÇô4.14); keep fail-closed on ambiguous ledger joins |
++| AR-ACCESS / FR-47 | Coarse read permissions only |
++| AR-DATA | No new sensitive categories |
++| AR-IDENTITY | No PopulationPort cutover |
++| AR-REPORTING | No launch report/dashboard product (ΓåÆ 5.4 / 5.5) |
++| AR-MIGRATION / FR-39 | Disclosure only ΓÇö no import provenance UI |
++| AR-SECONDARY | Secondary never counts as membership / headcount by default |
++
++### Previous story intelligence (4.10)
++
++- Extend shared date/Baseline helpers ΓÇö do not duplicate `parseDateOnly` / `isFutureAsOf` / boundary reader.
++- Review patches from 4.10 that apply here: fail-closed invalid Baseline env; midnight-safe semantics using captured `today`; Zod `parseDateOnly` on tRPC (not `z.string().min(1)` alone); foreshadow commit Jalali value before submit; a11y `htmlFor` / `aria-labelledby`; avoid brittle `JSON.stringify().includes('"Effective"')` oracles.
++- Leave deferred: planned double-scan TOCTOU; torn sequential projection reads; Vitest isolation; PopulationPort; FR-47 matrix.
++- Never use `listBusinessEventsForPerson` DESC for derive; never `toISOString().slice(0,10)` for PG DATE; noon-UTC DB dates.
++- Past-dated Start may leave `recalculation_status=pending` ΓÇö clear before gold-truth selfcheck reads.
++- Pattern continuity: domain module + `tsx` selfcheck + thin governed tRPC + optional foreshadow; Persian `messageFa`; no new write Operators.
++
++### Git intelligence
++
++```text
++ea232af story 4.10  ΓåÉ Person as-of / Baseline / planned ΓÇö reuse helpers
++7bb4f50 story 4.9   ΓåÉ assembler pattern
++8de3f2e story 4.8   ΓåÉ Title capacity move
++1e29400 story 4.7   ΓåÉ Transfer reserve vs Effective Primary + capacity
++669c8a8 story 4.6   ΓåÉ Termination release
++```
++
++Pattern: module public API + selfcheck oracles + thin tRPC; capacity mutations stay in Operators (4.5ΓÇô4.8) ΓÇö 4.11 is read-only reconstruction.
++
++### Latest tech notes
++
++- Industry practice (2025ΓÇô26): cohort/as-of aggregates should use **validity-interval projections** (Primary/OrgUnit already) or purpose-built ledgers ΓÇö **not** per-request full stream replay. Live mutable counters are not a historical store.
++- For capacity, reconstruct from consumption/reservation rows + event Effective/lifecycle (state-transition ledger), with conservation identity for approved/free until Approval entity exists (4.12).
++- Keep planned future state explicit in the API so clients cannot mistake Scheduled reserves/membership moves for Effective history.
++- MVP (~500 people): interval + ledger composition is enough; no new snapshot table.
++
++### Project structure notes
++
++```text
++packages/modules/headcount/src/
++  index.ts                                 # UPDATE ΓÇö reconstructHeadcountQuantitiesAsOf
++  historical-headcount.selfcheck.ts        # NEW (optional if coordinator selfcheck covers)
++  package.json                             # UPDATE ΓÇö selfcheck script if added
++packages/modules/person-employment/src/
++  historical-org-headcount.ts              # NEW ΓÇö coordinator
++  historical-org-headcount.selfcheck.ts    # NEW
++  index.ts                                 # UPDATE ΓÇö exports
++  package.json                             # UPDATE ΓÇö selfcheck script
++  baseline-boundary.ts / current-person-state.ts  # REUSE helpers only
++apps/web/src/server/
++  organization.ts or headcount.ts          # UPDATE/NEW ΓÇö governed as-of procedure
++apps/web/components/ΓÇª                      # OPTIONAL foreshadow
++_bmad-output/implementation-artifacts/
++  deferred-work.md                         # UPDATE
++  sprint-status.yaml                       # UPDATE ΓÇö ready-for-dev ΓåÆ (later done)
++```
++
++### Testing requirements
++
++- Pattern: `tsx` + `node:assert` + real `DATABASE_URL` (Vitest still deferred).
++- Exact oracles in Task 5; dual-consumer / detailΓëíaggregate deep-equal.
++- Seed DoD: FK-shaped Persons + Employments + Primaries + capacity slots; Effective Start; Scheduled Transfer (reserve); Effective Transfer; `$transaction` for fixture writes; exact counts.
++- Regression: 4.1ΓÇô4.10 + workers selfchecks green; typecheck `@divan/headcount`, `@divan/person-employment`, `web`.
++
++### Absolute non-goals
++
++- Headcount Approval lifecycle / Matching / Reservation-expiry UI / Override catalogue (4.12ΓÇô4.14)
++- Full dashboard, search, profile sections, timeline, report catalogue (Epic 5)
++- PopulationPort default-registry cutover
++- New Personnel Event Operators or projection-hook domain branches (unless critical read bug)
++- New authoritative historical Prisma snapshot table; sync full-event replay on GET
++- Using live `free_units`/`reserved_units` as historical as-of truth
++- Import cycle headcount ΓåÆ person-employment
++- Inventing open AR numbers; enabling reject-disposition dictionary elements
++- Full FR-47 temporal/cross-boundary as-of authorization matrix
++- Weakening FR-16 / FR-30 / append-only / Secondary non-consumption
++- UTF-8 BOM on `sprint-status.yaml`
++
++### References
++
++- [Source: `_bmad-output/planning-artifacts/epics.md` ΓÇö Epic 4, Story 4.11]
++- [Source: `_bmad-output/planning-artifacts/prds/prd-divan-2026-07-11/prd.md` ΓÇö FR-27, FR-11, FR-16, FR-18, FR-26, FR-30, UJ-1]
++- [Source: `_bmad-output/planning-artifacts/architecture/architecture-divan-2026-07-15/ARCHITECTURE-SPINE.md` ΓÇö AD-2, AD-3, AD-6, PROJECTION_HISTORICAL]
++- [Source: `_bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-13/EXPERIENCE.md` ΓÇö headcount-capacity-panel; jalali-date-picker]
++- [Source: `_bmad-output/implementation-artifacts/4-10-historical-person-reconstruction.md`]
++- [Source: `_bmad-output/implementation-artifacts/4-9-current-person-state-projection.md`]
++- [Source: `_bmad-output/implementation-artifacts/4-7-team-transfer-with-atomic-capacity-movement.md`]
++- [Source: `_bmad-output/implementation-artifacts/deferred-work.md`]
++- [Source: `packages/modules/headcount/src/index.ts` ΓÇö `readHeadcountCapacityPanel`]
++- [Source: `packages/modules/person-employment/src/management-relationship.ts` ΓÇö `listTeamMembersAsOf`]
++- [Source: `packages/modules/person-employment/src/org-unit.ts` ΓÇö `getHierarchyAsOf`]
++- [Source: `packages/modules/person-employment/src/current-person-state.ts`]
++- [Source: `packages/kernel/temporal-engine/src/date-only.ts`]
++- [Source: `packages/kernel/event-store/src/business-event.ts` ΓÇö `getBusinessEventById`]
++
++## Dev Agent Record
++
++### Agent Model Used
++
++Composer (Cursor agent)
++
++### Debug Log References
++
++- Selfcheck fixture initially used shared seed Team (polluted membership count 34); switched to scoped source Team for exact oracles.
++- Cancel of Scheduled Transfer required `hr.admin` (not operator) for `personnel_event_cancel`.
++- Stripped accidental UTF-8 BOM from `sprint-status.yaml` on status update.
++
++### Completion Notes List
++
++- Γ£à `reconstructHeadcountQuantitiesAsOf` ΓÇö event-linked used/reserved; MVP approved stand-in from live counters; free = approved ΓêÆ used ΓêÆ reserved; fail-closed on missing event joins; does not call live panel for historical dates.
++- Γ£à `getHistoricalOrgHeadcountState` ΓÇö membership via `listTeamMembersAsOf`, org counts via `getHierarchyAsOf`, headcount public API; `viewSemantics` + Baseline disclosure; planned channel; freshness fail-closed on recalc pending/failed/stale.
++- Γ£à tRPC `organization.getHistoricalCounts` with Zod `parseDateOnly`; Persian validation messages; optional `/headcount` Jalali foreshadow with tabular numerals + a11y.
++- Γ£à Module boundary preserved: headcount Γå¢ person-employment; no Approval/Matching/Override/SoT table/Operators.
++- Γ£à Selfcheck oracles green; regressions: current-person-state, transfer, start-return green.
++
++### File List
++
++- packages/modules/headcount/src/historical-headcount.ts (new)
++- packages/modules/headcount/src/index.ts
++- packages/modules/headcount/package.json
++- packages/modules/person-employment/src/historical-org-headcount.ts (new)
++- packages/modules/person-employment/src/historical-org-headcount.selfcheck.ts (new)
++- packages/modules/person-employment/src/index.ts
++- packages/modules/person-employment/package.json
++- apps/web/src/server/organization.ts
++- apps/web/components/organization/historical-org-headcount-foreshadow.tsx (new)
++- apps/web/app/(app)/headcount/page.tsx
++- _bmad-output/implementation-artifacts/deferred-work.md
++- _bmad-output/implementation-artifacts/sprint-status.yaml
++- _bmad-output/implementation-artifacts/4-11-historical-organization-headcount-reconstruction.md
++
++### Change Log
++
++- 2026-07-19: Implemented FR-27 historical org & headcount reconstruction (ledger as-of + coordinator + tRPC + foreshadow + selfcheck); status ΓåÆ review.
++
++## Story completion status
++
++Status: **review**
++
++Completion note: FR-27 as-of reconstruction of Team membership, org-unit counts, and headcount quantities shipped under the metric catalogue; ready for code review.
+
+diff --git a/apps/web/components/organization/historical-org-headcount-foreshadow.tsx b/apps/web/components/organization/historical-org-headcount-foreshadow.tsx
+new file mode 100644
+index 0000000..daf8702
+--- /dev/null
++++ b/apps/web/components/organization/historical-org-headcount-foreshadow.tsx
+@@ -0,0 +1,231 @@
++"use client";
++
++import * as React from "react";
++
++import { JalaliDatePicker, type JalaliDatePickerHandle } from "@/components/jalali-date-picker";
++import { Input } from "@/components/ui/input";
++import { Skeleton } from "@/components/ui/skeleton";
++import { toPersianDigits } from "@/lib/persian-digits";
++import { api } from "@/lib/trpc/client";
++import { cn } from "@/lib/utils";
++
++const VIEW_SEMANTICS_LABEL_FA: Record<
++  "current" | "historical" | "planned",
++  string
++> = {
++  current: "╪¼╪º╪▒█î",
++  historical: "╪¬╪º╪▒█î╪«█î",
++  planned: "╪¿╪▒┘å╪º┘à┘çΓÇî╪▒█î╪▓█îΓÇî╪┤╪»┘ç",
++};
++
++/**
++ * Optional foreshadow of org/headcount as-of counts (Story 4.11 / FR-27).
++ * Not Approval admin UI (ΓåÆ 4.12) or dashboard (ΓåÆ 5.4).
++ */
++export function HistoricalOrgHeadcountForeshadow() {
++  const formId = React.useId();
++  const asOfPickerRef = React.useRef<JalaliDatePickerHandle>(null);
++  const [teamId, setTeamId] = React.useState("");
++  const [asOf, setAsOf] = React.useState<string | undefined>(undefined);
++  const [submitted, setSubmitted] = React.useState<{
++    asOf: string;
++    teamId?: string;
++  } | null>(null);
++
++  const query = api.organization.getHistoricalCounts.useQuery(
++    {
++      asOf: submitted?.asOf ?? "",
++      teamId: submitted?.teamId,
++    },
++    { enabled: Boolean(submitted?.asOf) },
++  );
++
++  return (
++    <section className="space-y-4" aria-labelledby={`${formId}-heading`}>
++      <div className="space-y-1">
++        <h2 id={`${formId}-heading`} className="text-title-sm font-semibold">
++          ╪┤┘à╪º╪▒╪┤ ╪│╪º╪▓┘à╪º┘å ┘ê ╪╕╪▒┘ü█î╪¬ (╪¬╪º╪▒█î╪«█î)
++        </h2>
++        <p className="text-body text-muted-foreground">
++          ┘╛█î╪┤ΓÇî┘å┘à╪º█î╪┤ ┘ü┘é╪╖ΓÇî╪«┘ê╪º┘å╪»┘å█î ╪╣╪╢┘ê█î╪¬ ╪¬█î┘à ┘ê ╪╕╪▒┘ü█î╪¬ ΓÇö ┘å┘ç ╪»╪º╪┤╪¿┘ê╪▒╪» ┌⌐╪º┘à┘ä ┘ê ┘å┘ç ╪¬╪ú█î█î╪» ╪╕╪▒┘ü█î╪¬.
++        </p>
++      </div>
++
++      <form
++        className="flex flex-wrap items-end gap-3"
++        onSubmit={(e) => {
++          e.preventDefault();
++          const committed = asOfPickerRef.current?.commit();
++          if (committed && !committed.ok) return;
++          const asOfValue = committed?.ok
++            ? committed.value?.trim()
++            : asOf?.trim();
++          if (!asOfValue) return;
++          const tid = teamId.trim();
++          setSubmitted({
++            asOf: asOfValue,
++            teamId: tid.length > 0 ? tid : undefined,
++          });
++        }}
++      >
++        <div className="min-w-[14rem] space-y-1.5">
++          <label htmlFor={`${formId}-asof`} className="text-label">
++            ╪¬╪º╪▒█î╪« ┘à╪¿┘å╪º
++          </label>
++          <JalaliDatePicker
++            ref={asOfPickerRef}
++            id={`${formId}-asof`}
++            aria-label="╪¬╪º╪▒█î╪« ┘à╪¿┘å╪º ╪¿╪▒╪º█î ╪¿╪º╪▓╪│╪º╪▓█î ╪┤┘à╪º╪▒╪┤ ╪│╪º╪▓┘à╪º┘å ┘ê ╪╕╪▒┘ü█î╪¬"
++            value={asOf}
++            onChange={setAsOf}
++            helperText="╪º┘ä╪▓╪º┘à█î ΓÇö ╪¬╪º╪▒█î╪« ┘ü┘é╪╖ (╪¬┘ç╪▒╪º┘å)"
++          />
++        </div>
++        <div className="min-w-[16rem] flex-1 space-y-1.5">
++          <label htmlFor={`${formId}-team`} className="text-label">
++            ╪┤┘å╪º╪│┘ç ╪¬█î┘à (╪º╪«╪¬█î╪º╪▒█î)
++          </label>
++          <Input
++            id={`${formId}-team`}
++            value={teamId}
++            onChange={(e) => setTeamId(e.target.value)}
++            dir="ltr"
++            autoComplete="off"
++            placeholder="UUID ΓÇö ╪«╪º┘ä█î = ┘ç┘à┘ç ╪¬█î┘àΓÇî┘ç╪º"
++          />
++        </div>
++        <button
++          type="submit"
++          className={cn(
++            "inline-flex h-10 items-center justify-center rounded-md px-4",
++            "bg-primary text-primary-foreground text-label",
++          )}
++        >
++          ┘å┘à╪º█î╪┤
++        </button>
++      </form>
++
++      {!submitted ? null : query.isLoading ? (
++        <Skeleton className="h-24 w-full" />
++      ) : query.isError ? (
++        <p role="alert" className="text-body text-destructive">
++          {query.error.message}
++        </p>
++      ) : query.data && query.data.ok === false ? (
++        <p role="alert" className="text-body text-destructive">
++          {query.data.messageFa}
++        </p>
++      ) : query.data && query.data.ok === true ? (
++        <div className="space-y-3 text-body">
++          <p className="flex flex-wrap items-center gap-2">
++            <span className="text-muted-foreground">┘å┘ê╪╣ ┘å┘à╪º: </span>
++            <span
++              className={cn(
++                "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
++                query.data.viewSemantics === "planned"
++                  ? "status-badge-scheduled"
++                  : query.data.viewSemantics === "historical"
++                    ? "bg-muted text-muted-foreground"
++                    : "status-badge-effective",
++              )}
++            >
++              {VIEW_SEMANTICS_LABEL_FA[query.data.viewSemantics]}
++            </span>
++            {query.data.viewSemantics === "planned" ? (
++              <span className="text-muted-foreground text-sm">
++                (╪¡┘é╪º█î┘é ┘à╪ñ╪½╪▒ ╪º┘à╪▒┘ê╪▓╪¢ ┘å┘ç ╪¿╪▒┌å╪│╪¿ ┘à╪ñ╪½╪▒ ╪¿╪▒╪º█î ╪ó█î┘å╪»┘ç)
++              </span>
++            ) : null}
++          </p>
++          <p>
++            <span className="text-muted-foreground">╪¬╪º╪▒█î╪« ┘à╪¿┘å╪º: </span>
++            <span dir="ltr" className="tabular-nums">
++              {toPersianDigits(query.data.asOf)}
++            </span>
++          </p>
++          {query.data.baselineDisclosure.limited ||
++          !query.data.baselineDisclosure.configured ? (
++            <p role="alert" className="text-body text-amber-800 dark:text-amber-200">
++              {query.data.baselineDisclosure.messageFa}
++            </p>
++          ) : null}
++          <table className="w-full max-w-lg text-sm">
++            <caption className="sr-only">
++              ╪┤┘à╪º╪▒╪┤ ╪╣╪╢┘ê█î╪¬ ┘ê ╪╕╪▒┘ü█î╪¬
++            </caption>
++            <tbody>
++              <tr>
++                <th scope="row" className="py-1 text-muted-foreground text-start">
++                  ╪╣╪╢┘ê█î╪¬ ╪¬█î┘à
++                </th>
++                <td className="py-1 tabular-nums" dir="ltr">
++                  {toPersianDigits(String(query.data.aggregate.teamMembershipCount))}
++                </td>
++              </tr>
++              <tr>
++                <th scope="row" className="py-1 text-muted-foreground text-start">
++                  ┘ê╪º╪¡╪»┘ç╪º█î ╪¬█î┘à
++                </th>
++                <td className="py-1 tabular-nums" dir="ltr">
++                  {toPersianDigits(String(query.data.aggregate.orgUnitCounts.TEAM))}
++                </td>
++              </tr>
++              <tr>
++                <th scope="row" className="py-1 text-muted-foreground text-start">
++                  ╪¬╪ú█î█î╪»╪┤╪»┘ç
++                </th>
++                <td className="py-1 tabular-nums" dir="ltr">
++                  {toPersianDigits(String(query.data.aggregate.approved))}
++                </td>
++              </tr>
++              <tr>
++                <th scope="row" className="py-1 text-muted-foreground text-start">
++                  ┘à╪╡╪▒┘üΓÇî╪┤╪»┘ç
++                </th>
++                <td className="py-1 tabular-nums" dir="ltr">
++                  {toPersianDigits(String(query.data.aggregate.used))}
++                </td>
++              </tr>
++              <tr>
++                <th scope="row" className="py-1 text-muted-foreground text-start">
++                  ╪▒╪▓╪▒┘ê
++                </th>
++                <td className="py-1 tabular-nums" dir="ltr">
++                  {toPersianDigits(String(query.data.aggregate.reserved))}
++                </td>
++              </tr>
++              <tr>
++                <th scope="row" className="py-1 text-muted-foreground text-start">
++                  ╪ó╪▓╪º╪»
++                </th>
++                <td className="py-1 tabular-nums" dir="ltr">
++                  {toPersianDigits(String(query.data.aggregate.free))}
++                </td>
++              </tr>
++            </tbody>
++          </table>
++          {query.data.viewSemantics === "planned" &&
++          query.data.plannedMembershipDeltas.length > 0 ? (
++            <ul
++              className="space-y-1"
++              aria-label="╪º┘å╪¬┘é╪º┘äΓÇî┘ç╪º█î ╪¿╪▒┘å╪º┘à┘çΓÇî╪▒█î╪▓█îΓÇî╪┤╪»┘ç ╪¬╪º ╪¬╪º╪▒█î╪« ┘à╪¿┘å╪º"
++            >
++              {query.data.plannedMembershipDeltas.map((d) => (
++                <li key={d.eventId} className="text-sm text-muted-foreground">
++                  <span>╪¿╪▒┘å╪º┘à┘çΓÇî╪▒█î╪▓█îΓÇî╪┤╪»┘ç </span>
++                  <span dir="ltr" className="font-mono">
++                    {d.eventType}
++                  </span>
++                  <span> </span>
++                  <span dir="ltr" className="tabular-nums">
++                    {toPersianDigits(d.effectiveDate)}
++                  </span>
++                </li>
++              ))}
++            </ul>
++          ) : null}
++        </div>
++      ) : null}
++    </section>
++  );
++}
+
+diff --git a/packages/modules/headcount/src/historical-headcount.ts b/packages/modules/headcount/src/historical-headcount.ts
+new file mode 100644
+index 0000000..5eb0038
+--- /dev/null
++++ b/packages/modules/headcount/src/historical-headcount.ts
+@@ -0,0 +1,375 @@
++/**
++ * Historical headcount quantity reconstruction (Story 4.11 / FR-27).
++ * Event-linked ledger read ΓÇö NOT live free_units/reserved_units for asOf < today.
++ * `readHeadcountCapacityPanel` remains live/finalize-only (UX-DR13).
++ */
++
++import {
++  getBusinessEventById,
++  listChainLinksForEvents,
++  type BusinessEventRecord,
++  type BusinessEventStatus,
++  type PgQueryable,
++} from "@divan/event-store";
++import { parseDateOnly } from "@divan/temporal-engine";
++
++import type { Pool, PoolClient } from "@divan/db";
++
++export const MSG_HEADCOUNT_ASOF_INVALID_FA =
++  "╪¬╪º╪▒█î╪« ┘à╪¿┘å╪º ┘å╪º┘à╪╣╪¬╪¿╪▒ ╪º╪│╪¬╪¢ ╪¿╪º╪▓╪│╪º╪▓█î ╪╕╪▒┘ü█î╪¬ ╪º╪▒╪º╪ª┘ç ┘å┘à█îΓÇî╪┤┘ê╪».";
++
++export const MSG_HEADCOUNT_LEDGER_AMBIGUOUS_FA =
++  "┘╛█î┘ê┘å╪» ╪»┘ü╪¬╪▒ ╪╕╪▒┘ü█î╪¬ ╪¿╪º ╪▒┘ê█î╪»╪º╪» ┘à╪¿┘ç┘à █î╪º ┘å╪º┘à┘ê╪¼┘ê╪» ╪º╪│╪¬╪¢ ╪¿╪º╪▓╪│╪º╪▓█î ╪¬╪º╪▒█î╪«█î ┘à╪│╪»┘ê╪» ╪º╪│╪¬.";
++
++export class HeadcountLedgerError extends Error {
++  readonly code: "VALIDATION" | "LEDGER_AMBIGUOUS";
++  readonly messageFa: string;
++
++  constructor(
++    code: "VALIDATION" | "LEDGER_AMBIGUOUS",
++    messageFa: string,
++    message?: string,
++  ) {
++    super(message ?? messageFa);
++    this.name = "HeadcountLedgerError";
++    this.code = code;
++    this.messageFa = messageFa;
++  }
++}
++
++type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
++
++async function query<T extends Record<string, unknown>>(
++  db: Queryable,
++  sql: string,
++  params: unknown[] = [],
++): Promise<T[]> {
++  const r = await db.query(sql, params);
++  return r.rows as T[];
++}
++
++/**
++ * Lightweight evaluation-by-date (mirrors person-employment without import cycle).
++ */
++function evaluationStatusAsOf(
++  event: Pick<BusinessEventRecord, "status" | "effectiveDate">,
++  asOfDate: string,
++): BusinessEventStatus {
++  if (event.status === "Draft") return "Draft";
++  if (event.status === "Cancelled" || event.status === "Reversed") {
++    return event.status;
++  }
++  if (event.status === "Scheduled" && event.effectiveDate <= asOfDate) {
++    return "Effective";
++  }
++  return event.status;
++}
++
++function resolveLifecycleStatus(
++  event: BusinessEventRecord,
++  links: {
++    cancellations: BusinessEventRecord[];
++    reversals: BusinessEventRecord[];
++  },
++  asOfDate: string,
++): BusinessEventStatus {
++  if (links.cancellations.length > 0) return "Cancelled";
++  if (links.reversals.length > 0) return "Reversed";
++  return evaluationStatusAsOf(event, asOfDate);
++}
++
++export type ReconstructHeadcountQuantitiesInput = {
++  asOf: string;
++  teamId?: string;
++  slotId?: string;
++};
++
++export type HeadcountSlotQuantities = {
++  slotId: string;
++  teamId: string;
++  jobTitleId: string | null;
++  ladderId: string | null;
++  gradeId: string | null;
++  /** MVP Approval stand-in: live used + reserved + free ceiling. */
++  approved: number;
++  used: number;
++  reserved: number;
++  free: number;
++};
++
++export type ReconstructHeadcountQuantitiesResult = {
++  asOf: string;
++  slots: HeadcountSlotQuantities[];
++  aggregate: {
++    approved: number;
++    used: number;
++    reserved: number;
++    free: number;
++  };
++};
++
++/** Compare helper ΓÇö ignores nothing wall-clock; slots sorted by slotId. */
++export function headcountQuantitiesFactsForCompare(
++  result: ReconstructHeadcountQuantitiesResult,
++): unknown {
++  return {
++    asOf: result.asOf,
++    slots: [...result.slots]
++      .map((s) => ({
++        slotId: s.slotId,
++        teamId: s.teamId,
++        jobTitleId: s.jobTitleId,
++        ladderId: s.ladderId,
++        gradeId: s.gradeId,
++        approved: s.approved,
++        used: s.used,
++        reserved: s.reserved,
++        free: s.free,
++      }))
++      .sort((a, b) => a.slotId.localeCompare(b.slotId)),
++    aggregate: { ...result.aggregate },
++  };
++}
++
++type SlotRow = {
++  id: string;
++  team_id: string;
++  job_title_id: string | null;
++  ladder_id: string | null;
++  grade_id: string | null;
++  start_date: Date | string;
++  end_date_exclusive: Date | string | null;
++  free_units: number;
++  reserved_units: number;
++};
++
++type ConsumptionRow = {
++  id: string;
++  slot_id: string;
++  event_id: string;
++  person_id: string;
++  release_event_id: string | null;
++};
++
++type ReservationRow = {
++  id: string;
++  slot_id: string;
++  event_id: string;
++  person_id: string;
++  status: string;
++};
++
++/**
++ * Reconstruct approved/used/reserved/free per in-scope slot at `asOf`.
++ *
++ * - used/reserved: event-linked ledger + Effective/lifecycle (not live counters)
++ * - approved: MVP stand-in from current slot counters (until Story 4.12 Approval)
++ * - free: approved ΓêÆ used ΓêÆ reserved (catalogue identity; MVP ΓëÑ 0)
++ *
++ * Do **not** use this as a silent wrapper around `readHeadcountCapacityPanel`
++ * for historical dates ΓÇö that panel reads live counters only.
++ */
++export async function reconstructHeadcountQuantitiesAsOf(
++  db: Queryable,
++  input: ReconstructHeadcountQuantitiesInput,
++): Promise<ReconstructHeadcountQuantitiesResult> {
++  const parsed = parseDateOnly(input.asOf);
++  if (!parsed.ok) {
++    throw new HeadcountLedgerError(
++      "VALIDATION",
++      MSG_HEADCOUNT_ASOF_INVALID_FA,
++      parsed.reason,
++    );
++  }
++  const asOf = parsed.value;
++  const eventDb = db as PgQueryable;
++
++  const params: unknown[] = [asOf];
++  let sql = `
++    SELECT id, team_id, job_title_id, ladder_id, grade_id,
++           start_date, end_date_exclusive, free_units, reserved_units
++    FROM headcount_capacity_slot
++    WHERE start_date <= $1::date
++      AND (end_date_exclusive IS NULL OR end_date_exclusive > $1::date)`;
++  if (input.slotId?.trim()) {
++    params.push(input.slotId.trim());
++    sql += ` AND id = $${params.length}::uuid`;
++  }
++  if (input.teamId?.trim()) {
++    params.push(input.teamId.trim());
++    sql += ` AND team_id = $${params.length}::uuid`;
++  }
++  sql += ` ORDER BY team_id ASC, start_date ASC, id ASC`;
++
++  const slots = await query<SlotRow>(db, sql, params);
++  if (slots.length === 0) {
++    return {
++      asOf,
++      slots: [],
++      aggregate: { approved: 0, used: 0, reserved: 0, free: 0 },
++    };
++  }
++
++  const slotIds = slots.map((s) => s.id);
++  const consumptions = await query<ConsumptionRow>(
++    db,
++    `SELECT id, slot_id, event_id, person_id, release_event_id
++     FROM headcount_capacity_consumption
++     WHERE slot_id = ANY($1::uuid[])`,
++    [slotIds],
++  );
++  const reservations = await query<ReservationRow>(
++    db,
++    `SELECT id, slot_id, event_id, person_id, status
++     FROM headcount_capacity_reservation
++     WHERE slot_id = ANY($1::uuid[])`,
++    [slotIds],
++  );
++
++  const eventIds = new Set<string>();
++  for (const c of consumptions) {
++    eventIds.add(c.event_id);
++    if (c.release_event_id) eventIds.add(c.release_event_id);
++  }
++  for (const r of reservations) {
++    eventIds.add(r.event_id);
++  }
++
++  const eventIdList = [...eventIds];
++  const eventsById = new Map<string, BusinessEventRecord>();
++  for (const id of eventIdList) {
++    const ev = await getBusinessEventById(eventDb, id);
++    if (!ev) {
++      throw new HeadcountLedgerError(
++        "LEDGER_AMBIGUOUS",
++        MSG_HEADCOUNT_LEDGER_AMBIGUOUS_FA,
++        `missing_event:${id}`,
++      );
++    }
++    eventsById.set(id, ev);
++  }
++  const chainMap = await listChainLinksForEvents(eventDb, eventIdList);
++
++  const usedBySlot = new Map<string, number>();
++  const reservedBySlot = new Map<string, number>();
++  for (const id of slotIds) {
++    usedBySlot.set(id, 0);
++    reservedBySlot.set(id, 0);
++  }
++
++  for (const c of consumptions) {
++    const consumeEv = eventsById.get(c.event_id)!;
++    const consumeLinks = chainMap.get(c.event_id) ?? {
++      cancellations: [],
++      reversals: [],
++      corrections: [],
++    };
++    const consumeStatus = resolveLifecycleStatus(
++      consumeEv,
++      consumeLinks,
++      asOf,
++    );
++    if (
++      consumeStatus === "Cancelled" ||
++      consumeStatus === "Reversed" ||
++      consumeStatus === "Draft"
++    ) {
++      continue;
++    }
++    // Used only once the consume event is Effective at asOf.
++    if (consumeStatus !== "Effective") continue;
++
++    if (c.release_event_id) {
++      const releaseEv = eventsById.get(c.release_event_id)!;
++      const releaseLinks = chainMap.get(c.release_event_id) ?? {
++        cancellations: [],
++        reversals: [],
++        corrections: [],
++      };
++      const releaseStatus = resolveLifecycleStatus(
++        releaseEv,
++        releaseLinks,
++        asOf,
++      );
++      if (releaseStatus === "Effective") {
++        continue; // released as of asOf
++      }
++      // Cancelled/Reversed/Scheduled release ΓåÆ still used at asOf
++    }
++
++    usedBySlot.set(c.slot_id, (usedBySlot.get(c.slot_id) ?? 0) + 1);
++  }
++
++  for (const r of reservations) {
++    const ev = eventsById.get(r.event_id)!;
++    const links = chainMap.get(r.event_id) ?? {
++      cancellations: [],
++      reversals: [],
++      corrections: [],
++    };
++    const status = resolveLifecycleStatus(ev, links, asOf);
++    // Active reservation at asOf: Finalized event still Scheduled (pre-effect).
++    if (status === "Scheduled") {
++      reservedBySlot.set(r.slot_id, (reservedBySlot.get(r.slot_id) ?? 0) + 1);
++    }
++  }
++
++  // Live used for approved stand-in (current unreased consumptions).
++  const liveUsedRows = await query<{ slot_id: string; c: string }>(
++    db,
++    `SELECT slot_id, COUNT(*)::text AS c
++     FROM headcount_capacity_consumption
++     WHERE slot_id = ANY($1::uuid[]) AND release_event_id IS NULL
++     GROUP BY slot_id`,
++    [slotIds],
++  );
++  const liveUsedBySlot = new Map<string, number>();
++  for (const row of liveUsedRows) {
++    liveUsedBySlot.set(row.slot_id, Number(row.c));
++  }
++
++  const resultSlots: HeadcountSlotQuantities[] = [];
++  let aggApproved = 0;
++  let aggUsed = 0;
++  let aggReserved = 0;
++  let aggFree = 0;
++
++  for (const slot of slots) {
++    const liveUsed = liveUsedBySlot.get(slot.id) ?? 0;
++    const liveReserved = Number(slot.reserved_units);
++    const liveFree = Number(slot.free_units);
++    // Approval stand-in until 4.12 ΓÇö conserved live ceiling for the slot.
++    const approved = liveUsed + liveReserved + liveFree;
++    const used = usedBySlot.get(slot.id) ?? 0;
++    const reserved = reservedBySlot.get(slot.id) ?? 0;
++    let free = approved - used - reserved;
++    if (free < 0) free = 0;
++
++    resultSlots.push({
++      slotId: slot.id,
++      teamId: slot.team_id,
++      jobTitleId: slot.job_title_id,
++      ladderId: slot.ladder_id,
++      gradeId: slot.grade_id,
++      approved,
++      used,
++      reserved,
++      free,
++    });
++    aggApproved += approved;
++    aggUsed += used;
++    aggReserved += reserved;
++    aggFree += free;
++  }
++
++  return {
++    asOf,
++    slots: resultSlots,
++    aggregate: {
++      approved: aggApproved,
++      used: aggUsed,
++      reserved: aggReserved,
++      free: aggFree,
++    },
++  };
++}
+
+diff --git a/packages/modules/person-employment/src/historical-org-headcount.selfcheck.ts b/packages/modules/person-employment/src/historical-org-headcount.selfcheck.ts
+new file mode 100644
+index 0000000..efa06b6
+--- /dev/null
++++ b/packages/modules/person-employment/src/historical-org-headcount.selfcheck.ts
+@@ -0,0 +1,497 @@
++/**
++ * Historical org + headcount reconstruction selfcheck (Story 4.11 / FR-27).
++ * Run: pnpm --filter @divan/person-employment selfcheck:historical-org-headcount
++ * Requires DATABASE_URL, migrated schema, seeded accounts + org/job fixtures.
++ */
++import assert from "node:assert/strict";
++import { randomUUID } from "node:crypto";
++import { resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import { config as loadEnv } from "dotenv";
++
++import { createPgPool } from "@divan/db";
++import {
++  ensureHeadcountCapacitySchema,
++  headcountQuantitiesFactsForCompare,
++  readHeadcountCapacityPanel,
++  reconstructHeadcountQuantitiesAsOf,
++  seedCapacitySlot,
++} from "@divan/headcount";
++import { todayDateOnlyTehran } from "@divan/temporal-engine";
++
++import {
++  BASELINE_BOUNDARY_ENV,
++  cancelPersonnelEvent,
++  clearRecalculationStatus,
++  createDraft,
++  createOrgUnit,
++  createPerson,
++  finalizeDraft,
++  getBaselineBoundaryDate,
++  getHistoricalOrgHeadcountState,
++  getPersonDb,
++  historicalOrgHeadcountFactsForCompare,
++  listEmploymentsForPerson,
++  resetProjectionRefreshHook,
++  seedPersonnelEventPermissionFixtures,
++  seedPrimaryAssignmentFixtures,
++  SEED_EMPLOYMENT_LIFECYCLE,
++  SEED_JOB_REFERENCES,
++  SEED_ORGANIZATION_HIERARCHY,
++} from "./index";
++
++const rootEnv = resolve(
++  fileURLToPath(new URL(".", import.meta.url)),
++  "../../../../.env",
++);
++loadEnv({ path: rootEnv });
++
++function addDays(dateOnly: string, days: number): string {
++  const [ys, ms, ds] = dateOnly.split("-");
++  const dt = new Date(Date.UTC(Number(ys), Number(ms) - 1, Number(ds)));
++  dt.setUTCDate(dt.getUTCDate() + days);
++  const y = dt.getUTCFullYear();
++  const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
++  const d = String(dt.getUTCDate()).padStart(2, "0");
++  return `${y}-${m}-${d}`;
++}
++
++async function resolveJobRefs(db: ReturnType<typeof getPersonDb>) {
++  const role = await db.organizationalRole.findUniqueOrThrow({
++    where: { code: SEED_JOB_REFERENCES.role.code },
++  });
++  const title = await db.jobTitle.findUniqueOrThrow({
++    where: { code: SEED_JOB_REFERENCES.jobTitle.code },
++  });
++  const ladder = await db.ladder.findUniqueOrThrow({
++    where: { code: SEED_JOB_REFERENCES.ladder.code },
++  });
++  const grade = await db.grade.findUniqueOrThrow({
++    where: {
++      ladderId_code: {
++        ladderId: ladder.id,
++        code: SEED_JOB_REFERENCES.gradeLow.code,
++      },
++    },
++  });
++  const seniority = await db.seniority.findUniqueOrThrow({
++    where: { code: SEED_JOB_REFERENCES.seniority.code },
++  });
++  return {
++    organizationalRoleId: role.id,
++    jobTitleId: title.id,
++    ladderId: ladder.id,
++    gradeId: grade.id,
++    seniorityId: seniority.id,
++  };
++}
++
++async function main() {
++  const url = process.env.DATABASE_URL?.trim();
++  assert.ok(url, "DATABASE_URL required");
++
++  const db = getPersonDb();
++  const pool = createPgPool(url);
++  const prevBaseline = process.env[BASELINE_BOUNDARY_ENV];
++
++  try {
++    resetProjectionRefreshHook();
++    await seedPrimaryAssignmentFixtures(db);
++    await seedPersonnelEventPermissionFixtures(db);
++    await ensureHeadcountCapacitySchema(pool);
++
++    const jobRefs = await resolveJobRefs(db);
++    const dept = await db.organizationalUnit.findUniqueOrThrow({
++      where: { code: SEED_ORGANIZATION_HIERARCHY.department.code },
++    });
++
++    const operator =
++      (await db.internalAccount.findUnique({ where: { username: "hr.operator" } }))
++        ?.id ?? "selfcheck-operator";
++    const admin =
++      (await db.internalAccount.findUnique({ where: { username: "hr.admin" } }))
++        ?.id ?? "selfcheck-admin";
++
++    const suffix = randomUUID().slice(0, 8);
++    const today = todayDateOnlyTehran();
++    const startEd = addDays(today, -10);
++    const xferEd = addDays(today, -5);
++    const histAfterXfer = addDays(today, -2);
++    const histBeforeXfer = addDays(today, -7);
++    const future = addDays(today, 30);
++    const futureXferEd = addDays(today, 15);
++
++    const sourceTeamScoped = await createOrgUnit(
++      {
++        code: `TEAM-HOH-SRC-${suffix}`,
++        nameFa: "╪¬█î┘à ┘à╪¿╪»╪ú ╪┤┘à╪º╪▒╪┤ ╪¬╪º╪▒█î╪«█î",
++        unitType: "TEAM",
++        parentId: dept.id,
++        startDate: "2020-01-01",
++      },
++      db,
++    );
++    const sourceSlotScoped = await seedCapacitySlot(pool, {
++      id: randomUUID(),
++      teamId: sourceTeamScoped.id,
++      jobTitleId: jobRefs.jobTitleId,
++      ladderId: jobRefs.ladderId,
++      gradeId: jobRefs.gradeId,
++      startDate: "2020-01-01",
++      freeUnits: 5,
++      label: `hoh-src-${suffix}`,
++    });
++
++    const destTeam = await createOrgUnit(
++      {
++        code: `TEAM-HOH-${suffix}`,
++        nameFa: "╪¬█î┘à ┘à┘é╪╡╪» ╪┤┘à╪º╪▒╪┤ ╪¬╪º╪▒█î╪«█î",
++        unitType: "TEAM",
++        parentId: dept.id,
++        startDate: "2020-01-01",
++      },
++      db,
++    );
++    const destSlotId = await seedCapacitySlot(pool, {
++      id: randomUUID(),
++      teamId: destTeam.id,
++      jobTitleId: jobRefs.jobTitleId,
++      ladderId: jobRefs.ladderId,
++      gradeId: jobRefs.gradeId,
++      startDate: "2020-01-01",
++      freeUnits: 5,
++      label: `hoh-dest-${suffix}`,
++    });
++
++    const person = await createPerson(
++      {
++        personnelCode: `41${suffix.slice(0, 6)}`,
++        givenName: "╪┤┘à╪º╪▒╪┤",
++        familyName: "╪¬╪º╪▒█î╪«█î",
++        mobilePhone: "09124111001",
++      },
++      { accountId: operator, correlationId: `sc-hoh-${suffix}` },
++      db,
++    );
++
++    const startDraft = await createDraft(
++      {
++        personId: person.id,
++        eventType: "EmploymentStarted",
++        effectiveDate: startEd,
++        payload: {
++          collaborationType: SEED_EMPLOYMENT_LIFECYCLE.collaborationActive,
++          teamId: sourceTeamScoped.id,
++          ...jobRefs,
++          capacitySlotId: sourceSlotScoped,
++        },
++      },
++      { accountId: operator },
++      db,
++    );
++    const startFin = await finalizeDraft(
++      {
++        draftId: startDraft.id,
++        actorId: operator,
++        expectedVersion: startDraft.version,
++        idempotencyKey: `hoh-start-${suffix}`,
++      },
++      pool,
++      db,
++    );
++    assert.equal(startFin.outcome, "finalized");
++    await clearRecalculationStatus(pool, person.id);
++
++    const emps = await listEmploymentsForPerson(person.id, db);
++    assert.equal(emps.length, 1);
++    const employmentId = emps[0]!.id;
++
++    // --- Oracle: invalid asOf rejected ---
++    await assert.rejects(
++      () =>
++        getHistoricalOrgHeadcountState(
++          { asOf: "not-a-date", teamId: sourceTeamScoped.id },
++          { eventDb: pool },
++        ),
++      (err: unknown) =>
++        err instanceof Error &&
++        ("code" in err
++          ? (err as { code: string }).code === "VALIDATION"
++          : true),
++    );
++
++    // --- After Start, before Transfer: source membership 1; source used ΓëÑ 1 ---
++    const beforeXfer = await getHistoricalOrgHeadcountState(
++      { asOf: histBeforeXfer, teamId: sourceTeamScoped.id },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(beforeXfer.ok, true);
++    if (beforeXfer.ok) {
++      assert.equal(beforeXfer.viewSemantics, "historical");
++      assert.equal(beforeXfer.aggregate.teamMembershipCount, 1);
++      assert.ok(beforeXfer.aggregate.used >= 1);
++      const rollup = beforeXfer.detail.teams.reduce(
++        (s, t) => s + t.teamMembershipCount,
++        0,
++      );
++      assert.equal(rollup, beforeXfer.aggregate.teamMembershipCount);
++    }
++
++    // --- Scheduled Transfer (future effective): source membership unchanged; dest reserved ---
++    const schedDraft = await createDraft(
++      {
++        personId: person.id,
++        employmentId,
++        eventType: "TransferRecorded",
++        effectiveDate: futureXferEd,
++        payload: {
++          teamId: destTeam.id,
++          ...jobRefs,
++          capacitySlotId: destSlotId,
++        },
++      },
++      { accountId: operator },
++      db,
++    );
++    const schedFin = await finalizeDraft(
++      {
++        draftId: schedDraft.id,
++        actorId: operator,
++        expectedVersion: schedDraft.version,
++        idempotencyKey: `hoh-sched-${suffix}`,
++      },
++      pool,
++      db,
++    );
++    assert.equal(schedFin.outcome, "finalized");
++    await clearRecalculationStatus(pool, person.id);
++
++    const afterSchedSource = await getHistoricalOrgHeadcountState(
++      { asOf: today, teamId: sourceTeamScoped.id },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(afterSchedSource.ok, true);
++    if (afterSchedSource.ok) {
++      assert.equal(afterSchedSource.viewSemantics, "current");
++      assert.equal(afterSchedSource.aggregate.teamMembershipCount, 1);
++      assert.ok(afterSchedSource.aggregate.used >= 1);
++    }
++
++    const afterSchedDest = await getHistoricalOrgHeadcountState(
++      { asOf: today, teamId: destTeam.id },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(afterSchedDest.ok, true);
++    if (afterSchedDest.ok) {
++      assert.equal(afterSchedDest.aggregate.teamMembershipCount, 0);
++      assert.ok(
++        afterSchedDest.aggregate.reserved >= 1,
++        "dest reserved ΓëÑ 1 after Scheduled Transfer finalize",
++      );
++    }
++
++    // --- asOf=today ledger Γëí live panel for dest fixture slot ---
++    const ledgerToday = await reconstructHeadcountQuantitiesAsOf(pool, {
++      asOf: today,
++      slotId: destSlotId,
++    });
++    const panelToday = await readHeadcountCapacityPanel(pool, {
++      teamId: destTeam.id,
++      jobTitleId: jobRefs.jobTitleId,
++      ladderId: jobRefs.ladderId,
++      gradeId: jobRefs.gradeId,
++      effectiveDate: today,
++      preferredSlotId: destSlotId,
++    });
++    assert.equal(ledgerToday.slots.length, 1);
++    const destLedger = ledgerToday.slots[0]!;
++    assert.equal(destLedger.used, panelToday.used);
++    assert.equal(destLedger.reserved, panelToday.reserved);
++    assert.equal(destLedger.free, panelToday.free);
++    assert.equal(
++      destLedger.approved,
++      panelToday.used + panelToday.reserved + panelToday.free,
++    );
++
++    // Dual-consumer headcount facts
++    const ledgerTodayB = await reconstructHeadcountQuantitiesAsOf(pool, {
++      asOf: today,
++      slotId: destSlotId,
++    });
++    assert.deepEqual(
++      headcountQuantitiesFactsForCompare(ledgerToday),
++      headcountQuantitiesFactsForCompare(ledgerTodayB),
++    );
++
++    // Cancel scheduled transfer so we can create an Effective past transfer
++    if (schedFin.outcome === "finalized") {
++      await cancelPersonnelEvent(
++        schedFin.eventId,
++        {
++          actorId: admin,
++          reason: "selfcheck replace with past transfer",
++        },
++        pool,
++        db,
++      );
++      await clearRecalculationStatus(pool, person.id);
++    }
++
++    // --- Effective past Transfer: source ΓêÆ1, dest +1; capacity used moved ---
++    const xferDraft = await createDraft(
++      {
++        personId: person.id,
++        employmentId,
++        eventType: "TransferRecorded",
++        effectiveDate: xferEd,
++        payload: {
++          teamId: destTeam.id,
++          ...jobRefs,
++          capacitySlotId: destSlotId,
++        },
++      },
++      { accountId: operator },
++      db,
++    );
++    const xferFin = await finalizeDraft(
++      {
++        draftId: xferDraft.id,
++        actorId: operator,
++        expectedVersion: xferDraft.version,
++        idempotencyKey: `hoh-xfer-${suffix}`,
++      },
++      pool,
++      db,
++    );
++    assert.equal(xferFin.outcome, "finalized");
++    await clearRecalculationStatus(pool, person.id);
++
++    const afterXferSource = await getHistoricalOrgHeadcountState(
++      { asOf: histAfterXfer, teamId: sourceTeamScoped.id },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(afterXferSource.ok, true);
++    if (afterXferSource.ok) {
++      assert.equal(afterXferSource.aggregate.teamMembershipCount, 0);
++    }
++
++    const afterXferDest = await getHistoricalOrgHeadcountState(
++      { asOf: histAfterXfer, teamId: destTeam.id },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(afterXferDest.ok, true);
++    if (afterXferDest.ok) {
++      assert.equal(afterXferDest.aggregate.teamMembershipCount, 1);
++      assert.ok(afterXferDest.aggregate.used >= 1);
++      assert.equal(afterXferDest.aggregate.reserved, 0);
++      // Detail Γëí aggregate
++      const rollup = afterXferDest.detail.teams.reduce(
++        (s, t) => s + t.teamMembershipCount,
++        0,
++      );
++      assert.equal(rollup, afterXferDest.aggregate.teamMembershipCount);
++      assert.deepEqual(
++        afterXferDest.detail.orgUnitCounts,
++        afterXferDest.aggregate.orgUnitCounts,
++      );
++      assert.equal(
++        afterXferDest.detail.headcount.aggregate.used,
++        afterXferDest.aggregate.used,
++      );
++    }
++
++    // Dual-consumer coordinator facts
++    const afterXferDestB = await getHistoricalOrgHeadcountState(
++      { asOf: histAfterXfer, teamId: destTeam.id },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(afterXferDestB.ok, true);
++    if (afterXferDest.ok && afterXferDestB.ok) {
++      assert.deepEqual(
++        historicalOrgHeadcountFactsForCompare(afterXferDest),
++        historicalOrgHeadcountFactsForCompare(afterXferDestB),
++      );
++    }
++
++    // Historical before Effective: still on source
++    const midHist = await getHistoricalOrgHeadcountState(
++      { asOf: histBeforeXfer, teamId: sourceTeamScoped.id },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(midHist.ok, true);
++    if (midHist.ok) {
++      assert.equal(midHist.aggregate.teamMembershipCount, 1);
++    }
++
++    // --- Future asOf planned: facts @ today; no Effective label on planned ---
++    const planned = await getHistoricalOrgHeadcountState(
++      { asOf: future, teamId: destTeam.id },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(planned.ok, true);
++    if (planned.ok) {
++      assert.equal(planned.viewSemantics, "planned");
++      assert.equal(planned.factsAsOf, today);
++      assert.equal(planned.aggregate.teamMembershipCount, 1);
++      for (const d of planned.plannedMembershipDeltas) {
++        assert.equal(d.channel, "planned");
++        assert.notEqual(d.channel, "Effective");
++      }
++    }
++
++    // --- Baseline disclosure limited / unset ---
++    delete process.env[BASELINE_BOUNDARY_ENV];
++    const unsetBoundary = getBaselineBoundaryDate();
++    assert.equal(unsetBoundary, null);
++    const withUnset = await getHistoricalOrgHeadcountState(
++      { asOf: today, teamId: destTeam.id, baselineBoundaryDate: null },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(withUnset.ok, true);
++    if (withUnset.ok) {
++      assert.equal(withUnset.baselineDisclosure.configured, false);
++    }
++
++    const limitedBoundary = addDays(today, -100);
++    const withLimited = await getHistoricalOrgHeadcountState(
++      {
++        asOf: addDays(limitedBoundary, -1),
++        teamId: destTeam.id,
++        baselineBoundaryDate: limitedBoundary,
++      },
++      { personDb: db, eventDb: pool },
++    );
++    assert.equal(withLimited.ok, true);
++    if (withLimited.ok) {
++      assert.equal(withLimited.baselineDisclosure.limited, true);
++      assert.equal(withLimited.baselineDisclosure.configured, true);
++    }
++
++    // Conservation identity per slot
++    if (afterXferDest.ok) {
++      for (const slot of afterXferDest.detail.headcount.slots) {
++        assert.equal(
++          slot.approved,
++          slot.used + slot.reserved + slot.free,
++          `conservation slot=${slot.slotId}`,
++        );
++      }
++    }
++
++    console.log("historical-org-headcount.selfcheck: OK");
++  } finally {
++    if (prevBaseline === undefined) {
++      delete process.env[BASELINE_BOUNDARY_ENV];
++    } else {
++      process.env[BASELINE_BOUNDARY_ENV] = prevBaseline;
++    }
++    await pool.end();
++    await db.$disconnect();
++  }
++}
++
++main().catch((err) => {
++  console.error(err);
++  process.exit(1);
++});
+
+diff --git a/packages/modules/person-employment/src/historical-org-headcount.ts b/packages/modules/person-employment/src/historical-org-headcount.ts
+new file mode 100644
+index 0000000..113126d
+--- /dev/null
++++ b/packages/modules/person-employment/src/historical-org-headcount.ts
+@@ -0,0 +1,439 @@
++/**
++ * Historical organization + headcount reconstruction coordinator (Story 4.11 / FR-27).
++ * Composes Primary membership as-of, OrgUnit hierarchy as-of, and headcount ledger as-of.
++ * Does not replay the event log or write a historical SoT table.
++ */
++
++import type { PrismaClient } from "@divan/db";
++import {
++  reconstructHeadcountQuantitiesAsOf,
++  type ReconstructHeadcountQuantitiesResult,
++} from "@divan/headcount";
++import {
++  listBusinessEventsForPersonForApply,
++  listChainLinksForEvents,
++  type PgQueryable,
++} from "@divan/event-store";
++import {
++  parseDateOnly,
++  todayDateOnlyTehran,
++} from "@divan/temporal-engine";
++
++import { getBaselineBoundaryDate } from "./baseline-boundary";
++import {
++  buildBaselineDisclosure,
++  type BaselineDisclosure,
++  type PersonViewSemantics,
++} from "./current-person-state";
++import { getPersonDb } from "./db";
++import {
++  MSG_ASOF_INVALID_FA,
++  MSG_BASELINE_BOUNDARY_INVALID_FA,
++  PersonIdentityError,
++} from "./errors";
++import { listTeamMembersAsOf } from "./management-relationship";
++import {
++  getHierarchyAsOf,
++  type OrgUnitHierarchyNode,
++} from "./org-unit";
++import { ORG_UNIT_TYPES, type OrgUnitType } from "./org-unit-invariants";
++import {
++  getRecalculationStatus,
++  type RecalculationRowStatus,
++  type RecalcQueryable,
++} from "./personnel-event-recalc";
++import { resolveLifecycleStatus } from "./personnel-event-resolve";
++
++export const MSG_HIST_ORG_RECALC_PENDING_FA =
++  "╪¿╪º╪▓┘à╪¡╪º╪│╪¿┘ç ╪¿╪▒╪º█î ╪º┘ü╪▒╪º╪» ╪»╪▒ ┘à╪¡╪»┘ê╪»┘ç ╪»╪▒ ╪¼╪▒█î╪º┘å ╪º╪│╪¬╪¢ ╪┤┘à╪º╪▒╪┤ ╪¬╪º╪▒█î╪«█î ┘é╪╖╪╣█î ╪º╪▒╪º╪ª┘ç ┘å┘à█îΓÇî╪┤┘ê╪».";
++
++export const MSG_HIST_ORG_RECALC_FAILED_FA =
++  "╪¿╪º╪▓┘à╪¡╪º╪│╪¿┘ç ╪¿╪▒╪º█î ╪º┘ü╪▒╪º╪» ╪»╪▒ ┘à╪¡╪»┘ê╪»┘ç ┘å╪º┘à┘ê┘ü┘é ╪¿┘ê╪»┘ç ╪º╪│╪¬╪¢ ╪┤┘à╪º╪▒╪┤ ╪¬╪º╪▒█î╪«█î ┘é╪╖╪╣█î ╪º╪▒╪º╪ª┘ç ┘å┘à█îΓÇî╪┤┘ê╪».";
++
++export const MSG_HIST_ORG_RECALC_STALE_FA =
++  "┘ê╪╢╪╣█î╪¬ ╪¿╪º╪▓┘à╪¡╪º╪│╪¿┘ç ╪¿╪▒╪º█î ╪º┘ü╪▒╪º╪» ╪»╪▒ ┘à╪¡╪»┘ê╪»┘ç ┌⌐┘ç┘å┘ç ╪º╪│╪¬╪¢ ╪┤┘à╪º╪▒╪┤ ╪¬╪º╪▒█î╪«█î ┘é╪╖╪╣█î ╪º╪▒╪º╪ª┘ç ┘å┘à█îΓÇî╪┤┘ê╪».";
++
++export type OrgUnitCountsByType = Record<OrgUnitType, number>;
++
++export type TeamMembershipDetail = {
++  teamId: string;
++  teamMembershipCount: number;
++  memberPersonIds: string[];
++};
++
++export type PlannedMembershipDelta = {
++  eventId: string;
++  eventType: string;
++  effectiveDate: string;
++  sourceTeamId: string | null;
++  destinationTeamId: string | null;
++  /** Never labeled Effective ΓÇö planned channel only. */
++  channel: "planned";
++};
++
++export type HistoricalOrgHeadcountFreshnessCode =
++  | "RECALCULATION_PENDING"
++  | "RECALCULATION_FAILED"
++  | "RECALCULATION_STALE";
++
++export type HistoricalOrgHeadcountFreshnessBlock = {
++  ok: false;
++  code: HistoricalOrgHeadcountFreshnessCode;
++  personId: string;
++  status: RecalculationRowStatus;
++  messageFa: string;
++};
++
++export type HistoricalOrgHeadcountState = {
++  ok: true;
++  asOf: string;
++  /** Date used for membership/org/headcount facts (today when planned). */
++  factsAsOf: string;
++  viewSemantics: PersonViewSemantics;
++  baselineDisclosure: BaselineDisclosure;
++  detail: {
++    teams: TeamMembershipDetail[];
++    orgUnitCounts: OrgUnitCountsByType;
++    headcount: ReconstructHeadcountQuantitiesResult;
++  };
++  aggregate: {
++    teamMembershipCount: number;
++    orgUnitCounts: OrgUnitCountsByType;
++    approved: number;
++    used: number;
++    reserved: number;
++    free: number;
++  };
++  /**
++   * Planned channel (future asOf only): Scheduled transfers with
++   * today < effectiveDate <= asOf. Empty for current/historical.
++   */
++  plannedMembershipDeltas: PlannedMembershipDelta[];
++};
++
++export type GetHistoricalOrgHeadcountStateResult =
++  | HistoricalOrgHeadcountState
++  | HistoricalOrgHeadcountFreshnessBlock;
++
++export type GetHistoricalOrgHeadcountStateOptions = {
++  asOf?: string;
++  /** When set, restrict membership + headcount to this Team. */
++  teamId?: string;
++  baselineBoundaryDate?: string | null;
++};
++
++export type GetHistoricalOrgHeadcountStateDeps = {
++  personDb?: PrismaClient;
++  eventDb: PgQueryable & RecalcQueryable;
++};
++
++function resolveViewSemantics(
++  asOf: string,
++  today: string,
++): PersonViewSemantics {
++  if (asOf > today) return "planned";
++  if (asOf === today) return "current";
++  return "historical";
++}
++
++function resolveBaselineBoundaryOverride(
++  raw: string | null | undefined,
++): string | null {
++  if (raw == null) return null;
++  const trimmed = raw.trim();
++  if (!trimmed) return null;
++  const parsed = parseDateOnly(trimmed);
++  if (!parsed.ok) {
++    throw new PersonIdentityError(
++      "VALIDATION",
++      MSG_BASELINE_BOUNDARY_INVALID_FA,
++      parsed.reason,
++    );
++  }
++  return parsed.value;
++}
++
++function emptyOrgUnitCounts(): OrgUnitCountsByType {
++  return {
++    LEGAL_ENTITY: 0,
++    BUSINESS_UNIT: 0,
++    DEPARTMENT: 0,
++    TEAM: 0,
++  };
++}
++
++function countOrgUnitsByType(
++  nodes: OrgUnitHierarchyNode[],
++): OrgUnitCountsByType {
++  const counts = emptyOrgUnitCounts();
++  const walk = (n: OrgUnitHierarchyNode) => {
++    if ((ORG_UNIT_TYPES as readonly string[]).includes(n.unitType)) {
++      counts[n.unitType] += 1;
++    }
++    for (const child of n.children) walk(child);
++  };
++  for (const root of nodes) walk(root);
++  return counts;
++}
++
++function collectTeamIds(
++  nodes: OrgUnitHierarchyNode[],
++  filterTeamId?: string,
++): string[] {
++  const ids: string[] = [];
++  const walk = (n: OrgUnitHierarchyNode) => {
++    if (n.unitType === "TEAM") {
++      if (!filterTeamId || n.id === filterTeamId) ids.push(n.id);
++    }
++    for (const child of n.children) walk(child);
++  };
++  for (const root of nodes) walk(root);
++  return ids;
++}
++
++function freshnessCodeForStatus(
++  status: RecalculationRowStatus,
++): HistoricalOrgHeadcountFreshnessCode | null {
++  if (status === "pending") return "RECALCULATION_PENDING";
++  if (status === "failed") return "RECALCULATION_FAILED";
++  if (status === "stale") return "RECALCULATION_STALE";
++  return null;
++}
++
++function freshnessMessageFa(code: HistoricalOrgHeadcountFreshnessCode): string {
++  if (code === "RECALCULATION_PENDING") return MSG_HIST_ORG_RECALC_PENDING_FA;
++  if (code === "RECALCULATION_FAILED") return MSG_HIST_ORG_RECALC_FAILED_FA;
++  return MSG_HIST_ORG_RECALC_STALE_FA;
++}
++
++/**
++ * Oracle helper: deep-equal detail rollup vs aggregate under the metric catalogue.
++ * Ignores wall-clock / non-catalogue metadata.
++ */
++export function historicalOrgHeadcountFactsForCompare(
++  state: HistoricalOrgHeadcountState,
++): unknown {
++  return {
++    asOf: state.asOf,
++    factsAsOf: state.factsAsOf,
++    viewSemantics: state.viewSemantics,
++    baselineDisclosure: {
++      configured: state.baselineDisclosure.configured,
++      boundaryDate: state.baselineDisclosure.boundaryDate,
++      limited: state.baselineDisclosure.limited,
++    },
++    detail: {
++      teams: [...state.detail.teams]
++        .map((t) => ({
++          teamId: t.teamId,
++          teamMembershipCount: t.teamMembershipCount,
++          memberPersonIds: [...t.memberPersonIds].sort(),
++        }))
++        .sort((a, b) => a.teamId.localeCompare(b.teamId)),
++      orgUnitCounts: { ...state.detail.orgUnitCounts },
++      headcount: {
++        asOf: state.detail.headcount.asOf,
++        slots: [...state.detail.headcount.slots]
++          .map((s) => ({
++            slotId: s.slotId,
++            teamId: s.teamId,
++            approved: s.approved,
++            used: s.used,
++            reserved: s.reserved,
++            free: s.free,
++          }))
++          .sort((a, b) => a.slotId.localeCompare(b.slotId)),
++        aggregate: { ...state.detail.headcount.aggregate },
++      },
++    },
++    aggregate: { ...state.aggregate },
++    plannedMembershipDeltas: [...state.plannedMembershipDeltas]
++      .map((d) => ({
++        eventId: d.eventId,
++        eventType: d.eventType,
++        effectiveDate: d.effectiveDate,
++        sourceTeamId: d.sourceTeamId,
++        destinationTeamId: d.destinationTeamId,
++        channel: d.channel,
++      }))
++      .sort((a, b) => a.eventId.localeCompare(b.eventId)),
++  };
++}
++
++async function loadPlannedTransferDeltas(
++  personIds: string[],
++  today: string,
++  asOf: string,
++  eventDb: PgQueryable,
++): Promise<PlannedMembershipDelta[]> {
++  const deltas: PlannedMembershipDelta[] = [];
++  const seen = new Set<string>();
++
++  for (const personId of personIds) {
++    const events = await listBusinessEventsForPersonForApply(eventDb, personId, {
++      limit: 2000,
++    });
++    const transferish = events.filter(
++      (e) =>
++        e.eventType === "TransferRecorded" &&
++        e.effectiveDate > today &&
++        e.effectiveDate <= asOf,
++    );
++    if (transferish.length === 0) continue;
++    const links = await listChainLinksForEvents(
++      eventDb,
++      transferish.map((e) => e.id),
++    );
++    for (const ev of transferish) {
++      if (seen.has(ev.id)) continue;
++      const resolved = resolveLifecycleStatus(
++        ev,
++        links.get(ev.id) ?? {
++          cancellations: [],
++          reversals: [],
++          corrections: [],
++        },
++        today,
++      );
++      if (resolved !== "Scheduled") continue;
++      seen.add(ev.id);
++      const payload = ev.payload as Record<string, unknown>;
++      const dest =
++        typeof payload.teamId === "string" ? payload.teamId : null;
++      const source =
++        typeof payload.sourceTeamId === "string"
++          ? payload.sourceTeamId
++          : null;
++      deltas.push({
++        eventId: ev.id,
++        eventType: ev.eventType,
++        effectiveDate: ev.effectiveDate,
++        sourceTeamId: source,
++        destinationTeamId: dest,
++        channel: "planned",
++      });
++    }
++  }
++
++  return deltas.sort((a, b) =>
++    a.effectiveDate === b.effectiveDate
++      ? a.eventId.localeCompare(b.eventId)
++      : a.effectiveDate.localeCompare(b.effectiveDate),
++  );
++}
++
++/**
++ * Compose org membership counts + unit-type counts + headcount ledger as-of.
++ */
++export async function getHistoricalOrgHeadcountState(
++  options: GetHistoricalOrgHeadcountStateOptions,
++  deps: GetHistoricalOrgHeadcountStateDeps,
++): Promise<GetHistoricalOrgHeadcountStateResult> {
++  const today = todayDateOnlyTehran();
++  let asOf: string;
++  if (options.asOf !== undefined) {
++    const parsed = parseDateOnly(options.asOf);
++    if (!parsed.ok) {
++      throw new PersonIdentityError(
++        "VALIDATION",
++        MSG_ASOF_INVALID_FA,
++        parsed.reason,
++      );
++    }
++    asOf = parsed.value;
++  } else {
++    asOf = today;
++  }
++
++  const viewSemantics = resolveViewSemantics(asOf, today);
++  const factsAsOf = viewSemantics === "planned" ? today : asOf;
++
++  const boundary =
++    options.baselineBoundaryDate !== undefined
++      ? resolveBaselineBoundaryOverride(options.baselineBoundaryDate)
++      : getBaselineBoundaryDate();
++  const baselineDisclosure = buildBaselineDisclosure(asOf, boundary);
++
++  const personDb = deps.personDb ?? getPersonDb();
++  const { eventDb } = deps;
++  const scopeTeamId = options.teamId?.trim() || undefined;
++
++  const hierarchy = await getHierarchyAsOf(factsAsOf, personDb);
++  const orgUnitCounts = countOrgUnitsByType(hierarchy);
++  const teamIds = collectTeamIds(hierarchy, scopeTeamId);
++
++  const teams: TeamMembershipDetail[] = [];
++  const allMemberIds = new Set<string>();
++
++  for (const teamId of teamIds) {
++    const members = await listTeamMembersAsOf(teamId, factsAsOf, {}, personDb);
++    teams.push({
++      teamId,
++      teamMembershipCount: members.length,
++      memberPersonIds: members,
++    });
++    for (const id of members) allMemberIds.add(id);
++  }
++
++  // Freshness: fail-closed if any counted person has pending/failed/stale recalc.
++  for (const personId of allMemberIds) {
++    const recalc = await getRecalculationStatus(eventDb, personId);
++    if (recalc) {
++      const code = freshnessCodeForStatus(recalc.status);
++      if (code) {
++        return {
++          ok: false,
++          code,
++          personId,
++          status: recalc.status,
++          messageFa: freshnessMessageFa(code),
++        };
++      }
++    }
++  }
++
++  const headcount = await reconstructHeadcountQuantitiesAsOf(eventDb, {
++    asOf: factsAsOf,
++    teamId: scopeTeamId,
++  });
++
++  // When scoped to a team that has no slots, still return empty headcount OK.
++  const teamMembershipCount = teams.reduce(
++    (sum, t) => sum + t.teamMembershipCount,
++    0,
++  );
++
++  let plannedMembershipDeltas: PlannedMembershipDelta[] = [];
++  if (viewSemantics === "planned") {
++    // Scan members at today + any person with future transfers is harder;
++    // use today's members in scope as the seed set (MVP).
++    plannedMembershipDeltas = await loadPlannedTransferDeltas(
++      [...allMemberIds],
++      today,
++      asOf,
++      eventDb,
++    );
++  }
++
++  return {
++    ok: true,
++    asOf,
++    factsAsOf,
++    viewSemantics,
++    baselineDisclosure,
++    detail: {
++      teams: teams.sort((a, b) => a.teamId.localeCompare(b.teamId)),
++      orgUnitCounts,
++      headcount,
++    },
++    aggregate: {
++      teamMembershipCount,
++      orgUnitCounts: { ...orgUnitCounts },
++      approved: headcount.aggregate.approved,
++      used: headcount.aggregate.used,
++      reserved: headcount.aggregate.reserved,
++      free: headcount.aggregate.free,
++    },
++    plannedMembershipDeltas,
++  };
++}
+

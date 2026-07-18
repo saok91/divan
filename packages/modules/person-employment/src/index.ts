@@ -529,6 +529,27 @@ export {
   BASELINE_BOUNDARY_ENV,
 } from "./baseline-boundary";
 
+export {
+  getHistoricalOrgHeadcountState,
+  historicalOrgHeadcountFactsForCompare,
+  MSG_HIST_ORG_RECALC_PENDING_FA,
+  MSG_HIST_ORG_RECALC_FAILED_FA,
+  MSG_HIST_ORG_RECALC_STALE_FA,
+  MSG_HIST_ORG_TEAM_NOT_ACTIVE_FA,
+} from "./historical-org-headcount";
+
+export type {
+  OrgUnitCountsByType,
+  TeamMembershipDetail,
+  PlannedMembershipDelta,
+  HistoricalOrgHeadcountFreshnessCode,
+  HistoricalOrgHeadcountFreshnessBlock,
+  HistoricalOrgHeadcountState,
+  GetHistoricalOrgHeadcountStateResult,
+  GetHistoricalOrgHeadcountStateOptions,
+  GetHistoricalOrgHeadcountStateDeps,
+} from "./historical-org-headcount";
+
 export { POPULATION_SUBJECT_ID_TARGET } from "./population-cutover";
 
 export {

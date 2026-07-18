@@ -1,3 +1,22 @@
+## Deferred from: code review of 4-11-historical-organization-headcount-reconstruction.md (2026-07-19)
+
+- Planned **capacity** deltas (AC #4 partial) — only `plannedMembershipDeltas` shipped; facts@today already show current reserved; full planned capacity channel deferred to avoid mid-review DTO scope creep (revisit with 4.12 or a follow-up read story)
+- Planned Transfer scan seeds only from today's scoped members — persons with future Start→Transfer not yet on roster omitted (reaffirmed; already noted in Story 4.11 deferred block)
+- N+1 `getBusinessEventById` per ledger event id in `reconstructHeadcountQuantitiesAsOf` — acceptable at MVP ~500; batch when needed
+- Unscoped historical org path is O(teams×members) for membership + freshness — foreshadow can request all teams; optimize later
+- Shared `resolveLifecycleStatus` (person-employment) ignores cancel/reverse asOf — pre-existing display helper; historical-headcount local copy patched separately in review
+- Scoped `teamId` still returns org-wide `orgUnitCounts` — foreshadow shows TEAM only; tighten scope semantics later
+
+## Deferred from: Story 4.11 historical organization & headcount reconstruction (2026-07-19)
+
+- **Historical org/headcount reconstruction landed** — `reconstructHeadcountQuantitiesAsOf` (event-linked ledger); `getHistoricalOrgHeadcountState` coordinator (membership + org counts + headcount); `viewSemantics` + Baseline disclosure; planned channel; `organization.getHistoricalCounts` tRPC; optional `/headcount` foreshadow; `historical-org-headcount.selfcheck`
+- **Still 4.12–4.14:** Headcount Approval lifecycle / Matching / Reservation-expiry UI / Override catalogue; durable reservation for Scheduled Start
+- **Still Epic 5:** Full dashboard / search / profile / timeline / report catalogue
+- **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+- **AR-DATA:** Production enablement/masking of compensation category still open (`DEV_DEMO_CATEGORIES` on tRPC)
+- **FR-39 / FR-47:** Baseline migration provenance UI and full temporal as-of authz matrix remain open
+- **MVP Approval stand-in:** `approved = used_live + reserved_live + free_live` until 4.12 Approval entity; planned-channel Transfer scan seeds from today's scoped members only (persons not yet on roster with future Start→Transfer not included)
+
 ## Deferred from: code review of 4-10-historical-person-reconstruction.md (2026-07-19)
 
 - Planned as-of path runs two sequential `scanScheduledChanges` passes (`listPlannedChangesThroughAsOf` + `listRemainingScheduledAfterAsOf`) — Cancel/Reverse between scans can omit a change from both channels; same torn-sequential-read / TOCTOU class already deferred from 4.9 assembler reads
@@ -5,7 +24,7 @@
 ## Deferred from: Story 4.10 historical person reconstruction (2026-07-19)
 
 - **Historical / as-of Person reconstruction landed** — `parseDateOnly` validation; `viewSemantics` current|historical|planned; future as-of planned path (facts @ today + `plannedChangesThroughAsOf`); `baselineDisclosure` via shared `getBaselineBoundaryDate`; optional `asOf` on `person.getCurrentState`; Jalali foreshadow; extended `current-person-state.selfcheck`
-- **Still 4.11:** Historical organization & headcount reconstruction (FR-27)
+- **4.11 landed:** Historical organization & headcount reconstruction (see Story 4.11 deferred block above)
 - **Still 4.12–4.14 / FR-30 remainder:** Full Headcount Approval / Matching / Reservation expiry UI / Override catalogue; durable reservation for Scheduled Start
 - **Still Epic 5:** Full profile / search / timeline / report catalogue as-of consumers
 - **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged

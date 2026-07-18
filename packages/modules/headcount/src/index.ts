@@ -1,7 +1,25 @@
 /**
  * Narrow headcount capacity port (Stories 4.5–4.7 / FR-20 / FR-30 / FR-31 boundary).
  * NOT Approval lifecycle, Matching matrix, Reservation expiry, or Override catalogue.
+ * Story 4.11: historical ledger reconstruct via reconstructHeadcountQuantitiesAsOf —
+ * readHeadcountCapacityPanel remains live/finalize-only (do not use for asOf < today).
  */
+
+export {
+  reconstructHeadcountQuantitiesAsOf,
+  headcountQuantitiesFactsForCompare,
+  HeadcountLedgerError,
+  MSG_HEADCOUNT_ASOF_INVALID_FA,
+  MSG_HEADCOUNT_LEDGER_AMBIGUOUS_FA,
+  MSG_HEADCOUNT_CONSERVATION_FA,
+} from "./historical-headcount";
+
+export type {
+  ReconstructHeadcountQuantitiesInput,
+  ReconstructHeadcountQuantitiesResult,
+  HeadcountSlotQuantities,
+} from "./historical-headcount";
+
 
 import { randomUUID } from "node:crypto";
 

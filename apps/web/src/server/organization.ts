@@ -1,24 +1,31 @@
 /**
  * Organization hierarchy governed router (Story 3.5 / FR-9).
  * Coarse hr_admin unlocks nav only — mutations require organization.write.
+ * Story 4.11: historical org/headcount counts (`getHistoricalCounts`).
  */
+import { createPgPool, type Pool } from "@divan/db";
 import {
   ORGANIZATION_DATA_CATEGORY,
   ORGANIZATION_READ_PERMISSION,
   ORGANIZATION_WRITE_PERMISSION,
   ORG_UNIT_TYPES,
   OrgUnitError,
+  PersonIdentityError,
+  MSG_ASOF_INVALID_FA,
   activateOrgUnit,
   assertActorHasOrganizationRead,
   assertActorHasOrganizationWrite,
   createOrgUnit,
   deactivateOrgUnit,
   getHierarchyAsOf,
+  getHistoricalOrgHeadcountState,
   getOrgUnitById,
   listOrgUnits,
   updateOrgUnitIdentity,
   type OrgUnitType,
 } from "@divan/person-employment";
+import { HeadcountLedgerError } from "@divan/headcount";
+import { parseDateOnly } from "@divan/temporal-engine";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -44,7 +51,36 @@ const unitTypeSchema = z.enum(
   ORG_UNIT_TYPES as unknown as [OrgUnitType, ...OrgUnitType[]],
 );
 
+let historicalCountsPool: Pool | null = null;
+
+function getHistoricalCountsPool(): Pool {
+  if (historicalCountsPool) return historicalCountsPool;
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "پیکربندی پایگاه داده برای شمارش تاریخی سازمان موجود نیست.",
+    });
+  }
+  historicalCountsPool = createPgPool(url);
+  return historicalCountsPool;
+}
+
 function mapOrgError(err: unknown): never {
+  if (err instanceof HeadcountLedgerError) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: err.messageFa,
+      cause: err,
+    });
+  }
+  if (err instanceof PersonIdentityError) {
+    throw new TRPCError({
+      code: err.code === "PERSON_NOT_FOUND" ? "NOT_FOUND" : "BAD_REQUEST",
+      message: err.messageFa,
+      cause: err,
+    });
+  }
   if (err instanceof OrgUnitError) {
     if (err.code === "ORG_UNIT_NOT_FOUND") {
       throw new TRPCError({
@@ -151,6 +187,48 @@ export const organizationRouter = createTRPCRouter({
       await assertActorHasOrganizationRead(ctx.session.accountId);
       try {
         return await getHierarchyAsOf(input.asOfDate);
+      } catch (err) {
+        mapOrgError(err);
+      }
+    }),
+
+  /**
+   * FR-27 historical Team/org/headcount reconstruction (Story 4.11).
+   * Not Approval admin / dashboard product.
+   */
+  getHistoricalCounts: governedProcedure
+    .meta({
+      ...organizationReadMeta,
+      operation: "organization.historical_counts",
+      allowClientTemporal: true,
+    })
+    .input(
+      z.object({
+        asOf: z
+          .string()
+          .min(1)
+          .superRefine((val, ctx) => {
+            const parsed = parseDateOnly(val);
+            if (!parsed.ok) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: MSG_ASOF_INVALID_FA,
+              });
+            }
+          }),
+        teamId: z.string().uuid().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertActorHasOrganizationRead(ctx.session.accountId);
+      try {
+        return await getHistoricalOrgHeadcountState(
+          {
+            asOf: input.asOf,
+            teamId: input.teamId,
+          },
+          { eventDb: getHistoricalCountsPool() },
+        );
       } catch (err) {
         mapOrgError(err);
       }
