@@ -73,7 +73,8 @@ export type UpdateDraftInput = {
 };
 
 function dateOnlyToDb(dateOnly: string): Date {
-  return new Date(`${dateOnly}T00:00:00.000Z`);
+  // Noon UTC — avoids PG DATE session-TZ off-by-one for Asia/Tehran midnights.
+  return new Date(`${dateOnly}T12:00:00.000Z`);
 }
 
 function asPayload(value: unknown): Record<string, unknown> {

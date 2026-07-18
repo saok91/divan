@@ -543,10 +543,31 @@ export type {
 } from "./personnel-event-start-return";
 
 export {
+  TERMINATION_EVENT_TYPES,
+  PRODUCT_TERMINATION_EVENT_TYPE,
+  LEAN_TERMINATION_REASON_EXAMPLES,
+  parseTerminationPayload,
+  applyTerminationProjections,
+  compensateTerminationApply,
+  findIncompatibleFutureEvents,
+  incompatibleFutureToConflict,
+  priorDateOnly,
+} from "./personnel-event-termination";
+
+export type {
+  TerminationPayloadFacts,
+  MissingTerminationFact,
+  TerminationApplyResult,
+  TerminationAssignmentClose,
+  IncompatibleFutureEvent,
+} from "./personnel-event-termination";
+
+export {
   finalizeDraft,
   evaluateDraftForFinalize,
   inferRiskTiers,
   evaluateRiskTiers,
+  TERMINATION_PRODUCT_RISK_TIERS,
 } from "./personnel-event-finalize";
 
 export type {

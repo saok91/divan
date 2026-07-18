@@ -12,6 +12,7 @@ import { config as loadEnv } from "dotenv";
 
 import { createPgPool } from "@divan/db";
 import { withTransaction } from "@divan/event-store";
+import { todayDateOnlyTehran } from "@divan/temporal-engine";
 
 import {
   PersonnelEventError,
@@ -292,12 +293,22 @@ async function main() {
     assert.equal(warnOk.outcome, "finalized");
 
     // --- Risk tier → pending_review (non-authoritative) ---
+    // Conflicts must pass first; then omit riskTier config → pending_review (no append).
+    const demoEmp = await db.employment.findFirst({
+      where: { personId: demo.id, endDateExclusive: null },
+      orderBy: { startDate: "asc" },
+    });
+    assert.ok(demoEmp, "demo person needs an open Employment for Termination risk-tier check");
     const draftRisk = await createDraft(
       {
         personId: demo.id,
+        employmentId: demoEmp.id,
         eventType: "EmploymentTerminated",
-        effectiveDate: "2025-09-01",
-        payload: { riskTier: "termination" },
+        effectiveDate: todayDateOnlyTehran(),
+        payload: {
+          riskTier: "termination",
+          terminationReason: "contract_ended",
+        },
       },
       { accountId: actor },
       db,

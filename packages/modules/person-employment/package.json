@@ -21,7 +21,8 @@
     "selfcheck:personnel-event-draft": "tsx src/personnel-event-draft.selfcheck.ts",
     "selfcheck:personnel-event-lifecycle": "tsx src/personnel-event-lifecycle.selfcheck.ts",
     "selfcheck:personnel-event-recalc": "tsx src/personnel-event-recalc.selfcheck.ts",
-    "selfcheck:personnel-event-start-return": "tsx src/personnel-event-start-return.selfcheck.ts"
+    "selfcheck:personnel-event-start-return": "tsx src/personnel-event-start-return.selfcheck.ts",
+    "selfcheck:personnel-event-termination": "tsx src/personnel-event-termination.selfcheck.ts"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

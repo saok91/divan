@@ -76,11 +76,21 @@ export type ApplySecondaryAssignmentProjectionInput = {
 };
 
 function dateOnlyToDb(dateOnly: string): Date {
-  return new Date(`${dateOnly}T00:00:00.000Z`);
+  // Noon UTC — avoids PG DATE session-TZ off-by-one for Asia/Tehran midnights.
+  return new Date(`${dateOnly}T12:00:00.000Z`);
 }
 
 function dateOnlyFromDb(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function mapSecondary(row: {

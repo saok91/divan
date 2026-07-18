@@ -50,11 +50,23 @@ export type ApplyEmploymentProjectionInput = {
 };
 
 function dateOnlyToDb(dateOnly: string): Date {
-  return new Date(`${dateOnly}T00:00:00.000Z`);
+  // Noon UTC — avoids PG DATE session-TZ off-by-one for Asia/Tehran midnights.
+  return new Date(`${dateOnly}T12:00:00.000Z`);
 }
 
 function dateOnlyFromDb(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // PG @db.Date may surface as UTC midnight or local midnight depending on driver.
+  // UTC midnight → UTC Y-M-D; otherwise use local civil calendar (Iran offset safe).
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function mapEmployment(row: {
@@ -240,13 +252,18 @@ export async function applyEmploymentProjection(
 }
 
 /**
- * Close an open Employment interval (simulates Termination effect for tests).
+ * Close an open Employment interval (simulates Termination effect for tests /
+ * Story 4.6 Effective Termination apply).
  * Does not delete Person; does not append events.
+ * When `terminationReason` is provided, it is retained on the closed row.
+ * When already closed to the same exclusive end (and matching reason when set),
+ * returns the existing row (idempotent replay).
  */
 export async function closeEmploymentProjection(
   id: string,
   endDateExclusive: string,
   db: PrismaClient = getPersonDb(),
+  opts?: { terminationReason?: string | null },
 ): Promise<EmploymentRecord> {
   if (!endDateExclusive?.trim()) {
     throw new EmploymentError(
@@ -263,7 +280,20 @@ export async function closeEmploymentProjection(
       MSG_EMPLOYMENT_NOT_FOUND_FA,
     );
   }
+
+  const reasonOpt =
+    opts?.terminationReason !== undefined
+      ? normalizeEmploymentOptional(opts.terminationReason)
+      : undefined;
+
   if (existing.endDateExclusive !== null) {
+    const closedEnd = dateOnlyFromDb(existing.endDateExclusive);
+    const reasonMatches =
+      reasonOpt === undefined ||
+      (existing.terminationReason ?? null) === reasonOpt;
+    if (closedEnd === endDateExclusive.trim() && reasonMatches) {
+      return mapEmployment(existing);
+    }
     throw new EmploymentError(
       "VALIDATION",
       MSG_EMPLOYMENT_ALREADY_CLOSED_FA,
@@ -287,12 +317,20 @@ export async function closeEmploymentProjection(
     id,
   );
 
+  const data: {
+    endDateExclusive: Date;
+    terminationReason?: string | null;
+  } = {
+    endDateExclusive: dateOnlyToDb(interval.endDateExclusive),
+  };
+  if (reasonOpt !== undefined) {
+    data.terminationReason = reasonOpt;
+  }
+
   try {
     const updated = await db.employment.updateMany({
       where: { id, endDateExclusive: null },
-      data: {
-        endDateExclusive: dateOnlyToDb(interval.endDateExclusive),
-      },
+      data,
     });
     if (updated.count === 0) {
       const again = await db.employment.findUnique({ where: { id } });
@@ -301,6 +339,16 @@ export async function closeEmploymentProjection(
           "EMPLOYMENT_NOT_FOUND",
           MSG_EMPLOYMENT_NOT_FOUND_FA,
         );
+      }
+      // Concurrent close — idempotent if ends match
+      if (again.endDateExclusive !== null) {
+        const closedEnd = dateOnlyFromDb(again.endDateExclusive);
+        const reasonMatches =
+          reasonOpt === undefined ||
+          (again.terminationReason ?? null) === reasonOpt;
+        if (closedEnd === interval.endDateExclusive && reasonMatches) {
+          return mapEmployment(again);
+        }
       }
       throw new EmploymentError(
         "VALIDATION",

@@ -1,3 +1,18 @@
+## Deferred from: code review of 4-6-termination-events.md (2026-07-18)
+
+- Prisma Employment/Assignment projectors use `getPersonDb()` while finalize append/release run on `PoolClient` txn — same AD-6 cross-connection pattern as 4.5; compensate exists but perfect single-connection projector SQL remains hardening
+- Idempotent finalize early-return (`draft.status === finalized`) sets `projectionHookInvoked: false` — orphan projection without durable release cannot be healed by finalize retry alone; revisit with reclaim/worker path
+
+## Deferred from: Story 4.6 termination events (2026-07-18)
+
+- **Termination Operator landed** — `EmploymentTerminated` via Draft→Finalize→AD-6 hook; close Primary→Secondary→Employment(+lean `terminationReason`); narrow `releaseHeadcountCapacity` (idempotent on release_event_id); incompatible future Scheduled peers block until explicit Cancel; Scheduled Termination FR-16 no-op; UI Termination fields + confirm; `TERMINATION_PRODUCT_RISK_TIERS` from web finalize; `personnel-event-termination.selfcheck`
+- **Still 4.7–4.8:** Transfer atomic capacity / job-level / contract-comp Operators
+- **Still 4.9–4.11:** Current/historical person & org reconstruction products
+- **Still 4.12–4.14 / FR-30:** Full Headcount Approval / Matching / Reservation expiry / Override catalogue; durable reservation for Scheduled Termination; FR-30 remainder unchanged
+- **AR-ACCESS / AR-DATA:** Full termination risk-tier matrix and frozen termination-reason catalogue remain open — lean codes + minimal authorize config only
+- **PG DATE / session-TZ:** Draft/Employment/Assignment writers now use noon-UTC `dateOnlyToDb`; kernel `appendBusinessEvent` effective_date path may still off-by-one under Asia/Tehran — harden event-store DATE binding when next quality opportunity lands
+- **Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+
 ## Deferred from: code review of 4-5-start-return-events.md (2026-07-18)
 
 - Scheduled Start evaluates capacity / may stash `capacitySlotId` but does not durable-reserve — already noted under FR-30 / 4.12–4.14 remainder; capacity check only today
@@ -6,10 +21,11 @@
 ## Deferred from: Story 4.5 start & return events (2026-07-18)
 
 - **Start / Return Operators landed** — `EmploymentStarted` / `EmploymentReturned` via Draft→Finalize→AD-6 hook; `applyEmploymentProjection` + `applyPrimaryAssignmentProjection` (`sourceEventId`); narrow `@divan/headcount` capacity port (evaluate/consume/seed); minimum facts + inactive-ref + overlap + anonymized Return fail-closed; UI form Start/Return fields + Override reason; `personnel-event-start-return.selfcheck`
-- **Still 4.6–4.8:** Termination / Transfer atomic capacity / job-level / contract-comp Operators
+- **4.6 landed:** Termination Operator (see Story 4.6 deferred block above)
+- **Still 4.7–4.8:** Transfer atomic capacity / job-level / contract-comp Operators
 - **Still 4.9–4.11:** Current/historical person & org reconstruction products
 - **Still 4.12–4.14 / FR-30:** Full Headcount Approval lifecycle, Matching matrix, Reservation expiry/exceptions, Override catalogue UI; durable reservation for Scheduled future Start (minimal port write deferred — capacity check only today)
-- **AD-6 cross-connection note:** Employment/Primary projectors use Prisma while finalize txn is `PoolClient` — **4.5 review patch:** orphan compensate on consume/post-hook failure (`compensateOrphanStartReturnProjections`); perfect single-connection projector SQL remains a hardening opportunity
+- **AD-6 cross-connection note:** Employment/Primary projectors use Prisma while finalize txn is `PoolClient` — **4.5 review patch:** orphan compensate on consume/post-hook failure (`compensateOrphanStartReturnProjections`); **4.6:** `compensateTerminationApply` for close/release; perfect single-connection projector SQL remains a hardening opportunity
 - **Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
 
 ## Deferred from: code review of 4-4-deterministic-ordering-recalculation.md (2026-07-18)

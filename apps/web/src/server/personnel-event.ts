@@ -29,6 +29,7 @@ import {
   resolveLifecycleStatus,
   reversePersonnelEvent,
   updateDraft,
+  TERMINATION_PRODUCT_RISK_TIERS,
 } from "@divan/person-employment";
 import {
   BusinessEventValidationError,
@@ -319,6 +320,9 @@ export const personnelEventRouter = createTRPCRouter({
               : undefined,
             // Never trust client Override flag — session role only.
             actorMayOverride: ctx.session.coarseRole === "hr_admin",
+            // Authorize termination tier for actors with personnel_event.finalize.
+            // Omit → pending_review (keep stub fail-closed). Full AR-ACCESS matrix deferred.
+            riskTier: TERMINATION_PRODUCT_RISK_TIERS,
           },
           await readyFinalizePool(),
         );

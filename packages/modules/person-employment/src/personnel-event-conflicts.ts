@@ -25,9 +25,11 @@ import {
 } from "./errors";
 import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
 import { detectCorrectionCycle } from "./personnel-event-resolve";
-import { isEmploymentActiveAsOf } from "./employment";
+import { getEmploymentById, isEmploymentActiveAsOf } from "./employment";
 import { getGradeById } from "./job-reference";
 import { JobRefError } from "./errors";
+import { listPrimaryAssignmentsForEmployment } from "./primary-assignment";
+import { listSecondaryAssignmentsForEmployment } from "./secondary-assignment";
 import {
   START_RETURN_EVENT_TYPES,
   capacityResultToConflict,
@@ -35,6 +37,13 @@ import {
   findInactiveRefConflicts,
   parseStartReturnPayload,
 } from "./personnel-event-start-return";
+import {
+  TERMINATION_EVENT_TYPES,
+  findIncompatibleFutureEvents,
+  incompatibleFutureToConflict,
+  parseTerminationPayload,
+  priorDateOnly,
+} from "./personnel-event-termination";
 
 /** Lazy read pool for conflict existence checks outside a finalize txn. */
 let conflictReadPool: Pool | null = null;
@@ -48,13 +57,19 @@ function getConflictReadPool(): Pool | null {
 }
 
 /**
- * PG `@db.Date` → YYYY-MM-DD via UTC calendar components (never local-TZ shift).
- * Prefer this over `toISOString().slice(0,10)` when drivers return non-UTC midnights.
+ * PG `@db.Date` → YYYY-MM-DD.
+ * Drivers may surface UTC midnight or local midnight; never use toISOString().slice.
  */
 export function dateOnlyFromDb(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
@@ -435,7 +450,13 @@ export async function classifyConflicts(
   }
 
   // Inactive Employment mutation — check against Effective Date (not evaluation as-of alone)
-  if (draft.employmentId && snapshot.employment) {
+  // Termination is allowed on open Employment (still active as-of ED while endExclusive unset);
+  // already-closed / missing employment is handled in the Termination block below.
+  if (
+    draft.employmentId &&
+    snapshot.employment &&
+    !TERMINATION_EVENT_TYPES.has(draft.eventType)
+  ) {
     const active = isEmploymentActiveAsOf(
       {
         startDate: snapshot.employment.startDate,
@@ -451,7 +472,11 @@ export async function classifyConflicts(
           "تغییر روی همکاری غیرفعال در تاریخ مؤثر مجاز نیست؛ نهایی‌سازی مسدود است.",
       });
     }
-  } else if (draft.employmentId && !snapshot.employment) {
+  } else if (
+    draft.employmentId &&
+    !snapshot.employment &&
+    !TERMINATION_EVENT_TYPES.has(draft.eventType)
+  ) {
     findings.push({
       code: "EMPLOYMENT_REF_MISSING",
       severity: "blocking",
@@ -603,6 +628,119 @@ export async function classifyConflicts(
             severity: "blocking",
             messageFa: MSG_IRRECONCILABLE_ORDERING_FA,
           });
+        }
+      }
+    }
+  }
+
+  // Termination — open Employment + reason + incompatible future dispose (FR-21)
+  if (TERMINATION_EVENT_TYPES.has(draft.eventType)) {
+    const { facts, missing } = parseTerminationPayload(draft.payload);
+    for (const m of missing) {
+      findings.push({
+        code: m.code,
+        severity: "blocking",
+        messageFa: m.messageFa,
+      });
+    }
+
+    const targetEmpId =
+      draft.employmentId?.trim() ||
+      facts?.employmentId?.trim() ||
+      null;
+
+    if (!targetEmpId) {
+      findings.push({
+        code: "MISSING_EMPLOYMENT",
+        severity: "blocking",
+        messageFa:
+          "شناسه همکاری باز برای خاتمه الزامی است؛ نهایی‌سازی مسدود است.",
+      });
+    } else {
+      const emp = await getEmploymentById(targetEmpId, db);
+      if (!emp) {
+        findings.push({
+          code: "EMPLOYMENT_REF_MISSING",
+          severity: "blocking",
+          messageFa:
+            "سابقه همکاری پیوست‌شده یافت نشد؛ نهایی‌سازی مسدود است.",
+        });
+      } else if (emp.personId !== draft.personId) {
+        findings.push({
+          code: "EMPLOYMENT_PERSON_MISMATCH",
+          severity: "blocking",
+          messageFa:
+            "همکاری هدف متعلق به این فرد نیست؛ نهایی‌سازی مسدود است.",
+        });
+      } else if (emp.endDateExclusive !== null) {
+        findings.push({
+          code: "EMPLOYMENT_ALREADY_CLOSED",
+          severity: "blocking",
+          messageFa:
+            "همکاری هدف قبلاً بسته شده است؛ خاتمه مجدد مسدود است.",
+        });
+      } else {
+        // Must cover prior day (half-open: active on last day before ED)
+        const prior = priorDateOnly(draft.effectiveDate);
+        const activePrior = isEmploymentActiveAsOf(emp, prior);
+        if (!activePrior) {
+          findings.push({
+            code: "EMPLOYMENT_NOT_ACTIVE_BEFORE_TERMINATION",
+            severity: "blocking",
+            messageFa:
+              "همکاری در روز قبل از تاریخ مؤثر خاتمه فعال نیست؛ نهایی‌سازی مسدود است.",
+          });
+        }
+        // endExclusive = ED ⇒ end must be strictly after start
+        if (draft.effectiveDate <= emp.startDate) {
+          findings.push({
+            code: "INVALID_TERMINATION_DATE",
+            severity: "blocking",
+            messageFa:
+              "تاریخ مؤثر خاتمه باید بعد از تاریخ شروع همکاری باشد.",
+          });
+        }
+
+        // Assignments that would start on/after Termination ED cannot close cleanly
+        const [primaries, secondaries] = await Promise.all([
+          listPrimaryAssignmentsForEmployment(targetEmpId, db),
+          listSecondaryAssignmentsForEmployment(targetEmpId, db),
+        ]);
+        const badStart = [...primaries, ...secondaries].some(
+          (a) =>
+            (a.endDateExclusive === null ||
+              a.endDateExclusive > draft.effectiveDate) &&
+            a.startDate >= draft.effectiveDate,
+        );
+        if (badStart) {
+          findings.push({
+            code: "ASSIGNMENT_START_AFTER_TERMINATION",
+            severity: "blocking",
+            messageFa:
+              "انتصاب باز با تاریخ شروع بزرگ‌تر یا مساوی تاریخ مؤثر خاتمه وجود دارد؛ نهایی‌سازی مسدود است.",
+          });
+        }
+      }
+
+      // Incompatible future Scheduled events — explicit Cancel dispose required
+      const reader = opts.client ?? getConflictReadPool();
+      if (!reader) {
+        findings.push({
+          code: "INCOMPATIBLE_FUTURE_EVENTS",
+          severity: "blocking",
+          messageFa:
+            "امکان بررسی رویدادهای آینده ناسازگار وجود ندارد؛ نهایی‌سازی مسدود است.",
+        });
+      } else {
+        const future = await findIncompatibleFutureEvents(reader, {
+          personId: draft.personId,
+          employmentId: targetEmpId,
+          terminationEffectiveDate: draft.effectiveDate,
+          excludeEventId: draft.finalizedEventId,
+        });
+        const conflict = incompatibleFutureToConflict(future);
+        if (conflict) {
+          findings.push(conflict);
         }
       }
     }

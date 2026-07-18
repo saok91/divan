@@ -60,6 +60,7 @@ import {
   type RecalcJobPayload,
 } from "./personnel-event-recalc";
 import { compensateOrphanStartReturnProjections } from "./personnel-event-start-return";
+import { compensateTerminationApply } from "./personnel-event-termination";
 
 export type RiskTierKind =
   | "termination"
@@ -77,6 +78,17 @@ export type RiskTierConfig = {
   tiers?: Partial<Record<RiskTierKind, { requiresPreAuth: boolean }>>;
   /** Explicit pre-auth tokens supplied by caller (e.g. grant ids). */
   preAuthTokens?: string[];
+};
+
+/**
+ * Minimal product authorize config for Termination finalize (Story 4.6).
+ * Full AR-ACCESS termination matrix remains open — do not invent toxic combos.
+ * Actors still need `personnel_event.finalize`; omit this → pending_review.
+ */
+export const TERMINATION_PRODUCT_RISK_TIERS: RiskTierConfig = {
+  tiers: {
+    termination: { requiresPreAuth: false },
+  },
 };
 
 export type FinalizeAcknowledgement = {
@@ -779,11 +791,23 @@ export async function finalizeDraft(
         recalcScheduled: pendingRecalc,
       };
     } catch (err) {
-      // Only compensate newly created projections — never delete idempotent re-apply
+      // Only compensate newly created / applied projections — never undo idempotent re-apply
       if (hookCtx.createdStartReturnPrimaryId && hookCtx.appliedEmploymentId) {
         await compensateOrphanStartReturnProjections({
           employmentId: hookCtx.appliedEmploymentId,
           primaryId: hookCtx.createdStartReturnPrimaryId,
+        });
+      }
+      if (hookCtx.terminationApply) {
+        await compensateTerminationApply({
+          client,
+          employmentId: hookCtx.terminationApply.employmentId,
+          endDateExclusive: hookCtx.terminationApply.endDateExclusive,
+          closedPrimaries: hookCtx.terminationApply.closedPrimaries,
+          closedSecondaries: hookCtx.terminationApply.closedSecondaries,
+          releaseEventId: eventId!,
+          didRelease: hookCtx.terminationApply.didRelease,
+          didCloseEmployment: hookCtx.terminationApply.didCloseEmployment,
         });
       }
       throw err;

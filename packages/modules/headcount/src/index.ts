@@ -1,5 +1,5 @@
 /**
- * Narrow headcount capacity port (Story 4.5 / FR-20 boundary).
+ * Narrow headcount capacity port (Stories 4.5–4.6 / FR-20 / FR-31 boundary).
  * NOT Approval lifecycle, Matching matrix, Reservation expiry, or Override catalogue.
  */
 
@@ -15,6 +15,12 @@ export const MSG_HEADCOUNT_PORT_UNAVAILABLE_FA =
 
 export const MSG_HEADCOUNT_CONSUME_FAILED_FA =
   "مصرف ظرفیت نیروی انسانی ناموفق بود؛ نهایی‌سازی مسدود است.";
+
+export const MSG_HEADCOUNT_RELEASE_FAILED_FA =
+  "آزادسازی ظرفیت نیروی انسانی ناموفق بود؛ نهایی‌سازی مسدود است.";
+
+export const MSG_HEADCOUNT_RELEASE_AMBIGUOUS_FA =
+  "هدف آزادسازی ظرفیت مبهم یا ناموجود است؛ نهایی‌سازی مسدود است.";
 
 export type CapacityCheckInput = {
   teamId: string;
@@ -45,6 +51,23 @@ export type ConsumeCapacityInput = {
   slotId: string;
   eventId: string;
   personId: string;
+};
+
+export type ReleaseCapacityInput = {
+  /** Termination (or release) business event id — idempotency key. */
+  releaseEventId: string;
+  personId: string;
+  /**
+   * Start/Return consume event ids (PrimaryAssignment.sourceEventId) that opened
+   * capacity for this Employment. Empty + requireConsumption=false → no-op
+   * (fixture-only Employments without event-sourced consume).
+   */
+  consumeEventIds: string[];
+  /**
+   * When true (event-sourced Start/Return), missing/ambiguous unreased
+   * consumption fails closed. When false, missing consumption is a no-op.
+   */
+  requireConsumption: boolean;
 };
 
 type Queryable = Pool | PoolClient;
@@ -90,12 +113,22 @@ export async function ensureHeadcountCapacitySchema(
       event_id        UUID NOT NULL,
       person_id       UUID NOT NULL,
       consumed_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      release_event_id UUID,
       UNIQUE (event_id)
     )
   `);
   await db.query(`
     CREATE INDEX IF NOT EXISTS headcount_capacity_consumption_slot_idx
       ON headcount_capacity_consumption (slot_id)
+  `);
+  await db.query(`
+    ALTER TABLE headcount_capacity_consumption
+      ADD COLUMN IF NOT EXISTS release_event_id UUID
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS headcount_capacity_consumption_release_event_idx
+      ON headcount_capacity_consumption (release_event_id)
+      WHERE release_event_id IS NOT NULL
   `);
 }
 
@@ -260,6 +293,136 @@ export async function consumeHeadcountCapacity(
      VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
     [randomUUID(), input.slotId, input.eventId, input.personId],
   );
+}
+
+/**
+ * Restore one free unit for consumptions linked to Start/Return event ids.
+ * Idempotent on release_event_id — retry finalize / recalc replay safe.
+ * Fail-closed when requireConsumption and no unreased row matches.
+ */
+export async function releaseHeadcountCapacity(
+  db: PoolClient,
+  input: ReleaseCapacityInput,
+): Promise<{ released: boolean; slotId: string | null }> {
+  const already = await query<{ id: string; slot_id: string }>(
+    db,
+    `SELECT id, slot_id FROM headcount_capacity_consumption
+     WHERE release_event_id = $1::uuid`,
+    [input.releaseEventId],
+  );
+  if (already.length > 0) {
+    return { released: false, slotId: already[0]!.slot_id };
+  }
+
+  const consumeIds = input.consumeEventIds
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (consumeIds.length === 0) {
+    if (input.requireConsumption) {
+      throw new Error(MSG_HEADCOUNT_RELEASE_AMBIGUOUS_FA);
+    }
+    return { released: false, slotId: null };
+  }
+
+  const rows = await query<{ id: string; slot_id: string; person_id: string }>(
+    db,
+    `SELECT id, slot_id, person_id FROM headcount_capacity_consumption
+     WHERE event_id = ANY($1::uuid[])
+       AND release_event_id IS NULL
+     ORDER BY consumed_at ASC, id ASC`,
+    [consumeIds],
+  );
+
+  const forPerson = rows.filter((r) => r.person_id === input.personId);
+  if (forPerson.length === 0) {
+    if (input.requireConsumption) {
+      throw new Error(MSG_HEADCOUNT_RELEASE_AMBIGUOUS_FA);
+    }
+    return { released: false, slotId: null };
+  }
+
+  // Multiple unreased rows (same or different slots) are ambiguous — fail closed.
+  // Releasing N rows would over-restore free_units when history left >1 consumption.
+  if (forPerson.length > 1) {
+    throw new Error(MSG_HEADCOUNT_RELEASE_AMBIGUOUS_FA);
+  }
+
+  const row = forPerson[0]!;
+  const upd = await db.query(
+    `UPDATE headcount_capacity_consumption
+     SET release_event_id = $1::uuid
+     WHERE id = $2::uuid AND release_event_id IS NULL
+     RETURNING id, slot_id`,
+    [input.releaseEventId, row.id],
+  );
+  if (upd.rowCount === 0) {
+    // Race: another release claimed it — if ours already set, treat as idempotent
+    const mine = await query<{ id: string; slot_id: string }>(
+      db,
+      `SELECT id, slot_id FROM headcount_capacity_consumption
+       WHERE release_event_id = $1::uuid`,
+      [input.releaseEventId],
+    );
+    if (mine.length > 0) {
+      return { released: false, slotId: mine[0]!.slot_id };
+    }
+    throw new Error(MSG_HEADCOUNT_RELEASE_FAILED_FA);
+  }
+
+  const slotUpd = await db.query(
+    `UPDATE headcount_capacity_slot
+     SET free_units = free_units + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1::uuid
+     RETURNING id`,
+    [row.slot_id],
+  );
+  if (slotUpd.rowCount === 0) {
+    await undoHeadcountRelease(db, input.releaseEventId);
+    throw new Error(MSG_HEADCOUNT_RELEASE_FAILED_FA);
+  }
+
+  return { released: true, slotId: row.slot_id };
+}
+
+/**
+ * Best-effort undo of a release keyed by release_event_id (orphan compensate).
+ */
+export async function undoHeadcountRelease(
+  db: PoolClient,
+  releaseEventId: string,
+): Promise<void> {
+  try {
+    const rows = await query<{ id: string; slot_id: string }>(
+      db,
+      `SELECT id, slot_id FROM headcount_capacity_consumption
+       WHERE release_event_id = $1::uuid`,
+      [releaseEventId],
+    );
+    for (const row of rows) {
+      const slotUpd = await db.query(
+        `UPDATE headcount_capacity_slot
+         SET free_units = GREATEST(free_units - 1, 0),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1::uuid AND free_units > 0
+         RETURNING id`,
+        [row.slot_id],
+      );
+      // Keep release_event_id until free_units is actually restored — avoid
+      // clearing the mark when capacity was already zero (concurrent consume).
+      if (slotUpd.rowCount === 0) {
+        continue;
+      }
+      await db.query(
+        `UPDATE headcount_capacity_consumption
+         SET release_event_id = NULL
+         WHERE id = $1::uuid AND release_event_id = $2::uuid`,
+        [row.id, releaseEventId],
+      );
+    }
+  } catch {
+    // Best-effort; caller rethrows original error
+  }
 }
 
 export type SeedCapacitySlotInput = {

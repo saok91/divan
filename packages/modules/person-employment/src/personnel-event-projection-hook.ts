@@ -3,6 +3,7 @@
  *
  * FR-16: Scheduled events must not mutate current projections (applyToCurrentProjection=false).
  * Story 4.5: Effective Start/Return → Employment + Primary projectors (+ capacity consume).
+ * Story 4.6: Effective Termination → close Assignments + Employment + capacity release.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -17,6 +18,11 @@ import {
   bindEmploymentIdAfterApply,
   compensateOrphanStartReturnProjections,
 } from "./personnel-event-start-return";
+import {
+  TERMINATION_EVENT_TYPES,
+  applyTerminationProjections,
+  compensateTerminationApply,
+} from "./personnel-event-termination";
 
 export type ProjectionRefreshContext = {
   client: PoolClient;
@@ -34,10 +40,19 @@ export type ProjectionRefreshContext = {
   applyToCurrentProjection?: boolean;
   /** Set by hook implementations / tests to prove invocation. */
   invoked?: { eventId: string; eventType: string };
-  /** Filled when Start/Return created/bound an Employment. */
+  /** Filled when Start/Return/Termination touched an Employment. */
   appliedEmploymentId?: string;
   /** Set when this hook invocation newly created a Primary (for orphan compensate). */
   createdStartReturnPrimaryId?: string;
+  /** Set when Termination applied closes (for post-hook orphan compensate). */
+  terminationApply?: {
+    employmentId: string;
+    endDateExclusive: string;
+    closedPrimaries: Array<{ id: string; previousEnd: string | null }>;
+    closedSecondaries: Array<{ id: string; previousEnd: string | null }>;
+    didRelease: boolean;
+    didCloseEmployment: boolean;
+  };
 };
 
 export type ProjectionRefreshHook = (
@@ -45,10 +60,9 @@ export type ProjectionRefreshHook = (
 ) => Promise<void>;
 
 /**
- * Default production hook: records invocation; on Effective Start/Return applies
- * Employment + Primary projectors (idempotent via sourceEventId).
- * When `applyToCurrentProjection === false`, still records invocation but
- * performs no current-state mutation (FR-16 Scheduled discipline).
+ * Default production hook: records invocation; on Effective Start/Return / Termination
+ * applies domain projectors. When `applyToCurrentProjection === false`, still records
+ * invocation but performs no current-state mutation (FR-16 Scheduled discipline).
  */
 export async function defaultProjectionRefreshHook(
   ctx: ProjectionRefreshContext,
@@ -61,8 +75,28 @@ export async function defaultProjectionRefreshHook(
     return;
   }
 
+  if (TERMINATION_EVENT_TYPES.has(ctx.eventType)) {
+    const result = await applyTerminationProjections(ctx, getPersonDb());
+    ctx.appliedEmploymentId = result.employmentId;
+    if (
+      result.mutated ||
+      result.releasedCapacity ||
+      result.didCloseEmployment
+    ) {
+      ctx.terminationApply = {
+        employmentId: result.employmentId,
+        endDateExclusive: result.endDateExclusive,
+        closedPrimaries: result.closedPrimaries,
+        closedSecondaries: result.closedSecondaries,
+        didRelease: result.releasedCapacity,
+        didCloseEmployment: result.didCloseEmployment,
+      };
+    }
+    return;
+  }
+
   if (!START_RETURN_EVENT_TYPES.has(ctx.eventType)) {
-    // Terminate / Transfer / job-comp / scaffold — later stories or no-op
+    // Transfer / job-comp / scaffold — later stories or no-op
     return;
   }
 
@@ -132,3 +166,5 @@ export async function runProjectionRefreshHook(
     ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
   }
 }
+
+export { compensateTerminationApply };

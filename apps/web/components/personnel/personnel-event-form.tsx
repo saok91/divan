@@ -30,12 +30,20 @@ const EVENT_TYPE_OPTIONS = [
   { value: "ScaffoldChangeRecorded", labelFa: "اسکفولد (آزمایش بستر)" },
   { value: "EmploymentStarted", labelFa: "شروع همکاری (EmploymentStarted)" },
   { value: "EmploymentReturned", labelFa: "بازگشت همکاری (EmploymentReturned)" },
+  {
+    value: "EmploymentTerminated",
+    labelFa: "خاتمه همکاری (EmploymentTerminated)",
+  },
 ] as const;
 
 function isStartReturnType(eventType: string): boolean {
   return (
     eventType === "EmploymentStarted" || eventType === "EmploymentReturned"
   );
+}
+
+function isTerminationType(eventType: string): boolean {
+  return eventType === "EmploymentTerminated";
 }
 
 type LifecycleOp = "cancel" | "reverse" | "correct";
@@ -90,6 +98,8 @@ export function PersonnelEventForm() {
   const [ladderId, setLadderId] = React.useState("");
   const [gradeId, setGradeId] = React.useState("");
   const [seniorityId, setSeniorityId] = React.useState("");
+  const [terminationReason, setTerminationReason] =
+    React.useState("contract_ended");
   const [overrideReason, setOverrideReason] = React.useState("");
   const [draftId, setDraftId] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState(1);
@@ -133,6 +143,14 @@ export function PersonnelEventForm() {
   }, [draftId, dirty, setDemoDraftOpen]);
 
   const buildPayload = React.useCallback((): Record<string, unknown> => {
+    if (isTerminationType(eventType)) {
+      return {
+        terminationReason: terminationReason.trim(),
+        ...(employmentId.trim()
+          ? { employmentId: employmentId.trim() }
+          : {}),
+      };
+    }
     if (!isStartReturnType(eventType)) return {};
     const payload: Record<string, unknown> = {
       collaborationType: collaborationType.trim(),
@@ -153,6 +171,8 @@ export function PersonnelEventForm() {
     ladderId,
     gradeId,
     seniorityId,
+    terminationReason,
+    employmentId,
   ]);
 
   const saveDraft = React.useCallback(async (): Promise<boolean> => {
@@ -174,6 +194,16 @@ export function PersonnelEventForm() {
           setErrorMsg(
             "برای شروع/بازگشت، نوع همکاری، تیم، نقش، عنوان شغلی، لدر و گرید الزامی است.",
           );
+          return false;
+        }
+      }
+      if (isTerminationType(eventType)) {
+        if (!employmentId.trim()) {
+          setErrorMsg("برای خاتمه، شناسه همکاری باز الزامی است.");
+          return false;
+        }
+        if (!terminationReason.trim()) {
+          setErrorMsg("برای خاتمه، کد دلیل خاتمه الزامی است.");
           return false;
         }
       }
@@ -223,6 +253,7 @@ export function PersonnelEventForm() {
     jobTitleId,
     ladderId,
     gradeId,
+    terminationReason,
     buildPayload,
     draftId,
     version,
@@ -428,12 +459,21 @@ export function PersonnelEventForm() {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-label-medium">شناسه همکاری (اختیاری)</span>
+            <span className="text-label-medium">
+              شناسه همکاری
+              {isTerminationType(eventType) ? (
+                <span className="text-destructive"> *</span>
+              ) : (
+                " (اختیاری)"
+              )}
+            </span>
             <Input
               value={employmentId}
               onChange={(e) => setEmploymentId(e.target.value)}
               dir="ltr"
               autoComplete="off"
+              required={isTerminationType(eventType)}
+              aria-required={isTerminationType(eventType) || undefined}
             />
           </label>
         </fieldset>
@@ -535,6 +575,45 @@ export function PersonnelEventForm() {
                 />
               </label>
             ))}
+          </fieldset>
+        ) : null}
+
+        {isTerminationType(eventType) ? (
+          <fieldset className="space-y-3">
+            <legend className="text-label-medium">
+              واقعیت‌های حداقل خاتمه همکاری
+            </legend>
+            <p className="text-xs text-muted-foreground">
+              شناسه همکاری باز را بالا وارد کنید. دلیل خاتمه باید کد کوتاه باشد
+              (مثلاً contract_ended) — نه متن آزاد حساس.
+            </p>
+            <label className="block space-y-1">
+              <span
+                className="text-label-medium"
+                id={`${formId}-termination-reason`}
+              >
+                کد دلیل خاتمه <span className="text-destructive">*</span>
+              </span>
+              <Input
+                value={terminationReason}
+                onChange={(e) => {
+                  setTerminationReason(e.target.value);
+                  setDirty(true);
+                }}
+                required
+                dir="ltr"
+                aria-labelledby={`${formId}-termination-reason`}
+                aria-describedby={`${formId}-termination-reason-hint`}
+                autoComplete="off"
+                placeholder="contract_ended"
+              />
+              <span
+                id={`${formId}-termination-reason-hint`}
+                className="text-xs text-muted-foreground"
+              >
+                نمونه‌ها: contract_ended، resignation، dismissal
+              </span>
+            </label>
           </fieldset>
         ) : null}
 
@@ -765,15 +844,30 @@ export function PersonnelEventForm() {
       <SensitiveConfirmationDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="تأیید نهایی‌سازی رویداد"
+        title={
+          isTerminationType(eventType)
+            ? "تأیید خاتمه همکاری"
+            : "تأیید نهایی‌سازی رویداد"
+        }
         consequence={
           <div className="space-y-2">
-            <p>
-              با تأیید، یک رویداد معتبر در دفتر رویداد ثبت می‌شود و قابل ویرایش
-              یا حذف مستقیم نیست.
-            </p>
+            {isTerminationType(eventType) ? (
+              <p>
+                با تأیید، همکاری و انتصاب‌های باز در تاریخ مؤثر بسته می‌شوند و
+                ظرفیت آزاد می‌گردد. این عمل از مسیر رویداد ثبت می‌شود و قابل
+                ویرایش مستقیم نیست.
+              </p>
+            ) : (
+              <p>
+                با تأیید، یک رویداد معتبر در دفتر رویداد ثبت می‌شود و قابل ویرایش
+                یا حذف مستقیم نیست.
+              </p>
+            )}
             <p className="text-muted-foreground">
               تاریخ مؤثر: {effectiveDate || "—"} · نوع: {eventType}
+              {isTerminationType(eventType)
+                ? ` · دلیل: ${terminationReason || "—"}`
+                : ""}
             </p>
             {evaluateQuery.isLoading ? (
               <p role="status">در حال بررسی تعارض‌ها…</p>
