@@ -129,6 +129,10 @@ export {
   MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
   MSG_SENSITIVE_DRAFT_PAYLOAD_FA,
   MSG_HEADCOUNT_CHECK_BLOCKED_FA,
+  MSG_HEADCOUNT_NO_CAPACITY_FA,
+  MSG_HEADCOUNT_PORT_UNAVAILABLE_FA,
+  MSG_MISSING_PERSONNEL_CODE_FA,
+  MSG_ANONYMIZED_RETURN_BLOCKED_FA,
   MSG_BASELINE_BOUNDARY_BLOCKED_FA,
   MSG_RISK_TIER_PENDING_REVIEW_FA,
   MSG_EVENT_NOT_FOUND_FA,
@@ -510,6 +514,7 @@ export {
   codesRequiringOverride,
   dateOnlyFromDb,
   HEADCOUNT_CONSUMING_EVENT_TYPES,
+  HEADCOUNT_CAPACITY_PORT_EVENT_TYPES,
   WARNING_ACK_ALLOW_LIST,
 } from "./personnel-event-conflicts";
 
@@ -521,6 +526,21 @@ export type {
   BuildSnapshotInput,
   SnapshotReadOptions,
 } from "./personnel-event-conflicts";
+
+export {
+  START_RETURN_EVENT_TYPES,
+  PRODUCT_START_EVENT_TYPE,
+  PRODUCT_RETURN_EVENT_TYPE,
+  SCAFFOLD_EVENT_TYPE,
+  parseStartReturnPayload,
+  applyStartReturnProjections,
+  compensateOrphanStartReturnProjections,
+} from "./personnel-event-start-return";
+
+export type {
+  StartReturnPayloadFacts,
+  MissingFact,
+} from "./personnel-event-start-return";
 
 export {
   finalizeDraft,

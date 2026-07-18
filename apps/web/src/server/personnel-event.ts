@@ -293,7 +293,8 @@ export const personnelEventRouter = createTRPCRouter({
         override: z
           .object({
             reason: z.string().min(1),
-            approvedByAccountId: z.string().min(1),
+            /** Ignored — server binds to session account. */
+            approvedByAccountId: z.string().optional(),
           })
           .optional(),
       }),
@@ -309,8 +310,14 @@ export const personnelEventRouter = createTRPCRouter({
             expectedVersion: input.expectedVersion,
             idempotencyKey: input.idempotencyKey,
             acknowledgement: input.acknowledgement,
-            override: input.override,
-            // Never trust client Override flag — session role only (4.2 stub).
+            override: input.override
+              ? {
+                  reason: input.override.reason,
+                  // Never trust client account id — bind to session actor.
+                  approvedByAccountId: ctx.session.accountId,
+                }
+              : undefined,
+            // Never trust client Override flag — session role only.
             actorMayOverride: ctx.session.coarseRole === "hr_admin",
           },
           await readyFinalizePool(),

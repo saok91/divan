@@ -23,7 +23,20 @@ type Conflict = {
   severity: "blocking" | "warning";
   messageFa: string;
   requiresAck?: boolean;
+  requiresOverride?: boolean;
 };
+
+const EVENT_TYPE_OPTIONS = [
+  { value: "ScaffoldChangeRecorded", labelFa: "اسکفولد (آزمایش بستر)" },
+  { value: "EmploymentStarted", labelFa: "شروع همکاری (EmploymentStarted)" },
+  { value: "EmploymentReturned", labelFa: "بازگشت همکاری (EmploymentReturned)" },
+] as const;
+
+function isStartReturnType(eventType: string): boolean {
+  return (
+    eventType === "EmploymentStarted" || eventType === "EmploymentReturned"
+  );
+}
 
 type LifecycleOp = "cancel" | "reverse" | "correct";
 
@@ -70,6 +83,14 @@ export function PersonnelEventForm() {
   const [employmentId, setEmploymentId] = React.useState("");
   const [eventType, setEventType] = React.useState("ScaffoldChangeRecorded");
   const [effectiveDate, setEffectiveDate] = React.useState("");
+  const [collaborationType, setCollaborationType] = React.useState("employee");
+  const [teamId, setTeamId] = React.useState("");
+  const [organizationalRoleId, setOrganizationalRoleId] = React.useState("");
+  const [jobTitleId, setJobTitleId] = React.useState("");
+  const [ladderId, setLadderId] = React.useState("");
+  const [gradeId, setGradeId] = React.useState("");
+  const [seniorityId, setSeniorityId] = React.useState("");
+  const [overrideReason, setOverrideReason] = React.useState("");
   const [draftId, setDraftId] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState(1);
   const [statusMsg, setStatusMsg] = React.useState<string | null>(null);
@@ -111,6 +132,29 @@ export function PersonnelEventForm() {
     setDemoDraftOpen(Boolean(draftId) || dirty);
   }, [draftId, dirty, setDemoDraftOpen]);
 
+  const buildPayload = React.useCallback((): Record<string, unknown> => {
+    if (!isStartReturnType(eventType)) return {};
+    const payload: Record<string, unknown> = {
+      collaborationType: collaborationType.trim(),
+      teamId: teamId.trim(),
+      organizationalRoleId: organizationalRoleId.trim(),
+      jobTitleId: jobTitleId.trim(),
+      ladderId: ladderId.trim(),
+      gradeId: gradeId.trim(),
+    };
+    if (seniorityId.trim()) payload.seniorityId = seniorityId.trim();
+    return payload;
+  }, [
+    eventType,
+    collaborationType,
+    teamId,
+    organizationalRoleId,
+    jobTitleId,
+    ladderId,
+    gradeId,
+    seniorityId,
+  ]);
+
   const saveDraft = React.useCallback(async (): Promise<boolean> => {
     setErrorMsg(null);
     try {
@@ -118,6 +162,22 @@ export function PersonnelEventForm() {
         setErrorMsg("فرد، نوع رویداد و تاریخ مؤثر الزامی است.");
         return false;
       }
+      if (isStartReturnType(eventType)) {
+        if (
+          !collaborationType.trim() ||
+          !teamId.trim() ||
+          !organizationalRoleId.trim() ||
+          !jobTitleId.trim() ||
+          !ladderId.trim() ||
+          !gradeId.trim()
+        ) {
+          setErrorMsg(
+            "برای شروع/بازگشت، نوع همکاری، تیم، نقش، عنوان شغلی، لدر و گرید الزامی است.",
+          );
+          return false;
+        }
+      }
+      const payload = buildPayload();
       if (draftId) {
         const updated = await updateMut.mutateAsync({
           draftId,
@@ -125,7 +185,7 @@ export function PersonnelEventForm() {
           employmentId: employmentId.trim() || null,
           eventType: eventType.trim(),
           effectiveDate: effectiveDate.trim(),
-          payload: {},
+          payload,
         });
         setVersion(updated.version);
         setDraftId(updated.id);
@@ -135,7 +195,7 @@ export function PersonnelEventForm() {
           employmentId: employmentId.trim() || null,
           eventType: eventType.trim(),
           effectiveDate: effectiveDate.trim(),
-          payload: {},
+          payload,
         });
         setDraftId(created.id);
         setVersion(created.version);
@@ -157,6 +217,13 @@ export function PersonnelEventForm() {
     employmentId,
     eventType,
     effectiveDate,
+    collaborationType,
+    teamId,
+    organizationalRoleId,
+    jobTitleId,
+    ladderId,
+    gradeId,
+    buildPayload,
     draftId,
     version,
     createMut,
@@ -190,12 +257,17 @@ export function PersonnelEventForm() {
   const warningsNeedingAck = conflicts.filter(
     (c) => c.severity === "warning" && c.requiresAck,
   );
+  const overrideCodes = conflicts.filter((c) => c.requiresOverride);
+  const needsOverride = overrideCodes.length > 0;
   const ackComplete = warningsNeedingAck.every((w) => ackCodes.has(w.code));
+  const overrideComplete =
+    !needsOverride || overrideReason.trim().length >= 3;
   const finalizeBlocked =
     isGoldCtaBlocked ||
     isFinalizeBlockedByAuthzChange ||
     blocking ||
-    !ackComplete;
+    !ackComplete ||
+    !overrideComplete;
 
   async function onFinalizeConfirm() {
     if (!draftId || finalizeBlocked) return;
@@ -209,6 +281,12 @@ export function PersonnelEventForm() {
           warningsNeedingAck.length > 0
             ? { warningCodes: [...ackCodes] }
             : undefined,
+        override: needsOverride
+          ? {
+              reason: overrideReason.trim(),
+              approvedByAccountId: "server-bound",
+            }
+          : undefined,
       });
       if (result.outcome === "finalized") {
         setStatusMsg(
@@ -363,16 +441,25 @@ export function PersonnelEventForm() {
         <fieldset className="space-y-3">
           <legend className="text-label-medium">رویداد</legend>
           <label className="block space-y-1">
-            <span className="text-label-medium">
+            <span className="text-label-medium" id={`${formId}-event-type`}>
               نوع رویداد <span className="text-destructive">*</span>
             </span>
-            <Input
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={eventType}
-              onChange={(e) => setEventType(e.target.value)}
+              onChange={(e) => {
+                setEventType(e.target.value);
+                setDirty(true);
+              }}
               required
-              dir="ltr"
-              autoComplete="off"
-            />
+              aria-labelledby={`${formId}-event-type`}
+            >
+              {EVENT_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.labelFa}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="space-y-1">
             <span className="text-label-medium">
@@ -391,6 +478,65 @@ export function PersonnelEventForm() {
             />
           </div>
         </fieldset>
+
+        {isStartReturnType(eventType) ? (
+          <fieldset className="space-y-3">
+            <legend className="text-label-medium">
+              واقعیت‌های حداقل شروع/بازگشت
+            </legend>
+            <label className="block space-y-1">
+              <span className="text-label-medium" id={`${formId}-collab`}>
+                نوع همکاری <span className="text-destructive">*</span>
+              </span>
+              <Input
+                value={collaborationType}
+                onChange={(e) => {
+                  setCollaborationType(e.target.value);
+                  setDirty(true);
+                }}
+                required
+                dir="ltr"
+                aria-labelledby={`${formId}-collab`}
+                autoComplete="off"
+              />
+            </label>
+            {(
+              [
+                ["teamId", "شناسه تیم", teamId, setTeamId],
+                [
+                  "organizationalRoleId",
+                  "شناسه نقش سازمانی",
+                  organizationalRoleId,
+                  setOrganizationalRoleId,
+                ],
+                ["jobTitleId", "شناسه عنوان شغلی", jobTitleId, setJobTitleId],
+                ["ladderId", "شناسه لدر", ladderId, setLadderId],
+                ["gradeId", "شناسه گرید", gradeId, setGradeId],
+                ["seniorityId", "شناسه ارشدیت (اختیاری)", seniorityId, setSeniorityId],
+              ] as const
+            ).map(([key, label, value, setter]) => (
+              <label key={key} className="block space-y-1">
+                <span className="text-label-medium" id={`${formId}-${key}`}>
+                  {label}
+                  {key !== "seniorityId" ? (
+                    <span className="text-destructive"> *</span>
+                  ) : null}
+                </span>
+                <Input
+                  value={value}
+                  onChange={(e) => {
+                    setter(e.target.value);
+                    setDirty(true);
+                  }}
+                  required={key !== "seniorityId"}
+                  dir="ltr"
+                  aria-labelledby={`${formId}-${key}`}
+                  autoComplete="off"
+                />
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
 
         {conflicts.length > 0 ? (
           <div className="space-y-2">
@@ -420,6 +566,24 @@ export function PersonnelEventForm() {
                 </span>
               </label>
             ))}
+            {needsOverride ? (
+              <label className="block space-y-1">
+                <span className="text-label-medium" id={`${formId}-override`}>
+                  دلیل Override (فقط HR Admin){" "}
+                  <span className="text-destructive">*</span>
+                </span>
+                <Input
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  aria-labelledby={`${formId}-override`}
+                  aria-required
+                  autoComplete="off"
+                />
+                <span className="text-xs text-muted-foreground">
+                  ظرفیت یا محدودیت دیگر نیازمند تأیید صریح و ثبت ممیزی است.
+                </span>
+              </label>
+            ) : null}
           </div>
         ) : null}
 
@@ -447,6 +611,14 @@ export function PersonnelEventForm() {
               setEmploymentId("");
               setEventType("ScaffoldChangeRecorded");
               setEffectiveDate("");
+              setCollaborationType("employee");
+              setTeamId("");
+              setOrganizationalRoleId("");
+              setJobTitleId("");
+              setLadderId("");
+              setGradeId("");
+              setSeniorityId("");
+              setOverrideReason("");
               setDraftId(null);
               setVersion(1);
               setDirty(false);

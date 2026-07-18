@@ -6,16 +6,20 @@
 import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
 import { createPgPool, type Pool, type PoolClient, type PrismaClient } from "@divan/db";
 import { getBusinessEventById } from "@divan/event-store";
+import { evaluateHeadcountCapacity } from "@divan/headcount";
 
 import { getPersonDb } from "./db";
 import {
+  MSG_ANONYMIZED_RETURN_BLOCKED_FA,
   MSG_BASELINE_BOUNDARY_BLOCKED_FA,
   MSG_BROKEN_CORRECTION_REF_FA,
   MSG_CORRECTION_CYCLE_FA,
   MSG_CORRECTION_SELF_REF_FA,
   MSG_HEADCOUNT_CHECK_BLOCKED_FA,
+  MSG_HEADCOUNT_PORT_UNAVAILABLE_FA,
   MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
   MSG_IRRECONCILABLE_ORDERING_FA,
+  MSG_MISSING_PERSONNEL_CODE_FA,
   MSG_PERSON_NOT_FOUND_FA,
   PersonnelEventError,
 } from "./errors";
@@ -24,6 +28,13 @@ import { detectCorrectionCycle } from "./personnel-event-resolve";
 import { isEmploymentActiveAsOf } from "./employment";
 import { getGradeById } from "./job-reference";
 import { JobRefError } from "./errors";
+import {
+  START_RETURN_EVENT_TYPES,
+  capacityResultToConflict,
+  countEmploymentsForPerson,
+  findInactiveRefConflicts,
+  parseStartReturnPayload,
+} from "./personnel-event-start-return";
 
 /** Lazy read pool for conflict existence checks outside a finalize txn. */
 let conflictReadPool: Pool | null = null;
@@ -94,13 +105,20 @@ export type BuildSnapshotInput = {
   asOfDate?: string;
 };
 
-/** Event types that would consume headcount — stub-block until headcount module exists. */
+/**
+ * Event types that consume headcount.
+ * Start/Return use the narrow capacity port (4.5); Transfer stubs remain fail-closed.
+ */
 export const HEADCOUNT_CONSUMING_EVENT_TYPES = new Set([
   "EmploymentStarted",
+  "EmploymentReturned",
   "TransferRecorded",
   "TeamTransferRecorded",
   "HeadcountConsumed",
 ]);
+
+/** Start/Return — capacity evaluated via @divan/headcount port (not unconditional stub). */
+export const HEADCOUNT_CAPACITY_PORT_EVENT_TYPES = START_RETURN_EVENT_TYPES;
 
 /**
  * Warning allow-list — only these codes may proceed with acknowledgement.
@@ -108,6 +126,7 @@ export const HEADCOUNT_CONSUMING_EVENT_TYPES = new Set([
  */
 export const WARNING_ACK_ALLOW_LIST = new Set([
   "PRE_BASELINE_EFFECTIVE_DATE",
+  "HEADCOUNT_CAPACITY_MISSING",
 ]);
 
 export type ConflictPolicy = {
@@ -442,7 +461,8 @@ export async function classifyConflicts(
   }
 
   // Overlapping Employments — as-of draft Effective Date (date-only, not timestamptz UTC)
-  if (draft.eventType === "EmploymentStarted") {
+  // Start and Return both create a new open Employment — prior must already be closed.
+  if (START_RETURN_EVENT_TYPES.has(draft.eventType)) {
     let activeCount = 0;
     if (opts.client) {
       const active = await opts.client.query<{ id: string }>(
@@ -475,8 +495,116 @@ export async function classifyConflicts(
         code: "OVERLAPPING_EMPLOYMENT",
         severity: "blocking",
         messageFa:
-          "هم‌پوشانی همکاری فعال وجود دارد؛ شروع همکاری جدید بدون بستن قبلی مسدود است.",
+          "هم‌پوشانی همکاری فعال وجود دارد؛ شروع/بازگشت همکاری جدید بدون بستن قبلی مسدود است.",
       });
+    }
+  }
+
+  // Start/Return — stable Person + Personnel Code + minimum facts + AR-TEMPORAL refs
+  if (START_RETURN_EVENT_TYPES.has(draft.eventType)) {
+    const personRow = await db.person.findUnique({
+      where: { id: draft.personId },
+      select: { personnelCode: true, givenName: true, familyName: true },
+    });
+    if (!personRow?.personnelCode?.trim()) {
+      findings.push({
+        code: "MISSING_PERSONNEL_CODE",
+        severity: "blocking",
+        messageFa: MSG_MISSING_PERSONNEL_CODE_FA,
+      });
+    }
+
+    // Anonymized return — fail-closed; do not invent AR-DATA rehire-token acceptance
+    if (draft.eventType === "EmploymentReturned") {
+      const givenBlank =
+        !personRow?.givenName?.trim() || personRow.givenName === "[REDACTED]";
+      const familyBlank =
+        !personRow?.familyName?.trim() || personRow.familyName === "[REDACTED]";
+      const forceAnonymized = draft.payload.anonymizedPerson === true;
+      // Partial redaction also requires rematch — either name blank/redacted
+      if (forceAnonymized || givenBlank || familyBlank) {
+        // Ignore client rehireToken until AR-DATA schema exists — never silent bypass
+        const manualRematch =
+          draft.payload.manualRematchVerified === true &&
+          typeof draft.payload.manualRematchEvidence === "string" &&
+          draft.payload.manualRematchEvidence.trim().length > 0;
+        if (!manualRematch) {
+          findings.push({
+            code: "ANONYMIZED_RETURN_BLOCKED",
+            severity: "blocking",
+            messageFa: MSG_ANONYMIZED_RETURN_BLOCKED_FA,
+          });
+        }
+      }
+
+      const priorCount = await countEmploymentsForPerson(draft.personId, db);
+      if (priorCount === 0) {
+        findings.push({
+          code: "RETURN_WITHOUT_PRIOR_EMPLOYMENT",
+          severity: "blocking",
+          messageFa:
+            "بازگشت همکاری بدون سابقه همکاری قبلی مجاز نیست؛ از شروع همکاری استفاده کنید.",
+        });
+      }
+    }
+
+    const { facts, missing } = parseStartReturnPayload(draft.payload);
+    for (const m of missing) {
+      findings.push({
+        code: m.code,
+        severity: "blocking",
+        messageFa: m.messageFa,
+      });
+    }
+
+    if (facts) {
+      const inactive = await findInactiveRefConflicts(
+        facts,
+        draft.effectiveDate,
+        db,
+      );
+      for (const f of inactive) {
+        findings.push({
+          code: f.code,
+          severity: "blocking",
+          messageFa: f.messageFa,
+        });
+      }
+    }
+
+    // Exclusive-key / same-day Start collision — fail closed when detectable
+    {
+      const reader = opts.client ?? getConflictReadPool();
+      if (!reader) {
+        findings.push({
+          code: "IRRECONCILABLE_ORDERING",
+          severity: "blocking",
+          messageFa: MSG_IRRECONCILABLE_ORDERING_FA,
+        });
+      } else {
+        const peers = await reader.query<{ id: string }>(
+          `SELECT id FROM kernel_events
+           WHERE event_class = 'business'
+             AND person_id = $1::uuid
+             AND event_type = ANY($2::text[])
+             AND status NOT IN ('Cancelled', 'Reversed')
+             AND effective_date = $3::date
+             AND ($4::uuid IS NULL OR id <> $4::uuid)`,
+          [
+            draft.personId,
+            [...START_RETURN_EVENT_TYPES],
+            draft.effectiveDate,
+            draft.finalizedEventId ?? null,
+          ],
+        );
+        if (peers.rows.length > 0) {
+          findings.push({
+            code: "IRRECONCILABLE_ORDERING",
+            severity: "blocking",
+            messageFa: MSG_IRRECONCILABLE_ORDERING_FA,
+          });
+        }
+      }
     }
   }
 
@@ -508,8 +636,45 @@ export async function classifyConflicts(
     }
   }
 
-  // Headcount consuming types — fail-closed stub while headcount module empty
-  if (HEADCOUNT_CONSUMING_EVENT_TYPES.has(draft.eventType)) {
+  // Headcount — Start/Return use capacity port; other consuming types stay stub-blocked
+  if (HEADCOUNT_CAPACITY_PORT_EVENT_TYPES.has(draft.eventType)) {
+    const { facts } = parseStartReturnPayload(draft.payload);
+    if (facts) {
+      const reader = opts.client ?? getConflictReadPool();
+      if (!reader) {
+        findings.push({
+          code: "HEADCOUNT_PORT_UNAVAILABLE",
+          severity: "blocking",
+          messageFa: MSG_HEADCOUNT_PORT_UNAVAILABLE_FA,
+        });
+      } else {
+        const capacity = await evaluateHeadcountCapacity(reader, {
+          teamId: facts.teamId,
+          jobTitleId: facts.jobTitleId,
+          ladderId: facts.ladderId,
+          gradeId: facts.gradeId,
+          effectiveDate: draft.effectiveDate,
+          preferredSlotId: facts.capacitySlotId,
+        });
+        const conflict = capacityResultToConflict(capacity);
+        if (conflict) {
+          findings.push({
+            code: conflict.code,
+            severity: conflict.severity,
+            messageFa: conflict.messageFa,
+            requiresOverride: conflict.requiresOverride,
+            requiresAck: conflict.requiresAck,
+          });
+        } else if (capacity.outcome === "compatible") {
+          // Stash resolved slot into payload for consume on Effective apply
+          draft.payload = {
+            ...draft.payload,
+            capacitySlotId: capacity.slotId,
+          };
+        }
+      }
+    }
+  } else if (HEADCOUNT_CONSUMING_EVENT_TYPES.has(draft.eventType)) {
     findings.push({
       code: "HEADCOUNT_UNAPPROVED",
       severity: "blocking",

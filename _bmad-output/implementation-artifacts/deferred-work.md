@@ -1,3 +1,17 @@
+## Deferred from: code review of 4-5-start-return-events.md (2026-07-18)
+
+- Scheduled Start evaluates capacity / may stash `capacitySlotId` but does not durable-reserve — already noted under FR-30 / 4.12–4.14 remainder; capacity check only today
+- Duplicate capacity Persian message constants between `@divan/headcount` and `person-employment/errors` — drift risk; consolidate when headcount product surface expands
+
+## Deferred from: Story 4.5 start & return events (2026-07-18)
+
+- **Start / Return Operators landed** — `EmploymentStarted` / `EmploymentReturned` via Draft→Finalize→AD-6 hook; `applyEmploymentProjection` + `applyPrimaryAssignmentProjection` (`sourceEventId`); narrow `@divan/headcount` capacity port (evaluate/consume/seed); minimum facts + inactive-ref + overlap + anonymized Return fail-closed; UI form Start/Return fields + Override reason; `personnel-event-start-return.selfcheck`
+- **Still 4.6–4.8:** Termination / Transfer atomic capacity / job-level / contract-comp Operators
+- **Still 4.9–4.11:** Current/historical person & org reconstruction products
+- **Still 4.12–4.14 / FR-30:** Full Headcount Approval lifecycle, Matching matrix, Reservation expiry/exceptions, Override catalogue UI; durable reservation for Scheduled future Start (minimal port write deferred — capacity check only today)
+- **AD-6 cross-connection note:** Employment/Primary projectors use Prisma while finalize txn is `PoolClient` — **4.5 review patch:** orphan compensate on consume/post-hook failure (`compensateOrphanStartReturnProjections`); perfect single-connection projector SQL remains a hardening opportunity
+- **Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+
 ## Deferred from: code review of 4-4-deterministic-ordering-recalculation.md (2026-07-18)
 
 - Generation check outside txn (TOCTOU) in `runHistoricalRecalculation` — status read before BEGIN; `clear` still gated by generation so wrong clear is avoided; revisit when domain projectors make obsolete apply harmful
@@ -6,7 +20,7 @@
 ## Deferred from: Story 4.4 deterministic ordering & recalculation (2026-07-18)
 
 - **Ordering + recalc substrate landed** — `compareBusinessEventsForApply` / `orderBusinessEventsForApply`; `listBusinessEventsForPersonForApply`; `IRRECONCILABLE_ORDERING` exclusive-key stub; `recalculation_status` + pg-boss `temporal.recalculate`; PlatformStatusProvider wired to `platformStatus.recalc`; pre-Baseline Override access-event evidence
-- **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp domain Operators + projectors (AD-6 hook remains scaffold for domain effects; exclusive-key stub → real dependent graph)
+- **Still 4.6–4.8:** Terminate / Transfer / job-comp domain Operators + projectors (Start/Return landed in 4.5; exclusive-key stub → fuller dependent graph continues)
 - **Still 4.9–4.11:** Current/historical person & org reconstruction products
 - **Still 4.14:** Reservation release on Cancel (headcount math not invented here)
 - **Still 5.3:** Full `personnel-event-timeline` (UX-DR9) — UI list sort remains DESC display, separate from apply-order engine

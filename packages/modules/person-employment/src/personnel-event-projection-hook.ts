@@ -1,20 +1,26 @@
 /**
  * AD-6 projection refresh hook — runs inside the same DB txn as finalize / lifecycle append.
- * Scaffold event types may no-op domain projectors but the seam must be invoked.
  *
  * FR-16: Scheduled events must not mutate current projections (applyToCurrentProjection=false).
- * Domain Employment/Reservation effects remain stubs until Stories 4.5–4.8 / 4.14.
+ * Story 4.5: Effective Start/Return → Employment + Primary projectors (+ capacity consume).
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import type { PoolClient } from "@divan/db";
 
+import { getPersonDb } from "./db";
 import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
+import {
+  START_RETURN_EVENT_TYPES,
+  applyStartReturnProjections,
+  bindEmploymentIdAfterApply,
+  compensateOrphanStartReturnProjections,
+} from "./personnel-event-start-return";
 
 export type ProjectionRefreshContext = {
   client: PoolClient;
-  /** Present for Draft finalize; absent for Cancel/Reverse/Correction. */
+  /** Present for Draft finalize; absent for Cancel/Reverse/Correction / recalc. */
   draft?: PersonnelEventDraftRecord | null;
   eventId: string;
   eventType: string;
@@ -28,6 +34,10 @@ export type ProjectionRefreshContext = {
   applyToCurrentProjection?: boolean;
   /** Set by hook implementations / tests to prove invocation. */
   invoked?: { eventId: string; eventType: string };
+  /** Filled when Start/Return created/bound an Employment. */
+  appliedEmploymentId?: string;
+  /** Set when this hook invocation newly created a Primary (for orphan compensate). */
+  createdStartReturnPrimaryId?: string;
 };
 
 export type ProjectionRefreshHook = (
@@ -35,8 +45,8 @@ export type ProjectionRefreshHook = (
 ) => Promise<void>;
 
 /**
- * Default scaffold hook: records invocation on ctx for AD-6 selfcheck proof.
- * Production domain effects = Stories 4.5–4.8.
+ * Default production hook: records invocation; on Effective Start/Return applies
+ * Employment + Primary projectors (idempotent via sourceEventId).
  * When `applyToCurrentProjection === false`, still records invocation but
  * performs no current-state mutation (FR-16 Scheduled discipline).
  */
@@ -44,15 +54,45 @@ export async function defaultProjectionRefreshHook(
   ctx: ProjectionRefreshContext,
 ): Promise<void> {
   ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
-  void ctx.client;
-  void ctx.draft;
   void ctx.lifecycleOp;
   void ctx.targetEventId;
-  // Explicit no-op for Scheduled / Cancel-of-Scheduled — domain stubs later.
+
   if (ctx.applyToCurrentProjection === false) {
     return;
   }
-  // Effective reverse/correct/finalize: domain projectors still absent (stub).
+
+  if (!START_RETURN_EVENT_TYPES.has(ctx.eventType)) {
+    // Terminate / Transfer / job-comp / scaffold — later stories or no-op
+    return;
+  }
+
+  const result = await applyStartReturnProjections(ctx, getPersonDb());
+  ctx.appliedEmploymentId = result.employmentId;
+  if (result.created) {
+    ctx.createdStartReturnPrimaryId = result.primaryId;
+  }
+
+  try {
+    await bindEmploymentIdAfterApply(ctx.client, {
+      draftId: ctx.draft?.id ?? null,
+      eventId: ctx.eventId,
+      employmentId: result.employmentId,
+    });
+
+    if (ctx.draft) {
+      ctx.draft.employmentId = result.employmentId;
+    }
+  } catch (err) {
+    if (result.created) {
+      await compensateOrphanStartReturnProjections({
+        employmentId: result.employmentId,
+        primaryId: result.primaryId,
+      });
+      ctx.appliedEmploymentId = undefined;
+      ctx.createdStartReturnPrimaryId = undefined;
+    }
+    throw err;
+  }
 }
 
 /** Per-finalize capture — avoids cross-request leakage under concurrency. */

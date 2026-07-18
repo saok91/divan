@@ -59,6 +59,7 @@ import {
   scheduleHeavyRecalculation,
   type RecalcJobPayload,
 } from "./personnel-event-recalc";
+import { compensateOrphanStartReturnProjections } from "./personnel-event-start-return";
 
 export type RiskTierKind =
   | "termination"
@@ -668,55 +669,125 @@ export async function finalizeDraft(
     };
     await runProjectionRefreshHook(hookCtx);
 
-    // Pre-Baseline Override + ack → access-event audit evidence (AC #3)
-    if (needOverride.length > 0 && input.override) {
-      await appendAccessEvent(client, {
-        correlationId,
-        actorAccountId: input.actorId,
-        operation: "personnel_event.pre_baseline_override",
-        scope: {
-          draftId: draft.id,
-          personId: draft.personId,
-          overrideCodes: needOverride,
-          warningCodes: needAck,
-          effectiveDate: draft.effectiveDate,
-        },
-        result: "allow",
-        reason: input.override.reason,
-        entityType: "PersonnelEventDraft",
-        entityId: draft.id,
-        payload: {
-          baselineOverride: true,
-          acknowledgedWarningCodes: needAck,
-        },
-      });
+    try {
+      // Override + ack → access-event audit evidence (pre-Baseline / capacity)
+      if (needOverride.length > 0 && input.override) {
+        const wantsCapacity = needOverride.includes(
+          "HEADCOUNT_CAPACITY_MISSING",
+        );
+        const wantsBaseline = needOverride.includes(
+          "PRE_BASELINE_EFFECTIVE_DATE",
+        );
+        if (wantsCapacity) {
+          await appendAccessEvent(client, {
+            correlationId,
+            actorAccountId: input.actorId,
+            operation: "personnel_event.headcount_capacity_override",
+            scope: {
+              draftId: draft.id,
+              personId: draft.personId,
+              overrideCodes: needOverride,
+              warningCodes: needAck,
+              effectiveDate: draft.effectiveDate,
+            },
+            result: "allow",
+            reason: input.override.reason,
+            entityType: "PersonnelEventDraft",
+            entityId: draft.id,
+            payload: {
+              baselineOverride: wantsBaseline,
+              capacityOverride: true,
+              acknowledgedWarningCodes: needAck,
+            },
+          });
+        }
+        if (wantsBaseline) {
+          await appendAccessEvent(client, {
+            correlationId,
+            actorAccountId: input.actorId,
+            operation: "personnel_event.pre_baseline_override",
+            scope: {
+              draftId: draft.id,
+              personId: draft.personId,
+              overrideCodes: needOverride,
+              warningCodes: needAck,
+              effectiveDate: draft.effectiveDate,
+            },
+            result: "allow",
+            reason: input.override.reason,
+            entityType: "PersonnelEventDraft",
+            entityId: draft.id,
+            payload: {
+              baselineOverride: true,
+              capacityOverride: wantsCapacity,
+              acknowledgedWarningCodes: needAck,
+            },
+          });
+        }
+      }
+
+      // Manual rematch for anonymized Return — independent access-event evidence
+      if (
+        draft.eventType === "EmploymentReturned" &&
+        draft.payload.manualRematchVerified === true &&
+        typeof draft.payload.manualRematchEvidence === "string" &&
+        draft.payload.manualRematchEvidence.trim()
+      ) {
+        await appendAccessEvent(client, {
+          correlationId,
+          actorAccountId: input.actorId,
+          operation: "personnel_event.manual_rematch",
+          scope: {
+            draftId: draft.id,
+            personId: draft.personId,
+            effectiveDate: draft.effectiveDate,
+          },
+          result: "allow",
+          reason: draft.payload.manualRematchEvidence.trim(),
+          entityType: "PersonnelEventDraft",
+          entityId: draft.id,
+          payload: {
+            manualRematchVerified: true,
+            eventId: eventId!,
+          },
+        });
+      }
+
+      // AD-6 heavy path: past-dated Effective → durable pending + post-commit enqueue
+      if (
+        status === "Effective" &&
+        isPastDatedEffective(draft.effectiveDate, liveSnapshot.asOfDate)
+      ) {
+        pendingRecalc = await scheduleHeavyRecalculation(
+          client,
+          draft.personId,
+          draft.effectiveDate,
+        );
+      }
+
+      const finalRow = await lockDraftRow(client, draft.id);
+      draft = mapDraftRow(finalRow!);
+
+      return {
+        outcome: "finalized" as const,
+        draft,
+        eventId: eventId!,
+        status,
+        conflicts,
+        snapshot: liveSnapshot,
+        projectionHookInvoked: Boolean(hookCtx.invoked),
+        recalcScheduled: pendingRecalc,
+      };
+    } catch (err) {
+      // Only compensate newly created projections — never delete idempotent re-apply
+      if (hookCtx.createdStartReturnPrimaryId && hookCtx.appliedEmploymentId) {
+        await compensateOrphanStartReturnProjections({
+          employmentId: hookCtx.appliedEmploymentId,
+          primaryId: hookCtx.createdStartReturnPrimaryId,
+        });
+      }
+      throw err;
     }
-
-    // AD-6 heavy path: past-dated Effective → durable pending + post-commit enqueue
-    if (
-      status === "Effective" &&
-      isPastDatedEffective(draft.effectiveDate, liveSnapshot.asOfDate)
-    ) {
-      pendingRecalc = await scheduleHeavyRecalculation(
-        client,
-        draft.personId,
-        draft.effectiveDate,
-      );
-    }
-
-    const finalRow = await lockDraftRow(client, draft.id);
-    draft = mapDraftRow(finalRow!);
-
-    return {
-      outcome: "finalized" as const,
-      draft,
-      eventId: eventId!,
-      status,
-      conflicts,
-      snapshot: liveSnapshot,
-      projectionHookInvoked: Boolean(hookCtx.invoked),
-      recalcScheduled: pendingRecalc,
-    };
   }),
   );
 

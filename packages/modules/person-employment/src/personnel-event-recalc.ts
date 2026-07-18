@@ -441,13 +441,33 @@ export async function runHistoricalRecalculation(
   const release = "connect" in db;
   try {
     if (release) await client.query("BEGIN");
+    // Re-validate generation under row lock — TOCTOU after domain projectors (4.5+)
+    const locked = await client.query<{
+      generation: string | number | bigint;
+      status: string;
+    }>(
+      `SELECT generation, status FROM recalculation_status
+       WHERE person_id = $1::uuid FOR UPDATE`,
+      [payload.personId],
+    );
+    const lockedRow = locked.rows[0];
+    if (
+      !lockedRow ||
+      Number(lockedRow.generation) !== payload.generation ||
+      lockedRow.status === "clear"
+    ) {
+      if (release) await client.query("ROLLBACK");
+      return { applied: 0, skipped: true };
+    }
+
     for (const event of ordered) {
       const hookCtx: ProjectionRefreshContext = {
         client,
         eventId: event.id,
         eventType: event.eventType,
-        // Historical rebuild: domain projectors still stubs (4.5–4.8)
-        applyToCurrentProjection: false,
+        // Historical rebuild: apply domain projectors for Effective events only.
+        // Scheduled / Cancelled / Reversed must not mutate current projections (FR-16).
+        applyToCurrentProjection: event.status === "Effective",
       };
       await runProjectionRefreshHook(hookCtx);
     }

@@ -539,6 +539,18 @@ export const MSG_SENSITIVE_DRAFT_PAYLOAD_FA =
 export const MSG_HEADCOUNT_CHECK_BLOCKED_FA =
   "بررسی ظرفیت نیروی انسانی برای این نوع رویداد هنوز آماده نیست؛ نهایی‌سازی مسدود است.";
 
+export const MSG_HEADCOUNT_NO_CAPACITY_FA =
+  "ظرفیت نیروی انسانی سازگار برای این انتصاب وجود ندارد؛ بدون Override نهایی‌سازی مجاز نیست.";
+
+export const MSG_HEADCOUNT_PORT_UNAVAILABLE_FA =
+  "سامانه ظرفیت نیروی انسانی در دسترس نیست؛ نهایی‌سازی مسدود است.";
+
+export const MSG_MISSING_PERSONNEL_CODE_FA =
+  "فرد باید کد پرسنلی پایدار داشته باشد.";
+
+export const MSG_ANONYMIZED_RETURN_BLOCKED_FA =
+  "بازگشت خودکار برای هویت ناشناس‌سازی‌شده مسدود است؛ تا تعریف توکن AR-DATA یا تطبیق دستی ممیزی‌شده مجاز نیست.";
+
 export const MSG_BASELINE_BOUNDARY_BLOCKED_FA =
   "تاریخ مؤثر قبل از مرز Baseline است و بدون Override مجاز نیست.";
 
