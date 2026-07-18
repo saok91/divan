@@ -2,10 +2,13 @@
  * Person identity + Data Dictionary governed router (Stories 3.1 / 3.3 / FR-5 / FR-7).
  * Coarse hr_admin / hr_operator unlock nav only — mutations require
  * `person.write` / `person.read` via PermissionSet + envelope.
+ * Story 4.9: thin current-state read (`getCurrentState`).
  */
 import {
   DEV_DEMO_CATEGORIES,
 } from "@divan/audit-envelope";
+import { COMPENSATION_DATA_CATEGORY } from "@divan/compensation-facts";
+import { createPgPool, type Pool } from "@divan/db";
 import {
   PERSON_DATA_CATEGORY,
   PERSON_FIELD_MAX,
@@ -17,8 +20,10 @@ import {
   MSG_BLOCKED_IDENTITY_OPERATION_FA,
   assertActorHasPersonRead,
   assertActorHasPersonWrite,
+  actorHasCompensationRead,
   correctPersonnelCode,
   createPerson,
+  getCurrentPersonState,
   getPersonById,
   getPersonByPersonnelCode,
   listDataElements,
@@ -60,6 +65,18 @@ const nationalIdWriteMeta = {
   organizationalScope: "org:selfcheck",
   sensitive: true as const,
 };
+
+let currentStatePool: Pool | null = null;
+
+function getCurrentStatePool(): Pool {
+  if (currentStatePool) return currentStatePool;
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new Error("DATABASE_URL is required for current person state");
+  }
+  currentStatePool = createPgPool(url);
+  return currentStatePool;
+}
 
 function mapPersonError(err: unknown): never {
   if (err instanceof DataDictionaryError) {
@@ -211,6 +228,39 @@ export const personRouter = createTRPCRouter({
           );
         }
         return toPublicPerson(person);
+      } catch (err) {
+        mapPersonError(err);
+      }
+    }),
+
+  /**
+   * Shared current Person state (Story 4.9 / FR-25).
+   * Assembler lives in @divan/person-employment; compensation omit inside module.
+   */
+  getCurrentState: governedProcedure
+    .meta({ ...personReadMeta, operation: "person.current_state" })
+    .input(z.object({ personId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await requirePersonRead(ctx.session.accountId);
+      try {
+        const hasCompensationRead = await actorHasCompensationRead(
+          ctx.session.accountId,
+        );
+        const allowedCategories = new Set<string>([PERSON_DATA_CATEGORY]);
+        if (hasCompensationRead) {
+          allowedCategories.add(COMPENSATION_DATA_CATEGORY);
+        }
+        return await getCurrentPersonState(
+          input.personId,
+          {
+            actorAuthz: {
+              allowedCategories,
+              categories: DEV_DEMO_CATEGORIES,
+              hasCompensationRead,
+            },
+          },
+          { eventDb: getCurrentStatePool() },
+        );
       } catch (err) {
         mapPersonError(err);
       }

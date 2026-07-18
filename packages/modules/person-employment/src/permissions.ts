@@ -3,6 +3,7 @@
  * Envelope policy is 4-tuple only — assigned PermissionSet unlocks the API.
  */
 
+import { COMPENSATION_READ_PERMISSION } from "@divan/compensation-facts";
 import type { PrismaClient } from "@divan/db";
 
 import { getPersonDb } from "./db";
@@ -261,6 +262,14 @@ export async function assertActorHasCompensationWrite(
       "compensation_write_required",
     );
   }
+}
+
+/** Non-throwing — Story 4.9 current-state omits compensation block when false. */
+export async function actorHasCompensationRead(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<boolean> {
+  return actorHoldsPermission(accountId, COMPENSATION_READ_PERMISSION, db);
 }
 
 /** Non-throwing caps for UI gating (server still enforces on mutate). */

@@ -1,3 +1,20 @@
+## Deferred from: code review of 4-9-current-person-state-projection.md (2026-07-19)
+
+- tRPC `getCurrentState` hardcodes `DEV_DEMO_CATEGORIES` (compensation category never enabled) — same AR-DATA / person-router pattern; production enablement still open
+- Assembler sequential projection reads without shared snapshot/transaction — torn Employment/Primary/Team possible mid-finalize; pre-existing as-of read pattern
+- Module-scoped `createPgPool` (`currentStatePool`) instead of shared event-store pool — matches other web server modules
+- Recalc status can flip after freshness check (TOCTOU) — same class as torn reads
+- No `asOf` date-only validation on assembler options — product path defaults to Tehran today; tRPC does not expose `asOf`
+- Optional foreshadow: non-UUID personId + raw tRPC error message — same loose id input as `person.getById`
+
+## Deferred from: Story 4.9 current person state projection (2026-07-19)
+
+- **Current-state assembler landed** — `getCurrentPersonState` composes projection as-of helpers + `scheduledChanges` + fail-closed recalc; shared DTO; thin `person.getCurrentState` tRPC; optional `/personnel` foreshadow; `current-person-state.selfcheck`
+- **Still 4.10–4.11:** Historical Person reconstruction / as-of UI / Baseline disclosure; historical org/headcount reconstruction
+- **Still 4.12–4.14 / FR-30 remainder:** Full Headcount Approval / Matching / Reservation expiry UI / Override catalogue; durable reservation for Scheduled Start
+- **AD-6 cross-connection / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+- **AR-DATA:** Production enablement/masking of compensation category still open
+
 ## Deferred from: code review of 4-8-job-level-contract-compensation-change-events.md (2026-07-18)
 
 - AD-6 Prisma projectors (Primary / compensation-facts) vs PoolClient finalize txn — compensate wired for job-level + compensation; single-connection projector SQL still hardening (same as 4.5–4.7)
@@ -6,7 +23,8 @@
 ## Deferred from: Story 4.8 job-level contract compensation change events (2026-07-18)
 
 - **Job/level + Compensation/Contract Operators landed** — `OrganizationalRoleChanged` / `JobTitleChanged` / `SeniorityChanged` / `LadderChanged` / `GradeChanged` / `PromotionRecorded` / `CompensationChanged` / `ContractChanged` via Draft→Finalize→AD-6 hook; Primary close+open same-team; Title/Seniority capacity re-eval/reserve; Grade/Role/Ladder/Promotion no capacity mutate; compensation-facts sidecar for amounts; `compensation.write` + `COMPENSATION_PRODUCT_RISK_TIERS`; sectioned form; selfchecks
-- **Still 4.9–4.11:** Current/historical person & org reconstruction products
+- **4.9 landed:** Current Person state assembler (see Story 4.9 deferred block above)
+- **Still 4.10–4.11:** Historical person & org reconstruction products
 - **Still 4.12–4.14 / FR-30 remainder:** Full Headcount Approval / Matching / Reservation expiry UI / Override catalogue; durable reservation for Scheduled Start
 - **AD-6 cross-connection:** Prisma projectors vs PoolClient finalize — job/comp compensate wired; single-connection projector SQL still hardening
 - **AR-DATA:** Production enablement/masking of compensation category still open (selfcheck promotes FR-24 elements locally)

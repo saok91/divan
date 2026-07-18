@@ -487,9 +487,32 @@ export {
   assertActorHasPersonnelEventReverse,
   assertActorHasPersonnelEventCorrect,
   assertActorHasCompensationWrite,
+  actorHasCompensationRead,
   getPersonnelEventLifecycleCaps,
   MSG_PERSON_PERMISSION_REQUIRED_FA,
 } from "./permissions";
+
+export {
+  getCurrentPersonState,
+  listScheduledFutureChanges,
+  currentPersonStateFactsForCompare,
+  MSG_CURRENT_STATE_RECALC_PENDING_FA,
+  MSG_CURRENT_STATE_RECALC_FAILED_FA,
+  MSG_CURRENT_STATE_RECALC_STALE_FA,
+  MSG_SCHEDULED_SCAN_TRUNCATED_FA,
+  SCHEDULED_CHANGES_APPLY_LIMIT,
+} from "./current-person-state";
+
+export type {
+  CurrentPersonState,
+  CurrentPersonStateActorAuthz,
+  CurrentPersonStateFreshnessBlock,
+  CurrentPersonStateFreshnessCode,
+  GetCurrentPersonStateDeps,
+  GetCurrentPersonStateOptions,
+  GetCurrentPersonStateResult,
+  ScheduledFutureChange,
+} from "./current-person-state";
 
 export { POPULATION_SUBJECT_ID_TARGET } from "./population-cutover";
 
