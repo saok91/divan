@@ -653,6 +653,51 @@ export async function applyContractualProjection(
 }
 
 /**
+ * Delete a compensation/contractual fact by id (compensate / Reverse undo).
+ * Public AD-3 boundary — callers outside this module must not touch Prisma models.
+ */
+export async function deleteCompensationProjection(
+  id: string,
+  db: PrismaClient = getCompensationDb(),
+): Promise<void> {
+  await db.compensationFact.deleteMany({ where: { id } });
+}
+
+/**
+ * Restore a previously closed interval's end (compensate / Reverse undo).
+ * Matches on id + expected current end so concurrent closes do not reopen the wrong row.
+ */
+export async function reopenCompensationProjection(
+  id: string,
+  previousEndDateExclusive: string | null,
+  expectedCurrentEndExclusive: string,
+  db: PrismaClient = getCompensationDb(),
+): Promise<void> {
+  await db.compensationFact.updateMany({
+    where: {
+      id,
+      endDateExclusive: dateOnlyToDb(expectedCurrentEndExclusive),
+    },
+    data: {
+      endDateExclusive: previousEndDateExclusive
+        ? dateOnlyToDb(previousEndDateExclusive)
+        : null,
+    },
+  });
+}
+
+/**
+ * Dictionary gate for structural + monetary write fields (conflicts / pre-append).
+ */
+export async function assertCompensationFieldsEnabled(
+  fields: Record<string, unknown>,
+  db: PrismaClient = getCompensationDb(),
+  skipDictionaryGate?: boolean,
+): Promise<void> {
+  await assertDictionaryFieldsEnabled(fields, db, skipDictionaryGate);
+}
+
+/**
  * Close an open compensation or contractual interval.
  * Does not delete Person; does not append events.
  */

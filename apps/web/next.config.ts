@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
     "@divan/audit-envelope",
     "@divan/identity-access",
     "@divan/person-employment",
+    "@divan/compensation-facts",
+    "@divan/headcount",
   ],
 };
 

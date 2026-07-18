@@ -497,6 +497,9 @@ export const PERSONNEL_EVENT_REVERSE_PERMISSION = "personnel_event.reverse";
 export const PERSONNEL_EVENT_CORRECT_PERMISSION = "personnel_event.correct";
 export const PERSONNEL_EVENT_DATA_CATEGORY = "identity.person";
 
+/** Fine permission for CompensationChanged / ContractChanged finalize (Story 4.8 / FR-24). */
+export const COMPENSATION_WRITE_PERMISSION = "compensation.write";
+
 export const MSG_DRAFT_NOT_FOUND_FA = "پیش‌نویس رویداد یافت نشد.";
 
 export const MSG_DRAFT_NOT_EDITABLE_FA =
@@ -532,6 +535,9 @@ export const MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA =
   "تاریخ مؤثر نامعتبر است. فقط تاریخ روز (YYYY-MM-DD) مجاز است.";
 
 export const MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";
+
+export const MSG_COMPENSATION_WRITE_REQUIRED_FA =
+  "برای نهایی‌سازی تغییر جبران‌خدمت یا قرارداد به مجوز compensation.write نیاز است.";
 
 export const MSG_SENSITIVE_DRAFT_PAYLOAD_FA =
   "پیش‌نویس نباید حاوی دادهٔ حساس (مبلغ، کد ملی، …) باشد.";

@@ -36,6 +36,9 @@ export {
   applyCompensationProjection,
   applyContractualProjection,
   closeCompensationProjection,
+  deleteCompensationProjection,
+  reopenCompensationProjection,
+  assertCompensationFieldsEnabled,
   listCompensationFactsForPerson,
   listContractualFactsForPerson,
   getCompensationFactById,
@@ -76,6 +79,17 @@ export {
   seedDemoCompensationFacts,
   seedCompensationFactsFixtures,
 } from "./seed";
+
+export {
+  ensureCompensationDraftSidecarSchema,
+  putDraftCompensationValues,
+  peekDraftCompensationValues,
+  takeDraftCompensationValues,
+  clearDraftCompensationValues,
+  restoreDraftCompensationValues,
+} from "./draft-sidecar";
+
+export type { DraftCompensationValues } from "./draft-sidecar";
 
 /**
  * Documents the AD-3 boundary for callers/docs.

@@ -314,13 +314,13 @@ function dateInSlot(
 export async function consumeHeadcountCapacity(
   db: PoolClient,
   input: ConsumeCapacityInput,
-): Promise<void> {
+): Promise<{ consumed: boolean }> {
   const existing = await query<{ id: string }>(
     db,
     `SELECT id FROM headcount_capacity_consumption WHERE event_id = $1::uuid`,
     [input.eventId],
   );
-  if (existing.length > 0) return;
+  if (existing.length > 0) return { consumed: false };
 
   await db.query(
     `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
@@ -344,6 +344,7 @@ export async function consumeHeadcountCapacity(
      VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
     [randomUUID(), input.slotId, input.eventId, input.personId],
   );
+  return { consumed: true };
 }
 
 /**

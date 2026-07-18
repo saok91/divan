@@ -13,6 +13,7 @@ import {
   MSG_JOB_REF_PERMISSION_REQUIRED_FA,
   MSG_ORG_PERMISSION_REQUIRED_FA,
   MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+  MSG_COMPENSATION_WRITE_REQUIRED_FA,
   ORGANIZATION_READ_PERMISSION,
   ORGANIZATION_WRITE_PERMISSION,
   OrgUnitError,
@@ -23,6 +24,7 @@ import {
   PERSONNEL_EVENT_CANCEL_PERMISSION,
   PERSONNEL_EVENT_REVERSE_PERMISSION,
   PERSONNEL_EVENT_CORRECT_PERMISSION,
+  COMPENSATION_WRITE_PERMISSION,
   PersonIdentityError,
   PersonnelEventError,
 } from "./errors";
@@ -239,6 +241,24 @@ export async function assertActorHasPersonnelEventCorrect(
       "PERMISSION_DENIED",
       MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
       "personnel_event_correct_required",
+    );
+  }
+}
+
+export async function assertActorHasCompensationWrite(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    COMPENSATION_WRITE_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new PersonnelEventError(
+      "PERMISSION_DENIED",
+      MSG_COMPENSATION_WRITE_REQUIRED_FA,
+      "compensation_write_required",
     );
   }
 }

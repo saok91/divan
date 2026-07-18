@@ -191,6 +191,11 @@ function assertEditable(draft: PersonnelEventDraftRecord): void {
   }
 }
 
+/** Public guard for sidecar / other draft-adjacent writers. */
+export function assertDraftEditable(draft: PersonnelEventDraftRecord): void {
+  assertEditable(draft);
+}
+
 export async function createDraft(
   input: CreateDraftInput,
   actor: { accountId: string },

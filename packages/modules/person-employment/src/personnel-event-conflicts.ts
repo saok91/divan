@@ -53,6 +53,21 @@ import {
   parseTransferPayload,
   transferFactsAsStartFacts,
 } from "./personnel-event-transfer";
+import {
+  JOB_LEVEL_CAPACITY_EVENT_TYPES,
+  JOB_LEVEL_EVENT_TYPES,
+  findIncompatibleFutureEventsForJobLevel,
+  incompatibleJobLevelFutureToConflict,
+  isJobFactsNoop,
+  jobLevelFactsAsStartFacts,
+  parseJobLevelPayload,
+  resolveSuccessorPrimary,
+} from "./personnel-event-job-level";
+import {
+  COMPENSATION_EVENT_TYPES,
+  parseCompensationPayload,
+  peekCompensationSidecarForDraft,
+} from "./personnel-event-compensation";
 import { getActivePrimaryAssignmentAsOf } from "./primary-assignment";
 
 /** Lazy read pool for conflict existence checks outside a finalize txn. */
@@ -140,12 +155,15 @@ export const HEADCOUNT_CONSUMING_EVENT_TYPES = new Set([
   "TransferRecorded",
   "TeamTransferRecorded",
   "HeadcountConsumed",
+  "JobTitleChanged",
+  "SeniorityChanged",
 ]);
 
-/** Start/Return/Transfer — capacity evaluated via @divan/headcount port (not unconditional stub). */
+/** Start/Return/Transfer/Title/Seniority — capacity via @divan/headcount port (not stub). */
 export const HEADCOUNT_CAPACITY_PORT_EVENT_TYPES = new Set([
   ...START_RETURN_EVENT_TYPES,
   "TransferRecorded",
+  ...JOB_LEVEL_CAPACITY_EVENT_TYPES,
 ]);
 
 /**
@@ -875,6 +893,299 @@ export async function classifyConflicts(
     }
   }
 
+  // Job / level — open Employment + open Primary + overlay + no-op + peers (FR-23)
+  if (JOB_LEVEL_EVENT_TYPES.has(draft.eventType)) {
+    const { facts: overlay, missing } = parseJobLevelPayload(
+      draft.eventType,
+      draft.payload,
+    );
+    for (const m of missing) {
+      findings.push({
+        code: m.code,
+        severity: "blocking",
+        messageFa: m.messageFa,
+      });
+    }
+
+    const targetEmpId =
+      draft.employmentId?.trim() || overlay?.employmentId?.trim() || null;
+
+    if (!targetEmpId) {
+      findings.push({
+        code: "MISSING_EMPLOYMENT",
+        severity: "blocking",
+        messageFa:
+          "شناسه همکاری باز برای تغییر شغلی الزامی است؛ نهایی‌سازی مسدود است.",
+      });
+    } else {
+      const emp = await getEmploymentById(targetEmpId, db);
+      if (!emp) {
+        findings.push({
+          code: "EMPLOYMENT_REF_MISSING",
+          severity: "blocking",
+          messageFa:
+            "سابقه همکاری پیوست‌شده یافت نشد؛ نهایی‌سازی مسدود است.",
+        });
+      } else if (emp.personId !== draft.personId) {
+        findings.push({
+          code: "EMPLOYMENT_PERSON_MISMATCH",
+          severity: "blocking",
+          messageFa:
+            "همکاری هدف متعلق به این فرد نیست؛ نهایی‌سازی مسدود است.",
+        });
+      } else if (!isEmploymentActiveAsOf(emp, draft.effectiveDate)) {
+        findings.push({
+          code: "EMPLOYMENT_NOT_ACTIVE",
+          severity: "blocking",
+          messageFa:
+            "همکاری در تاریخ مؤثر فعال نیست؛ نهایی‌سازی مسدود است.",
+        });
+      } else {
+        const sourcePrimary = await getActivePrimaryAssignmentAsOf(
+          targetEmpId,
+          draft.effectiveDate,
+          db,
+        );
+        if (!sourcePrimary) {
+          findings.push({
+            code: "MISSING_SOURCE_PRIMARY",
+            severity: "blocking",
+            messageFa:
+              "انتصاب اولیه مبدأ برای تغییر شغلی یافت نشد؛ نهایی‌سازی مسدود است.",
+          });
+        } else if (overlay) {
+          if (overlay.teamId && overlay.teamId !== sourcePrimary.teamId) {
+            findings.push({
+              code: "USE_TRANSFER",
+              severity: "blocking",
+              messageFa:
+                "تغییر تیم از مسیر شغلی مجاز نیست؛ از TransferRecorded استفاده کنید.",
+            });
+          }
+
+          const successor = resolveSuccessorPrimary(
+            sourcePrimary,
+            draft.eventType,
+            overlay,
+          );
+          if (isJobFactsNoop(sourcePrimary, successor)) {
+            findings.push({
+              code: "JOB_FACTS_NOOP",
+              severity: "blocking",
+              messageFa:
+                "واقعیت‌های شغلی بدون تغییر است؛ رویداد بی‌اثر مجاز نیست.",
+            });
+          }
+
+          try {
+            const grade = await getGradeById(successor.gradeId, db);
+            if (!grade || grade.ladderId !== successor.ladderId) {
+              findings.push({
+                code: "LADDER_GRADE_INVALID",
+                severity: "blocking",
+                messageFa: "گرید به لدر انتخاب‌شده تعلق ندارد.",
+              });
+            }
+          } catch (err) {
+            if (err instanceof JobRefError) {
+              findings.push({
+                code: "LADDER_GRADE_INVALID",
+                severity: "blocking",
+                messageFa: err.messageFa,
+              });
+            } else {
+              findings.push({
+                code: "LADDER_GRADE_INVALID",
+                severity: "blocking",
+                messageFa: "گرید به لدر انتخاب‌شده تعلق ندارد.",
+              });
+            }
+          }
+
+          const inactive = await findInactiveRefConflicts(
+            jobLevelFactsAsStartFacts(successor),
+            draft.effectiveDate,
+            db,
+          );
+          for (const f of inactive) {
+            findings.push({
+              code: f.code,
+              severity: "blocking",
+              messageFa: f.messageFa,
+            });
+          }
+        }
+
+        const reader = opts.client ?? getConflictReadPool();
+        if (!reader) {
+          findings.push({
+            code: "INCOMPATIBLE_FUTURE_EVENTS",
+            severity: "blocking",
+            messageFa:
+              "امکان بررسی رویدادهای آینده ناسازگار وجود ندارد؛ نهایی‌سازی مسدود است.",
+          });
+        } else {
+          const future = await findIncompatibleFutureEventsForJobLevel(
+            reader,
+            {
+              personId: draft.personId,
+              employmentId: targetEmpId,
+              effectiveDate: draft.effectiveDate,
+              excludeEventId: draft.finalizedEventId,
+            },
+          );
+          const conflict = incompatibleJobLevelFutureToConflict(future);
+          if (conflict) {
+            findings.push(conflict);
+          }
+        }
+      }
+    }
+  }
+
+  // Compensation / Contract — employment + structural payload (FR-24)
+  if (COMPENSATION_EVENT_TYPES.has(draft.eventType)) {
+    const { facts, missing } = parseCompensationPayload(
+      draft.eventType,
+      draft.payload,
+      { employmentIdFallback: draft.employmentId },
+    );
+    for (const m of missing) {
+      findings.push({
+        code: m.code,
+        severity: "blocking",
+        messageFa: m.messageFa,
+      });
+    }
+
+    const targetEmpId =
+      draft.employmentId?.trim() || facts?.employmentId?.trim() || null;
+    if (targetEmpId) {
+      const emp = await getEmploymentById(targetEmpId, db);
+      if (!emp) {
+        findings.push({
+          code: "EMPLOYMENT_REF_MISSING",
+          severity: "blocking",
+          messageFa:
+            "سابقه همکاری پیوست‌شده یافت نشد؛ نهایی‌سازی مسدود است.",
+        });
+      } else if (emp.personId !== draft.personId) {
+        findings.push({
+          code: "EMPLOYMENT_PERSON_MISMATCH",
+          severity: "blocking",
+          messageFa:
+            "همکاری هدف متعلق به این فرد نیست؛ نهایی‌سازی مسدود است.",
+        });
+      } else if (!isEmploymentActiveAsOf(emp, draft.effectiveDate)) {
+        findings.push({
+          code: "EMPLOYMENT_NOT_ACTIVE",
+          severity: "blocking",
+          messageFa:
+            "همکاری در تاریخ مؤثر فعال نیست؛ نهایی‌سازی مسدود است.",
+        });
+      }
+    }
+
+    let sidecarAmount: string | null = null;
+    let sidecarComponents: unknown = null;
+    if (draft.eventType === "CompensationChanged") {
+      const sidecar = await peekCompensationSidecarForDraft(draft.id);
+      const amount = sidecar?.amount;
+      const hasAmount =
+        amount !== undefined &&
+        amount !== null &&
+        String(amount).trim() !== "";
+      if (!hasAmount) {
+        findings.push({
+          code: "MISSING_SIDECAR_AMOUNT",
+          severity: "blocking",
+          messageFa:
+            "مبلغ جبران‌خدمت باید از کانال حساس پیش‌نویس ثبت شود (نه در payload).",
+        });
+      } else {
+        sidecarAmount = String(amount).trim();
+        sidecarComponents = sidecar?.components ?? null;
+      }
+    }
+
+    if (facts) {
+      try {
+        const {
+          assertCompensationFieldsEnabled,
+          CompensationError,
+        } = await import("@divan/compensation-facts");
+        const gateFields: Record<string, unknown> =
+          draft.eventType === "CompensationChanged"
+            ? {
+                amount: sidecarAmount,
+                components: sidecarComponents,
+                currency: facts.currency,
+                changeType: facts.changeType,
+              }
+            : {
+                collaborationType: facts.collaborationType,
+                contractType: facts.contractType,
+                contractingEntity: facts.contractingEntity,
+                insuringEntity: facts.insuringEntity,
+                contractReference: facts.contractReference,
+                contractStartDate: facts.contractStartDate,
+                contractEndDateExclusive: facts.contractEndDateExclusive,
+              };
+        await assertCompensationFieldsEnabled(gateFields);
+      } catch (err) {
+        const { CompensationError } = await import("@divan/compensation-facts");
+        if (
+          err instanceof CompensationError &&
+          err.code === "FIELD_NOT_ENABLED"
+        ) {
+          findings.push({
+            code: "FIELD_NOT_ENABLED",
+            severity: "blocking",
+            messageFa: err.messageFa,
+          });
+        } else if (
+          err instanceof CompensationError &&
+          err.code === "FREE_TEXT_PURPOSE_REQUIRED"
+        ) {
+          findings.push({
+            code: "FREE_TEXT_PURPOSE_REQUIRED",
+            severity: "blocking",
+            messageFa: err.messageFa,
+          });
+        } else if (!(err instanceof CompensationError)) {
+          throw err;
+        } else {
+          findings.push({
+            code: err.code,
+            severity: "blocking",
+            messageFa: err.messageFa,
+          });
+        }
+      }
+    }
+
+    const reader = opts.client ?? getConflictReadPool();
+    if (!reader) {
+      findings.push({
+        code: "INCOMPATIBLE_FUTURE_EVENTS",
+        severity: "blocking",
+        messageFa:
+          "امکان بررسی رویدادهای آینده ناسازگار وجود ندارد؛ نهایی‌سازی مسدود است.",
+      });
+    } else {
+      const future = await findIncompatibleFutureEventsForJobLevel(reader, {
+        personId: draft.personId,
+        employmentId: targetEmpId,
+        effectiveDate: draft.effectiveDate,
+        excludeEventId: draft.finalizedEventId,
+      });
+      const conflict = incompatibleJobLevelFutureToConflict(future);
+      if (conflict) {
+        findings.push(conflict);
+      }
+    }
+  }
+
   // Ladder–Grade invalid
   if (snapshot.refs.ladderId && snapshot.refs.gradeId) {
     try {
@@ -903,13 +1214,56 @@ export async function classifyConflicts(
     }
   }
 
-  // Headcount — Start/Return/Transfer use capacity port; other consuming types stay stub-blocked
+  // Headcount — Start/Return/Transfer/Title/Seniority use capacity port; other consuming types stay stub-blocked
   if (HEADCOUNT_CAPACITY_PORT_EVENT_TYPES.has(draft.eventType)) {
     const isTransfer = TRANSFER_EVENT_TYPES.has(draft.eventType);
-    const parsed = isTransfer
-      ? parseTransferPayload(draft.payload)
-      : parseStartReturnPayload(draft.payload);
-    const facts = parsed.facts;
+    const isJobCapacity = JOB_LEVEL_CAPACITY_EVENT_TYPES.has(draft.eventType);
+    let facts: {
+      teamId: string;
+      jobTitleId: string;
+      ladderId: string;
+      gradeId: string;
+      capacitySlotId: string | null;
+    } | null = null;
+
+    if (isTransfer) {
+      const parsed = parseTransferPayload(draft.payload);
+      facts = parsed.facts;
+    } else if (isJobCapacity) {
+      const { facts: overlay, missing } = parseJobLevelPayload(
+        draft.eventType,
+        draft.payload,
+      );
+      if (overlay && missing.length === 0) {
+        const targetEmpId =
+          draft.employmentId?.trim() || overlay.employmentId?.trim() || null;
+        if (targetEmpId) {
+          const sourcePrimary = await getActivePrimaryAssignmentAsOf(
+            targetEmpId,
+            draft.effectiveDate,
+            db,
+          );
+          if (sourcePrimary) {
+            const successor = resolveSuccessorPrimary(
+              sourcePrimary,
+              draft.eventType,
+              overlay,
+            );
+            facts = {
+              teamId: successor.teamId,
+              jobTitleId: successor.jobTitleId,
+              ladderId: successor.ladderId,
+              gradeId: successor.gradeId,
+              capacitySlotId: overlay.capacitySlotId,
+            };
+          }
+        }
+      }
+    } else {
+      const parsed = parseStartReturnPayload(draft.payload);
+      facts = parsed.facts;
+    }
+
     if (facts) {
       const reader = opts.client ?? getConflictReadPool();
       if (!reader) {
@@ -929,9 +1283,6 @@ export async function classifyConflicts(
         });
         const conflict = capacityResultToConflict(capacity);
         if (conflict) {
-          // Transfer: capacity missing is blocking (no Override catalogue in 4.7) unless
-          // existing Start Override seam already applies — keep same warning+Override as Start
-          // for Operator/Admin path consistency when Override is provided.
           findings.push({
             code: conflict.code,
             severity: conflict.severity,

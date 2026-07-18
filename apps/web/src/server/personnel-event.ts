@@ -17,6 +17,7 @@ import {
   assertActorHasPersonnelEventDraft,
   assertActorHasPersonnelEventFinalize,
   assertActorHasPersonnelEventReverse,
+  assertActorHasCompensationWrite,
   cancelPersonnelEvent,
   correctPersonnelEvent,
   createDraft,
@@ -25,14 +26,20 @@ import {
   finalizeDraft,
   getActivePrimaryAssignmentAsOf,
   getDraft,
+  assertDraftEditable,
   getPersonnelEventLifecycleCaps,
   listOpenDraftsForPerson,
   loadEventWithResolvedStatus,
   resolveLifecycleStatus,
   reversePersonnelEvent,
   updateDraft,
-  TERMINATION_PRODUCT_RISK_TIERS,
+  PERSONNEL_EVENT_PRODUCT_RISK_TIERS,
+  COMPENSATION_EVENT_TYPES,
 } from "@divan/person-employment";
+import {
+  clearDraftCompensationValues,
+  putDraftCompensationValues,
+} from "@divan/compensation-facts";
 import {
   BusinessEventValidationError,
   getBusinessEventById,
@@ -230,11 +237,47 @@ export const personnelEventRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         await assertActorHasPersonnelEventDraft(ctx.session.accountId);
+        await clearDraftCompensationValues(input.draftId);
         return await deleteDraft(
           input.draftId,
           input.expectedVersion,
           { accountId: ctx.session.accountId },
         );
+      } catch (err) {
+        mapPersonnelEventError(err);
+      }
+    }),
+
+  /** Story 4.8 — sensitive monetary values for CompensationChanged (never in draft payload). */
+  putCompensationSidecar: governedProcedure
+    .meta({ ...draftMeta, operation: "personnel_event.compensation_sidecar.put" })
+    .input(
+      z.object({
+        draftId: z.string().min(1),
+        amount: z
+          .string()
+          .min(1)
+          .regex(/^-?\d+(\.\d+)?$/, "مبلغ باید عدد اعشاری معتبر باشد"),
+        components: z.unknown().optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await assertActorHasPersonnelEventDraft(ctx.session.accountId);
+        await assertActorHasCompensationWrite(ctx.session.accountId);
+        const draft = await getDraft(input.draftId);
+        if (!draft || draft.eventType !== "CompensationChanged") {
+          throw new PersonnelEventError(
+            "VALIDATION",
+            "کانال حساس فقط برای CompensationChanged مجاز است.",
+          );
+        }
+        assertDraftEditable(draft);
+        await putDraftCompensationValues(input.draftId, {
+          amount: input.amount,
+          components: input.components ?? null,
+        });
+        return { ok: true as const };
       } catch (err) {
         mapPersonnelEventError(err);
       }
@@ -305,6 +348,10 @@ export const personnelEventRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         await assertActorHasPersonnelEventFinalize(ctx.session.accountId);
+        const draft = await getDraft(input.draftId);
+        if (draft && COMPENSATION_EVENT_TYPES.has(draft.eventType)) {
+          await assertActorHasCompensationWrite(ctx.session.accountId);
+        }
         const result = await finalizeDraft(
           {
             draftId: input.draftId,
@@ -322,9 +369,9 @@ export const personnelEventRouter = createTRPCRouter({
               : undefined,
             // Never trust client Override flag — session role only.
             actorMayOverride: ctx.session.coarseRole === "hr_admin",
-            // Authorize termination tier for actors with personnel_event.finalize.
-            // Omit → pending_review (keep stub fail-closed). Full AR-ACCESS matrix deferred.
-            riskTier: TERMINATION_PRODUCT_RISK_TIERS,
+            // Authorize termination + compensation_change tiers (Stories 4.6 / 4.8).
+            // Omit → pending_review. Full AR-ACCESS matrix deferred.
+            riskTier: PERSONNEL_EVENT_PRODUCT_RISK_TIERS,
           },
           await readyFinalizePool(),
         );

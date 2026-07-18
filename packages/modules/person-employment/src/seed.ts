@@ -22,6 +22,7 @@ import {
   PERSONNEL_EVENT_DRAFT_PERMISSION,
   PERSONNEL_EVENT_FINALIZE_PERMISSION,
   PERSONNEL_EVENT_REVERSE_PERMISSION,
+  COMPENSATION_WRITE_PERMISSION,
 } from "./errors";
 import {
   createGrade,
@@ -389,6 +390,47 @@ export async function seedPersonnelEventPermissionFixtures(
       create: {
         accountId: admin.id,
         accessRoleId: lifecycleRole.id,
+      },
+      update: {},
+    });
+  }
+
+  // Story 4.8 — compensation.write: HR Admin only (fine permission for Comp/Contract finalize)
+  const compWriteSet = await db.permissionSet.upsert({
+    where: { name: "compensation-write" },
+    create: {
+      name: "compensation-write",
+      permissions: [COMPENSATION_WRITE_PERMISSION],
+    },
+    update: {
+      permissions: [COMPENSATION_WRITE_PERMISSION],
+    },
+  });
+
+  const compWriteRole = await db.accessRole.upsert({
+    where: { code: "compensation_write_admin" },
+    create: {
+      code: "compensation_write_admin",
+      labelFa: "مدیر نوشتن جبران‌خدمت",
+      permissionSetId: compWriteSet.id,
+    },
+    update: {
+      labelFa: "مدیر نوشتن جبران‌خدمت",
+      permissionSetId: compWriteSet.id,
+    },
+  });
+
+  if (admin) {
+    await db.accountAccessRole.upsert({
+      where: {
+        accountId_accessRoleId: {
+          accountId: admin.id,
+          accessRoleId: compWriteRole.id,
+        },
+      },
+      create: {
+        accountId: admin.id,
+        accessRoleId: compWriteRole.id,
       },
       update: {},
     });

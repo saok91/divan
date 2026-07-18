@@ -715,12 +715,12 @@ async function moveTransferCapacity(
       );
     }
 
-    await consumeHeadcountCapacity(ctx.client, {
+    const consumeResult = await consumeHeadcountCapacity(ctx.client, {
       slotId,
       eventId: ctx.eventId,
       personId,
     });
-    didMoveDest = true;
+    didMoveDest = consumeResult.consumed;
     return { didReleaseSource, didMoveDest };
   } catch (err) {
     // Undo capacity side-effects before outer Primary compensate sees stale flags

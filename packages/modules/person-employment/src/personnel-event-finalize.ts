@@ -61,7 +61,13 @@ import {
 } from "./personnel-event-recalc";
 import { compensateOrphanStartReturnProjections } from "./personnel-event-start-return";
 import { compensateTerminationApply } from "./personnel-event-termination";
-import { compensateTransferApply } from "./personnel-event-transfer";
+import { compensateTransferApply, releaseTransferReservationOnCancel } from "./personnel-event-transfer";
+import {
+  compensateJobLevelApply,
+  releaseJobLevelReservationOnCancel,
+} from "./personnel-event-job-level";
+import { compensateCompensationApply } from "./personnel-event-compensation";
+import { assertActorHasCompensationWrite } from "./permissions";
 
 export type RiskTierKind =
   | "termination"
@@ -89,6 +95,24 @@ export type RiskTierConfig = {
 export const TERMINATION_PRODUCT_RISK_TIERS: RiskTierConfig = {
   tiers: {
     termination: { requiresPreAuth: false },
+  },
+};
+
+/**
+ * Minimal product authorize config for Compensation/Contract finalize (Story 4.8).
+ * Full AR-ACCESS matrix remains open — do not invent toxic combos.
+ */
+export const COMPENSATION_PRODUCT_RISK_TIERS: RiskTierConfig = {
+  tiers: {
+    compensation_change: { requiresPreAuth: false },
+  },
+};
+
+/** Combined product risk tiers for web finalize covering Termination + Compensation. */
+export const PERSONNEL_EVENT_PRODUCT_RISK_TIERS: RiskTierConfig = {
+  tiers: {
+    termination: { requiresPreAuth: false },
+    compensation_change: { requiresPreAuth: false },
   },
 };
 
@@ -392,6 +416,14 @@ export async function finalizeDraft(
         "DRAFT_ALREADY_FINALIZED",
         MSG_DRAFT_ALREADY_FINALIZED_FA,
       );
+    }
+
+    // Story 4.8 — Compensation/Contract finalize requires compensation.write
+    if (
+      draft.eventType === "CompensationChanged" ||
+      draft.eventType === "ContractChanged"
+    ) {
+      await assertActorHasCompensationWrite(input.actorId, db);
     }
 
     if (
@@ -811,19 +843,56 @@ export async function finalizeDraft(
           didCloseEmployment: hookCtx.terminationApply.didCloseEmployment,
         });
       }
-      if (hookCtx.transferApply && !hookCtx.transferApply.reservedOnly) {
-        await compensateTransferApply({
-          client,
-          employmentId: hookCtx.transferApply.employmentId,
-          endDateExclusive: hookCtx.transferApply.endDateExclusive,
-          sourcePrimaryId: hookCtx.transferApply.sourcePrimaryId,
-          previousSourceEnd: hookCtx.transferApply.previousSourceEnd,
-          destinationPrimaryId: hookCtx.transferApply.destinationPrimaryId,
-          transferEventId: eventId!,
-          didCloseSource: hookCtx.transferApply.didCloseSource,
-          didOpenDest: hookCtx.transferApply.didOpenDest,
-          didReleaseSource: hookCtx.transferApply.didReleaseSource,
-          didMoveDestCapacity: hookCtx.transferApply.didMoveDestCapacity,
+      if (hookCtx.transferApply) {
+        if (hookCtx.transferApply.reservedOnly) {
+          await releaseTransferReservationOnCancel(client, eventId!);
+        } else {
+          await compensateTransferApply({
+            client,
+            employmentId: hookCtx.transferApply.employmentId,
+            endDateExclusive: hookCtx.transferApply.endDateExclusive,
+            sourcePrimaryId: hookCtx.transferApply.sourcePrimaryId,
+            previousSourceEnd: hookCtx.transferApply.previousSourceEnd,
+            destinationPrimaryId: hookCtx.transferApply.destinationPrimaryId,
+            transferEventId: eventId!,
+            didCloseSource: hookCtx.transferApply.didCloseSource,
+            didOpenDest: hookCtx.transferApply.didOpenDest,
+            didReleaseSource: hookCtx.transferApply.didReleaseSource,
+            didMoveDestCapacity: hookCtx.transferApply.didMoveDestCapacity,
+          });
+        }
+      }
+      if (hookCtx.jobLevelApply) {
+        if (hookCtx.jobLevelApply.reservedOnly) {
+          await releaseJobLevelReservationOnCancel(client, eventId!);
+        } else {
+          await compensateJobLevelApply({
+            client,
+            employmentId: hookCtx.jobLevelApply.employmentId,
+            endDateExclusive: hookCtx.jobLevelApply.endDateExclusive,
+            sourcePrimaryId: hookCtx.jobLevelApply.sourcePrimaryId,
+            previousSourceEnd: hookCtx.jobLevelApply.previousSourceEnd,
+            successorPrimaryId: hookCtx.jobLevelApply.successorPrimaryId,
+            jobEventId: eventId!,
+            didCloseSource: hookCtx.jobLevelApply.didCloseSource,
+            didOpenSuccessor: hookCtx.jobLevelApply.didOpenSuccessor,
+            didReleaseSource: hookCtx.jobLevelApply.didReleaseSource,
+            didMoveDestCapacity: hookCtx.jobLevelApply.didMoveDestCapacity,
+          });
+        }
+      }
+      if (hookCtx.compensationApply) {
+        await compensateCompensationApply({
+          personId: hookCtx.compensationApply.personId,
+          endDateExclusive: hookCtx.compensationApply.endDateExclusive,
+          priorFactId: hookCtx.compensationApply.priorFactId,
+          previousPriorEnd: hookCtx.compensationApply.previousPriorEnd,
+          newFactId: hookCtx.compensationApply.newFactId,
+          didClosePrior: hookCtx.compensationApply.didClosePrior,
+          didOpenNew: hookCtx.compensationApply.didOpenNew,
+          takenSidecar: hookCtx.compensationApply.takenSidecar,
+          draftId: hookCtx.compensationApply.draftId,
+          kind: hookCtx.compensationApply.kind,
         });
       }
       throw err;

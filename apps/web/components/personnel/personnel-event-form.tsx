@@ -36,6 +36,17 @@ const EVENT_TYPE_OPTIONS = [
     labelFa: "خاتمه همکاری (EmploymentTerminated)",
   },
   { value: "TransferRecorded", labelFa: "انتقال (TransferRecorded)" },
+  {
+    value: "OrganizationalRoleChanged",
+    labelFa: "تغییر نقش سازمانی",
+  },
+  { value: "JobTitleChanged", labelFa: "تغییر عنوان شغلی" },
+  { value: "SeniorityChanged", labelFa: "تغییر ارشدیت" },
+  { value: "LadderChanged", labelFa: "تغییر لدر" },
+  { value: "GradeChanged", labelFa: "تغییر گرید" },
+  { value: "PromotionRecorded", labelFa: "ثبت ارتقا (نتیجه نهایی)" },
+  { value: "CompensationChanged", labelFa: "تغییر جبران‌خدمت" },
+  { value: "ContractChanged", labelFa: "تغییر قرارداد" },
 ] as const;
 
 function isStartReturnType(eventType: string): boolean {
@@ -50,6 +61,28 @@ function isTerminationType(eventType: string): boolean {
 
 function isTransferType(eventType: string): boolean {
   return eventType === "TransferRecorded";
+}
+
+function isJobLevelType(eventType: string): boolean {
+  return (
+    eventType === "OrganizationalRoleChanged" ||
+    eventType === "JobTitleChanged" ||
+    eventType === "SeniorityChanged" ||
+    eventType === "LadderChanged" ||
+    eventType === "GradeChanged" ||
+    eventType === "PromotionRecorded"
+  );
+}
+
+function isJobCapacityType(eventType: string): boolean {
+  // SeniorityChanged: Primary-only until AR-HEADCOUNT (Decision B)
+  return eventType === "JobTitleChanged";
+}
+
+function isCompensationType(eventType: string): boolean {
+  return (
+    eventType === "CompensationChanged" || eventType === "ContractChanged"
+  );
 }
 
 type LifecycleOp = "cancel" | "reverse" | "correct";
@@ -104,9 +137,14 @@ export function PersonnelEventForm() {
   const [ladderId, setLadderId] = React.useState("");
   const [gradeId, setGradeId] = React.useState("");
   const [seniorityId, setSeniorityId] = React.useState("");
+  const [clearSeniority, setClearSeniority] = React.useState(false);
   const [terminationReason, setTerminationReason] =
     React.useState("contract_ended");
   const [overrideReason, setOverrideReason] = React.useState("");
+  const [currency, setCurrency] = React.useState("IRR");
+  const [changeType, setChangeType] = React.useState("");
+  const [contractType, setContractType] = React.useState("");
+  const [compensationAmount, setCompensationAmount] = React.useState("");
   const [draftId, setDraftId] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState(1);
   const [statusMsg, setStatusMsg] = React.useState<string | null>(null);
@@ -128,6 +166,7 @@ export function PersonnelEventForm() {
   const updateMut = api.personnelEvent.draftUpdate.useMutation();
   const deleteMut = api.personnelEvent.draftDelete.useMutation();
   const finalizeMut = api.personnelEvent.finalize.useMutation();
+  const putSidecarMut = api.personnelEvent.putCompensationSidecar.useMutation();
   const cancelMut = api.personnelEvent.cancel.useMutation();
   const reverseMut = api.personnelEvent.reverse.useMutation();
   const correctMut = api.personnelEvent.correct.useMutation();
@@ -144,23 +183,6 @@ export function PersonnelEventForm() {
   const canReverse = lifecycleCapsQuery.data?.reverse === true;
   const canCorrect = lifecycleCapsQuery.data?.correct === true;
 
-  const capacityQuery = api.personnelEvent.headcountCapacity.useQuery(
-    {
-      teamId: teamId.trim(),
-      effectiveDate: effectiveDate.trim(),
-      jobTitleId: jobTitleId.trim() || undefined,
-      ladderId: ladderId.trim() || undefined,
-      gradeId: gradeId.trim() || undefined,
-    },
-    {
-      enabled:
-        isTransferType(eventType) &&
-        Boolean(teamId.trim()) &&
-        Boolean(effectiveDate.trim()) &&
-        /^[0-9a-f-]{36}$/i.test(teamId.trim()),
-    },
-  );
-
   const sourcePrimaryQuery = api.personnelEvent.sourcePrimarySummary.useQuery(
     {
       employmentId: employmentId.trim(),
@@ -168,12 +190,49 @@ export function PersonnelEventForm() {
     },
     {
       enabled:
-        isTransferType(eventType) &&
+        (isTransferType(eventType) || isJobLevelType(eventType)) &&
         Boolean(employmentId.trim()) &&
         Boolean(effectiveDate.trim()) &&
         /^[0-9a-f-]{36}$/i.test(employmentId.trim()) &&
         /^\d{4}-\d{2}-\d{2}$/.test(effectiveDate.trim()),
     },
+  );
+
+  const capacityTeamId =
+    teamId.trim() || sourcePrimaryQuery.data?.teamId || "";
+  const capacityJobTitleId =
+    jobTitleId.trim() || sourcePrimaryQuery.data?.jobTitleId || "";
+
+  const capacityQuery = api.personnelEvent.headcountCapacity.useQuery(
+    {
+      teamId: capacityTeamId,
+      effectiveDate: effectiveDate.trim(),
+      jobTitleId: capacityJobTitleId || undefined,
+      ladderId: ladderId.trim() || undefined,
+      gradeId: gradeId.trim() || undefined,
+    },
+    {
+      enabled:
+        (isTransferType(eventType) || isJobCapacityType(eventType)) &&
+        Boolean(capacityTeamId) &&
+        Boolean(effectiveDate.trim()) &&
+        /^[0-9a-f-]{36}$/i.test(capacityTeamId),
+    },
+  );
+
+  const dictionaryQuery = api.person.listDictionary.useQuery(undefined, {
+    enabled: isCompensationType(eventType),
+  });
+  const enabledElementIds = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const row of dictionaryQuery.data ?? []) {
+      if (row.enabled) set.add(row.elementId);
+    }
+    return set;
+  }, [dictionaryQuery.data]);
+  const showCompField = React.useCallback(
+    (elementId: string) => enabledElementIds.has(elementId),
+    [enabledElementIds],
   );
 
   React.useEffect(() => {
@@ -201,6 +260,46 @@ export function PersonnelEventForm() {
       if (employmentId.trim()) payload.employmentId = employmentId.trim();
       return payload;
     }
+    if (isJobLevelType(eventType)) {
+      const payload: Record<string, unknown> = {};
+      if (employmentId.trim()) payload.employmentId = employmentId.trim();
+      if (eventType === "OrganizationalRoleChanged") {
+        payload.organizationalRoleId = organizationalRoleId.trim();
+      } else if (eventType === "JobTitleChanged") {
+        payload.jobTitleId = jobTitleId.trim();
+      } else if (eventType === "SeniorityChanged") {
+        if (clearSeniority) {
+          payload.seniorityId = null;
+        } else if (seniorityId.trim()) {
+          payload.seniorityId = seniorityId.trim();
+        }
+        // Omit key when untouched — parser requires explicit set or clear
+      } else if (eventType === "LadderChanged") {
+        payload.ladderId = ladderId.trim();
+        payload.gradeId = gradeId.trim();
+      } else if (
+        eventType === "GradeChanged" ||
+        eventType === "PromotionRecorded"
+      ) {
+        payload.gradeId = gradeId.trim();
+        if (ladderId.trim()) payload.ladderId = ladderId.trim();
+      }
+      return payload;
+    }
+    if (isCompensationType(eventType)) {
+      const payload: Record<string, unknown> = {};
+      if (employmentId.trim()) payload.employmentId = employmentId.trim();
+      if (eventType === "CompensationChanged") {
+        if (currency.trim()) payload.currency = currency.trim();
+        if (changeType.trim()) payload.changeType = changeType.trim();
+      } else {
+        if (contractType.trim()) payload.contractType = contractType.trim();
+        if (collaborationType.trim()) {
+          payload.collaborationType = collaborationType.trim();
+        }
+      }
+      return payload;
+    }
     if (!isStartReturnType(eventType)) return {};
     const payload: Record<string, unknown> = {
       collaborationType: collaborationType.trim(),
@@ -221,8 +320,12 @@ export function PersonnelEventForm() {
     ladderId,
     gradeId,
     seniorityId,
+    clearSeniority,
     terminationReason,
     employmentId,
+    currency,
+    changeType,
+    contractType,
   ]);
 
   const saveDraft = React.useCallback(async (): Promise<boolean> => {
@@ -275,7 +378,28 @@ export function PersonnelEventForm() {
           return false;
         }
       }
+      if (isJobLevelType(eventType)) {
+        if (!employmentId.trim()) {
+          setErrorMsg("برای تغییر شغلی، شناسه همکاری باز الزامی است.");
+          return false;
+        }
+      }
+      if (isCompensationType(eventType)) {
+        if (!employmentId.trim()) {
+          setErrorMsg("برای تغییر جبران‌خدمت/قرارداد، شناسه همکاری الزامی است.");
+          return false;
+        }
+        if (
+          eventType === "CompensationChanged" &&
+          !compensationAmount.trim()
+        ) {
+          setErrorMsg("مبلغ جبران‌خدمت الزامی است (از کانال حساس ذخیره می‌شود).");
+          return false;
+        }
+      }
       const payload = buildPayload();
+      let savedId = draftId;
+      let savedVersion = version;
       if (draftId) {
         const updated = await updateMut.mutateAsync({
           draftId,
@@ -285,6 +409,8 @@ export function PersonnelEventForm() {
           effectiveDate: effectiveDate.trim(),
           payload,
         });
+        savedVersion = updated.version;
+        savedId = updated.id;
         setVersion(updated.version);
         setDraftId(updated.id);
       } else {
@@ -295,8 +421,20 @@ export function PersonnelEventForm() {
           effectiveDate: effectiveDate.trim(),
           payload,
         });
+        savedId = created.id;
+        savedVersion = created.version;
         setDraftId(created.id);
         setVersion(created.version);
+      }
+      if (
+        eventType === "CompensationChanged" &&
+        savedId &&
+        compensationAmount.trim()
+      ) {
+        await putSidecarMut.mutateAsync({
+          draftId: savedId,
+          amount: compensationAmount.trim(),
+        });
       }
       setDirty(false);
       setDemoDraftSaved(true);
@@ -322,11 +460,13 @@ export function PersonnelEventForm() {
     ladderId,
     gradeId,
     terminationReason,
+    compensationAmount,
     buildPayload,
     draftId,
     version,
     createMut,
     updateMut,
+    putSidecarMut,
     setDemoDraftSaved,
   ]);
 
@@ -529,7 +669,10 @@ export function PersonnelEventForm() {
           <label className="block space-y-1">
             <span className="text-label-medium">
               شناسه همکاری
-              {isTerminationType(eventType) || isTransferType(eventType) ? (
+              {isTerminationType(eventType) ||
+              isTransferType(eventType) ||
+              isJobLevelType(eventType) ||
+              isCompensationType(eventType) ? (
                 <span className="text-destructive"> *</span>
               ) : (
                 " (اختیاری)"
@@ -541,10 +684,16 @@ export function PersonnelEventForm() {
               dir="ltr"
               autoComplete="off"
               required={
-                isTerminationType(eventType) || isTransferType(eventType)
+                isTerminationType(eventType) ||
+                isTransferType(eventType) ||
+                isJobLevelType(eventType) ||
+                isCompensationType(eventType)
               }
               aria-required={
-                isTerminationType(eventType) || isTransferType(eventType)
+                isTerminationType(eventType) ||
+                isTransferType(eventType) ||
+                isJobLevelType(eventType) ||
+                isCompensationType(eventType)
                   ? true
                   : undefined
               }
@@ -809,6 +958,287 @@ export function PersonnelEventForm() {
           </fieldset>
         ) : null}
 
+        {isJobLevelType(eventType) ? (
+          <fieldset className="space-y-3">
+            <legend className="text-label-medium">
+              تغییر واقعیت‌های شغلی / سطحی
+            </legend>
+            <p className="text-xs text-muted-foreground">
+              تیم ثابت می‌ماند. برای جابه‌جایی تیم از TransferRecorded استفاده
+              کنید. ارتقا فقط نتیجه نهایی گرید (± لدر) است — بدون گردش درخواست.
+            </p>
+            {sourcePrimaryQuery.data ? (
+              <div
+                className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                role="region"
+                aria-label="خلاصه انتصاب اولیه فعلی"
+              >
+                <p className="text-label-medium mb-2">انتصاب اولیه فعلی</p>
+                <dl className="grid gap-1 text-xs">
+                  <div className="flex gap-2">
+                    <dt className="text-muted-foreground shrink-0">تیم</dt>
+                    <dd className="font-mono truncate" dir="ltr">
+                      {sourcePrimaryQuery.data.teamId}
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="text-muted-foreground shrink-0">عنوان</dt>
+                    <dd className="font-mono truncate" dir="ltr">
+                      {sourcePrimaryQuery.data.jobTitleId}
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="text-muted-foreground shrink-0">لدر / گرید</dt>
+                    <dd className="font-mono truncate" dir="ltr">
+                      {sourcePrimaryQuery.data.ladderId.slice(0, 8)}… /{" "}
+                      {sourcePrimaryQuery.data.gradeId.slice(0, 8)}…
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
+            {eventType === "OrganizationalRoleChanged" ? (
+              <label className="block space-y-1">
+                <span className="text-label-medium">شناسه نقش سازمانی جدید</span>
+                <Input
+                  value={organizationalRoleId}
+                  onChange={(e) => {
+                    setOrganizationalRoleId(e.target.value);
+                    setDirty(true);
+                  }}
+                  required
+                  dir="ltr"
+                  autoComplete="off"
+                />
+              </label>
+            ) : null}
+            {eventType === "JobTitleChanged" ? (
+              <label className="block space-y-1">
+                <span className="text-label-medium">شناسه عنوان شغلی جدید</span>
+                <Input
+                  value={jobTitleId}
+                  onChange={(e) => {
+                    setJobTitleId(e.target.value);
+                    setDirty(true);
+                  }}
+                  required
+                  dir="ltr"
+                  autoComplete="off"
+                />
+              </label>
+            ) : null}
+            {eventType === "SeniorityChanged" ? (
+              <div className="space-y-3">
+                <label className="block space-y-1">
+                  <span className="text-label-medium">شناسه ارشدیت جدید</span>
+                  <Input
+                    value={seniorityId}
+                    onChange={(e) => {
+                      setSeniorityId(e.target.value);
+                      if (e.target.value.trim()) setClearSeniority(false);
+                      setDirty(true);
+                    }}
+                    disabled={clearSeniority}
+                    dir="ltr"
+                    autoComplete="off"
+                    aria-describedby={`${formId}-seniority-hint`}
+                  />
+                  <span
+                    id={`${formId}-seniority-hint`}
+                    className="text-xs text-muted-foreground"
+                  >
+                    مقدار را وارد کنید یا پاک‌کردن صریح را علامت بزنید؛ خالیِ
+                    دست‌نخورده پذیرفته نمی‌شود.
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={clearSeniority}
+                    onChange={(e) => {
+                      setClearSeniority(e.target.checked);
+                      if (e.target.checked) setSeniorityId("");
+                      setDirty(true);
+                    }}
+                  />
+                  پاک‌کردن ارشدیت (null)
+                </label>
+              </div>
+            ) : null}
+            {eventType === "LadderChanged" ||
+            eventType === "GradeChanged" ||
+            eventType === "PromotionRecorded" ? (
+              <>
+                {(eventType === "LadderChanged" ||
+                  eventType === "PromotionRecorded") && (
+                  <label className="block space-y-1">
+                    <span className="text-label-medium">
+                      شناسه لدر
+                      {eventType === "LadderChanged" ? " جدید" : " (اختیاری)"}
+                    </span>
+                    <Input
+                      value={ladderId}
+                      onChange={(e) => {
+                        setLadderId(e.target.value);
+                        setDirty(true);
+                      }}
+                      required={eventType === "LadderChanged"}
+                      dir="ltr"
+                      autoComplete="off"
+                    />
+                  </label>
+                )}
+                <label className="block space-y-1">
+                  <span className="text-label-medium">شناسه گرید جدید</span>
+                  <Input
+                    value={gradeId}
+                    onChange={(e) => {
+                      setGradeId(e.target.value);
+                      setDirty(true);
+                    }}
+                    required
+                    dir="ltr"
+                    autoComplete="off"
+                  />
+                </label>
+              </>
+            ) : null}
+            {isJobCapacityType(eventType) ? (
+              <HeadcountCapacityPanel
+                used={capacityQuery.data?.used ?? 0}
+                reserved={capacityQuery.data?.reserved ?? 0}
+                free={capacityQuery.data?.free ?? 0}
+                slotFound={
+                  capacityQuery.isFetched
+                    ? Boolean(capacityQuery.data?.slotId)
+                    : true
+                }
+                loading={capacityQuery.isFetching}
+                errorFa={
+                  capacityQuery.isError
+                    ? "خواندن ظرفیت ناموفق بود."
+                    : null
+                }
+              />
+            ) : null}
+          </fieldset>
+        ) : null}
+
+        {isCompensationType(eventType) ? (
+          <fieldset className="space-y-3">
+            <legend className="text-label-medium">
+              {eventType === "CompensationChanged"
+                ? "تغییر جبران‌خدمت"
+                : "تغییر قرارداد"}
+            </legend>
+            <p className="text-xs text-muted-foreground">
+              مبلغ هرگز در payload پیش‌نویس ذخیره نمی‌شود — کانال حساس جداگانه.
+              نهایی‌سازی نیازمند مجوز compensation.write است.
+            </p>
+            {eventType === "CompensationChanged" ? (
+              <>
+                {showCompField("compensation.amount") ? (
+                  <label className="block space-y-1">
+                    <span className="text-label-medium">
+                      مبلغ <span className="text-destructive">*</span>
+                    </span>
+                    <Input
+                      value={compensationAmount}
+                      onChange={(e) => {
+                        setCompensationAmount(e.target.value);
+                        setDirty(true);
+                      }}
+                      required
+                      dir="ltr"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      aria-describedby={`${formId}-amount-hint`}
+                    />
+                    <span
+                      id={`${formId}-amount-hint`}
+                      className="text-xs text-muted-foreground"
+                    >
+                      فقط در کانال حساس؛ کلید amount در payload مجاز نیست.
+                    </span>
+                  </label>
+                ) : null}
+                {showCompField("compensation.currency") ? (
+                  <label className="block space-y-1">
+                    <span className="text-label-medium">کد ارز</span>
+                    <Input
+                      value={currency}
+                      onChange={(e) => {
+                        setCurrency(e.target.value);
+                        setDirty(true);
+                      }}
+                      dir="ltr"
+                      autoComplete="off"
+                    />
+                  </label>
+                ) : null}
+                {showCompField("compensation.change_type") ? (
+                  <label className="block space-y-1">
+                    <span className="text-label-medium">نوع تغییر</span>
+                    <Input
+                      value={changeType}
+                      onChange={(e) => {
+                        setChangeType(e.target.value);
+                        setDirty(true);
+                      }}
+                      dir="ltr"
+                      autoComplete="off"
+                    />
+                  </label>
+                ) : null}
+                {!showCompField("compensation.amount") &&
+                !showCompField("compensation.currency") &&
+                !showCompField("compensation.change_type") ? (
+                  <p className="text-xs text-muted-foreground">
+                    هیچ فیلد جبران‌خدمت در دیکشنری داده فعال نیست.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {showCompField("contract.contract_type") ? (
+                  <label className="block space-y-1">
+                    <span className="text-label-medium">نوع قرارداد</span>
+                    <Input
+                      value={contractType}
+                      onChange={(e) => {
+                        setContractType(e.target.value);
+                        setDirty(true);
+                      }}
+                      dir="ltr"
+                      autoComplete="off"
+                    />
+                  </label>
+                ) : null}
+                {showCompField("contract.collaboration_type") ? (
+                  <label className="block space-y-1">
+                    <span className="text-label-medium">نوع همکاری</span>
+                    <Input
+                      value={collaborationType}
+                      onChange={(e) => {
+                        setCollaborationType(e.target.value);
+                        setDirty(true);
+                      }}
+                      dir="ltr"
+                      autoComplete="off"
+                    />
+                  </label>
+                ) : null}
+                {!showCompField("contract.contract_type") &&
+                !showCompField("contract.collaboration_type") ? (
+                  <p className="text-xs text-muted-foreground">
+                    فیلدهای قرارداد فعال در دیکشنری یافت نشد.
+                  </p>
+                ) : null}
+              </>
+            )}
+          </fieldset>
+        ) : null}
+
         {conflicts.length > 0 ? (
           <div className="space-y-2">
             <h3 className="text-label-medium">تعارض‌ها</h3>
@@ -1039,7 +1469,9 @@ export function PersonnelEventForm() {
         title={
           isTerminationType(eventType)
             ? "تأیید خاتمه همکاری"
-            : "تأیید نهایی‌سازی رویداد"
+            : isCompensationType(eventType)
+              ? "تأیید تغییر جبران‌خدمت / قرارداد"
+              : "تأیید نهایی‌سازی رویداد"
         }
         consequence={
           <div className="space-y-2">
@@ -1048,6 +1480,11 @@ export function PersonnelEventForm() {
                 با تأیید، همکاری و انتصاب‌های باز در تاریخ مؤثر بسته می‌شوند و
                 ظرفیت آزاد می‌گردد. این عمل از مسیر رویداد ثبت می‌شود و قابل
                 ویرایش مستقیم نیست.
+              </p>
+            ) : isCompensationType(eventType) ? (
+              <p>
+                با تأیید، واقعیت جبران‌خدمت/قرارداد در تاریخ مؤثر بسته و باز می‌شود.
+                مبلغ از کانال حساس اعمال می‌شود و در payload رویداد نمی‌آید.
               </p>
             ) : (
               <p>

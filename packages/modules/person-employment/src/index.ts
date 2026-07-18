@@ -112,6 +112,7 @@ export {
   PERSONNEL_EVENT_CANCEL_PERMISSION,
   PERSONNEL_EVENT_REVERSE_PERMISSION,
   PERSONNEL_EVENT_CORRECT_PERMISSION,
+  COMPENSATION_WRITE_PERMISSION,
   PERSONNEL_EVENT_DATA_CATEGORY,
   PersonnelEventError,
   MSG_DRAFT_NOT_FOUND_FA,
@@ -127,6 +128,7 @@ export {
   MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA,
   MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
   MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+  MSG_COMPENSATION_WRITE_REQUIRED_FA,
   MSG_SENSITIVE_DRAFT_PAYLOAD_FA,
   MSG_HEADCOUNT_CHECK_BLOCKED_FA,
   MSG_HEADCOUNT_NO_CAPACITY_FA,
@@ -484,6 +486,7 @@ export {
   assertActorHasPersonnelEventCancel,
   assertActorHasPersonnelEventReverse,
   assertActorHasPersonnelEventCorrect,
+  assertActorHasCompensationWrite,
   getPersonnelEventLifecycleCaps,
   MSG_PERSON_PERMISSION_REQUIRED_FA,
 } from "./permissions";
@@ -496,6 +499,7 @@ export {
   updateDraft,
   deleteDraft,
   listOpenDraftsForPerson,
+  assertDraftEditable,
 } from "./personnel-event-draft";
 
 export type {
@@ -586,11 +590,62 @@ export type {
 } from "./personnel-event-transfer";
 
 export {
+  JOB_LEVEL_EVENT_TYPES,
+  JOB_LEVEL_CAPACITY_EVENT_TYPES,
+  PRODUCT_ORG_ROLE_CHANGED,
+  PRODUCT_JOB_TITLE_CHANGED,
+  PRODUCT_SENIORITY_CHANGED,
+  PRODUCT_LADDER_CHANGED,
+  PRODUCT_GRADE_CHANGED,
+  PRODUCT_PROMOTION_RECORDED,
+  parseJobLevelPayload,
+  resolveSuccessorPrimary,
+  isJobFactsNoop,
+  matchingBucketChanged,
+  isJobLevelEffectUnapplied,
+  applyJobLevelProjections,
+  applyJobLevelScheduledReserve,
+  compensateJobLevelApply,
+  undoJobLevelApply,
+  releaseJobLevelReservationOnCancel,
+  findIncompatibleFutureEventsForJobLevel,
+  incompatibleJobLevelFutureToConflict,
+} from "./personnel-event-job-level";
+
+export type {
+  JobLevelOverlayFacts,
+  JobLevelSuccessorFacts,
+  MissingJobLevelFact,
+  JobLevelApplyResult,
+  JobLevelIncompatibleFutureEvent,
+} from "./personnel-event-job-level";
+
+export {
+  COMPENSATION_EVENT_TYPES,
+  PRODUCT_COMPENSATION_EVENT_TYPE,
+  PRODUCT_CONTRACT_EVENT_TYPE,
+  parseCompensationPayload,
+  applyCompensationProjections,
+  compensateCompensationApply,
+  undoCompensationApply,
+  clearCompensationSidecarForDraft,
+  peekCompensationSidecarForDraft,
+} from "./personnel-event-compensation";
+
+export type {
+  CompensationStructuralFacts,
+  MissingCompensationFact,
+  CompensationApplyResult,
+} from "./personnel-event-compensation";
+
+export {
   finalizeDraft,
   evaluateDraftForFinalize,
   inferRiskTiers,
   evaluateRiskTiers,
   TERMINATION_PRODUCT_RISK_TIERS,
+  COMPENSATION_PRODUCT_RISK_TIERS,
+  PERSONNEL_EVENT_PRODUCT_RISK_TIERS,
 } from "./personnel-event-finalize";
 
 export type {

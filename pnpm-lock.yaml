@@ -26,6 +26,9 @@ importers:
       '@divan/audit-envelope':
         specifier: workspace:*
         version: link:../../packages/kernel/audit-envelope
+      '@divan/compensation-facts':
+        specifier: workspace:*
+        version: link:../../packages/modules/compensation-facts
       '@divan/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -334,6 +337,9 @@ importers:
       '@divan/audit-envelope':
         specifier: workspace:*
         version: link:../../kernel/audit-envelope
+      '@divan/compensation-facts':
+        specifier: workspace:*
+        version: link:../compensation-facts
       '@divan/db':
         specifier: workspace:*
         version: link:../../db

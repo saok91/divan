@@ -59,6 +59,10 @@ import {
   TRANSFER_EVENT_TYPES,
   isTransferEffectUnapplied,
 } from "./personnel-event-transfer";
+import {
+  JOB_LEVEL_CAPACITY_EVENT_TYPES,
+  isJobLevelEffectUnapplied,
+} from "./personnel-event-job-level";
 
 export type LifecycleActorInput = {
   actorId: string;
@@ -195,7 +199,11 @@ export async function cancelPersonnelEvent(
           TRANSFER_EVENT_TYPES.has(target.eventType) &&
           target.status === "Scheduled" &&
           (await isTransferEffectUnapplied(target.id, db));
-        if (!transferReservedOnly) {
+        const jobLevelReservedOnly =
+          JOB_LEVEL_CAPACITY_EVENT_TYPES.has(target.eventType) &&
+          target.status === "Scheduled" &&
+          (await isJobLevelEffectUnapplied(target.id, db));
+        if (!transferReservedOnly && !jobLevelReservedOnly) {
           throw new PersonnelEventError(
             "CANCEL_AFTER_EFFECT",
             MSG_CANCEL_AFTER_EFFECT_FA,
