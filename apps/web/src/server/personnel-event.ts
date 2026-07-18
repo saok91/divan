@@ -40,6 +40,7 @@ import { todayDateOnlyTehran } from "@divan/temporal-engine";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { ensureRecalcEnqueueRegistered } from "./recalc-enqueue";
 import { createTRPCRouter, governedProcedure } from "./trpc";
 
 const draftMeta = {
@@ -91,6 +92,7 @@ const correctMeta = {
 };
 
 let finalizePool: Pool | null = null;
+let enqueueReady: Promise<void> | null = null;
 
 function getFinalizePool(): Pool {
   if (finalizePool) return finalizePool;
@@ -103,6 +105,19 @@ function getFinalizePool(): Pool {
   }
   finalizePool = createPgPool(url);
   return finalizePool;
+}
+
+/** Pool + send port ready before any heavy-recalc mutation. */
+async function readyFinalizePool(): Promise<Pool> {
+  const pool = getFinalizePool();
+  if (!enqueueReady) {
+    enqueueReady = ensureRecalcEnqueueRegistered().catch((err) => {
+      enqueueReady = null;
+      throw err;
+    });
+  }
+  await enqueueReady;
+  return pool;
 }
 
 function mapPersonnelEventError(err: unknown): never {
@@ -298,7 +313,7 @@ export const personnelEventRouter = createTRPCRouter({
             // Never trust client Override flag — session role only (4.2 stub).
             actorMayOverride: ctx.session.coarseRole === "hr_admin",
           },
-          getFinalizePool(),
+          await readyFinalizePool(),
         );
         if (result.outcome === "rejected") {
           throw new PersonnelEventError(result.code, result.messageFa);
@@ -462,7 +477,7 @@ export const personnelEventRouter = createTRPCRouter({
             reason: input.reason,
             idempotencyKey: input.idempotencyKey,
           },
-          getFinalizePool(),
+          await readyFinalizePool(),
         );
       } catch (err) {
         mapPersonnelEventError(err);
@@ -491,7 +506,7 @@ export const personnelEventRouter = createTRPCRouter({
             idempotencyKey: input.idempotencyKey,
             correctionPayload: input.correctionPayload,
           },
-          getFinalizePool(),
+          await readyFinalizePool(),
         );
       } catch (err) {
         mapPersonnelEventError(err);

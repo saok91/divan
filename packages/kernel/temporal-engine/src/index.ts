@@ -1,6 +1,7 @@
 /**
- * @divan/temporal-engine — pure temporal helpers only (Story 2.6).
- * Projection rebuild / event ordering engine remains Epic 4.
+ * @divan/temporal-engine — pure temporal helpers (Story 2.6) +
+ * authoritative apply-order comparator (Story 4.4 / FR-18).
+ * Domain projectors / reconstruction UIs remain later Epic 4 stories.
  */
 
 export {
@@ -11,3 +12,11 @@ export {
   dateOnlyInInterval,
   intervalsOverlap,
 } from "./date-only";
+
+export {
+  applyOrderTimestampMs,
+  compareBusinessEventsForApply,
+  orderBusinessEventsForApply,
+  APPLY_ORDER_SQL_ORDER_BY,
+} from "./order-business-events";
+export type { ApplyOrderableBusinessEvent } from "./order-business-events";

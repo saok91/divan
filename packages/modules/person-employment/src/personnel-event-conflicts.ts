@@ -15,6 +15,7 @@ import {
   MSG_CORRECTION_SELF_REF_FA,
   MSG_HEADCOUNT_CHECK_BLOCKED_FA,
   MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
+  MSG_IRRECONCILABLE_ORDERING_FA,
   MSG_PERSON_NOT_FOUND_FA,
   PersonnelEventError,
 } from "./errors";
@@ -514,6 +515,69 @@ export async function classifyConflicts(
       severity: "blocking",
       messageFa: MSG_HEADCOUNT_CHECK_BLOCKED_FA,
     });
+  }
+
+  // Irreconcilable same-day ordering (Story 4.4) — conservative detectable stub.
+  // Full dependent-graph detection lands with domain Start/Transfer (4.5+).
+  // Detectable now: shared non-empty payload.orderingExclusiveKey on the same
+  // person without neutralizing the earlier event (fail-closed).
+  // Date equality is intentionally not required here — PG DATE ↔ JS Date TZ
+  // shifts can skew equality; exclusive-key collision is sufficient for the stub.
+  {
+    const exclusiveKey = draft.payload.orderingExclusiveKey;
+    if (typeof exclusiveKey === "string" && exclusiveKey.trim()) {
+      const key = exclusiveKey.trim();
+      const reader = opts.client ?? getConflictReadPool();
+      if (!reader) {
+        findings.push({
+          code: "IRRECONCILABLE_ORDERING",
+          severity: "blocking",
+          messageFa: MSG_IRRECONCILABLE_ORDERING_FA,
+        });
+      } else {
+        const existing = await reader.query<{
+          id: string;
+          cancels_event_id: string | null;
+          reverses_event_id: string | null;
+          payload: Record<string, unknown>;
+        }>(
+          `SELECT id, cancels_event_id, reverses_event_id, payload
+           FROM kernel_events
+           WHERE event_class = 'business'
+             AND person_id = $1::uuid
+             AND status NOT IN ('Cancelled', 'Reversed')
+             AND payload->>'orderingExclusiveKey' = $2
+             AND ($3::uuid IS NULL OR id <> $3::uuid)`,
+          [draft.personId, key, draft.finalizedEventId ?? null],
+        );
+        const neutralizedTargets = new Set<string>();
+        for (const row of existing.rows) {
+          if (row.cancels_event_id) neutralizedTargets.add(row.cancels_event_id);
+          if (row.reverses_event_id) neutralizedTargets.add(row.reverses_event_id);
+        }
+        const draftNeutralizes = new Set<string>();
+        for (const k of [
+          "correctsEventId",
+          "cancelsEventId",
+          "reversesEventId",
+        ] as const) {
+          const ref = draft.payload[k];
+          if (typeof ref === "string" && ref.trim()) {
+            draftNeutralizes.add(ref.trim());
+          }
+        }
+        for (const row of existing.rows) {
+          if (neutralizedTargets.has(row.id)) continue;
+          if (draftNeutralizes.has(row.id)) continue;
+          findings.push({
+            code: "IRRECONCILABLE_ORDERING",
+            severity: "blocking",
+            messageFa: MSG_IRRECONCILABLE_ORDERING_FA,
+          });
+          break;
+        }
+      }
+    }
   }
 
   // Pre-Baseline boundary (AR-TEMPORAL partial freeze).

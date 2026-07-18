@@ -542,6 +542,9 @@ export const MSG_HEADCOUNT_CHECK_BLOCKED_FA =
 export const MSG_BASELINE_BOUNDARY_BLOCKED_FA =
   "تاریخ مؤثر قبل از مرز Baseline است و بدون Override مجاز نیست.";
 
+export const MSG_IRRECONCILABLE_ORDERING_FA =
+  "ترتیب رویدادهای هم‌روز قابل سازگاری نیست؛ نهایی‌سازی تا رفع تعارض مسدود است.";
+
 export const MSG_RISK_TIER_PENDING_REVIEW_FA =
   "این نوع رویداد نیازمند پیش‌تأیید سطح ریسک است و هنوز به‌صورت معتبر ثبت نمی‌شود.";
 

@@ -37,7 +37,8 @@
     "superjson": "^2.2.2",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "pg-boss": "12.26.0"
   },
   "devDependencies": {
     "@types/jalaali-js": "^1.2.0",

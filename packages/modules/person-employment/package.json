@@ -19,7 +19,8 @@
     "selfcheck:secondary-assignment": "tsx src/secondary-assignment.selfcheck.ts",
     "selfcheck:management-relationships": "tsx src/management-relationship.selfcheck.ts",
     "selfcheck:personnel-event-draft": "tsx src/personnel-event-draft.selfcheck.ts",
-    "selfcheck:personnel-event-lifecycle": "tsx src/personnel-event-lifecycle.selfcheck.ts"
+    "selfcheck:personnel-event-lifecycle": "tsx src/personnel-event-lifecycle.selfcheck.ts",
+    "selfcheck:personnel-event-recalc": "tsx src/personnel-event-recalc.selfcheck.ts"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

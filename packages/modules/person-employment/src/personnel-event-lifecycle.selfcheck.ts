@@ -257,15 +257,37 @@ async function main() {
     const corrEvt = await getBusinessEventById(pool, corr.neutralizingEventId);
     assert.equal(corrEvt!.correctsEventId, baseFin.eventId);
 
-    // Self-ref reject
+    // Self-ref reject — fresh target (no prior correction → must not idempotent-replay)
+    const selfRefDraft = await createDraft(
+      {
+        personId: demo.id,
+        eventType: "ScaffoldChangeRecorded",
+        effectiveDate: pastDate(3),
+        payload: { note: "self-ref-target" },
+      },
+      { accountId: admin },
+      db,
+    );
+    const selfRefFin = await finalizeDraft(
+      {
+        draftId: selfRefDraft.id,
+        actorId: admin,
+        expectedVersion: selfRefDraft.version,
+      },
+      pool,
+      db,
+    );
+    assert.equal(selfRefFin.outcome, "finalized");
+    if (selfRefFin.outcome !== "finalized") throw new Error("unreachable");
+
     await assert.rejects(
       () =>
         correctPersonnelEvent(
-          baseFin.eventId,
+          selfRefFin.eventId,
           {
             actorId: admin,
             reason: "self",
-            prospectiveEventId: baseFin.eventId,
+            prospectiveEventId: selfRefFin.eventId,
           },
           pool,
           db,

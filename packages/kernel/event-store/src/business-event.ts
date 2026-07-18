@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { parseDateOnly } from "@divan/temporal-engine";
+import { parseDateOnly, APPLY_ORDER_SQL_ORDER_BY } from "@divan/temporal-engine";
 import type { Pool, PoolClient } from "pg";
 
 type PgQueryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
@@ -613,6 +613,42 @@ export async function listBusinessEventsForPerson(
     `SELECT ${BUSINESS_SELECT} FROM kernel_events
      WHERE event_class = 'business' AND person_id = $1::uuid
      ORDER BY effective_date DESC, registered_at DESC, id DESC
+     LIMIT $2`,
+    [personId.trim(), limit],
+  );
+  return result.rows.map(mapBusinessRow);
+}
+
+/**
+ * Authoritative apply / reconstruct load order (Story 4.4 / FR-18).
+ * SQL twin of `@divan/temporal-engine` `orderBusinessEventsForApply` —
+ * never reuse the DESC UI list sort for reconstruction.
+ *
+ * Optional `fromEffectiveDate`: include events with effective_date >= from.
+ */
+export async function listBusinessEventsForPersonForApply(
+  db: PgQueryable,
+  personId: string,
+  opts: { fromEffectiveDate?: string; limit?: number } = {},
+): Promise<BusinessEventRecord[]> {
+  assertUuid("personId", "invalid_person_id", personId.trim());
+  const limit = Math.min(Math.max(opts.limit ?? 500, 1), 2000);
+  const from = opts.fromEffectiveDate?.trim();
+  if (from) {
+    const result = await db.query<KernelBusinessRow>(
+      `SELECT ${BUSINESS_SELECT} FROM kernel_events
+       WHERE event_class = 'business' AND person_id = $1::uuid
+         AND effective_date >= $2::date
+       ORDER BY ${APPLY_ORDER_SQL_ORDER_BY}
+       LIMIT $3`,
+      [personId.trim(), from, limit],
+    );
+    return result.rows.map(mapBusinessRow);
+  }
+  const result = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND person_id = $1::uuid
+     ORDER BY ${APPLY_ORDER_SQL_ORDER_BY}
      LIMIT $2`,
     [personId.trim(), limit],
   );

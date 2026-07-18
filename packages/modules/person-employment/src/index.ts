@@ -576,3 +576,32 @@ export type {
   LifecycleResult,
   CorrectPersonnelEventInput,
 } from "./personnel-event-lifecycle";
+
+export {
+  TEMPORAL_RECALCULATE_QUEUE,
+  isPastDatedEffective,
+  markRecalculationPending,
+  clearRecalculationStatus,
+  markRecalculationFailed,
+  markRecalculationStale,
+  getRecalculationStatus,
+  getPlatformRecalcSignal,
+  enqueueRecalculationAfterCommit,
+  scheduleHeavyRecalculation,
+  runHistoricalRecalculation,
+  loadOrderedEventsForRecalc,
+  listPendingRecalculationJobs,
+  reenqueuePendingRecalculationIfNeeded,
+  setRecalcEnqueue,
+  setRecalcEnqueueForTest,
+  runWithRecalcEnqueue,
+  recalcJobKey,
+} from "./personnel-event-recalc";
+
+export type {
+  RecalculationRowStatus,
+  RecalculationStatusRow,
+  RecalcJobPayload,
+  PlatformRecalcSignal,
+  RecalcEnqueueFn,
+} from "./personnel-event-recalc";

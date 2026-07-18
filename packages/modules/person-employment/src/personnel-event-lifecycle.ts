@@ -45,6 +45,12 @@ import {
   type ProjectionRefreshHook,
 } from "./personnel-event-projection-hook";
 import {
+  enqueueRecalculationAfterCommit,
+  reenqueuePendingRecalculationIfNeeded,
+  scheduleHeavyRecalculation,
+  type RecalcJobPayload,
+} from "./personnel-event-recalc";
+import {
   assertActorHasPersonnelEventCancel,
   assertActorHasPersonnelEventCorrect,
   assertActorHasPersonnelEventReverse,
@@ -66,6 +72,8 @@ export type LifecycleResult = {
   resolvedStatus: "Cancelled" | "Reversed" | "Effective" | "Scheduled";
   projectionHookInvoked: boolean;
   idempotentReplay: boolean;
+  /** Heavy historical recalc scheduled (Reverse / Correction). */
+  recalcScheduled?: RecalcJobPayload | null;
 };
 
 function requireReason(reason: string | undefined, messageFa: string): string {
@@ -261,7 +269,10 @@ export async function reversePersonnelEvent(
   const hook =
     input.projectionRefreshHook ?? getProjectionRefreshHook();
 
-  return runWithProjectionRefreshHook(hook, () =>
+  let pendingRecalc: RecalcJobPayload | null = null;
+  let replayPersonId: string | null = null;
+
+  const result = await runWithProjectionRefreshHook(hook, () =>
     withTransaction(pool, async (client) => {
       const target = await lockBusinessEventForUpdate(client, targetEventId);
       if (!target) {
@@ -274,6 +285,7 @@ export async function reversePersonnelEvent(
         "reverse",
       );
       if (existing) {
+        replayPersonId = target.personId;
         return {
           neutralizingEventId: existing.id,
           targetEventId: target.id,
@@ -346,15 +358,30 @@ export async function reversePersonnelEvent(
       };
       await runProjectionRefreshHook(hookCtx);
 
+      // Reverse always affects derived history from target Effective Date
+      pendingRecalc = await scheduleHeavyRecalculation(
+        client,
+        target.personId,
+        target.effectiveDate,
+      );
+
       return {
         neutralizingEventId: eventId!,
         targetEventId: target.id,
         resolvedStatus: "Reversed" as const,
         projectionHookInvoked: Boolean(hookCtx.invoked),
         idempotentReplay: false,
+        recalcScheduled: pendingRecalc,
       };
     }),
   );
+
+  if (pendingRecalc) {
+    await enqueueRecalculationAfterCommit(pendingRecalc);
+  } else if (result.idempotentReplay && replayPersonId) {
+    await reenqueuePendingRecalculationIfNeeded(pool, replayPersonId);
+  }
+  return result;
 }
 
 export type CorrectPersonnelEventInput = LifecycleActorInput & {
@@ -390,7 +417,10 @@ export async function correctPersonnelEvent(
     input.projectionRefreshHook ?? getProjectionRefreshHook();
   const prospectiveId = input.prospectiveEventId?.trim() || randomUUID();
 
-  return runWithProjectionRefreshHook(hook, () =>
+  let pendingRecalc: RecalcJobPayload | null = null;
+  let replayPersonId: string | null = null;
+
+  const result = await runWithProjectionRefreshHook(hook, () =>
     withTransaction(pool, async (client) => {
       const target = await lockBusinessEventForUpdate(client, targetEventId);
       if (!target) {
@@ -404,6 +434,7 @@ export async function correctPersonnelEvent(
       );
       // Cardinality 1: any existing correction replays (with or without key).
       if (existing) {
+        replayPersonId = target.personId;
         const links = await listChainLinksForEvent(client, target.id);
         return {
           neutralizingEventId: existing.id,
@@ -528,13 +559,28 @@ export async function correctPersonnelEvent(
       };
       await runProjectionRefreshHook(hookCtx);
 
+      // Correction rebuilds from target Effective Date forward
+      pendingRecalc = await scheduleHeavyRecalculation(
+        client,
+        target.personId,
+        target.effectiveDate,
+      );
+
       return {
         neutralizingEventId: eventId!,
         targetEventId: target.id,
         resolvedStatus: evalStatus as "Effective" | "Scheduled",
         projectionHookInvoked: Boolean(hookCtx.invoked),
         idempotentReplay: false,
+        recalcScheduled: pendingRecalc,
       };
     }),
   );
+
+  if (pendingRecalc) {
+    await enqueueRecalculationAfterCommit(pendingRecalc);
+  } else if (result.idempotentReplay && replayPersonId) {
+    await reenqueuePendingRecalculationIfNeeded(pool, replayPersonId);
+  }
+  return result;
 }

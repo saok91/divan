@@ -1,7 +1,8 @@
 /**
  * Pure AR-TEMPORAL date helpers (Story 2.6).
  * Date-only YYYY-MM-DD in Asia/Tehran calendar day semantics.
- * No projection rebuild / event engine — Epic 4 owns that.
+ * Exclusive interval ends ([start, end)) — do not invent new calendar rules.
+ * Apply-order / rebuild comparator lives in order-business-events.ts (Story 4.4).
  */
 
 export const TEHRAN_TZ = "Asia/Tehran";

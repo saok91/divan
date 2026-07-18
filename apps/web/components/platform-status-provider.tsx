@@ -106,15 +106,45 @@ export function PlatformStatusProvider({
   children: React.ReactNode;
   initial?: Partial<PlatformStatus>;
 }) {
-  const [recalculationPending, setRecalculationPending] = React.useState(
+  const initialAuthzChanged = initial?.authzChanged ?? false;
+
+  // Mid-session sync: poll fresh session (breakGlass + authzChanged).
+  const meQuery = api.me.useQuery(undefined, {
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
+
+  // AD-6 / UX-DR5: durable recalc pending/stale from server (not demo-only toggle).
+  const recalcQuery = api.platformStatus.recalc.useQuery(undefined, {
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const serverRecalcPending = recalcQuery.data?.recalculationPending === true;
+  const serverBlockingStale = recalcQuery.data?.blockingStale === true;
+  const serverStalePendingUntil = recalcQuery.data?.stalePendingUntil;
+
+  // Local/demo toggles OR with server — server is source of truth for production pending.
+  const [recalculationPendingLocal, setRecalculationPending] = React.useState(
     initial?.recalculationPending ?? DEFAULT_STATUS.recalculationPending,
   );
-  const [blockingStale, setBlockingStale] = React.useState(
+  const [blockingStaleLocal, setBlockingStale] = React.useState(
     initial?.blockingStale ?? DEFAULT_STATUS.blockingStale,
   );
   const [stalePendingUntil, setStalePendingUntil] = React.useState(
     initial?.stalePendingUntil ?? DEFAULT_STATUS.stalePendingUntil,
   );
+
+  React.useEffect(() => {
+    if (serverStalePendingUntil) {
+      setStalePendingUntil(serverStalePendingUntil);
+    }
+  }, [serverStalePendingUntil]);
+
+  const recalculationPending =
+    serverRecalcPending || recalculationPendingLocal;
+  const blockingStale = serverBlockingStale || blockingStaleLocal;
+
   const [breakGlassOverride, setBreakGlassOverride] =
     React.useState<BreakGlassGrant | null>(null);
   const [authzChangedAcked, setAuthzChangedAcked] = React.useState(false);
@@ -144,14 +174,6 @@ export function PlatformStatusProvider({
     }
     return fn();
   }, []);
-
-  const initialAuthzChanged = initial?.authzChanged ?? false;
-
-  // Mid-session sync: poll fresh session (breakGlass + authzChanged).
-  const meQuery = api.me.useQuery(undefined, {
-    refetchInterval: 15_000,
-    refetchOnWindowFocus: true,
-  });
 
   const breakGlass = toBreakGlassGrant(
     breakGlassOverride ??

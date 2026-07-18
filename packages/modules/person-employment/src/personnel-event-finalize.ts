@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   appendBusinessEvent,
+  appendAccessEvent,
   BusinessEventValidationError,
   withTransaction,
   type BusinessEventStatus,
@@ -52,6 +53,12 @@ import {
   type ProjectionRefreshContext,
   type ProjectionRefreshHook,
 } from "./personnel-event-projection-hook";
+import {
+  enqueueRecalculationAfterCommit,
+  isPastDatedEffective,
+  scheduleHeavyRecalculation,
+  type RecalcJobPayload,
+} from "./personnel-event-recalc";
 
 export type RiskTierKind =
   | "termination"
@@ -115,6 +122,8 @@ export type FinalizeDraftResult =
       conflicts: ConflictFinding[];
       snapshot: EvaluationSnapshot;
       projectionHookInvoked: boolean;
+      /** Set when past-dated Effective triggered heavy historical recalc. */
+      recalcScheduled?: RecalcJobPayload | null;
     }
   | {
       outcome: "pending_review";
@@ -298,7 +307,9 @@ export async function finalizeDraft(
   const hook =
     input.projectionRefreshHook ?? getProjectionRefreshHook();
 
-  return runWithProjectionRefreshHook(hook, () =>
+  let pendingRecalc: RecalcJobPayload | null = null;
+
+  const result = await runWithProjectionRefreshHook(hook, () =>
     withTransaction(pool, async (client) => {
     const row = await lockDraftRow(client, input.draftId);
     if (!row) {
@@ -657,6 +668,42 @@ export async function finalizeDraft(
     };
     await runProjectionRefreshHook(hookCtx);
 
+    // Pre-Baseline Override + ack → access-event audit evidence (AC #3)
+    if (needOverride.length > 0 && input.override) {
+      await appendAccessEvent(client, {
+        correlationId,
+        actorAccountId: input.actorId,
+        operation: "personnel_event.pre_baseline_override",
+        scope: {
+          draftId: draft.id,
+          personId: draft.personId,
+          overrideCodes: needOverride,
+          warningCodes: needAck,
+          effectiveDate: draft.effectiveDate,
+        },
+        result: "allow",
+        reason: input.override.reason,
+        entityType: "PersonnelEventDraft",
+        entityId: draft.id,
+        payload: {
+          baselineOverride: true,
+          acknowledgedWarningCodes: needAck,
+        },
+      });
+    }
+
+    // AD-6 heavy path: past-dated Effective → durable pending + post-commit enqueue
+    if (
+      status === "Effective" &&
+      isPastDatedEffective(draft.effectiveDate, liveSnapshot.asOfDate)
+    ) {
+      pendingRecalc = await scheduleHeavyRecalculation(
+        client,
+        draft.personId,
+        draft.effectiveDate,
+      );
+    }
+
     const finalRow = await lockDraftRow(client, draft.id);
     draft = mapDraftRow(finalRow!);
 
@@ -668,9 +715,15 @@ export async function finalizeDraft(
       conflicts,
       snapshot: liveSnapshot,
       projectionHookInvoked: Boolean(hookCtx.invoked),
+      recalcScheduled: pendingRecalc,
     };
   }),
   );
+
+  if (pendingRecalc) {
+    await enqueueRecalculationAfterCommit(pendingRecalc);
+  }
+  return result as FinalizeDraftResult;
 }
 
 /**

@@ -1,3 +1,17 @@
+## Deferred from: code review of 4-4-deterministic-ordering-recalculation.md (2026-07-18)
+
+- Generation check outside txn (TOCTOU) in `runHistoricalRecalculation` — status read before BEGIN; `clear` still gated by generation so wrong clear is avoided; revisit when domain projectors make obsolete apply harmful
+- `pending`→`stale` never auto-transitions — `markRecalculationStale` + UX signal exist; no timeout/ops policy in 4.4; `failed` already blocks gold CTAs; revisit with retry/SLA policy
+
+## Deferred from: Story 4.4 deterministic ordering & recalculation (2026-07-18)
+
+- **Ordering + recalc substrate landed** — `compareBusinessEventsForApply` / `orderBusinessEventsForApply`; `listBusinessEventsForPersonForApply`; `IRRECONCILABLE_ORDERING` exclusive-key stub; `recalculation_status` + pg-boss `temporal.recalculate`; PlatformStatusProvider wired to `platformStatus.recalc`; pre-Baseline Override access-event evidence
+- **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp domain Operators + projectors (AD-6 hook remains scaffold for domain effects; exclusive-key stub → real dependent graph)
+- **Still 4.9–4.11:** Current/historical person & org reconstruction products
+- **Still 4.14:** Reservation release on Cancel (headcount math not invented here)
+- **Still 5.3:** Full `personnel-event-timeline` (UX-DR9) — UI list sort remains DESC display, separate from apply-order engine
+- **Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+
 ## Deferred from: code review of 4-3-scheduled-state-cancel-reverse-correction.md (2026-07-18)
 
 - Person/org-scoped authorization on `get` / `resolve` / `listForPerson` (potential IDOR with draft permission only) — pre-existing draft-read pattern; revisit with broader access epic
@@ -7,7 +21,7 @@
 ## Deferred from: Story 4.3 scheduled state / cancel / reverse / correction (2026-07-18)
 
 - **Scheduled + Cancel / Reverse / Correction landed** — `resolveLifecycleStatus` / evaluation-by-date; `cancelPersonnelEvent` / `reversePersonnelEvent` / `correctPersonnelEvent` append-only chains; Cancel↔effect race (`FOR UPDATE`); `BROKEN_CORRECTION_REF` existence+cycle; UX-DR10 `status-badge-*`; governed tRPC lifecycle; Admin-only lifecycle PermissionSet
-- **Still 4.4+:** Deterministic same-day ordering + pg-boss recalc / `recalculation_pending` (past-dated Reverse/Correction historical rebuild)
+- **4.4 landed:** Deterministic same-day ordering + pg-boss recalc / `recalculation_pending`
 - **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp domain Operators + projectors (AD-6 hook remains scaffold for domain effects)
 - **Still 4.9–4.11:** Current/historical person & org reconstruction products
 - **Still 4.14:** Reservation release on Cancel (headcount math not invented here)
@@ -17,14 +31,14 @@
 ## Deferred from: code review of 4-2-draft-finalization-conflict-classification.md (2026-07-18)
 
 - Primary-assignment overlap conflict stub beyond EmploymentStarted employment overlap — product Primary-mutating flows are 4.5–4.7; EXCLUDE stays on `applyPrimaryAssignmentProjection`
-- Irreconcilable ordering conflict stub — Story 4.4 deterministic ordering / recalc
+- ~~Irreconcilable ordering conflict stub — Story 4.4 deterministic ordering / recalc~~ → **landed in 4.4** (`IRRECONCILABLE_ORDERING` exclusive-key detectable stub; full graph → 4.5+)
 - Selfcheck delete↔finalize race is sequential (finalize then delete), not true concurrency — revisit with Vitest/ephemeral DB isolation
 
 ## Deferred from: Story 4.2 draft finalization & conflict classification (2026-07-18)
 
 - **Draft / finalize / conflict landed** — `PersonnelEventDraft` Prisma working store; `createDraft` / `updateDraft` / `deleteDraft`; `finalizeDraft` inside `withTransaction` + `appendBusinessEvent` + AD-6 projection hook; `classifyConflicts` + evaluation snapshot (FR-56); risk-tier fail-closed stubs; governed tRPC `personnelEvent.*`; minimal فرم رویداد + sensitive confirm; authz modal real save-draft seam
 - **4.3 landed:** Cancel / Reverse / Correction writers + UX-DR10 badge set (Scheduled vs Effective UI)
-- **Still 4.4+:** Deterministic same-day ordering + pg-boss recalc UI
+- **4.4 landed:** Deterministic same-day ordering + pg-boss recalc UI
 - **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp domain Operators (same finalize substrate)
 - **Still 4.9–4.11:** Current/historical person & org reconstruction products
 - **Still 4.12+:** Headcount Approval / Reservation / Override product lifecycle (finalize port remains fail-closed stub for consuming types)
@@ -39,7 +53,7 @@
 - **Business attributable record landed** — `003_business_event_attributable_fields.sql` + real `appendBusinessEvent` (FR-14 columns, PascalCase type, evidence sanitizer, append-only trigger)
 - **4.2 landed:** Draft edit/delete UI, finalization product flow, conflict classification (see Story 4.2 deferred block above)
 - **4.3 landed:** Scheduled / Cancel / Reverse / Correction writers and UX-DR10 badges
-- **Still 4.4+:** Deterministic same-day ordering + pg-boss recalc
+- **4.4 landed:** Deterministic same-day ordering + pg-boss recalc
 - **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp Operators flows (Transfer coverage-after-atomic-close+open + AR-TEMPORAL apply active-as-of remain fail-closed dispositions in 4.1 Dev Notes)
 - **Hash-chain tamper evidence (NFR-10 / AR-AUDIT)** still deferred
 - **AuthAttempt → access event migration** unchanged from Story 2.1 plan (keep writing AuthAttempt on login)

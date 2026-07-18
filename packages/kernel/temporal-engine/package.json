@@ -9,9 +9,11 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "selfcheck:ordering": "tsx src/order-business-events.selfcheck.ts"
   },
   "devDependencies": {
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }

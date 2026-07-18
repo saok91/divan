@@ -9,12 +9,18 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "tsx src/index.ts",
+    "selfcheck:recalc": "tsx src/recalc.selfcheck.ts"
   },
   "dependencies": {
+    "@divan/db": "workspace:*",
+    "@divan/person-employment": "workspace:*",
     "pg-boss": "12.26.0"
   },
   "devDependencies": {
+    "dotenv": "^17.4.2",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }
