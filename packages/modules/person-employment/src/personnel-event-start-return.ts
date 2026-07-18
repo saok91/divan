@@ -302,6 +302,7 @@ export async function applyStartReturnProjections(
         slotId,
         eventId: ctx.eventId,
         personId: source.personId,
+        evaluationDate: source.effectiveDate,
       });
     }
 

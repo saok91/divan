@@ -9,7 +9,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "selfcheck:headcount-approval": "tsx src/headcount-approval.selfcheck.ts"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

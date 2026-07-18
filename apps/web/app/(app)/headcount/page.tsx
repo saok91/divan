@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { HeadcountApprovalPanel } from "@/components/headcount/approval-panel";
 import { HistoricalOrgHeadcountForeshadow } from "@/components/organization/historical-org-headcount-foreshadow";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 /**
- * Headcount surface — Story 4.11 foreshadow only (not Approval admin → 4.12).
+ * Headcount surface — Approval admin (4.12) + FR-27 foreshadow (4.11).
  */
 export default async function HeadcountPage() {
   const session = await auth();
@@ -23,6 +24,7 @@ export default async function HeadcountPage() {
           ظرفیت سازمانی و فرایند جذب در این بخش پیگیری می‌شود.
         </p>
       </div>
+      <HeadcountApprovalPanel />
       <HistoricalOrgHeadcountForeshadow />
     </div>
   );

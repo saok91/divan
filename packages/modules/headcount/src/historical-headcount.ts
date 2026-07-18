@@ -24,12 +24,23 @@ export const MSG_HEADCOUNT_LEDGER_AMBIGUOUS_FA =
 export const MSG_HEADCOUNT_CONSERVATION_FA =
   "هویت کاتالوگ ظرفیت (approved = used + reserved + free) برقرار نیست؛ بازسازی تاریخی مسدود است.";
 
+export const MSG_HEADCOUNT_MISSING_APPROVAL_FA =
+  "پیوند مجوز ظرفیت برای اسلات ناقص است؛ بازسازی تاریخی مسدود است.";
+
 export class HeadcountLedgerError extends Error {
-  readonly code: "VALIDATION" | "LEDGER_AMBIGUOUS" | "CONSERVATION";
+  readonly code:
+    | "VALIDATION"
+    | "LEDGER_AMBIGUOUS"
+    | "CONSERVATION"
+    | "MISSING_APPROVAL";
   readonly messageFa: string;
 
   constructor(
-    code: "VALIDATION" | "LEDGER_AMBIGUOUS" | "CONSERVATION",
+    code:
+      | "VALIDATION"
+      | "LEDGER_AMBIGUOUS"
+      | "CONSERVATION"
+      | "MISSING_APPROVAL",
     messageFa: string,
     message?: string,
   ) {
@@ -115,7 +126,7 @@ export type HeadcountSlotQuantities = {
   jobTitleId: string | null;
   ladderId: string | null;
   gradeId: string | null;
-  /** MVP Approval stand-in: live used + reserved + free ceiling. */
+  /** Approval allowed_count when linked; else live ceiling stand-in (legacy slots). */
   approved: number;
   used: number;
   reserved: number;
@@ -166,6 +177,15 @@ type SlotRow = {
   end_date_exclusive: Date | string | null;
   free_units: number;
   reserved_units: number;
+  approval_id: string | null;
+};
+
+type ApprovalCeilingRow = {
+  id: string;
+  allowed_count: number;
+  validity_start: Date | string;
+  validity_end_exclusive: Date | string;
+  status: string;
 };
 
 type ConsumptionRow = {
@@ -188,7 +208,9 @@ type ReservationRow = {
  * Reconstruct approved/used/reserved/free per in-scope slot at `asOf`.
  *
  * - used/reserved: event-linked ledger + Effective/lifecycle (not live counters)
- * - approved: MVP stand-in from current slot counters (until Story 4.12 Approval)
+ * - approved: Approval `allowed_count` when status=active and validity contains asOf;
+ *   Approval-backed but not consumable-as-of → used+reserved (free=0; no live stand-in);
+ *   dangling approval_id → fail-closed; legacy slots keep live ceiling stand-in
  * - free: approved − used − reserved (catalogue identity; never silently floor)
  *
  * Do **not** use this as a silent wrapper around `readHeadcountCapacityPanel`
@@ -212,7 +234,8 @@ export async function reconstructHeadcountQuantitiesAsOf(
   const params: unknown[] = [asOf];
   let sql = `
     SELECT id, team_id, job_title_id, ladder_id, grade_id,
-           start_date, end_date_exclusive, free_units, reserved_units
+           start_date, end_date_exclusive, free_units, reserved_units,
+           approval_id
     FROM headcount_capacity_slot
     WHERE start_date <= $1::date
       AND (end_date_exclusive IS NULL OR end_date_exclusive > $1::date)`;
@@ -236,6 +259,27 @@ export async function reconstructHeadcountQuantitiesAsOf(
   }
 
   const slotIds = slots.map((s) => s.id);
+  const approvalIds = [
+    ...new Set(
+      slots
+        .map((s) => s.approval_id)
+        .filter((id): id is string => Boolean(id?.trim())),
+    ),
+  ];
+  const approvalById = new Map<string, ApprovalCeilingRow>();
+  if (approvalIds.length > 0) {
+    const approvalRows = await query<ApprovalCeilingRow>(
+      db,
+      `SELECT id, allowed_count, validity_start, validity_end_exclusive, status
+       FROM headcount_approval
+       WHERE id = ANY($1::uuid[])`,
+      [approvalIds],
+    );
+    for (const a of approvalRows) {
+      approvalById.set(a.id, a);
+    }
+  }
+
   const consumptions = await query<ConsumptionRow>(
     db,
     `SELECT id, slot_id, event_id, person_id, release_event_id
@@ -339,7 +383,7 @@ export async function reconstructHeadcountQuantitiesAsOf(
     }
   }
 
-  // Live used for approved stand-in (current unreased consumptions).
+  // Live used for legacy stand-in (slots without Approval).
   const liveUsedRows = await query<{ slot_id: string; c: string }>(
     db,
     `SELECT slot_id, COUNT(*)::text AS c
@@ -353,6 +397,14 @@ export async function reconstructHeadcountQuantitiesAsOf(
     liveUsedBySlot.set(row.slot_id, Number(row.c));
   }
 
+  function dateOnlyFromPg(value: Date | string): string {
+    if (typeof value === "string") return value.slice(0, 10);
+    const y = value.getUTCFullYear();
+    const m = String(value.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(value.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
   const resultSlots: HeadcountSlotQuantities[] = [];
   let aggApproved = 0;
   let aggUsed = 0;
@@ -360,13 +412,34 @@ export async function reconstructHeadcountQuantitiesAsOf(
   let aggFree = 0;
 
   for (const slot of slots) {
-    const liveUsed = liveUsedBySlot.get(slot.id) ?? 0;
-    const liveReserved = Number(slot.reserved_units);
-    const liveFree = Number(slot.free_units);
-    // Approval stand-in until 4.12 — conserved live ceiling for the slot.
-    const approved = liveUsed + liveReserved + liveFree;
     const used = usedBySlot.get(slot.id) ?? 0;
     const reserved = reservedBySlot.get(slot.id) ?? 0;
+    let approved: number;
+    if (slot.approval_id) {
+      const approval = approvalById.get(slot.approval_id);
+      if (!approval) {
+        throw new HeadcountLedgerError(
+          "MISSING_APPROVAL",
+          MSG_HEADCOUNT_MISSING_APPROVAL_FA,
+          `approval_id=${slot.approval_id};slot=${slot.id}`,
+        );
+      }
+      const vStart = dateOnlyFromPg(approval.validity_start);
+      const vEnd = dateOnlyFromPg(approval.validity_end_exclusive);
+      const inValidity = asOf >= vStart && asOf < vEnd;
+      // Consumable-as-of: active + validity ∩ asOf (cancelled/expired never ceiling).
+      if (inValidity && approval.status === "active") {
+        approved = Number(approval.allowed_count);
+      } else {
+        // Out of window / non-active — claims-only ceiling; never live stand-in.
+        approved = used + reserved;
+      }
+    } else {
+      const liveUsed = liveUsedBySlot.get(slot.id) ?? 0;
+      const liveReserved = Number(slot.reserved_units);
+      const liveFree = Number(slot.free_units);
+      approved = liveUsed + liveReserved + liveFree;
+    }
     const free = approved - used - reserved;
     if (free < 0 || approved !== used + reserved + free) {
       throw new HeadcountLedgerError(

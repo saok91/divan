@@ -24,6 +24,7 @@ import {
   protectedProcedure,
 } from "./trpc";
 import { accessAdminRouter } from "./access-admin";
+import { headcountRouter } from "./headcount";
 import { jobReferenceRouter } from "./job-reference";
 import { organizationRouter } from "./organization";
 import { personRouter } from "./person";
@@ -83,6 +84,8 @@ export const appRouter = createTRPCRouter({
   organization: organizationRouter,
 
   jobReference: jobReferenceRouter,
+
+  headcount: headcountRouter,
 
   personnelEvent: personnelEventRouter,
 

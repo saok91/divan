@@ -395,6 +395,7 @@ export async function applyTransferScheduledReserve(
     slotId,
     eventId: ctx.eventId,
     personId: source.personId,
+    evaluationDate: source.effectiveDate,
   });
 
   return {
@@ -513,6 +514,7 @@ export async function applyTransferProjections(
         source.personId,
         facts,
         closedSource,
+        source.effectiveDate,
       );
       didReleaseSource = capacity.didReleaseSource;
       didMoveDestCapacity = capacity.didMoveDest;
@@ -633,6 +635,7 @@ export async function applyTransferProjections(
       source.personId,
       facts,
       openSource,
+      source.effectiveDate,
     );
     didReleaseSource = capacity.didReleaseSource;
     didMoveDestCapacity = capacity.didMoveDest;
@@ -676,6 +679,7 @@ async function moveTransferCapacity(
   personId: string,
   facts: TransferPayloadFacts,
   sourcePrimary: PrimaryAssignmentRecord,
+  evaluationDate: string,
 ): Promise<{ didReleaseSource: boolean; didMoveDest: boolean }> {
   let didReleaseSource = false;
   let didMoveDest = false;
@@ -719,6 +723,7 @@ async function moveTransferCapacity(
       slotId,
       eventId: ctx.eventId,
       personId,
+      evaluationDate,
     });
     didMoveDest = consumeResult.consumed;
     return { didReleaseSource, didMoveDest };

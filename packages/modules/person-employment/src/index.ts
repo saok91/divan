@@ -469,6 +469,7 @@ export {
   seedDemoOrganizationHierarchy,
   seedOrganizationHierarchyFixtures,
   seedJobReferencePermissionFixtures,
+  seedHeadcountApprovalPermissionFixtures,
   seedDemoJobReferences,
   seedJobReferenceFixtures,
   seedDemoPrimaryAssignments,

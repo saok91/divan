@@ -1,3 +1,20 @@
+## Deferred from: code review of 4-12-headcount-approval-lifecycle.md (2026-07-19)
+
+- `ensureHeadcountApprovalSchema` runs DDL on every tRPC request — same ensure-* pattern as other modules; revisit when migrations are sole runtime path
+- N+1 `slotApprovalAllowsConsume` per candidate slot in `evaluateHeadcountCapacity` — batch/JOIN when team slot cardinality hurts
+- Unscoped `listApprovals` / `getApproval` (permission-only) — same IDOR-on-list/get class already tracked for drafts
+- Coarse nav unlocks `/headcount` while Approval write/read is seeded only for `hr.admin` — empty/error UX for other nav-capable roles until access epic
+
+## Deferred from: Story 4.12 headcount approval lifecycle (2026-07-19)
+
+- **Headcount Approval lifecycle landed** — `headcount_approval` entity; create/activate/update/cancel/expire; slot bridge (`approval_id`); consume/reserve gates on Draft|Cancelled|Expired|out-of-validity; historical `approved` = Approval `allowed_count` (legacy slots keep live ceiling); Admin UI on `/headcount`; `headcount.approval.*` permissions; `headcount-approval.selfcheck`
+- **MVP live-counter stand-in removed** for Approval-backed slots (4.11 follow-through)
+- **Still fail-closed orphan disposition** — cancel/reduce/expire with active claims rejected until AR-HEADCOUNT disposition (→ 4.14 Override path may unblock)
+- **Still 4.13:** Matching matrix / oldest-valid default / exemptions / `PrimaryAssignment.headcountApprovalId` product link
+- **Still 4.14:** Reservation-expiry warnings / Scheduled-exception / Override catalogue; durable reserve for Scheduled Start
+- **Still Epic 5:** Full dashboard / open-headcount product
+- **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+
 ## Deferred from: code review of 4-11-historical-organization-headcount-reconstruction.md (2026-07-19)
 
 - Planned **capacity** deltas (AC #4 partial) — only `plannedMembershipDeltas` shipped; facts@today already show current reserved; full planned capacity channel deferred to avoid mid-review DTO scope creep (revisit with 4.12 or a follow-up read story)
@@ -15,7 +32,8 @@
 - **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
 - **AR-DATA:** Production enablement/masking of compensation category still open (`DEV_DEMO_CATEGORIES` on tRPC)
 - **FR-39 / FR-47:** Baseline migration provenance UI and full temporal as-of authz matrix remain open
-- **MVP Approval stand-in:** `approved = used_live + reserved_live + free_live` until 4.12 Approval entity; planned-channel Transfer scan seeds from today's scoped members only (persons not yet on roster with future Start→Transfer not included)
+- ~~**MVP Approval stand-in:** `approved = used_live + reserved_live + free_live` until 4.12 Approval entity~~ — **closed in 4.12** for Approval-backed slots; legacy fixture slots retain live ceiling
+- Planned-channel Transfer scan seeds from today's scoped members only (persons not yet on roster with future Start→Transfer not included)
 
 ## Deferred from: code review of 4-10-historical-person-reconstruction.md (2026-07-19)
 

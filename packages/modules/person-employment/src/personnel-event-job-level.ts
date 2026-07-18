@@ -576,6 +576,7 @@ export async function applyJobLevelScheduledReserve(
     slotId,
     eventId: ctx.eventId,
     personId: source.personId,
+    evaluationDate: source.effectiveDate,
   });
 
   return {
@@ -605,6 +606,7 @@ async function moveJobLevelCapacity(
   personId: string,
   successor: JobLevelSuccessorFacts,
   sourcePrimary: PrimaryAssignmentRecord,
+  evaluationDate: string,
 ): Promise<{ didReleaseSource: boolean; didMoveDest: boolean }> {
   let didReleaseSource = false;
   let didMoveDest = false;
@@ -648,6 +650,7 @@ async function moveJobLevelCapacity(
       slotId,
       eventId: ctx.eventId,
       personId,
+      evaluationDate,
     });
     didMoveDest = consumeResult.consumed;
     return { didReleaseSource, didMoveDest };
@@ -766,6 +769,7 @@ export async function applyJobLevelProjections(
           source.personId,
           successor,
           closedSource,
+          source.effectiveDate,
         );
         didReleaseSource = capacity.didReleaseSource;
         didMoveDestCapacity = capacity.didMoveDest;
@@ -913,6 +917,7 @@ export async function applyJobLevelProjections(
         source.personId,
         successor,
         openSource,
+        source.effectiveDate,
       );
       didReleaseSource = capacity.didReleaseSource;
       didMoveDestCapacity = capacity.didMoveDest;

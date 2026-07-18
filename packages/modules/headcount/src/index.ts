@@ -1,6 +1,7 @@
 /**
  * Narrow headcount capacity port (Stories 4.5–4.7 / FR-20 / FR-30 / FR-31 boundary).
- * NOT Approval lifecycle, Matching matrix, Reservation expiry, or Override catalogue.
+ * Story 4.12: Approval lifecycle + consume/reserve status gates.
+ * NOT Matching matrix, Reservation expiry, or Override catalogue (→ 4.13 / 4.14).
  * Story 4.11: historical ledger reconstruct via reconstructHeadcountQuantitiesAsOf —
  * readHeadcountCapacityPanel remains live/finalize-only (do not use for asOf < today).
  */
@@ -12,6 +13,7 @@ export {
   MSG_HEADCOUNT_ASOF_INVALID_FA,
   MSG_HEADCOUNT_LEDGER_AMBIGUOUS_FA,
   MSG_HEADCOUNT_CONSERVATION_FA,
+  MSG_HEADCOUNT_MISSING_APPROVAL_FA,
 } from "./historical-headcount";
 
 export type {
@@ -20,10 +22,56 @@ export type {
   HeadcountSlotQuantities,
 } from "./historical-headcount";
 
+export {
+  HEADCOUNT_APPROVAL_READ_PERMISSION,
+  HEADCOUNT_APPROVAL_WRITE_PERMISSION,
+  HEADCOUNT_APPROVAL_DATA_CATEGORY,
+  HeadcountApprovalError,
+  MSG_HEADCOUNT_APPROVAL_PERMISSION_REQUIRED_FA,
+  MSG_HEADCOUNT_APPROVAL_NOT_FOUND_FA,
+  MSG_HEADCOUNT_APPROVAL_DUPLICATE_CODE_FA,
+  MSG_HEADCOUNT_APPROVAL_INVALID_VALIDITY_FA,
+  MSG_HEADCOUNT_APPROVAL_INVALID_ALLOWED_FA,
+  MSG_HEADCOUNT_APPROVAL_INVALID_REFS_FA,
+  MSG_HEADCOUNT_APPROVAL_INVALID_STATUS_FA,
+  MSG_HEADCOUNT_APPROVAL_ORPHAN_CLAIMS_FA,
+  MSG_HEADCOUNT_APPROVAL_NOT_CONSUMABLE_FA,
+  MSG_HEADCOUNT_APPROVAL_IDENTITY_LOCKED_FA,
+  APPROVAL_STATUS_LABEL_FA,
+  ensureHeadcountApprovalSchema,
+  assertActorHasHeadcountApprovalRead,
+  assertActorHasHeadcountApprovalWrite,
+  createApproval,
+  activateApproval,
+  updateApproval,
+  cancelApproval,
+  expireApproval,
+  getApproval,
+  listApprovals,
+  assertSlotApprovalConsumable,
+  slotApprovalAllowsConsume,
+  effectiveApprovalStatus,
+  isApprovalConsumableAt,
+} from "./headcount-approval";
+
+export type {
+  HeadcountApprovalStatus,
+  HeadcountApprovalRecord,
+  HeadcountApprovalErrorCode,
+  CreateApprovalInput,
+  UpdateApprovalInput,
+} from "./headcount-approval";
 
 import { randomUUID } from "node:crypto";
 
 import type { Pool, PoolClient, PrismaClient } from "@divan/db";
+import { todayDateOnlyTehran } from "@divan/temporal-engine";
+
+import {
+  assertSlotApprovalConsumable,
+  HeadcountApprovalError,
+  slotApprovalAllowsConsume,
+} from "./headcount-approval";
 
 export const MSG_HEADCOUNT_NO_CAPACITY_FA =
   "ظرفیت نیروی انسانی سازگار برای این انتصاب وجود ندارد؛ بدون Override نهایی‌سازی مجاز نیست.";
@@ -75,6 +123,8 @@ export type ConsumeCapacityInput = {
   slotId: string;
   eventId: string;
   personId: string;
+  /** Date-only for Approval validity gate; defaults to today (Tehran). */
+  evaluationDate?: string;
 };
 
 export type ReleaseCapacityInput = {
@@ -193,6 +243,10 @@ export async function ensureHeadcountCapacitySchema(
       ON headcount_capacity_reservation (status)
       WHERE status = 'reserved'
   `);
+  await db.query(`
+    ALTER TABLE headcount_capacity_slot
+      ADD COLUMN IF NOT EXISTS approval_id UUID
+  `);
 }
 
 function slotMatchesRefs(
@@ -248,7 +302,8 @@ export async function evaluateHeadcountCapacity(
         slot.team_id === input.teamId &&
         slot.free_units > 0 &&
         slotMatchesRefs(slot, input) &&
-        dateInSlot(slot, input.effectiveDate)
+        dateInSlot(slot, input.effectiveDate) &&
+        (await slotApprovalAllowsConsume(db, slot.id, input.effectiveDate))
       ) {
         return {
           outcome: "compatible",
@@ -281,7 +336,10 @@ export async function evaluateHeadcountCapacity(
     );
 
     for (const row of rows) {
-      if (slotMatchesRefs(row, input)) {
+      if (
+        slotMatchesRefs(row, input) &&
+        (await slotApprovalAllowsConsume(db, row.id, input.effectiveDate))
+      ) {
         return {
           outcome: "compatible",
           slotId: row.id,
@@ -343,6 +401,13 @@ export async function consumeHeadcountCapacity(
   await db.query(
     `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
     [input.slotId],
+  );
+
+  // Approval gate after lock — Draft|Cancelled|Expired|out-of-validity fail-closed.
+  await assertSlotApprovalConsumable(
+    db,
+    input.slotId,
+    input.evaluationDate ?? todayDateOnlyTehran(),
   );
 
   const upd = await db.query(
@@ -624,6 +689,8 @@ export type ReserveCapacityInput = {
   slotId: string;
   eventId: string;
   personId: string;
+  /** Date-only for Approval validity gate; defaults to today (Tehran). */
+  evaluationDate?: string;
 };
 
 /**
@@ -650,6 +717,12 @@ export async function reserveHeadcountCapacity(
   await db.query(
     `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
     [input.slotId],
+  );
+
+  await assertSlotApprovalConsumable(
+    db,
+    input.slotId,
+    input.evaluationDate ?? todayDateOnlyTehran(),
   );
 
   const upd = await db.query(

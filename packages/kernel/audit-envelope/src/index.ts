@@ -215,6 +215,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 4.12 — Headcount Approval lifecycle (FR-28)
+    {
+      permission: "headcount.approval.read",
+      dataCategory: "organization.headcount_approval",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "headcount.approval.write",
+      dataCategory: "organization.headcount_approval",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 

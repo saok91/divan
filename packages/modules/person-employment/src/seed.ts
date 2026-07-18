@@ -741,6 +741,72 @@ export async function seedJobReferencePermissionFixtures(
   }
 }
 
+/** Story 4.12 — headcount.approval.read / write for hr.admin. */
+export const SEED_HEADCOUNT_APPROVAL = {
+  permissionSetName: "headcount-approval",
+  roleCode: "headcount_approval_admin",
+  roleLabelFa: "مدیر مجوز ظرفیت",
+} as const;
+
+/**
+ * Bind headcount.approval.read / headcount.approval.write for hr.admin.
+ * Idempotent. Coarse nav already unlocks /headcount; these unlock API.
+ */
+export async function seedHeadcountApprovalPermissionFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  const permissionSet = await db.permissionSet.upsert({
+    where: { name: SEED_HEADCOUNT_APPROVAL.permissionSetName },
+    create: {
+      name: SEED_HEADCOUNT_APPROVAL.permissionSetName,
+      permissions: [
+        "headcount.approval.read",
+        "headcount.approval.write",
+      ],
+    },
+    update: {
+      permissions: [
+        "headcount.approval.read",
+        "headcount.approval.write",
+      ],
+    },
+  });
+
+  const role = await db.accessRole.upsert({
+    where: { code: SEED_HEADCOUNT_APPROVAL.roleCode },
+    create: {
+      code: SEED_HEADCOUNT_APPROVAL.roleCode,
+      labelFa: SEED_HEADCOUNT_APPROVAL.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+    update: {
+      labelFa: SEED_HEADCOUNT_APPROVAL.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+  });
+
+  for (const username of ["hr.admin"] as const) {
+    const account = await db.internalAccount.findUnique({
+      where: { username },
+    });
+    if (!account) continue;
+
+    await db.accountAccessRole.upsert({
+      where: {
+        accountId_accessRoleId: {
+          accountId: account.id,
+          accessRoleId: role.id,
+        },
+      },
+      create: {
+        accountId: account.id,
+        accessRoleId: role.id,
+      },
+      update: {},
+    });
+  }
+}
+
 async function ensureByCode<T extends { id: string; code: string }>(
   find: () => Promise<T | null>,
   create: () => Promise<T>,
@@ -898,6 +964,7 @@ export async function seedJobReferenceFixtures(
   db: PrismaClient,
 ): Promise<void> {
   await seedJobReferencePermissionFixtures(db);
+  await seedHeadcountApprovalPermissionFixtures(db);
   await seedDemoJobReferences(db);
 }
 
