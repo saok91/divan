@@ -7,6 +7,7 @@
  * Story 3.7: Primary Assignment integrity (FR-11) — projection + exactly-one + Team/job facts.
  * Story 3.8: Secondary Assignment fidelity (FR-12) — dual-role projection; no headcount; inventory gate.
  * Story 3.9: Derived management relationships (FR-13) — compute from Primary+org+Role; no editable shadow.
+ * Story 4.2: Draft working store + finalize/conflict substrate (FR-15 / FR-19 / AD-6).
  * Start/Return/Terminate / Secondary create-change-end product flows = Epic 4 (4.5–4.8).
  */
 
@@ -105,6 +106,27 @@ export {
   MSG_AMBIGUOUS_MANAGEMENT_SCOPE_FA,
   MSG_MANAGEMENT_ROLE_REGISTRY_INVALID_FA,
   MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA,
+  PERSONNEL_EVENT_DRAFT_PERMISSION,
+  PERSONNEL_EVENT_FINALIZE_PERMISSION,
+  PERSONNEL_EVENT_DATA_CATEGORY,
+  PersonnelEventError,
+  MSG_DRAFT_NOT_FOUND_FA,
+  MSG_DRAFT_NOT_EDITABLE_FA,
+  MSG_DRAFT_ALREADY_FINALIZED_FA,
+  MSG_DRAFT_DELETED_FA,
+  MSG_DRAFT_VERSION_CONFLICT_FA,
+  MSG_FINALIZE_BLOCKED_FA,
+  MSG_FINALIZE_WARNING_ACK_REQUIRED_FA,
+  MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
+  MSG_FINALIZE_STALE_SNAPSHOT_FA,
+  MSG_FINALIZE_PENDING_REVIEW_FA,
+  MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA,
+  MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
+  MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+  MSG_SENSITIVE_DRAFT_PAYLOAD_FA,
+  MSG_HEADCOUNT_CHECK_BLOCKED_FA,
+  MSG_BASELINE_BOUNDARY_BLOCKED_FA,
+  MSG_RISK_TIER_PENDING_REVIEW_FA,
 } from "./errors";
 
 export type {
@@ -116,6 +138,7 @@ export type {
   PrimaryAssignmentErrorCode,
   SecondaryAssignmentErrorCode,
   ManagementRelationshipErrorCode,
+  PersonnelEventErrorCode,
 } from "./errors";
 
 export {
@@ -407,8 +430,10 @@ export {
   SEED_PRIMARY_ASSIGNMENT,
   SEED_SECONDARY_ASSIGNMENT,
   SEED_MANAGEMENT_RELATIONSHIPS,
+  SEED_PERSONNEL_EVENT,
   seedPersonIdentityFixtures,
   seedPersonPermissionFixtures,
+  seedPersonnelEventPermissionFixtures,
   seedDemoPerson,
   seedDemoEmployments,
   seedEmploymentLifecycleFixtures,
@@ -434,7 +459,75 @@ export {
   assertActorHasOrganizationWrite,
   assertActorHasJobReferenceRead,
   assertActorHasJobReferenceWrite,
+  assertActorHasPersonnelEventDraft,
+  assertActorHasPersonnelEventFinalize,
   MSG_PERSON_PERMISSION_REQUIRED_FA,
 } from "./permissions";
 
 export { POPULATION_SUBJECT_ID_TARGET } from "./population-cutover";
+
+export {
+  createDraft,
+  getDraft,
+  updateDraft,
+  deleteDraft,
+  listOpenDraftsForPerson,
+} from "./personnel-event-draft";
+
+export type {
+  DraftStatus,
+  PersonnelEventDraftRecord,
+  CreateDraftInput,
+  UpdateDraftInput,
+} from "./personnel-event-draft";
+
+export {
+  buildEvaluationSnapshot,
+  classifyConflicts,
+  assertSnapshotFresh,
+  hasBlockingConflicts,
+  warningCodesRequiringAck,
+  codesRequiringOverride,
+  dateOnlyFromDb,
+  HEADCOUNT_CONSUMING_EVENT_TYPES,
+  WARNING_ACK_ALLOW_LIST,
+} from "./personnel-event-conflicts";
+
+export type {
+  ConflictSeverity,
+  ConflictFinding,
+  EvaluationSnapshot,
+  ConflictPolicy,
+  BuildSnapshotInput,
+  SnapshotReadOptions,
+} from "./personnel-event-conflicts";
+
+export {
+  finalizeDraft,
+  evaluateDraftForFinalize,
+  inferRiskTiers,
+  evaluateRiskTiers,
+} from "./personnel-event-finalize";
+
+export type {
+  RiskTierKind,
+  RiskTierConfig,
+  FinalizeAcknowledgement,
+  FinalizeOverride,
+  FinalizeDraftInput,
+  FinalizeDraftResult,
+} from "./personnel-event-finalize";
+
+export {
+  setProjectionRefreshHook,
+  resetProjectionRefreshHook,
+  getProjectionRefreshHook,
+  runProjectionRefreshHook,
+  runWithProjectionRefreshHook,
+  defaultProjectionRefreshHook,
+} from "./personnel-event-projection-hook";
+
+export type {
+  ProjectionRefreshContext,
+  ProjectionRefreshHook,
+} from "./personnel-event-projection-hook";

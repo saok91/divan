@@ -17,7 +17,8 @@
     "selfcheck:job-reference": "tsx src/job-reference.selfcheck.ts",
     "selfcheck:primary-assignment": "tsx src/primary-assignment.selfcheck.ts",
     "selfcheck:secondary-assignment": "tsx src/secondary-assignment.selfcheck.ts",
-    "selfcheck:management-relationships": "tsx src/management-relationship.selfcheck.ts"
+    "selfcheck:management-relationships": "tsx src/management-relationship.selfcheck.ts",
+    "selfcheck:personnel-event-draft": "tsx src/personnel-event-draft.selfcheck.ts"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

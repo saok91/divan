@@ -20,7 +20,8 @@ import { usePlatformStatus } from "@/components/platform-status-provider";
  * Mid-session authz change modal (Story 2.6 AC #4 / EXPERIENCE).
  * Exact title: «دسترسی شما تغییر کرد.»
  * Required acknowledgement — Esc does not dismiss (blocking).
- * Demo draft stand-in for Epic 4 Draft forms.
+ * Story 4.2: real Draft save/discard when فرم رویداد has registered a handler;
+ * finalize remains blocked while authz-changed is active.
  *
  * After ack: refresh JWT fingerprint, then go straight to role safe landing.
  * Do NOT hop via `/` + router.refresh() — that caused a redirect/RSC reload loop.
@@ -40,6 +41,7 @@ export function AuthzChangedModal({
     setDemoDraftOpen,
     setDemoDraftSaved,
     isFinalizeBlockedByAuthzChange,
+    runPersonnelDraftSave,
   } = usePlatformStatus();
   const [acking, setAcking] = React.useState(false);
 
@@ -56,7 +58,12 @@ export function AuthzChangedModal({
       // Refresh JWT fingerprint first — then clear UI gate.
       await update();
       if (opts.saveDraft) {
-        setDemoDraftSaved(true);
+        const saved = await runPersonnelDraftSave();
+        setDemoDraftSaved(saved);
+        if (!saved) {
+          setAcking(false);
+          return;
+        }
       } else {
         setDemoDraftSaved(false);
       }

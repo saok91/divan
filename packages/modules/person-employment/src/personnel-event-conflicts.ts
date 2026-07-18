@@ -1,0 +1,509 @@
+/**
+ * Evaluation snapshot + conflict classification (Story 4.2 / FR-19 / FR-56).
+ * Fail-closed stubs for AR-TEMPORAL / AR-HEADCOUNT — do not invent frozen matrices.
+ */
+
+import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
+import type { PoolClient, PrismaClient } from "@divan/db";
+
+import { getPersonDb } from "./db";
+import {
+  MSG_BASELINE_BOUNDARY_BLOCKED_FA,
+  MSG_HEADCOUNT_CHECK_BLOCKED_FA,
+  MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
+  MSG_PERSON_NOT_FOUND_FA,
+  PersonnelEventError,
+} from "./errors";
+import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
+import { isEmploymentActiveAsOf } from "./employment";
+import { getGradeById } from "./job-reference";
+import { JobRefError } from "./errors";
+
+/**
+ * PG `@db.Date` → YYYY-MM-DD via UTC calendar components (never local-TZ shift).
+ * Prefer this over `toISOString().slice(0,10)` when drivers return non-UTC midnights.
+ */
+export function dateOnlyFromDb(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export type ConflictSeverity = "blocking" | "warning";
+
+export type ConflictFinding = {
+  code: string;
+  severity: ConflictSeverity;
+  messageFa: string;
+  /** When true, warning may proceed only with recorded acknowledgement. */
+  requiresAck?: boolean;
+  /** When true, only Override path (HR Admin / configured) may proceed. */
+  requiresOverride?: boolean;
+};
+
+export type EvaluationSnapshot = {
+  /** Asia/Tehran date-only as-of for checks (FR-56). */
+  asOfDate: string;
+  actorAccountId: string;
+  /** PermissionSet fingerprint or joined permission keys for attribution. */
+  permissionSetFingerprint: string;
+  correlationId: string;
+  /** Frozen Person stamp. */
+  person: { id: string; updatedAt: string };
+  /** Frozen Employment stamp when bound. */
+  employment: {
+    id: string;
+    updatedAt: string;
+    startDate: string;
+    endDateExclusive: string | null;
+  } | null;
+  /** Optional org/job refs from draft payload (structural ids only). */
+  refs: {
+    ladderId?: string;
+    gradeId?: string;
+    teamId?: string;
+    organizationalRoleId?: string;
+    jobTitleId?: string;
+  };
+  builtAt: string;
+};
+
+export type BuildSnapshotInput = {
+  draft: PersonnelEventDraftRecord;
+  actorAccountId: string;
+  correlationId: string;
+  permissionSetFingerprint?: string;
+  asOfDate?: string;
+};
+
+/** Event types that would consume headcount — stub-block until headcount module exists. */
+export const HEADCOUNT_CONSUMING_EVENT_TYPES = new Set([
+  "EmploymentStarted",
+  "TransferRecorded",
+  "TeamTransferRecorded",
+  "HeadcountConsumed",
+]);
+
+/**
+ * Warning allow-list — only these codes may proceed with acknowledgement.
+ * Everything else that is a warning without policy stays blocking.
+ */
+export const WARNING_ACK_ALLOW_LIST = new Set([
+  "PRE_BASELINE_EFFECTIVE_DATE",
+]);
+
+export type ConflictPolicy = {
+  /** When set, Effective Date before this boundary needs Override (+ ack). */
+  baselineBoundaryDate?: string | null;
+  /** When true, PRE_BASELINE can be Override'd by HR Admin path. */
+  allowPreBaselineOverride?: boolean;
+  /** Codes that may proceed with warning acknowledgement. */
+  warningAckAllowList?: Set<string>;
+};
+
+export type SnapshotReadOptions = {
+  /**
+   * When set (finalize txn), Person/Employment stamps are read on this connection
+   * so they share the same transactional view as Draft `FOR UPDATE` + append.
+   */
+  client?: PoolClient;
+};
+
+export async function buildEvaluationSnapshot(
+  input: BuildSnapshotInput,
+  db: PrismaClient = getPersonDb(),
+  opts: SnapshotReadOptions = {},
+): Promise<EvaluationSnapshot> {
+  const asOf =
+    input.asOfDate != null
+      ? (() => {
+          const p = parseDateOnly(input.asOfDate);
+          if (!p.ok) {
+            throw new PersonnelEventError(
+              "VALIDATION",
+              MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
+              `invalid_as_of:${p.reason}`,
+            );
+          }
+          return p.value;
+        })()
+      : todayDateOnlyTehran();
+
+  let personId: string;
+  let personUpdatedAt: string;
+  let employment: EvaluationSnapshot["employment"] = null;
+
+  if (opts.client) {
+    const personRes = await opts.client.query<{
+      id: string;
+      updatedAt: Date;
+    }>(`SELECT id, "updatedAt" FROM "Person" WHERE id = $1`, [
+      input.draft.personId,
+    ]);
+    const person = personRes.rows[0];
+    if (!person) {
+      throw new PersonnelEventError("PERSON_NOT_FOUND", MSG_PERSON_NOT_FOUND_FA);
+    }
+    personId = person.id;
+    personUpdatedAt = person.updatedAt.toISOString();
+
+    if (input.draft.employmentId) {
+      const empRes = await opts.client.query<{
+        id: string;
+        personId: string;
+        updatedAt: Date;
+        startDate: Date;
+        endDateExclusive: Date | null;
+      }>(
+        `SELECT id, "personId", "updatedAt", "startDate", "endDateExclusive"
+         FROM "Employment" WHERE id = $1`,
+        [input.draft.employmentId],
+      );
+      const emp = empRes.rows[0];
+      if (emp && emp.personId === input.draft.personId) {
+        employment = {
+          id: emp.id,
+          updatedAt: emp.updatedAt.toISOString(),
+          startDate: dateOnlyFromDb(emp.startDate),
+          endDateExclusive: emp.endDateExclusive
+            ? dateOnlyFromDb(emp.endDateExclusive)
+            : null,
+        };
+      }
+    }
+  } else {
+    const person = await db.person.findUnique({
+      where: { id: input.draft.personId },
+    });
+    if (!person) {
+      throw new PersonnelEventError("PERSON_NOT_FOUND", MSG_PERSON_NOT_FOUND_FA);
+    }
+    personId = person.id;
+    personUpdatedAt = person.updatedAt.toISOString();
+
+    if (input.draft.employmentId) {
+      const emp = await db.employment.findUnique({
+        where: { id: input.draft.employmentId },
+      });
+      if (emp && emp.personId === input.draft.personId) {
+        employment = {
+          id: emp.id,
+          updatedAt: emp.updatedAt.toISOString(),
+          startDate: dateOnlyFromDb(emp.startDate),
+          endDateExclusive: emp.endDateExclusive
+            ? dateOnlyFromDb(emp.endDateExclusive)
+            : null,
+        };
+      }
+    }
+  }
+
+  const payload = input.draft.payload;
+  const refs: EvaluationSnapshot["refs"] = {};
+  for (const key of [
+    "ladderId",
+    "gradeId",
+    "teamId",
+    "organizationalRoleId",
+    "jobTitleId",
+  ] as const) {
+    const v = payload[key];
+    if (typeof v === "string" && v.trim()) {
+      refs[key] = v.trim();
+    }
+  }
+
+  return {
+    asOfDate: asOf,
+    actorAccountId: input.actorAccountId,
+    permissionSetFingerprint:
+      input.permissionSetFingerprint?.trim() || "unspecified",
+    correlationId: input.correlationId,
+    person: {
+      id: personId,
+      updatedAt: personUpdatedAt,
+    },
+    employment,
+    refs,
+    builtAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Re-validate client-supplied snapshot against live stamps.
+ * Stale refs → block (FR-56).
+ */
+export function assertSnapshotFresh(
+  snapshot: EvaluationSnapshot,
+  live: EvaluationSnapshot,
+): ConflictFinding | null {
+  if (snapshot.person.id !== live.person.id) {
+    return {
+      code: "STALE_PERSON_REF",
+      severity: "blocking",
+      messageFa:
+        "مرجع فرد در اسنپ‌شات ارزیابی با وضعیت فعلی هم‌خوان نیست؛ نهایی‌سازی مسدود است.",
+    };
+  }
+  if (snapshot.asOfDate !== live.asOfDate) {
+    return {
+      code: "STALE_AS_OF",
+      severity: "blocking",
+      messageFa:
+        "تاریخ ارزیابی اسنپ‌شات با روز جاری هم‌خوان نیست؛ دوباره بررسی کنید.",
+    };
+  }
+  if (
+    snapshot.permissionSetFingerprint !== live.permissionSetFingerprint
+  ) {
+    return {
+      code: "STALE_PERMISSION_FINGERPRINT",
+      severity: "blocking",
+      messageFa:
+        "مجوزهای ارزیابی پس از ساخت اسنپ‌شات تغییر کرده است؛ نهایی‌سازی مسدود است.",
+    };
+  }
+  if (snapshot.person.updatedAt !== live.person.updatedAt) {
+    return {
+      code: "STALE_PERSON_REF",
+      severity: "blocking",
+      messageFa:
+        "فرد پس از ساخت اسنپ‌شات تغییر کرده است؛ دوباره بررسی کنید.",
+    };
+  }
+  if (
+    (snapshot.employment?.id ?? null) !== (live.employment?.id ?? null) ||
+    (snapshot.employment?.updatedAt ?? null) !==
+      (live.employment?.updatedAt ?? null)
+  ) {
+    return {
+      code: "STALE_EMPLOYMENT_REF",
+      severity: "blocking",
+      messageFa:
+        "سابقه همکاری پس از ساخت اسنپ‌شات تغییر کرده است؛ نهایی‌سازی مسدود است.",
+    };
+  }
+  return null;
+}
+
+export async function classifyConflicts(
+  draft: PersonnelEventDraftRecord,
+  snapshot: EvaluationSnapshot,
+  policy: ConflictPolicy = {},
+  db: PrismaClient = getPersonDb(),
+  opts: SnapshotReadOptions = {},
+): Promise<ConflictFinding[]> {
+  const findings: ConflictFinding[] = [];
+  const warningAllow =
+    policy.warningAckAllowList ?? WARNING_ACK_ALLOW_LIST;
+
+  const dateParsed = parseDateOnly(draft.effectiveDate);
+  if (!dateParsed.ok) {
+    findings.push({
+      code: "INVALID_EFFECTIVE_DATE",
+      severity: "blocking",
+      messageFa: MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
+    });
+    return findings;
+  }
+
+  // Broken correction refs (if draft carries them)
+  for (const key of [
+    "correctsEventId",
+    "cancelsEventId",
+    "reversesEventId",
+  ] as const) {
+    const ref = draft.payload[key];
+    if (typeof ref === "string" && ref.trim()) {
+      // Application-level UUID shape check; existence validated when event-store lookup lands (4.3)
+      const uuidOk =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          ref.trim(),
+        );
+      if (!uuidOk) {
+        findings.push({
+          code: "BROKEN_CORRECTION_REF",
+          severity: "blocking",
+          messageFa:
+            "ارجاع اصلاح/لغو/بازگشت نامعتبر است؛ نهایی‌سازی مسدود است.",
+        });
+      }
+    }
+  }
+
+  // Inactive Employment mutation — check against Effective Date (not evaluation as-of alone)
+  if (draft.employmentId && snapshot.employment) {
+    const active = isEmploymentActiveAsOf(
+      {
+        startDate: snapshot.employment.startDate,
+        endDateExclusive: snapshot.employment.endDateExclusive,
+      },
+      draft.effectiveDate,
+    );
+    if (!active) {
+      findings.push({
+        code: "INACTIVE_EMPLOYMENT_MUTATION",
+        severity: "blocking",
+        messageFa:
+          "تغییر روی همکاری غیرفعال در تاریخ مؤثر مجاز نیست؛ نهایی‌سازی مسدود است.",
+      });
+    }
+  } else if (draft.employmentId && !snapshot.employment) {
+    findings.push({
+      code: "EMPLOYMENT_REF_MISSING",
+      severity: "blocking",
+      messageFa:
+        "سابقه همکاری پیوست‌شده یافت نشد؛ نهایی‌سازی مسدود است.",
+    });
+  }
+
+  // Overlapping Employments — as-of draft Effective Date (date-only, not timestamptz UTC)
+  if (draft.eventType === "EmploymentStarted") {
+    let activeCount = 0;
+    if (opts.client) {
+      const active = await opts.client.query<{ id: string }>(
+        `SELECT id FROM "Employment"
+         WHERE "personId" = $1
+           AND "startDate" <= $2::date
+           AND ("endDateExclusive" IS NULL OR "endDateExclusive" > $2::date)`,
+        [draft.personId, draft.effectiveDate],
+      );
+      activeCount = active.rows.length;
+    } else {
+      const active = await db.employment.findMany({
+        where: {
+          personId: draft.personId,
+          startDate: { lte: new Date(`${draft.effectiveDate}T12:00:00.000Z`) },
+          OR: [
+            { endDateExclusive: null },
+            {
+              endDateExclusive: {
+                gt: new Date(`${draft.effectiveDate}T12:00:00.000Z`),
+              },
+            },
+          ],
+        },
+      });
+      activeCount = active.length;
+    }
+    if (activeCount > 0) {
+      findings.push({
+        code: "OVERLAPPING_EMPLOYMENT",
+        severity: "blocking",
+        messageFa:
+          "هم‌پوشانی همکاری فعال وجود دارد؛ شروع همکاری جدید بدون بستن قبلی مسدود است.",
+      });
+    }
+  }
+
+  // Ladder–Grade invalid
+  if (snapshot.refs.ladderId && snapshot.refs.gradeId) {
+    try {
+      const grade = await getGradeById(snapshot.refs.gradeId, db);
+      if (!grade || grade.ladderId !== snapshot.refs.ladderId) {
+        findings.push({
+          code: "LADDER_GRADE_INVALID",
+          severity: "blocking",
+          messageFa: "گرید به لدر انتخاب‌شده تعلق ندارد.",
+        });
+      }
+    } catch (err) {
+      if (err instanceof JobRefError) {
+        findings.push({
+          code: "LADDER_GRADE_INVALID",
+          severity: "blocking",
+          messageFa: err.messageFa,
+        });
+      } else {
+        findings.push({
+          code: "LADDER_GRADE_INVALID",
+          severity: "blocking",
+          messageFa: "گرید به لدر انتخاب‌شده تعلق ندارد.",
+        });
+      }
+    }
+  }
+
+  // Headcount consuming types — fail-closed stub while headcount module empty
+  if (HEADCOUNT_CONSUMING_EVENT_TYPES.has(draft.eventType)) {
+    findings.push({
+      code: "HEADCOUNT_UNAPPROVED",
+      severity: "blocking",
+      messageFa: MSG_HEADCOUNT_CHECK_BLOCKED_FA,
+    });
+  }
+
+  // Pre-Baseline boundary (AR-TEMPORAL partial freeze).
+  // Disposition when baselineBoundaryDate unset: gate inactive until configured
+  // (documented fail-closed — do not invent a default epoch). Drafts may set
+  // payload.requireBaselineCheck=true to force block while config is absent.
+  const baseline = policy.baselineBoundaryDate?.trim() || null;
+  if (baseline) {
+    const b = parseDateOnly(baseline);
+    if (!b.ok) {
+      findings.push({
+        code: "BASELINE_BOUNDARY_INVALID",
+        severity: "blocking",
+        messageFa:
+          "مرز Baseline نامعتبر است؛ نهایی‌سازی تا اصلاح پیکربندی مسدود است.",
+      });
+    } else if (draft.effectiveDate < b.value) {
+      if (policy.allowPreBaselineOverride) {
+        findings.push({
+          code: "PRE_BASELINE_EFFECTIVE_DATE",
+          severity: "warning",
+          messageFa: MSG_BASELINE_BOUNDARY_BLOCKED_FA,
+          requiresAck: true,
+          requiresOverride: true,
+        });
+      } else {
+        findings.push({
+          code: "PRE_BASELINE_EFFECTIVE_DATE",
+          severity: "blocking",
+          messageFa: MSG_BASELINE_BOUNDARY_BLOCKED_FA,
+        });
+      }
+    }
+  } else if (draft.payload.requireBaselineCheck === true) {
+    // Baseline not configured but draft demanded check — fail-closed
+    findings.push({
+      code: "BASELINE_NOT_CONFIGURED",
+      severity: "blocking",
+      messageFa:
+        "مرز Baseline پیکربندی نشده است؛ پذیرش خاموش تاریخ پیش از Baseline مجاز نیست.",
+    });
+  }
+
+  // Downgrade unknown warnings that are not on allow-list to blocking
+  for (const f of findings) {
+    if (
+      f.severity === "warning" &&
+      f.requiresAck &&
+      !warningAllow.has(f.code)
+    ) {
+      f.severity = "blocking";
+      delete f.requiresAck;
+    }
+  }
+
+  return findings;
+}
+
+export function hasBlockingConflicts(findings: ConflictFinding[]): boolean {
+  return findings.some((f) => f.severity === "blocking");
+}
+
+export function warningCodesRequiringAck(
+  findings: ConflictFinding[],
+): string[] {
+  return findings
+    .filter((f) => f.severity === "warning" && f.requiresAck)
+    .map((f) => f.code);
+}
+
+export function codesRequiringOverride(
+  findings: ConflictFinding[],
+): string[] {
+  return findings.filter((f) => f.requiresOverride).map((f) => f.code);
+}

@@ -573,6 +573,43 @@ model AccessDenial {
 }
 
 
+/// Mutable Draft working store (Story 4.2 / FR-15). Non-authoritative — NOT the event log.
+/// Authoritative mutations go through finalize → appendBusinessEvent (AD-2 / AD-3).
+/// Soft-delete via status=deleted; never UPDATE/DELETE kernel_events for Draft edits.
+model PersonnelEventDraft {
+  id               String   @id @default(uuid(7))
+  personId         String
+  employmentId     String?
+  /// PascalCase past-tense event type (scaffold ok in 4.2; domain catalogue = 4.5–4.8).
+  eventType        String
+  /// Business Effective Date — DATE only (never timestamptz).
+  effectiveDate    DateTime @db.Date
+  /// Non-sensitive structural payload only (assertNoSensitiveEvidence on write).
+  payload          Json     @default("{}")
+  /// open | finalized | deleted | pending_review
+  status           String   @default("open")
+  /// Optimistic concurrency — reject stale version on update/finalize.
+  version          Int      @default(1)
+  /// InternalAccount cuid (TEXT) — created/updated actors.
+  createdBy        String
+  updatedBy        String
+  /// Set on successful finalize — kernel_events.id (UUID, no Prisma FK).
+  finalizedEventId String?
+  /// Client/server idempotency key for finalize retries (unique when present).
+  idempotencyKey   String?  @unique
+  /// Recorded warning acknowledgements (codes + timestamps).
+  warningAcks      Json?
+  /// Override evidence when policy allows (reason + actor + at).
+  overrideEvidence Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([personId, status])
+  @@index([finalizedEventId])
+  @@index([status, updatedAt])
+  @@schema("public")
+}
+
 /// Compensation / contractual fact projection (Story 3.4 / FR-8). AD-2: not event-store truth.
 /// Lives in isolated schema `compensation` — only @divan/compensation-facts may access.
 /// Half-open [startDate, endDateExclusive); null end = unbounded open.

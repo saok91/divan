@@ -441,3 +441,94 @@ export const MSG_MANAGEMENT_ROLE_REGISTRY_INVALID_FA =
 
 export const MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA =
   "سیاست دامنه مدیر ارشد هنوز تعریف نشده است.";
+
+/** Personnel Event Draft / finalize errors (Story 4.2 / FR-15 / FR-19). Clients match codes. */
+export type PersonnelEventErrorCode =
+  | "DRAFT_NOT_FOUND"
+  | "DRAFT_NOT_EDITABLE"
+  | "DRAFT_ALREADY_FINALIZED"
+  | "DRAFT_DELETED"
+  | "DRAFT_VERSION_CONFLICT"
+  | "FINALIZE_BLOCKED"
+  | "FINALIZE_WARNING_ACK_REQUIRED"
+  | "FINALIZE_OVERRIDE_REQUIRED"
+  | "FINALIZE_STALE_SNAPSHOT"
+  | "FINALIZE_PENDING_REVIEW"
+  | "FINALIZE_IDEMPOTENCY_CONFLICT"
+  | "INVALID_EFFECTIVE_DATE"
+  | "PERSON_NOT_FOUND"
+  | "EMPLOYMENT_NOT_FOUND"
+  | "VALIDATION"
+  | "SENSITIVE_PAYLOAD"
+  | "PERMISSION_DENIED"
+  | "HEADCOUNT_CHECK_BLOCKED"
+  | "BASELINE_BOUNDARY_BLOCKED"
+  | "RISK_TIER_PENDING_REVIEW";
+
+export class PersonnelEventError extends Error {
+  readonly code: PersonnelEventErrorCode;
+  readonly messageFa: string;
+
+  constructor(
+    code: PersonnelEventErrorCode,
+    messageFa: string,
+    message?: string,
+  ) {
+    super(message ?? messageFa);
+    this.name = "PersonnelEventError";
+    this.code = code;
+    this.messageFa = messageFa;
+  }
+}
+
+export const PERSONNEL_EVENT_DRAFT_PERMISSION = "personnel_event.draft";
+export const PERSONNEL_EVENT_FINALIZE_PERMISSION = "personnel_event.finalize";
+export const PERSONNEL_EVENT_DATA_CATEGORY = "identity.person";
+
+export const MSG_DRAFT_NOT_FOUND_FA = "پیش‌نویس رویداد یافت نشد.";
+
+export const MSG_DRAFT_NOT_EDITABLE_FA =
+  "این پیش‌نویس قابل ویرایش یا حذف نیست.";
+
+export const MSG_DRAFT_ALREADY_FINALIZED_FA =
+  "این پیش‌نویس قبلاً نهایی شده است.";
+
+export const MSG_DRAFT_DELETED_FA = "این پیش‌نویس حذف شده است.";
+
+export const MSG_DRAFT_VERSION_CONFLICT_FA =
+  "پیش‌نویس توسط کاربر دیگری تغییر کرده است. صفحه را تازه کنید.";
+
+export const MSG_FINALIZE_BLOCKED_FA =
+  "نهایی‌سازی به‌خاطر تعارض مسدود شد. جزئیات را در فهرست تعارض‌ها ببینید.";
+
+export const MSG_FINALIZE_WARNING_ACK_REQUIRED_FA =
+  "برای ادامه باید هشدارها را صریحاً تأیید کنید.";
+
+export const MSG_FINALIZE_OVERRIDE_REQUIRED_FA =
+  "برای این عملیات Override با دلیل الزامی است.";
+
+export const MSG_FINALIZE_STALE_SNAPSHOT_FA =
+  "مرجع‌های ارزیابی کهنه شده‌اند. دوباره بررسی کنید و نهایی‌سازی را تکرار کنید.";
+
+export const MSG_FINALIZE_PENDING_REVIEW_FA =
+  "این رویداد تا پیش‌تأیید سطح ریسک، غیررسمی می‌ماند و رویداد معتبر ثبت نشد.";
+
+export const MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA =
+  "کلید یکتایی نهایی‌سازی با پیش‌نویس دیگری تداخل دارد.";
+
+export const MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA =
+  "تاریخ مؤثر نامعتبر است. فقط تاریخ روز (YYYY-MM-DD) مجاز است.";
+
+export const MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";
+
+export const MSG_SENSITIVE_DRAFT_PAYLOAD_FA =
+  "پیش‌نویس نباید حاوی دادهٔ حساس (مبلغ، کد ملی، …) باشد.";
+
+export const MSG_HEADCOUNT_CHECK_BLOCKED_FA =
+  "بررسی ظرفیت نیروی انسانی برای این نوع رویداد هنوز آماده نیست؛ نهایی‌سازی مسدود است.";
+
+export const MSG_BASELINE_BOUNDARY_BLOCKED_FA =
+  "تاریخ مؤثر قبل از مرز Baseline است و بدون Override مجاز نیست.";
+
+export const MSG_RISK_TIER_PENDING_REVIEW_FA =
+  "این نوع رویداد نیازمند پیش‌تأیید سطح ریسک است و هنوز به‌صورت معتبر ثبت نمی‌شود.";

@@ -17,6 +17,8 @@ import {
   ORGANIZATION_WRITE_PERMISSION,
   PERSON_READ_PERMISSION,
   PERSON_WRITE_PERMISSION,
+  PERSONNEL_EVENT_DRAFT_PERMISSION,
+  PERSONNEL_EVENT_FINALIZE_PERMISSION,
 } from "./errors";
 import {
   createGrade,
@@ -267,6 +269,72 @@ export async function seedPersonPermissionFixtures(
   }
 }
 
+/** Story 4.2 — personnel_event.draft / finalize for HR Operator/Admin demo sets. */
+export const SEED_PERSONNEL_EVENT = {
+  permissionSetName: "personnel-event",
+  roleCode: "personnel_event_operator",
+  roleLabelFa: "اپراتور رویداد پرسنلی",
+} as const;
+
+/**
+ * Bind personnel_event.draft + personnel_event.finalize into a PermissionSet
+ * and attach to hr.admin / hr.operator. Idempotent.
+ */
+export async function seedPersonnelEventPermissionFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  const permissionSet = await db.permissionSet.upsert({
+    where: { name: SEED_PERSONNEL_EVENT.permissionSetName },
+    create: {
+      name: SEED_PERSONNEL_EVENT.permissionSetName,
+      permissions: [
+        PERSONNEL_EVENT_DRAFT_PERMISSION,
+        PERSONNEL_EVENT_FINALIZE_PERMISSION,
+      ],
+    },
+    update: {
+      permissions: [
+        PERSONNEL_EVENT_DRAFT_PERMISSION,
+        PERSONNEL_EVENT_FINALIZE_PERMISSION,
+      ],
+    },
+  });
+
+  const role = await db.accessRole.upsert({
+    where: { code: SEED_PERSONNEL_EVENT.roleCode },
+    create: {
+      code: SEED_PERSONNEL_EVENT.roleCode,
+      labelFa: SEED_PERSONNEL_EVENT.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+    update: {
+      labelFa: SEED_PERSONNEL_EVENT.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+  });
+
+  for (const username of ["hr.admin", "hr.operator"] as const) {
+    const account = await db.internalAccount.findUnique({
+      where: { username },
+    });
+    if (!account) continue;
+
+    await db.accountAccessRole.upsert({
+      where: {
+        accountId_accessRoleId: {
+          accountId: account.id,
+          accessRoleId: role.id,
+        },
+      },
+      create: {
+        accountId: account.id,
+        accessRoleId: role.id,
+      },
+      update: {},
+    });
+  }
+}
+
 /**
  * Ensure ≥1 demo Person exists (unique personnel code).
  * Requires Data Dictionary approve fields enabled first.
@@ -364,6 +432,7 @@ export async function seedPersonIdentityFixtures(
 ): Promise<void> {
   await seedDataDictionary(db);
   await seedPersonPermissionFixtures(db);
+  await seedPersonnelEventPermissionFixtures(db);
   await seedDemoPerson(db);
 }
 

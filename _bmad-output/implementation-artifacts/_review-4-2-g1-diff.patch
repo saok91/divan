@@ -1,0 +1,2322 @@
+diff --git a/packages/modules/person-employment/package.json b/packages/modules/person-employment/package.json
+index e3e9651..99df00a 100644
+--- a/packages/modules/person-employment/package.json
++++ b/packages/modules/person-employment/package.json
+@@ -17,7 +17,8 @@
+     "selfcheck:job-reference": "tsx src/job-reference.selfcheck.ts",
+     "selfcheck:primary-assignment": "tsx src/primary-assignment.selfcheck.ts",
+     "selfcheck:secondary-assignment": "tsx src/secondary-assignment.selfcheck.ts",
+-    "selfcheck:management-relationships": "tsx src/management-relationship.selfcheck.ts"
++    "selfcheck:management-relationships": "tsx src/management-relationship.selfcheck.ts",
++    "selfcheck:personnel-event-draft": "tsx src/personnel-event-draft.selfcheck.ts"
+   },
+   "devDependencies": {
+     "dotenv": "^17.4.2",
+diff --git a/packages/modules/person-employment/src/errors.ts b/packages/modules/person-employment/src/errors.ts
+index 0119251..da9d040 100644
+--- a/packages/modules/person-employment/src/errors.ts
++++ b/packages/modules/person-employment/src/errors.ts
+@@ -441,3 +441,94 @@ export const MSG_MANAGEMENT_ROLE_REGISTRY_INVALID_FA =
+ 
+ export const MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA =
+   "سیاست دامنه مدیر ارشد هنوز تعریف نشده است.";
++
++/** Personnel Event Draft / finalize errors (Story 4.2 / FR-15 / FR-19). Clients match codes. */
++export type PersonnelEventErrorCode =
++  | "DRAFT_NOT_FOUND"
++  | "DRAFT_NOT_EDITABLE"
++  | "DRAFT_ALREADY_FINALIZED"
++  | "DRAFT_DELETED"
++  | "DRAFT_VERSION_CONFLICT"
++  | "FINALIZE_BLOCKED"
++  | "FINALIZE_WARNING_ACK_REQUIRED"
++  | "FINALIZE_OVERRIDE_REQUIRED"
++  | "FINALIZE_STALE_SNAPSHOT"
++  | "FINALIZE_PENDING_REVIEW"
++  | "FINALIZE_IDEMPOTENCY_CONFLICT"
++  | "INVALID_EFFECTIVE_DATE"
++  | "PERSON_NOT_FOUND"
++  | "EMPLOYMENT_NOT_FOUND"
++  | "VALIDATION"
++  | "SENSITIVE_PAYLOAD"
++  | "PERMISSION_DENIED"
++  | "HEADCOUNT_CHECK_BLOCKED"
++  | "BASELINE_BOUNDARY_BLOCKED"
++  | "RISK_TIER_PENDING_REVIEW";
++
++export class PersonnelEventError extends Error {
++  readonly code: PersonnelEventErrorCode;
++  readonly messageFa: string;
++
++  constructor(
++    code: PersonnelEventErrorCode,
++    messageFa: string,
++    message?: string,
++  ) {
++    super(message ?? messageFa);
++    this.name = "PersonnelEventError";
++    this.code = code;
++    this.messageFa = messageFa;
++  }
++}
++
++export const PERSONNEL_EVENT_DRAFT_PERMISSION = "personnel_event.draft";
++export const PERSONNEL_EVENT_FINALIZE_PERMISSION = "personnel_event.finalize";
++export const PERSONNEL_EVENT_DATA_CATEGORY = "identity.person";
++
++export const MSG_DRAFT_NOT_FOUND_FA = "پیش‌نویس رویداد یافت نشد.";
++
++export const MSG_DRAFT_NOT_EDITABLE_FA =
++  "این پیش‌نویس قابل ویرایش یا حذف نیست.";
++
++export const MSG_DRAFT_ALREADY_FINALIZED_FA =
++  "این پیش‌نویس قبلاً نهایی شده است.";
++
++export const MSG_DRAFT_DELETED_FA = "این پیش‌نویس حذف شده است.";
++
++export const MSG_DRAFT_VERSION_CONFLICT_FA =
++  "پیش‌نویس توسط کاربر دیگری تغییر کرده است. صفحه را تازه کنید.";
++
++export const MSG_FINALIZE_BLOCKED_FA =
++  "نهایی‌سازی به‌خاطر تعارض مسدود شد. جزئیات را در فهرست تعارض‌ها ببینید.";
++
++export const MSG_FINALIZE_WARNING_ACK_REQUIRED_FA =
++  "برای ادامه باید هشدارها را صریحاً تأیید کنید.";
++
++export const MSG_FINALIZE_OVERRIDE_REQUIRED_FA =
++  "برای این عملیات Override با دلیل الزامی است.";
++
++export const MSG_FINALIZE_STALE_SNAPSHOT_FA =
++  "مرجع‌های ارزیابی کهنه شده‌اند. دوباره بررسی کنید و نهایی‌سازی را تکرار کنید.";
++
++export const MSG_FINALIZE_PENDING_REVIEW_FA =
++  "این رویداد تا پیش‌تأیید سطح ریسک، غیررسمی می‌ماند و رویداد معتبر ثبت نشد.";
++
++export const MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA =
++  "کلید یکتایی نهایی‌سازی با پیش‌نویس دیگری تداخل دارد.";
++
++export const MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA =
++  "تاریخ مؤثر نامعتبر است. فقط تاریخ روز (YYYY-MM-DD) مجاز است.";
++
++export const MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";
++
++export const MSG_SENSITIVE_DRAFT_PAYLOAD_FA =
++  "پیش‌نویس نباید حاوی دادهٔ حساس (مبلغ، کد ملی، …) باشد.";
++
++export const MSG_HEADCOUNT_CHECK_BLOCKED_FA =
++  "بررسی ظرفیت نیروی انسانی برای این نوع رویداد هنوز آماده نیست؛ نهایی‌سازی مسدود است.";
++
++export const MSG_BASELINE_BOUNDARY_BLOCKED_FA =
++  "تاریخ مؤثر قبل از مرز Baseline است و بدون Override مجاز نیست.";
++
++export const MSG_RISK_TIER_PENDING_REVIEW_FA =
++  "این نوع رویداد نیازمند پیش‌تأیید سطح ریسک است و هنوز به‌صورت معتبر ثبت نمی‌شود.";
+diff --git a/packages/modules/person-employment/src/index.ts b/packages/modules/person-employment/src/index.ts
+index ee6ec33..ee204fc 100644
+--- a/packages/modules/person-employment/src/index.ts
++++ b/packages/modules/person-employment/src/index.ts
+@@ -7,6 +7,7 @@
+  * Story 3.7: Primary Assignment integrity (FR-11) — projection + exactly-one + Team/job facts.
+  * Story 3.8: Secondary Assignment fidelity (FR-12) — dual-role projection; no headcount; inventory gate.
+  * Story 3.9: Derived management relationships (FR-13) — compute from Primary+org+Role; no editable shadow.
++ * Story 4.2: Draft working store + finalize/conflict substrate (FR-15 / FR-19 / AD-6).
+  * Start/Return/Terminate / Secondary create-change-end product flows = Epic 4 (4.5–4.8).
+  */
+ 
+@@ -105,6 +106,27 @@ export {
+   MSG_AMBIGUOUS_MANAGEMENT_SCOPE_FA,
+   MSG_MANAGEMENT_ROLE_REGISTRY_INVALID_FA,
+   MSG_SENIOR_MANAGER_POLICY_UNDEFINED_FA,
++  PERSONNEL_EVENT_DRAFT_PERMISSION,
++  PERSONNEL_EVENT_FINALIZE_PERMISSION,
++  PERSONNEL_EVENT_DATA_CATEGORY,
++  PersonnelEventError,
++  MSG_DRAFT_NOT_FOUND_FA,
++  MSG_DRAFT_NOT_EDITABLE_FA,
++  MSG_DRAFT_ALREADY_FINALIZED_FA,
++  MSG_DRAFT_DELETED_FA,
++  MSG_DRAFT_VERSION_CONFLICT_FA,
++  MSG_FINALIZE_BLOCKED_FA,
++  MSG_FINALIZE_WARNING_ACK_REQUIRED_FA,
++  MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
++  MSG_FINALIZE_STALE_SNAPSHOT_FA,
++  MSG_FINALIZE_PENDING_REVIEW_FA,
++  MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA,
++  MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
++  MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
++  MSG_SENSITIVE_DRAFT_PAYLOAD_FA,
++  MSG_HEADCOUNT_CHECK_BLOCKED_FA,
++  MSG_BASELINE_BOUNDARY_BLOCKED_FA,
++  MSG_RISK_TIER_PENDING_REVIEW_FA,
+ } from "./errors";
+ 
+ export type {
+@@ -116,6 +138,7 @@ export type {
+   PrimaryAssignmentErrorCode,
+   SecondaryAssignmentErrorCode,
+   ManagementRelationshipErrorCode,
++  PersonnelEventErrorCode,
+ } from "./errors";
+ 
+ export {
+@@ -407,8 +430,10 @@ export {
+   SEED_PRIMARY_ASSIGNMENT,
+   SEED_SECONDARY_ASSIGNMENT,
+   SEED_MANAGEMENT_RELATIONSHIPS,
++  SEED_PERSONNEL_EVENT,
+   seedPersonIdentityFixtures,
+   seedPersonPermissionFixtures,
++  seedPersonnelEventPermissionFixtures,
+   seedDemoPerson,
+   seedDemoEmployments,
+   seedEmploymentLifecycleFixtures,
+@@ -434,7 +459,72 @@ export {
+   assertActorHasOrganizationWrite,
+   assertActorHasJobReferenceRead,
+   assertActorHasJobReferenceWrite,
++  assertActorHasPersonnelEventDraft,
++  assertActorHasPersonnelEventFinalize,
+   MSG_PERSON_PERMISSION_REQUIRED_FA,
+ } from "./permissions";
+ 
+ export { POPULATION_SUBJECT_ID_TARGET } from "./population-cutover";
++
++export {
++  createDraft,
++  getDraft,
++  updateDraft,
++  deleteDraft,
++  listOpenDraftsForPerson,
++} from "./personnel-event-draft";
++
++export type {
++  DraftStatus,
++  PersonnelEventDraftRecord,
++  CreateDraftInput,
++  UpdateDraftInput,
++} from "./personnel-event-draft";
++
++export {
++  buildEvaluationSnapshot,
++  classifyConflicts,
++  assertSnapshotFresh,
++  hasBlockingConflicts,
++  warningCodesRequiringAck,
++  codesRequiringOverride,
++  HEADCOUNT_CONSUMING_EVENT_TYPES,
++  WARNING_ACK_ALLOW_LIST,
++} from "./personnel-event-conflicts";
++
++export type {
++  ConflictSeverity,
++  ConflictFinding,
++  EvaluationSnapshot,
++  ConflictPolicy,
++  BuildSnapshotInput,
++} from "./personnel-event-conflicts";
++
++export {
++  finalizeDraft,
++  evaluateDraftForFinalize,
++  inferRiskTiers,
++  evaluateRiskTiers,
++} from "./personnel-event-finalize";
++
++export type {
++  RiskTierKind,
++  RiskTierConfig,
++  FinalizeAcknowledgement,
++  FinalizeOverride,
++  FinalizeDraftInput,
++  FinalizeDraftResult,
++} from "./personnel-event-finalize";
++
++export {
++  setProjectionRefreshHook,
++  resetProjectionRefreshHook,
++  getProjectionRefreshHook,
++  runProjectionRefreshHook,
++  defaultProjectionRefreshHook,
++} from "./personnel-event-projection-hook";
++
++export type {
++  ProjectionRefreshContext,
++  ProjectionRefreshHook,
++} from "./personnel-event-projection-hook";
+diff --git a/packages/modules/person-employment/src/permissions.ts b/packages/modules/person-employment/src/permissions.ts
+index 54a2d23..9639430 100644
+--- a/packages/modules/person-employment/src/permissions.ts
++++ b/packages/modules/person-employment/src/permissions.ts
+@@ -12,12 +12,16 @@ import {
+   JobRefError,
+   MSG_JOB_REF_PERMISSION_REQUIRED_FA,
+   MSG_ORG_PERMISSION_REQUIRED_FA,
++  MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+   ORGANIZATION_READ_PERMISSION,
+   ORGANIZATION_WRITE_PERMISSION,
+   OrgUnitError,
+   PERSON_READ_PERMISSION,
+   PERSON_WRITE_PERMISSION,
++  PERSONNEL_EVENT_DRAFT_PERMISSION,
++  PERSONNEL_EVENT_FINALIZE_PERMISSION,
+   PersonIdentityError,
++  PersonnelEventError,
+ } from "./errors";
+ 
+ export const MSG_PERSON_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";
+@@ -145,3 +149,39 @@ export async function assertActorHasJobReferenceWrite(
+     );
+   }
+ }
++
++export async function assertActorHasPersonnelEventDraft(
++  accountId: string,
++  db: PrismaClient = getPersonDb(),
++): Promise<void> {
++  const has = await actorHoldsPermission(
++    accountId,
++    PERSONNEL_EVENT_DRAFT_PERMISSION,
++    db,
++  );
++  if (!has) {
++    throw new PersonnelEventError(
++      "PERMISSION_DENIED",
++      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
++      "personnel_event_draft_required",
++    );
++  }
++}
++
++export async function assertActorHasPersonnelEventFinalize(
++  accountId: string,
++  db: PrismaClient = getPersonDb(),
++): Promise<void> {
++  const has = await actorHoldsPermission(
++    accountId,
++    PERSONNEL_EVENT_FINALIZE_PERMISSION,
++    db,
++  );
++  if (!has) {
++    throw new PersonnelEventError(
++      "PERMISSION_DENIED",
++      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
++      "personnel_event_finalize_required",
++    );
++  }
++}
+diff --git a/packages/modules/person-employment/src/seed.ts b/packages/modules/person-employment/src/seed.ts
+index 65f1a9d..48c2282 100644
+--- a/packages/modules/person-employment/src/seed.ts
++++ b/packages/modules/person-employment/src/seed.ts
+@@ -17,6 +17,8 @@ import {
+   ORGANIZATION_WRITE_PERMISSION,
+   PERSON_READ_PERMISSION,
+   PERSON_WRITE_PERMISSION,
++  PERSONNEL_EVENT_DRAFT_PERMISSION,
++  PERSONNEL_EVENT_FINALIZE_PERMISSION,
+ } from "./errors";
+ import {
+   createGrade,
+@@ -267,6 +269,72 @@ export async function seedPersonPermissionFixtures(
+   }
+ }
+ 
++/** Story 4.2 — personnel_event.draft / finalize for HR Operator/Admin demo sets. */
++export const SEED_PERSONNEL_EVENT = {
++  permissionSetName: "personnel-event",
++  roleCode: "personnel_event_operator",
++  roleLabelFa: "اپراتور رویداد پرسنلی",
++} as const;
++
++/**
++ * Bind personnel_event.draft + personnel_event.finalize into a PermissionSet
++ * and attach to hr.admin / hr.operator. Idempotent.
++ */
++export async function seedPersonnelEventPermissionFixtures(
++  db: PrismaClient,
++): Promise<void> {
++  const permissionSet = await db.permissionSet.upsert({
++    where: { name: SEED_PERSONNEL_EVENT.permissionSetName },
++    create: {
++      name: SEED_PERSONNEL_EVENT.permissionSetName,
++      permissions: [
++        PERSONNEL_EVENT_DRAFT_PERMISSION,
++        PERSONNEL_EVENT_FINALIZE_PERMISSION,
++      ],
++    },
++    update: {
++      permissions: [
++        PERSONNEL_EVENT_DRAFT_PERMISSION,
++        PERSONNEL_EVENT_FINALIZE_PERMISSION,
++      ],
++    },
++  });
++
++  const role = await db.accessRole.upsert({
++    where: { code: SEED_PERSONNEL_EVENT.roleCode },
++    create: {
++      code: SEED_PERSONNEL_EVENT.roleCode,
++      labelFa: SEED_PERSONNEL_EVENT.roleLabelFa,
++      permissionSetId: permissionSet.id,
++    },
++    update: {
++      labelFa: SEED_PERSONNEL_EVENT.roleLabelFa,
++      permissionSetId: permissionSet.id,
++    },
++  });
++
++  for (const username of ["hr.admin", "hr.operator"] as const) {
++    const account = await db.internalAccount.findUnique({
++      where: { username },
++    });
++    if (!account) continue;
++
++    await db.accountAccessRole.upsert({
++      where: {
++        accountId_accessRoleId: {
++          accountId: account.id,
++          accessRoleId: role.id,
++        },
++      },
++      create: {
++        accountId: account.id,
++        accessRoleId: role.id,
++      },
++      update: {},
++    });
++  }
++}
++
+ /**
+  * Ensure ≥1 demo Person exists (unique personnel code).
+  * Requires Data Dictionary approve fields enabled first.
+@@ -364,6 +432,7 @@ export async function seedPersonIdentityFixtures(
+ ): Promise<void> {
+   await seedDataDictionary(db);
+   await seedPersonPermissionFixtures(db);
++  await seedPersonnelEventPermissionFixtures(db);
+   await seedDemoPerson(db);
+ }
+ 
+diff --git a/packages/modules/person-employment/src/personnel-event-conflicts.ts b/packages/modules/person-employment/src/personnel-event-conflicts.ts
+new file mode 100644
+index 0000000..dafd5dc
+--- /dev/null
++++ b/packages/modules/person-employment/src/personnel-event-conflicts.ts
+@@ -0,0 +1,400 @@
++/**
++ * Evaluation snapshot + conflict classification (Story 4.2 / FR-19 / FR-56).
++ * Fail-closed stubs for AR-TEMPORAL / AR-HEADCOUNT — do not invent frozen matrices.
++ */
++
++import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
++import type { PrismaClient } from "@divan/db";
++
++import { getPersonDb } from "./db";
++import {
++  MSG_BASELINE_BOUNDARY_BLOCKED_FA,
++  MSG_HEADCOUNT_CHECK_BLOCKED_FA,
++  MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
++} from "./errors";
++import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
++import { isEmploymentActiveAsOf } from "./employment";
++import { getGradeById } from "./job-reference";
++import { JobRefError } from "./errors";
++
++export type ConflictSeverity = "blocking" | "warning";
++
++export type ConflictFinding = {
++  code: string;
++  severity: ConflictSeverity;
++  messageFa: string;
++  /** When true, warning may proceed only with recorded acknowledgement. */
++  requiresAck?: boolean;
++  /** When true, only Override path (HR Admin / configured) may proceed. */
++  requiresOverride?: boolean;
++};
++
++export type EvaluationSnapshot = {
++  /** Asia/Tehran date-only as-of for checks (FR-56). */
++  asOfDate: string;
++  actorAccountId: string;
++  /** PermissionSet fingerprint or joined permission keys for attribution. */
++  permissionSetFingerprint: string;
++  correlationId: string;
++  /** Frozen Person stamp. */
++  person: { id: string; updatedAt: string };
++  /** Frozen Employment stamp when bound. */
++  employment: {
++    id: string;
++    updatedAt: string;
++    startDate: string;
++    endDateExclusive: string | null;
++  } | null;
++  /** Optional org/job refs from draft payload (structural ids only). */
++  refs: {
++    ladderId?: string;
++    gradeId?: string;
++    teamId?: string;
++    organizationalRoleId?: string;
++    jobTitleId?: string;
++  };
++  builtAt: string;
++};
++
++export type BuildSnapshotInput = {
++  draft: PersonnelEventDraftRecord;
++  actorAccountId: string;
++  correlationId: string;
++  permissionSetFingerprint?: string;
++  asOfDate?: string;
++};
++
++/** Event types that would consume headcount — stub-block until headcount module exists. */
++export const HEADCOUNT_CONSUMING_EVENT_TYPES = new Set([
++  "EmploymentStarted",
++  "TransferRecorded",
++  "TeamTransferRecorded",
++  "HeadcountConsumed",
++]);
++
++/**
++ * Warning allow-list — only these codes may proceed with acknowledgement.
++ * Everything else that is a warning without policy stays blocking.
++ */
++export const WARNING_ACK_ALLOW_LIST = new Set([
++  "PRE_BASELINE_EFFECTIVE_DATE",
++]);
++
++export type ConflictPolicy = {
++  /** When set, Effective Date before this boundary needs Override (+ ack). */
++  baselineBoundaryDate?: string | null;
++  /** When true, PRE_BASELINE can be Override'd by HR Admin path. */
++  allowPreBaselineOverride?: boolean;
++  /** Codes that may proceed with warning acknowledgement. */
++  warningAckAllowList?: Set<string>;
++};
++
++function dateOnlyFromDb(d: Date): string {
++  return d.toISOString().slice(0, 10);
++}
++
++export async function buildEvaluationSnapshot(
++  input: BuildSnapshotInput,
++  db: PrismaClient = getPersonDb(),
++): Promise<EvaluationSnapshot> {
++  const asOf =
++    input.asOfDate != null
++      ? (() => {
++          const p = parseDateOnly(input.asOfDate);
++          if (!p.ok) {
++            throw new Error(`invalid_as_of:${p.reason}`);
++          }
++          return p.value;
++        })()
++      : todayDateOnlyTehran();
++
++  const person = await db.person.findUnique({
++    where: { id: input.draft.personId },
++  });
++  if (!person) {
++    throw new Error("person_not_found_for_snapshot");
++  }
++
++  let employment: EvaluationSnapshot["employment"] = null;
++  if (input.draft.employmentId) {
++    const emp = await db.employment.findUnique({
++      where: { id: input.draft.employmentId },
++    });
++    if (emp) {
++      employment = {
++        id: emp.id,
++        updatedAt: emp.updatedAt.toISOString(),
++        startDate: dateOnlyFromDb(emp.startDate),
++        endDateExclusive: emp.endDateExclusive
++          ? dateOnlyFromDb(emp.endDateExclusive)
++          : null,
++      };
++    }
++  }
++
++  const payload = input.draft.payload;
++  const refs: EvaluationSnapshot["refs"] = {};
++  for (const key of [
++    "ladderId",
++    "gradeId",
++    "teamId",
++    "organizationalRoleId",
++    "jobTitleId",
++  ] as const) {
++    const v = payload[key];
++    if (typeof v === "string" && v.trim()) {
++      refs[key] = v.trim();
++    }
++  }
++
++  return {
++    asOfDate: asOf,
++    actorAccountId: input.actorAccountId,
++    permissionSetFingerprint:
++      input.permissionSetFingerprint?.trim() || "unspecified",
++    correlationId: input.correlationId,
++    person: {
++      id: person.id,
++      updatedAt: person.updatedAt.toISOString(),
++    },
++    employment,
++    refs,
++    builtAt: new Date().toISOString(),
++  };
++}
++
++/**
++ * Re-validate client-supplied snapshot against live stamps.
++ * Stale refs → block (FR-56).
++ */
++export function assertSnapshotFresh(
++  snapshot: EvaluationSnapshot,
++  live: EvaluationSnapshot,
++): ConflictFinding | null {
++  if (snapshot.person.id !== live.person.id) {
++    return {
++      code: "STALE_PERSON_REF",
++      severity: "blocking",
++      messageFa:
++        "مرجع فرد در اسنپ‌شات ارزیابی با وضعیت فعلی هم‌خوان نیست؛ نهایی‌سازی مسدود است.",
++    };
++  }
++  if (snapshot.person.updatedAt !== live.person.updatedAt) {
++    return {
++      code: "STALE_PERSON_REF",
++      severity: "blocking",
++      messageFa:
++        "فرد پس از ساخت اسنپ‌شات تغییر کرده است؛ دوباره بررسی کنید.",
++    };
++  }
++  if (
++    (snapshot.employment?.id ?? null) !== (live.employment?.id ?? null) ||
++    (snapshot.employment?.updatedAt ?? null) !==
++      (live.employment?.updatedAt ?? null)
++  ) {
++    return {
++      code: "STALE_EMPLOYMENT_REF",
++      severity: "blocking",
++      messageFa:
++        "سابقه همکاری پس از ساخت اسنپ‌شات تغییر کرده است؛ نهایی‌سازی مسدود است.",
++    };
++  }
++  return null;
++}
++
++export async function classifyConflicts(
++  draft: PersonnelEventDraftRecord,
++  snapshot: EvaluationSnapshot,
++  policy: ConflictPolicy = {},
++  db: PrismaClient = getPersonDb(),
++): Promise<ConflictFinding[]> {
++  const findings: ConflictFinding[] = [];
++  const warningAllow =
++    policy.warningAckAllowList ?? WARNING_ACK_ALLOW_LIST;
++
++  const dateParsed = parseDateOnly(draft.effectiveDate);
++  if (!dateParsed.ok) {
++    findings.push({
++      code: "INVALID_EFFECTIVE_DATE",
++      severity: "blocking",
++      messageFa: MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
++    });
++    return findings;
++  }
++
++  // Broken correction refs (if draft carries them)
++  for (const key of [
++    "correctsEventId",
++    "cancelsEventId",
++    "reversesEventId",
++  ] as const) {
++    const ref = draft.payload[key];
++    if (typeof ref === "string" && ref.trim()) {
++      // Application-level UUID shape check; existence validated when event-store lookup lands (4.3)
++      const uuidOk =
++        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
++          ref.trim(),
++        );
++      if (!uuidOk) {
++        findings.push({
++          code: "BROKEN_CORRECTION_REF",
++          severity: "blocking",
++          messageFa:
++            "ارجاع اصلاح/لغو/بازگشت نامعتبر است؛ نهایی‌سازی مسدود است.",
++        });
++      }
++    }
++  }
++
++  // Inactive Employment mutation — when employment is bound and as-of is outside interval
++  if (draft.employmentId && snapshot.employment) {
++    const active = isEmploymentActiveAsOf(
++      {
++        startDate: snapshot.employment.startDate,
++        endDateExclusive: snapshot.employment.endDateExclusive,
++      },
++      snapshot.asOfDate,
++    );
++    if (!active) {
++      findings.push({
++        code: "INACTIVE_EMPLOYMENT_MUTATION",
++        severity: "blocking",
++        messageFa:
++          "تغییر روی همکاری غیرفعال در تاریخ ارزیابی مجاز نیست؛ نهایی‌سازی مسدود است.",
++      });
++    }
++  } else if (draft.employmentId && !snapshot.employment) {
++    findings.push({
++      code: "EMPLOYMENT_REF_MISSING",
++      severity: "blocking",
++      messageFa:
++        "سابقه همکاری پیوست‌شده یافت نشد؛ نهایی‌سازی مسدود است.",
++    });
++  }
++
++  // Overlapping Employments / Primary — prove with Epic 3 as-of when starting new employment
++  if (draft.eventType === "EmploymentStarted") {
++    const active = await db.employment.findMany({
++      where: {
++        personId: draft.personId,
++        startDate: { lte: new Date(`${snapshot.asOfDate}T00:00:00.000Z`) },
++        OR: [
++          { endDateExclusive: null },
++          {
++            endDateExclusive: {
++              gt: new Date(`${snapshot.asOfDate}T00:00:00.000Z`),
++            },
++          },
++        ],
++      },
++    });
++    if (active.length > 0) {
++      findings.push({
++        code: "OVERLAPPING_EMPLOYMENT",
++        severity: "blocking",
++        messageFa:
++          "هم‌پوشانی همکاری فعال وجود دارد؛ شروع همکاری جدید بدون بستن قبلی مسدود است.",
++      });
++    }
++  }
++
++  // Ladder–Grade invalid
++  if (snapshot.refs.ladderId && snapshot.refs.gradeId) {
++    try {
++      const grade = await getGradeById(snapshot.refs.gradeId, db);
++      if (!grade || grade.ladderId !== snapshot.refs.ladderId) {
++        findings.push({
++          code: "LADDER_GRADE_INVALID",
++          severity: "blocking",
++          messageFa: "گرید به لدر انتخاب‌شده تعلق ندارد.",
++        });
++      }
++    } catch (err) {
++      if (err instanceof JobRefError) {
++        findings.push({
++          code: "LADDER_GRADE_INVALID",
++          severity: "blocking",
++          messageFa: err.messageFa,
++        });
++      } else {
++        findings.push({
++          code: "LADDER_GRADE_INVALID",
++          severity: "blocking",
++          messageFa: "گرید به لدر انتخاب‌شده تعلق ندارد.",
++        });
++      }
++    }
++  }
++
++  // Headcount consuming types — fail-closed stub while headcount module empty
++  if (HEADCOUNT_CONSUMING_EVENT_TYPES.has(draft.eventType)) {
++    findings.push({
++      code: "HEADCOUNT_UNAPPROVED",
++      severity: "blocking",
++      messageFa: MSG_HEADCOUNT_CHECK_BLOCKED_FA,
++    });
++  }
++
++  // Pre-Baseline boundary (AR-TEMPORAL partial freeze)
++  const baseline = policy.baselineBoundaryDate?.trim() || null;
++  if (baseline) {
++    const b = parseDateOnly(baseline);
++    if (b.ok && draft.effectiveDate < b.value) {
++      if (policy.allowPreBaselineOverride) {
++        findings.push({
++          code: "PRE_BASELINE_EFFECTIVE_DATE",
++          severity: "warning",
++          messageFa: MSG_BASELINE_BOUNDARY_BLOCKED_FA,
++          requiresAck: true,
++          requiresOverride: true,
++        });
++      } else {
++        findings.push({
++          code: "PRE_BASELINE_EFFECTIVE_DATE",
++          severity: "blocking",
++          messageFa: MSG_BASELINE_BOUNDARY_BLOCKED_FA,
++        });
++      }
++    }
++  } else if (draft.payload.requireBaselineCheck === true) {
++    // Baseline not configured but draft demanded check — fail-closed
++    findings.push({
++      code: "BASELINE_NOT_CONFIGURED",
++      severity: "blocking",
++      messageFa:
++        "مرز Baseline پیکربندی نشده است؛ پذیرش خاموش تاریخ پیش از Baseline مجاز نیست.",
++    });
++  }
++
++  // Downgrade unknown warnings that are not on allow-list to blocking
++  for (const f of findings) {
++    if (
++      f.severity === "warning" &&
++      f.requiresAck &&
++      !warningAllow.has(f.code)
++    ) {
++      f.severity = "blocking";
++      delete f.requiresAck;
++    }
++  }
++
++  return findings;
++}
++
++export function hasBlockingConflicts(findings: ConflictFinding[]): boolean {
++  return findings.some((f) => f.severity === "blocking");
++}
++
++export function warningCodesRequiringAck(
++  findings: ConflictFinding[],
++): string[] {
++  return findings
++    .filter((f) => f.severity === "warning" && f.requiresAck)
++    .map((f) => f.code);
++}
++
++export function codesRequiringOverride(
++  findings: ConflictFinding[],
++): string[] {
++  return findings.filter((f) => f.requiresOverride).map((f) => f.code);
++}
+diff --git a/packages/modules/person-employment/src/personnel-event-draft.selfcheck.ts b/packages/modules/person-employment/src/personnel-event-draft.selfcheck.ts
+new file mode 100644
+index 0000000..939c271
+--- /dev/null
++++ b/packages/modules/person-employment/src/personnel-event-draft.selfcheck.ts
+@@ -0,0 +1,412 @@
++/**
++ * Personnel Event Draft / finalize selfcheck (Story 4.2 / FR-15 / FR-19 / AD-6).
++ * Run: pnpm --filter @divan/person-employment selfcheck:personnel-event-draft
++ * Requires DATABASE_URL, migrated Draft table + kernel_events SQL, seeded accounts.
++ */
++import assert from "node:assert/strict";
++import { randomUUID } from "node:crypto";
++import { resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import { config as loadEnv } from "dotenv";
++
++import { createPgPool } from "@divan/db";
++import { withTransaction } from "@divan/event-store";
++
++import {
++  PersonnelEventError,
++  createDraft,
++  deleteDraft,
++  finalizeDraft,
++  getDraft,
++  getPersonDb,
++  resetProjectionRefreshHook,
++  seedPersonIdentityFixtures,
++  setProjectionRefreshHook,
++  updateDraft,
++  SEED_PERSON_IDENTITY,
++} from "./index";
++
++const rootEnv = resolve(
++  fileURLToPath(new URL(".", import.meta.url)),
++  "../../../../.env",
++);
++loadEnv({ path: rootEnv });
++
++async function countBusinessEvents(
++  pool: ReturnType<typeof createPgPool>,
++  personId: string,
++  draftId: string,
++): Promise<number> {
++  const r = await pool.query(
++    `SELECT count(*)::int AS n FROM kernel_events
++     WHERE event_class = 'business'
++       AND person_id = $1::uuid
++       AND payload->>'draftId' = $2`,
++    [personId, draftId],
++  );
++  return r.rows[0]?.n ?? 0;
++}
++
++async function main() {
++  const url = process.env.DATABASE_URL?.trim();
++  assert.ok(url, "DATABASE_URL required");
++
++  const db = getPersonDb();
++  const pool = createPgPool(url);
++  await seedPersonIdentityFixtures(db);
++
++  const demo = await db.person.findUnique({
++    where: { personnelCode: SEED_PERSON_IDENTITY.demoPersonnelCode },
++  });
++  assert.ok(demo, "demo person required");
++
++  const actor =
++    (await db.internalAccount.findUnique({ where: { username: "hr.operator" } }))
++      ?.id ?? "selfcheck-actor";
++
++  let hookCalls = 0;
++  setProjectionRefreshHook(async (ctx) => {
++    hookCalls += 1;
++    ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
++  });
++
++  try {
++    // --- Create / edit / delete Draft: no kernel_events, no projection ---
++    const draft = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: "2025-06-15",
++        payload: { note: "scaffold" },
++      },
++      { accountId: actor },
++      db,
++    );
++    assert.equal(draft.status, "open");
++    assert.equal(draft.version, 1);
++
++    const beforeCreate = await countBusinessEvents(pool, demo.id, draft.id);
++    assert.equal(beforeCreate, 0, "draft create must not append kernel event");
++
++    const updated = await updateDraft(
++      {
++        draftId: draft.id,
++        expectedVersion: 1,
++        effectiveDate: "2025-07-01",
++        payload: { note: "edited" },
++      },
++      { accountId: actor },
++      db,
++    );
++    assert.equal(updated.version, 2);
++    assert.equal(updated.effectiveDate, "2025-07-01");
++    assert.equal(
++      await countBusinessEvents(pool, demo.id, draft.id),
++      0,
++      "draft update must not append",
++    );
++
++    const deleted = await deleteDraft(draft.id, 2, { accountId: actor }, db);
++    assert.equal(deleted.status, "deleted");
++
++    // Cannot finalize deleted
++    await assert.rejects(
++      () =>
++        finalizeDraft(
++          { draftId: draft.id, actorId: actor },
++          pool,
++          db,
++        ),
++      (err: unknown) =>
++        err instanceof PersonnelEventError && err.code === "DRAFT_DELETED",
++    );
++
++    // --- Finalize happy path ---
++    const draft2 = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: "2025-06-15",
++        payload: { scaffold: true },
++      },
++      { accountId: actor },
++      db,
++    );
++    const idem = `selfcheck-finalize-${draft2.id}`;
++    hookCalls = 0;
++    const fin = await finalizeDraft(
++      {
++        draftId: draft2.id,
++        actorId: actor,
++        idempotencyKey: idem,
++        expectedVersion: draft2.version,
++        correlationId: randomUUID(),
++      },
++      pool,
++      db,
++    );
++    assert.equal(fin.outcome, "finalized");
++    if (fin.outcome !== "finalized") throw new Error("expected finalized");
++    assert.ok(fin.eventId);
++    assert.ok(
++      fin.status === "Effective" || fin.status === "Scheduled",
++      `status ${fin.status}`,
++    );
++    assert.equal(fin.draft.status, "finalized");
++    assert.equal(fin.draft.finalizedEventId, fin.eventId);
++    assert.equal(hookCalls, 1, "AD-6 projection hook must run once");
++    assert.equal(fin.projectionHookInvoked, true);
++
++    const row = await pool.query(
++      `SELECT status, finalized_at, finalized_by, event_type
++       FROM kernel_events WHERE id = $1::uuid`,
++      [fin.eventId],
++    );
++    assert.equal(row.rows.length, 1);
++    assert.ok(row.rows[0].finalized_at);
++    assert.equal(row.rows[0].finalized_by, actor);
++    assert.equal(row.rows[0].event_type, "ScaffoldChangeRecorded");
++    assert.ok(
++      row.rows[0].status === "Effective" || row.rows[0].status === "Scheduled",
++    );
++
++    // Exact cardinality: one event
++    assert.equal(await countBusinessEvents(pool, demo.id, draft2.id), 1);
++
++    // --- Idempotent retry → same event id ---
++    const retry = await finalizeDraft(
++      {
++        draftId: draft2.id,
++        actorId: actor,
++        idempotencyKey: idem,
++      },
++      pool,
++      db,
++    );
++    assert.equal(retry.outcome, "finalized");
++    if (retry.outcome === "finalized") {
++      assert.equal(retry.eventId, fin.eventId);
++    }
++    assert.equal(
++      await countBusinessEvents(pool, demo.id, draft2.id),
++      1,
++      "retry must not create second event",
++    );
++
++    // --- No UPDATE on kernel_events ---
++    await assert.rejects(async () => {
++      await pool.query(
++        `UPDATE kernel_events SET status = 'Draft' WHERE id = $1::uuid`,
++        [fin.eventId],
++      );
++    });
++
++    // --- Blocking conflict (headcount-consuming type) ---
++    const draftBlock = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "EmploymentStarted",
++        effectiveDate: "2025-08-01",
++        payload: {},
++      },
++      { accountId: actor },
++      db,
++    );
++    const blocked = await finalizeDraft(
++      {
++        draftId: draftBlock.id,
++        actorId: actor,
++        expectedVersion: draftBlock.version,
++      },
++      pool,
++      db,
++    );
++    assert.equal(blocked.outcome, "rejected");
++    if (blocked.outcome === "rejected") {
++      assert.equal(blocked.code, "FINALIZE_BLOCKED");
++      assert.ok(
++        blocked.conflicts.some((c) => c.severity === "blocking"),
++        "blocking conflict required",
++      );
++    }
++    const stillOpen = await getDraft(draftBlock.id, db);
++    assert.equal(stillOpen.status, "open");
++    assert.equal(await countBusinessEvents(pool, demo.id, draftBlock.id), 0);
++
++    // --- Warning requires ack ---
++    const draftWarn = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: "2010-01-01",
++        payload: {},
++      },
++      { accountId: actor },
++      db,
++    );
++    const warnReject = await finalizeDraft(
++      {
++        draftId: draftWarn.id,
++        actorId: actor,
++        expectedVersion: draftWarn.version,
++        conflictPolicy: {
++          baselineBoundaryDate: "2020-01-01",
++          allowPreBaselineOverride: true,
++        },
++        actorMayOverride: true,
++        // missing acknowledgement
++      },
++      pool,
++      db,
++    );
++    assert.equal(warnReject.outcome, "rejected");
++    if (warnReject.outcome === "rejected") {
++      assert.ok(
++        warnReject.code === "FINALIZE_WARNING_ACK_REQUIRED" ||
++          warnReject.code === "FINALIZE_OVERRIDE_REQUIRED",
++      );
++    }
++
++    const warnOk = await finalizeDraft(
++      {
++        draftId: draftWarn.id,
++        actorId: actor,
++        expectedVersion: draftWarn.version,
++        conflictPolicy: {
++          baselineBoundaryDate: "2020-01-01",
++          allowPreBaselineOverride: true,
++        },
++        actorMayOverride: true,
++        acknowledgement: {
++          warningCodes: ["PRE_BASELINE_EFFECTIVE_DATE"],
++        },
++        override: {
++          reason: "selfcheck override for pre-baseline scaffold",
++          approvedByAccountId: actor,
++        },
++      },
++      pool,
++      db,
++    );
++    assert.equal(warnOk.outcome, "finalized");
++
++    // --- Risk tier → pending_review (non-authoritative) ---
++    const draftRisk = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "EmploymentTerminated",
++        effectiveDate: "2025-09-01",
++        payload: { riskTier: "termination" },
++      },
++      { accountId: actor },
++      db,
++    );
++    const pending = await finalizeDraft(
++      {
++        draftId: draftRisk.id,
++        actorId: actor,
++        expectedVersion: draftRisk.version,
++        // no risk tier config → pending_review
++      },
++      pool,
++      db,
++    );
++    assert.equal(pending.outcome, "pending_review");
++    if (pending.outcome === "pending_review") {
++      assert.equal(pending.draft.status, "pending_review");
++    }
++    assert.equal(await countBusinessEvents(pool, demo.id, draftRisk.id), 0);
++
++    // --- Delete vs finalize race: finalize wins under lock ---
++    const raceDraft = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: "2025-10-01",
++        payload: {},
++      },
++      { accountId: actor },
++      db,
++    );
++    const raceFin = await finalizeDraft(
++      {
++        draftId: raceDraft.id,
++        actorId: actor,
++        expectedVersion: raceDraft.version,
++        idempotencyKey: `race-${raceDraft.id}`,
++      },
++      pool,
++      db,
++    );
++    assert.equal(raceFin.outcome, "finalized");
++    await assert.rejects(
++      () =>
++        deleteDraft(raceDraft.id, raceDraft.version, { accountId: actor }, db),
++      (err: unknown) =>
++        err instanceof PersonnelEventError &&
++        (err.code === "DRAFT_ALREADY_FINALIZED" ||
++          err.code === "DRAFT_NOT_EDITABLE" ||
++          err.code === "DRAFT_VERSION_CONFLICT"),
++    );
++    const afterRace = await getDraft(raceDraft.id, db);
++    assert.equal(afterRace.status, "finalized");
++    assert.ok(afterRace.finalizedEventId);
++
++    // --- AD-6: hook + append same txn (rollback rolls both) ---
++    const rollbackDraft = await createDraft(
++      {
++        personId: demo.id,
++        eventType: "ScaffoldChangeRecorded",
++        effectiveDate: "2025-11-01",
++        payload: {},
++      },
++      { accountId: actor },
++      db,
++    );
++    setProjectionRefreshHook(async () => {
++      throw new Error("force_rollback_after_hook_setup");
++    });
++    // Force failure inside finalize after we'd normally append: use a hook that throws
++    // Re-implement via finalize path — hook throws → txn rolls back
++    await assert.rejects(() =>
++      finalizeDraft(
++        {
++          draftId: rollbackDraft.id,
++          actorId: actor,
++          expectedVersion: rollbackDraft.version,
++        },
++        pool,
++        db,
++      ),
++    );
++    const afterRollback = await getDraft(rollbackDraft.id, db);
++    assert.equal(
++      afterRollback.status,
++      "open",
++      "failed finalize must leave draft open",
++    );
++    assert.equal(
++      await countBusinessEvents(pool, demo.id, rollbackDraft.id),
++      0,
++      "rolled-back finalize must not leave kernel event",
++    );
++
++    // Prove withTransaction seam still works for access path companion
++    await withTransaction(pool, async (client) => {
++      const r = await client.query("SELECT 1 AS n");
++      assert.equal(r.rows[0].n, 1);
++    });
++
++    console.log("personnel-event-draft selfcheck: OK");
++  } finally {
++    resetProjectionRefreshHook();
++    await pool.end();
++    await db.$disconnect();
++  }
++}
++
++main().catch((err) => {
++  console.error(err);
++  process.exit(1);
++});
+diff --git a/packages/modules/person-employment/src/personnel-event-draft.ts b/packages/modules/person-employment/src/personnel-event-draft.ts
+new file mode 100644
+index 0000000..4013a69
+--- /dev/null
++++ b/packages/modules/person-employment/src/personnel-event-draft.ts
+@@ -0,0 +1,369 @@
++/**
++ * Mutable Draft working store (Story 4.2 / FR-15).
++ * Non-authoritative — never mutates kernel_events or projections on save.
++ */
++
++import { assertNoSensitiveEvidence, BusinessEventValidationError } from "@divan/event-store";
++import { parseDateOnly } from "@divan/temporal-engine";
++import type { Prisma, PrismaClient } from "@divan/db";
++
++import { getPersonDb } from "./db";
++import {
++  MSG_DRAFT_ALREADY_FINALIZED_FA,
++  MSG_DRAFT_DELETED_FA,
++  MSG_DRAFT_NOT_EDITABLE_FA,
++  MSG_DRAFT_NOT_FOUND_FA,
++  MSG_DRAFT_VERSION_CONFLICT_FA,
++  MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
++  MSG_PERSON_NOT_FOUND_FA,
++  MSG_REQUIRED_FIELD_FA,
++  MSG_SENSITIVE_DRAFT_PAYLOAD_FA,
++  PersonnelEventError,
++} from "./errors";
++import { requireNonEmpty as requireNonEmptyBase } from "./normalize";
++
++function requireNonEmpty(value: string | null | undefined, field: string): string {
++  return requireNonEmptyBase(value, `${MSG_REQUIRED_FIELD_FA} (${field})`);
++}
++
++const EVENT_TYPE_PASCAL_RE = /^[A-Z][A-Za-z0-9]*$/;
++
++export type DraftStatus =
++  | "open"
++  | "finalized"
++  | "deleted"
++  | "pending_review";
++
++export type PersonnelEventDraftRecord = {
++  id: string;
++  personId: string;
++  employmentId: string | null;
++  eventType: string;
++  effectiveDate: string;
++  payload: Record<string, unknown>;
++  status: DraftStatus;
++  version: number;
++  createdBy: string;
++  updatedBy: string;
++  finalizedEventId: string | null;
++  idempotencyKey: string | null;
++  warningAcks: unknown;
++  overrideEvidence: unknown;
++  createdAt: Date;
++  updatedAt: Date;
++};
++
++export type CreateDraftInput = {
++  personId: string;
++  employmentId?: string | null;
++  eventType: string;
++  effectiveDate: string;
++  payload?: Record<string, unknown>;
++  idempotencyKey?: string | null;
++};
++
++export type UpdateDraftInput = {
++  draftId: string;
++  expectedVersion: number;
++  employmentId?: string | null;
++  eventType?: string;
++  effectiveDate?: string;
++  payload?: Record<string, unknown>;
++};
++
++function dateOnlyToDb(dateOnly: string): Date {
++  return new Date(`${dateOnly}T00:00:00.000Z`);
++}
++
++function dateOnlyFromDb(d: Date): string {
++  return d.toISOString().slice(0, 10);
++}
++
++function asPayload(value: unknown): Record<string, unknown> {
++  if (value && typeof value === "object" && !Array.isArray(value)) {
++    return value as Record<string, unknown>;
++  }
++  return {};
++}
++
++function mapDraft(row: {
++  id: string;
++  personId: string;
++  employmentId: string | null;
++  eventType: string;
++  effectiveDate: Date;
++  payload: unknown;
++  status: string;
++  version: number;
++  createdBy: string;
++  updatedBy: string;
++  finalizedEventId: string | null;
++  idempotencyKey: string | null;
++  warningAcks: unknown;
++  overrideEvidence: unknown;
++  createdAt: Date;
++  updatedAt: Date;
++}): PersonnelEventDraftRecord {
++  return {
++    id: row.id,
++    personId: row.personId,
++    employmentId: row.employmentId,
++    eventType: row.eventType,
++    effectiveDate: dateOnlyFromDb(row.effectiveDate),
++    payload: asPayload(row.payload),
++    status: row.status as DraftStatus,
++    version: row.version,
++    createdBy: row.createdBy,
++    updatedBy: row.updatedBy,
++    finalizedEventId: row.finalizedEventId,
++    idempotencyKey: row.idempotencyKey,
++    warningAcks: row.warningAcks,
++    overrideEvidence: row.overrideEvidence,
++    createdAt: row.createdAt,
++    updatedAt: row.updatedAt,
++  };
++}
++
++function assertValidEventType(eventType: string): string {
++  const trimmed = requireNonEmpty(eventType, "eventType");
++  if (!EVENT_TYPE_PASCAL_RE.test(trimmed)) {
++    throw new PersonnelEventError(
++      "VALIDATION",
++      "نوع رویداد نامعتبر است. باید PascalCase باشد (مثلاً ScaffoldChangeRecorded).",
++      "invalid_event_type",
++    );
++  }
++  return trimmed;
++}
++
++function assertValidEffectiveDate(raw: string): string {
++  const parsed = parseDateOnly(raw);
++  if (!parsed.ok) {
++    throw new PersonnelEventError(
++      "INVALID_EFFECTIVE_DATE",
++      MSG_INVALID_DRAFT_EFFECTIVE_DATE_FA,
++      parsed.reason,
++    );
++  }
++  return parsed.value;
++}
++
++function assertSafePayload(payload: Record<string, unknown>): void {
++  try {
++    assertNoSensitiveEvidence("draft.payload", payload);
++  } catch (err) {
++    if (err instanceof BusinessEventValidationError) {
++      throw new PersonnelEventError(
++        "SENSITIVE_PAYLOAD",
++        MSG_SENSITIVE_DRAFT_PAYLOAD_FA,
++        err.code,
++      );
++    }
++    throw err;
++  }
++}
++
++function assertEditable(draft: PersonnelEventDraftRecord): void {
++  if (draft.status === "deleted") {
++    throw new PersonnelEventError("DRAFT_DELETED", MSG_DRAFT_DELETED_FA);
++  }
++  if (draft.status === "finalized") {
++    throw new PersonnelEventError(
++      "DRAFT_ALREADY_FINALIZED",
++      MSG_DRAFT_ALREADY_FINALIZED_FA,
++    );
++  }
++  if (draft.status !== "open" && draft.status !== "pending_review") {
++    throw new PersonnelEventError(
++      "DRAFT_NOT_EDITABLE",
++      MSG_DRAFT_NOT_EDITABLE_FA,
++    );
++  }
++}
++
++export async function createDraft(
++  input: CreateDraftInput,
++  actor: { accountId: string },
++  db: PrismaClient = getPersonDb(),
++): Promise<PersonnelEventDraftRecord> {
++  const personId = requireNonEmpty(input.personId, "personId");
++  const person = await db.person.findUnique({ where: { id: personId } });
++  if (!person) {
++    throw new PersonnelEventError("PERSON_NOT_FOUND", MSG_PERSON_NOT_FOUND_FA);
++  }
++
++  const eventType = assertValidEventType(input.eventType);
++  const effectiveDate = assertValidEffectiveDate(input.effectiveDate);
++  const payload = input.payload ?? {};
++  assertSafePayload(payload);
++
++  if (input.employmentId?.trim()) {
++    const emp = await db.employment.findUnique({
++      where: { id: input.employmentId.trim() },
++    });
++    if (!emp || emp.personId !== personId) {
++      throw new PersonnelEventError(
++        "EMPLOYMENT_NOT_FOUND",
++        "سابقه همکاری یافت نشد یا به این فرد تعلق ندارد.",
++      );
++    }
++  }
++
++  const actorId = requireNonEmpty(actor.accountId, "accountId");
++  const row = await db.personnelEventDraft.create({
++    data: {
++      personId,
++      employmentId: input.employmentId?.trim() || null,
++      eventType,
++      effectiveDate: dateOnlyToDb(effectiveDate),
++      payload: payload as Prisma.InputJsonValue,
++      status: "open",
++      version: 1,
++      createdBy: actorId,
++      updatedBy: actorId,
++      idempotencyKey: input.idempotencyKey?.trim() || null,
++    },
++  });
++  return mapDraft(row);
++}
++
++export async function getDraft(
++  draftId: string,
++  db: PrismaClient = getPersonDb(),
++): Promise<PersonnelEventDraftRecord> {
++  const id = requireNonEmpty(draftId, "draftId");
++  const row = await db.personnelEventDraft.findUnique({ where: { id } });
++  if (!row) {
++    throw new PersonnelEventError("DRAFT_NOT_FOUND", MSG_DRAFT_NOT_FOUND_FA);
++  }
++  return mapDraft(row);
++}
++
++export async function updateDraft(
++  input: UpdateDraftInput,
++  actor: { accountId: string },
++  db: PrismaClient = getPersonDb(),
++): Promise<PersonnelEventDraftRecord> {
++  const existing = await getDraft(input.draftId, db);
++  assertEditable(existing);
++
++  if (existing.version !== input.expectedVersion) {
++    throw new PersonnelEventError(
++      "DRAFT_VERSION_CONFLICT",
++      MSG_DRAFT_VERSION_CONFLICT_FA,
++    );
++  }
++
++  const eventType =
++    input.eventType !== undefined
++      ? assertValidEventType(input.eventType)
++      : existing.eventType;
++  const effectiveDate =
++    input.effectiveDate !== undefined
++      ? assertValidEffectiveDate(input.effectiveDate)
++      : existing.effectiveDate;
++  const payload =
++    input.payload !== undefined ? input.payload : existing.payload;
++  assertSafePayload(payload);
++
++  const employmentId =
++    input.employmentId !== undefined
++      ? input.employmentId?.trim() || null
++      : existing.employmentId;
++
++  if (employmentId) {
++    const emp = await db.employment.findUnique({ where: { id: employmentId } });
++    if (!emp || emp.personId !== existing.personId) {
++      throw new PersonnelEventError(
++        "EMPLOYMENT_NOT_FOUND",
++        "سابقه همکاری یافت نشد یا به این فرد تعلق ندارد.",
++      );
++    }
++  }
++
++  const updated = await db.personnelEventDraft.updateMany({
++    where: {
++      id: existing.id,
++      version: input.expectedVersion,
++      status: { in: ["open", "pending_review"] },
++    },
++    data: {
++      employmentId,
++      eventType,
++      effectiveDate: dateOnlyToDb(effectiveDate),
++      payload: payload as Prisma.InputJsonValue,
++      updatedBy: requireNonEmpty(actor.accountId, "accountId"),
++      version: { increment: 1 },
++    },
++  });
++
++  if (updated.count === 0) {
++    throw new PersonnelEventError(
++      "DRAFT_VERSION_CONFLICT",
++      MSG_DRAFT_VERSION_CONFLICT_FA,
++    );
++  }
++
++  return getDraft(existing.id, db);
++}
++
++export async function deleteDraft(
++  draftId: string,
++  expectedVersion: number,
++  actor: { accountId: string },
++  db: PrismaClient = getPersonDb(),
++): Promise<PersonnelEventDraftRecord> {
++  const existing = await getDraft(draftId, db);
++  assertEditable(existing);
++
++  if (existing.version !== expectedVersion) {
++    throw new PersonnelEventError(
++      "DRAFT_VERSION_CONFLICT",
++      MSG_DRAFT_VERSION_CONFLICT_FA,
++    );
++  }
++
++  const updated = await db.personnelEventDraft.updateMany({
++    where: {
++      id: existing.id,
++      version: expectedVersion,
++      status: { in: ["open", "pending_review"] },
++    },
++    data: {
++      status: "deleted",
++      updatedBy: requireNonEmpty(actor.accountId, "accountId"),
++      version: { increment: 1 },
++    },
++  });
++
++  if (updated.count === 0) {
++    // Race: may have been finalized concurrently
++    const again = await getDraft(draftId, db);
++    if (again.status === "finalized") {
++      throw new PersonnelEventError(
++        "DRAFT_ALREADY_FINALIZED",
++        MSG_DRAFT_ALREADY_FINALIZED_FA,
++      );
++    }
++    throw new PersonnelEventError(
++      "DRAFT_VERSION_CONFLICT",
++      MSG_DRAFT_VERSION_CONFLICT_FA,
++    );
++  }
++
++  return getDraft(existing.id, db);
++}
++
++export async function listOpenDraftsForPerson(
++  personId: string,
++  db: PrismaClient = getPersonDb(),
++): Promise<PersonnelEventDraftRecord[]> {
++  const rows = await db.personnelEventDraft.findMany({
++    where: {
++      personId: requireNonEmpty(personId, "personId"),
++      status: { in: ["open", "pending_review"] },
++    },
++    orderBy: { updatedAt: "desc" },
++  });
++  return rows.map(mapDraft);
++}
+diff --git a/packages/modules/person-employment/src/personnel-event-finalize.ts b/packages/modules/person-employment/src/personnel-event-finalize.ts
+new file mode 100644
+index 0000000..1b31486
+--- /dev/null
++++ b/packages/modules/person-employment/src/personnel-event-finalize.ts
+@@ -0,0 +1,655 @@
++/**
++ * Finalize Draft → authoritative business event (Story 4.2 / FR-15 / FR-19 / AD-6).
++ * All critical steps run inside one withTransaction (append + draft mark + projection hook).
++ */
++
++import { randomUUID } from "node:crypto";
++
++import {
++  appendBusinessEvent,
++  BusinessEventValidationError,
++  withTransaction,
++  type BusinessEventStatus,
++} from "@divan/event-store";
++import { todayDateOnlyTehran } from "@divan/temporal-engine";
++import type { Pool, PoolClient, PrismaClient } from "@divan/db";
++
++import { getPersonDb } from "./db";
++import {
++  MSG_DRAFT_ALREADY_FINALIZED_FA,
++  MSG_DRAFT_DELETED_FA,
++  MSG_DRAFT_NOT_FOUND_FA,
++  MSG_DRAFT_VERSION_CONFLICT_FA,
++  MSG_FINALIZE_BLOCKED_FA,
++  MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA,
++  MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
++  MSG_FINALIZE_STALE_SNAPSHOT_FA,
++  MSG_FINALIZE_WARNING_ACK_REQUIRED_FA,
++  MSG_RISK_TIER_PENDING_REVIEW_FA,
++  PersonnelEventError,
++} from "./errors";
++import {
++  assertSnapshotFresh,
++  buildEvaluationSnapshot,
++  classifyConflicts,
++  codesRequiringOverride,
++  hasBlockingConflicts,
++  warningCodesRequiringAck,
++  type ConflictFinding,
++  type ConflictPolicy,
++  type EvaluationSnapshot,
++} from "./personnel-event-conflicts";
++import type {
++  DraftStatus,
++  PersonnelEventDraftRecord,
++} from "./personnel-event-draft";
++import { runProjectionRefreshHook } from "./personnel-event-projection-hook";
++import type { ProjectionRefreshContext } from "./personnel-event-projection-hook";
++
++export type RiskTierKind =
++  | "termination"
++  | "compensation_change"
++  | "retro_beyond_window"
++  | "high_impact_override"
++  | "production_bulk_import";
++
++export type RiskTierConfig = {
++  /**
++   * Map of risk tier → whether pre-authorization is required.
++   * When a tier applies and pre-auth is missing → pending_review (no append).
++   * When config absent for a type → documented non-authoritative pending_review.
++   */
++  tiers?: Partial<Record<RiskTierKind, { requiresPreAuth: boolean }>>;
++  /** Explicit pre-auth tokens supplied by caller (e.g. grant ids). */
++  preAuthTokens?: string[];
++};
++
++export type FinalizeAcknowledgement = {
++  warningCodes: string[];
++  acknowledgedAt?: string;
++};
++
++export type FinalizeOverride = {
++  reason: string;
++  /** HR Admin (or configured) actor — must match finalize actor for 4.2 stub. */
++  approvedByAccountId: string;
++};
++
++export type FinalizeDraftInput = {
++  draftId: string;
++  actorId: string;
++  correlationId?: string;
++  acknowledgement?: FinalizeAcknowledgement;
++  override?: FinalizeOverride;
++  idempotencyKey?: string;
++  /** Client snapshot from pre-check — rejected if stale vs live rebuild. */
++  clientSnapshot?: EvaluationSnapshot;
++  /** Optimistic concurrency — reject if draft.version differs. */
++  expectedVersion?: number;
++  conflictPolicy?: ConflictPolicy;
++  riskTier?: RiskTierConfig;
++  /** Permission fingerprint for evaluation snapshot attribution. */
++  permissionSetFingerprint?: string;
++  /** Actor holds HR Admin coarse role / Override permission — for Override path. */
++  actorMayOverride?: boolean;
++};
++
++export type FinalizeDraftResult =
++  | {
++      outcome: "finalized";
++      draft: PersonnelEventDraftRecord;
++      eventId: string;
++      status: BusinessEventStatus;
++      conflicts: ConflictFinding[];
++      snapshot: EvaluationSnapshot;
++      projectionHookInvoked: boolean;
++    }
++  | {
++      outcome: "pending_review";
++      draft: PersonnelEventDraftRecord;
++      reason: "risk_tier" | "pre_auth_missing";
++      messageFa: string;
++      conflicts: ConflictFinding[];
++      snapshot: EvaluationSnapshot;
++    }
++  | {
++      outcome: "rejected";
++      draft: PersonnelEventDraftRecord;
++      conflicts: ConflictFinding[];
++      snapshot: EvaluationSnapshot;
++      messageFa: string;
++      code: PersonnelEventError["code"];
++    };
++
++type DraftRow = {
++  id: string;
++  personId: string;
++  employmentId: string | null;
++  eventType: string;
++  effectiveDate: Date;
++  payload: unknown;
++  status: string;
++  version: number;
++  createdBy: string;
++  updatedBy: string;
++  finalizedEventId: string | null;
++  idempotencyKey: string | null;
++  warningAcks: unknown;
++  overrideEvidence: unknown;
++  createdAt: Date;
++  updatedAt: Date;
++};
++
++function dateOnlyFromDb(d: Date): string {
++  return d.toISOString().slice(0, 10);
++}
++
++function asPayload(value: unknown): Record<string, unknown> {
++  if (value && typeof value === "object" && !Array.isArray(value)) {
++    return value as Record<string, unknown>;
++  }
++  return {};
++}
++
++function mapDraftRow(row: DraftRow): PersonnelEventDraftRecord {
++  return {
++    id: row.id,
++    personId: row.personId,
++    employmentId: row.employmentId,
++    eventType: row.eventType,
++    effectiveDate: dateOnlyFromDb(row.effectiveDate),
++    payload: asPayload(row.payload),
++    status: row.status as DraftStatus,
++    version: row.version,
++    createdBy: row.createdBy,
++    updatedBy: row.updatedBy,
++    finalizedEventId: row.finalizedEventId,
++    idempotencyKey: row.idempotencyKey,
++    warningAcks: row.warningAcks,
++    overrideEvidence: row.overrideEvidence,
++    createdAt: row.createdAt,
++    updatedAt: row.updatedAt,
++  };
++}
++
++function mapKernelError(err: unknown): never {
++  if (err instanceof BusinessEventValidationError) {
++    if (err.code === "sensitive_evidence_forbidden") {
++      throw new PersonnelEventError(
++        "SENSITIVE_PAYLOAD",
++        "پیش‌نویس یا شواهد نباید حاوی دادهٔ حساس باشد.",
++        err.code,
++      );
++    }
++    throw new PersonnelEventError(
++      "VALIDATION",
++      "اعتبارسنجی رویداد کسب‌وکار ناموفق بود.",
++      err.code,
++    );
++  }
++  throw err;
++}
++
++/** Infer risk tier from event type / payload flags — stub, not AR-ACCESS matrix. */
++export function inferRiskTiers(
++  draft: PersonnelEventDraftRecord,
++  snapshot: EvaluationSnapshot,
++): RiskTierKind[] {
++  const tiers: RiskTierKind[] = [];
++  const t = draft.eventType;
++  if (
++    t === "EmploymentTerminated" ||
++    t === "TerminationRecorded" ||
++    draft.payload.riskTier === "termination"
++  ) {
++    tiers.push("termination");
++  }
++  if (
++    t === "CompensationChanged" ||
++    t === "ContractChanged" ||
++    draft.payload.riskTier === "compensation_change"
++  ) {
++    tiers.push("compensation_change");
++  }
++  if (
++    draft.payload.productionBulkImport === true ||
++    draft.payload.riskTier === "production_bulk_import"
++  ) {
++    tiers.push("production_bulk_import");
++  }
++  if (draft.payload.highImpactOverride === true) {
++    tiers.push("high_impact_override");
++  }
++  // Retro beyond window — if Effective Date is older than asOf by > configured days
++  // Without config, treat payload flag only (do not invent day threshold).
++  if (draft.payload.retroBeyondWindow === true) {
++    tiers.push("retro_beyond_window");
++  } else if (
++    draft.effectiveDate < snapshot.asOfDate &&
++    draft.payload.treatAsRetroRisk === true
++  ) {
++    tiers.push("retro_beyond_window");
++  }
++  return tiers;
++}
++
++/**
++ * When tier applies and pre-auth missing → pending_review (non-authoritative).
++ * When tier config absent for inferred kinds → also pending_review (documented).
++ */
++export function evaluateRiskTiers(
++  inferred: RiskTierKind[],
++  config: RiskTierConfig | undefined,
++): { ok: true } | { ok: false; reason: string } {
++  if (inferred.length === 0) return { ok: true };
++  const preAuth = new Set(config?.preAuthTokens ?? []);
++  for (const kind of inferred) {
++    const tierCfg = config?.tiers?.[kind];
++    if (!tierCfg) {
++      // Config absent → non-authoritative pending review (do not invent thresholds)
++      return { ok: false, reason: `tier_unconfigured:${kind}` };
++    }
++    if (tierCfg.requiresPreAuth) {
++      const token = `risk:${kind}`;
++      if (!preAuth.has(token) && !preAuth.has(kind)) {
++        return { ok: false, reason: `pre_auth_missing:${kind}` };
++      }
++    }
++  }
++  return { ok: true };
++}
++
++function resolveAuthoritativeStatus(
++  effectiveDate: string,
++  asOfDate: string,
++): BusinessEventStatus {
++  return effectiveDate > asOfDate ? "Scheduled" : "Effective";
++}
++
++async function lockDraftRow(
++  client: PoolClient,
++  draftId: string,
++): Promise<DraftRow | null> {
++  const result = await client.query<DraftRow>(
++    `SELECT * FROM "PersonnelEventDraft" WHERE id = $1 FOR UPDATE`,
++    [draftId],
++  );
++  return result.rows[0] ?? null;
++}
++
++/**
++ * Finalize a Draft inside one DB transaction (AD-6).
++ * `pool` must be the same PostgreSQL database as Prisma Draft store.
++ */
++export async function finalizeDraft(
++  input: FinalizeDraftInput,
++  pool: Pool,
++  db: PrismaClient = getPersonDb(),
++): Promise<FinalizeDraftResult> {
++  const correlationId = input.correlationId?.trim() || randomUUID();
++
++  return withTransaction(pool, async (client) => {
++    const row = await lockDraftRow(client, input.draftId);
++    if (!row) {
++      throw new PersonnelEventError("DRAFT_NOT_FOUND", MSG_DRAFT_NOT_FOUND_FA);
++    }
++    let draft = mapDraftRow(row);
++
++    // Idempotent retry: already finalized → return same event id
++    if (draft.status === "finalized" && draft.finalizedEventId) {
++      if (
++        input.idempotencyKey &&
++        draft.idempotencyKey &&
++        input.idempotencyKey !== draft.idempotencyKey
++      ) {
++        throw new PersonnelEventError(
++          "FINALIZE_IDEMPOTENCY_CONFLICT",
++          MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA,
++        );
++      }
++      const snapshot = await buildEvaluationSnapshot(
++        {
++          draft,
++          actorAccountId: input.actorId,
++          correlationId,
++          permissionSetFingerprint: input.permissionSetFingerprint,
++        },
++        db,
++      );
++      return {
++        outcome: "finalized" as const,
++        draft,
++        eventId: draft.finalizedEventId,
++        status: resolveAuthoritativeStatus(
++          draft.effectiveDate,
++          snapshot.asOfDate,
++        ),
++        conflicts: [],
++        snapshot,
++        projectionHookInvoked: false,
++      };
++    }
++
++    if (draft.status === "deleted") {
++      throw new PersonnelEventError("DRAFT_DELETED", MSG_DRAFT_DELETED_FA);
++    }
++
++    if (draft.status !== "open" && draft.status !== "pending_review") {
++      throw new PersonnelEventError(
++        "DRAFT_ALREADY_FINALIZED",
++        MSG_DRAFT_ALREADY_FINALIZED_FA,
++      );
++    }
++
++    if (
++      input.expectedVersion !== undefined &&
++      draft.version !== input.expectedVersion
++    ) {
++      throw new PersonnelEventError(
++        "DRAFT_VERSION_CONFLICT",
++        MSG_DRAFT_VERSION_CONFLICT_FA,
++      );
++    }
++
++    // Bind idempotency key on first finalize attempt
++    if (input.idempotencyKey?.trim()) {
++      const key = input.idempotencyKey.trim();
++      if (draft.idempotencyKey && draft.idempotencyKey !== key) {
++        throw new PersonnelEventError(
++          "FINALIZE_IDEMPOTENCY_CONFLICT",
++          MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA,
++        );
++      }
++      // Check unique collision with another draft
++      const clash = await client.query<{ id: string }>(
++        `SELECT id FROM "PersonnelEventDraft"
++         WHERE "idempotencyKey" = $1 AND id <> $2`,
++        [key, draft.id],
++      );
++      if (clash.rows.length > 0) {
++        throw new PersonnelEventError(
++          "FINALIZE_IDEMPOTENCY_CONFLICT",
++          MSG_FINALIZE_IDEMPOTENCY_CONFLICT_FA,
++        );
++      }
++    }
++
++    const liveSnapshot = await buildEvaluationSnapshot(
++      {
++        draft,
++        actorAccountId: input.actorId,
++        correlationId,
++        permissionSetFingerprint: input.permissionSetFingerprint,
++      },
++      db,
++    );
++
++    if (input.clientSnapshot) {
++      const stale = assertSnapshotFresh(input.clientSnapshot, liveSnapshot);
++      if (stale) {
++        return {
++          outcome: "rejected" as const,
++          draft,
++          conflicts: [stale],
++          snapshot: liveSnapshot,
++          messageFa: MSG_FINALIZE_STALE_SNAPSHOT_FA,
++          code: "FINALIZE_STALE_SNAPSHOT",
++        };
++      }
++    }
++
++    const conflicts = await classifyConflicts(
++      draft,
++      liveSnapshot,
++      input.conflictPolicy ?? {},
++      db,
++    );
++
++    if (hasBlockingConflicts(conflicts)) {
++      return {
++        outcome: "rejected" as const,
++        draft,
++        conflicts,
++        snapshot: liveSnapshot,
++        messageFa: MSG_FINALIZE_BLOCKED_FA,
++        code: "FINALIZE_BLOCKED",
++      };
++    }
++
++    const needAck = warningCodesRequiringAck(conflicts);
++    if (needAck.length > 0) {
++      const acked = new Set(input.acknowledgement?.warningCodes ?? []);
++      const missing = needAck.filter((c) => !acked.has(c));
++      if (missing.length > 0) {
++        return {
++          outcome: "rejected" as const,
++          draft,
++          conflicts,
++          snapshot: liveSnapshot,
++          messageFa: MSG_FINALIZE_WARNING_ACK_REQUIRED_FA,
++          code: "FINALIZE_WARNING_ACK_REQUIRED",
++        };
++      }
++    }
++
++    const needOverride = codesRequiringOverride(conflicts);
++    if (needOverride.length > 0) {
++      if (!input.actorMayOverride) {
++        return {
++          outcome: "rejected" as const,
++          draft,
++          conflicts,
++          snapshot: liveSnapshot,
++          messageFa: MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
++          code: "FINALIZE_OVERRIDE_REQUIRED",
++        };
++      }
++      const reason = input.override?.reason?.trim() ?? "";
++      if (!reason || input.override?.approvedByAccountId !== input.actorId) {
++        return {
++          outcome: "rejected" as const,
++          draft,
++          conflicts,
++          snapshot: liveSnapshot,
++          messageFa: MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
++          code: "FINALIZE_OVERRIDE_REQUIRED",
++        };
++      }
++    }
++
++    // Risk tiers — leave non-authoritative when configured/unconfigured requires review
++    const inferred = inferRiskTiers(draft, liveSnapshot);
++    const risk = evaluateRiskTiers(inferred, input.riskTier);
++    if (!risk.ok) {
++      await client.query(
++        `UPDATE "PersonnelEventDraft"
++         SET status = 'pending_review',
++             "updatedBy" = $2,
++             "updatedAt" = CURRENT_TIMESTAMP,
++             version = version + 1
++         WHERE id = $1`,
++        [draft.id, input.actorId],
++      );
++      const refreshed = await lockDraftRow(client, draft.id);
++      draft = mapDraftRow(refreshed!);
++      return {
++        outcome: "pending_review" as const,
++        draft,
++        reason: "risk_tier",
++        messageFa: MSG_RISK_TIER_PENDING_REVIEW_FA,
++        conflicts,
++        snapshot: liveSnapshot,
++      };
++    }
++
++    const finalizedAt = new Date();
++    const status = resolveAuthoritativeStatus(
++      draft.effectiveDate,
++      liveSnapshot.asOfDate,
++    );
++
++    let eventId: string;
++    try {
++      const appended = await appendBusinessEvent(client, {
++        correlationId,
++        eventType: draft.eventType,
++        personId: draft.personId,
++        employmentId: draft.employmentId,
++        effectiveDate: draft.effectiveDate,
++        registeredBy: draft.createdBy,
++        registeredAt: draft.createdAt,
++        status,
++        finalizedBy: input.actorId,
++        finalizedAt,
++        payload: {
++          ...draft.payload,
++          draftId: draft.id,
++        },
++        provenance: {
++          draftId: draft.id,
++          evaluationAsOf: liveSnapshot.asOfDate,
++          permissionSetFingerprint: liveSnapshot.permissionSetFingerprint,
++        },
++        afterEvidence: {
++          draftVersion: draft.version,
++          personUpdatedAt: liveSnapshot.person.updatedAt,
++        },
++        scope: {
++          source: "personnel_event_finalize",
++        },
++      });
++      eventId = appended.id;
++    } catch (err) {
++      mapKernelError(err);
++    }
++
++    const warningAcksJson =
++      needAck.length > 0
++        ? JSON.stringify({
++            codes: needAck,
++            acknowledgedAt:
++              input.acknowledgement?.acknowledgedAt ??
++              finalizedAt.toISOString(),
++            actorId: input.actorId,
++          })
++        : null;
++    const overrideJson =
++      needOverride.length > 0 && input.override
++        ? JSON.stringify({
++            codes: needOverride,
++            reason: input.override.reason,
++            approvedByAccountId: input.override.approvedByAccountId,
++            at: finalizedAt.toISOString(),
++          })
++        : null;
++
++    const idemKey = input.idempotencyKey?.trim() || draft.idempotencyKey;
++
++    const mark = await client.query(
++      `UPDATE "PersonnelEventDraft"
++       SET status = 'finalized',
++           "finalizedEventId" = $2,
++           "idempotencyKey" = COALESCE($3, "idempotencyKey"),
++           "warningAcks" = COALESCE($4::jsonb, "warningAcks"),
++           "overrideEvidence" = COALESCE($5::jsonb, "overrideEvidence"),
++           "updatedBy" = $6,
++           "updatedAt" = CURRENT_TIMESTAMP,
++           version = version + 1
++       WHERE id = $1 AND status IN ('open', 'pending_review')`,
++      [
++        draft.id,
++        eventId!,
++        idemKey,
++        warningAcksJson,
++        overrideJson,
++        input.actorId,
++      ],
++    );
++
++    if (mark.rowCount === 0) {
++      // Should not happen under FOR UPDATE — treat as conflict
++      throw new PersonnelEventError(
++        "DRAFT_VERSION_CONFLICT",
++        MSG_DRAFT_VERSION_CONFLICT_FA,
++      );
++    }
++
++    const hookCtx: ProjectionRefreshContext = {
++      client,
++      draft,
++      eventId: eventId!,
++      eventType: draft.eventType,
++    };
++    await runProjectionRefreshHook(hookCtx);
++
++    const finalRow = await lockDraftRow(client, draft.id);
++    draft = mapDraftRow(finalRow!);
++
++    return {
++      outcome: "finalized" as const,
++      draft,
++      eventId: eventId!,
++      status,
++      conflicts,
++      snapshot: liveSnapshot,
++      projectionHookInvoked: Boolean(hookCtx.invoked),
++    };
++  });
++}
++
++/**
++ * Convenience: evaluate conflicts without finalizing (UI pre-check).
++ */
++export async function evaluateDraftForFinalize(
++  draftId: string,
++  actorId: string,
++  opts: {
++    correlationId?: string;
++    conflictPolicy?: ConflictPolicy;
++    permissionSetFingerprint?: string;
++  } = {},
++  db: PrismaClient = getPersonDb(),
++): Promise<{
++  draft: PersonnelEventDraftRecord;
++  snapshot: EvaluationSnapshot;
++  conflicts: ConflictFinding[];
++  asOfDate: string;
++}> {
++  const row = await db.personnelEventDraft.findUnique({
++    where: { id: draftId },
++  });
++  if (!row) {
++    throw new PersonnelEventError("DRAFT_NOT_FOUND", MSG_DRAFT_NOT_FOUND_FA);
++  }
++  const draft = mapDraftRow(row as DraftRow);
++  if (draft.status === "deleted") {
++    throw new PersonnelEventError("DRAFT_DELETED", MSG_DRAFT_DELETED_FA);
++  }
++  if (draft.status === "finalized") {
++    throw new PersonnelEventError(
++      "DRAFT_ALREADY_FINALIZED",
++      MSG_DRAFT_ALREADY_FINALIZED_FA,
++    );
++  }
++  const snapshot = await buildEvaluationSnapshot(
++    {
++      draft,
++      actorAccountId: actorId,
++      correlationId: opts.correlationId ?? randomUUID(),
++      permissionSetFingerprint: opts.permissionSetFingerprint,
++    },
++    db,
++  );
++  const conflicts = await classifyConflicts(
++    draft,
++    snapshot,
++    opts.conflictPolicy ?? {},
++    db,
++  );
++  return {
++    draft,
++    snapshot,
++    conflicts,
++    asOfDate: snapshot.asOfDate || todayDateOnlyTehran(),
++  };
++}
+diff --git a/packages/modules/person-employment/src/personnel-event-projection-hook.ts b/packages/modules/person-employment/src/personnel-event-projection-hook.ts
+new file mode 100644
+index 0000000..e811828
+--- /dev/null
++++ b/packages/modules/person-employment/src/personnel-event-projection-hook.ts
+@@ -0,0 +1,56 @@
++/**
++ * AD-6 projection refresh hook — runs inside the same DB txn as finalize append.
++ * Scaffold event types may no-op domain projectors but the seam must be invoked.
++ */
++
++import type { PoolClient } from "@divan/db";
++
++import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
++
++export type ProjectionRefreshContext = {
++  client: PoolClient;
++  draft: PersonnelEventDraftRecord;
++  eventId: string;
++  eventType: string;
++  /** Set by hook implementations / tests to prove invocation. */
++  invoked?: { eventId: string; eventType: string };
++};
++
++export type ProjectionRefreshHook = (
++  ctx: ProjectionRefreshContext,
++) => Promise<void>;
++
++/**
++ * Default scaffold hook: records invocation via a txn-local temp marker table
++ * is unnecessary — callers pass a spy or rely on `onProjectionRefresh` registry.
++ * For production scaffold types: no-op (domain effects = Stories 4.5–4.8).
++ */
++export async function defaultProjectionRefreshHook(
++  ctx: ProjectionRefreshContext,
++): Promise<void> {
++  // Prove the seam ran inside the txn by writing a session-local note on the client.
++  // Selfcheck replaces this via setProjectionRefreshHook.
++  ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
++  void ctx.client;
++  void ctx.draft;
++}
++
++let activeHook: ProjectionRefreshHook = defaultProjectionRefreshHook;
++
++export function setProjectionRefreshHook(hook: ProjectionRefreshHook): void {
++  activeHook = hook;
++}
++
++export function resetProjectionRefreshHook(): void {
++  activeHook = defaultProjectionRefreshHook;
++}
++
++export function getProjectionRefreshHook(): ProjectionRefreshHook {
++  return activeHook;
++}
++
++export async function runProjectionRefreshHook(
++  ctx: ProjectionRefreshContext,
++): Promise<void> {
++  await activeHook(ctx);
++}

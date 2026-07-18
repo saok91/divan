@@ -41,6 +41,14 @@ type PlatformStatusContextValue = PlatformStatus & {
   clearAuthzChanged: () => void;
   setDemoDraftOpen: (value: boolean) => void;
   setDemoDraftSaved: (value: boolean) => void;
+  /**
+   * Real Draft save handler registered by فرم رویداد (Story 4.2).
+   * Authz modal calls this instead of a pure demo flag flip when present.
+   */
+  registerPersonnelDraftSaveHandler: (
+    handler: (() => Promise<boolean>) | null,
+  ) => void;
+  runPersonnelDraftSave: () => Promise<boolean>;
   /** True while blocking stale / recalc / authz-change — gold CTA gate. */
   isGoldCtaBlocked: boolean;
   /** Break-glass grant still within expiry window (requires finite future expiresAt). */
@@ -112,6 +120,25 @@ export function PlatformStatusProvider({
     initial?.demoDraftSaved ?? false,
   );
   const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const personnelDraftSaveRef = React.useRef<
+    (() => Promise<boolean>) | null
+  >(null);
+
+  const registerPersonnelDraftSaveHandler = React.useCallback(
+    (handler: (() => Promise<boolean>) | null) => {
+      personnelDraftSaveRef.current = handler;
+    },
+    [],
+  );
+
+  const runPersonnelDraftSave = React.useCallback(async () => {
+    const fn = personnelDraftSaveRef.current;
+    if (!fn) {
+      setDemoDraftSaved(true);
+      return true;
+    }
+    return fn();
+  }, []);
 
   const initialAuthzChanged = initial?.authzChanged ?? false;
 
@@ -201,6 +228,8 @@ export function PlatformStatusProvider({
       clearAuthzChanged,
       setDemoDraftOpen,
       setDemoDraftSaved,
+      registerPersonnelDraftSaveHandler,
+      runPersonnelDraftSave,
       isGoldCtaBlocked,
       isBreakGlassLive,
       isFinalizeBlockedByAuthzChange,
@@ -216,6 +245,8 @@ export function PlatformStatusProvider({
       setBreakGlass,
       setAuthzChanged,
       clearAuthzChanged,
+      registerPersonnelDraftSaveHandler,
+      runPersonnelDraftSave,
       isGoldCtaBlocked,
       isBreakGlassLive,
       isFinalizeBlockedByAuthzChange,

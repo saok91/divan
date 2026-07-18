@@ -1,3 +1,19 @@
+## Deferred from: code review of 4-2-draft-finalization-conflict-classification.md (2026-07-18)
+
+- Primary-assignment overlap conflict stub beyond EmploymentStarted employment overlap — product Primary-mutating flows are 4.5–4.7; EXCLUDE stays on `applyPrimaryAssignmentProjection`
+- Irreconcilable ordering conflict stub — Story 4.4 deterministic ordering / recalc
+- Selfcheck delete↔finalize race is sequential (finalize then delete), not true concurrency — revisit with Vitest/ephemeral DB isolation
+
+## Deferred from: Story 4.2 draft finalization & conflict classification (2026-07-18)
+
+- **Draft / finalize / conflict landed** — `PersonnelEventDraft` Prisma working store; `createDraft` / `updateDraft` / `deleteDraft`; `finalizeDraft` inside `withTransaction` + `appendBusinessEvent` + AD-6 projection hook; `classifyConflicts` + evaluation snapshot (FR-56); risk-tier fail-closed stubs; governed tRPC `personnelEvent.*`; minimal فرم رویداد + sensitive confirm; authz modal real save-draft seam
+- **Still 4.3+:** Cancel / Reverse / Correction writers + UX-DR10 full badge set (Scheduled vs Effective UI distinction beyond storage token)
+- **Still 4.4+:** Deterministic same-day ordering + pg-boss recalc UI
+- **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp domain Operators (same finalize substrate)
+- **Still 4.9–4.11:** Current/historical person & org reconstruction products
+- **Still 4.12+:** Headcount Approval / Reservation / Override product lifecycle (finalize port remains fail-closed stub for consuming types)
+- **Hash-chain / PopulationPort cutover / Vitest isolation** unchanged from 4.1 notes
+
 ## Deferred from: code review of 4-1-append-only-event-store-attributable-event-record.md (2026-07-18)
 
 - `event-store.selfcheck` permanently inserts access + business fixture rows into `kernel_events` with no cleanup / isolation — same thin-selfcheck pattern as prior stories; isolate DB when Vitest/CI lands
@@ -5,7 +21,7 @@
 ## Deferred from: Story 4.1 append-only event store / attributable event record (2026-07-18)
 
 - **Business attributable record landed** — `003_business_event_attributable_fields.sql` + real `appendBusinessEvent` (FR-14 columns, PascalCase type, evidence sanitizer, append-only trigger)
-- **Still 4.2+:** Draft edit/delete UI, finalization product flow, conflict classification
+- **4.2 landed:** Draft edit/delete UI, finalization product flow, conflict classification (see Story 4.2 deferred block above)
 - **Still 4.3+:** Scheduled / Cancel / Reverse / Correction writers and UX-DR10 badges
 - **Still 4.4+:** Deterministic same-day ordering + pg-boss recalc
 - **Still 4.5–4.8:** Start / Return / Terminate / Transfer / job-comp Operators flows (Transfer coverage-after-atomic-close+open + AR-TEMPORAL apply active-as-of remain fail-closed dispositions in 4.1 Dev Notes)

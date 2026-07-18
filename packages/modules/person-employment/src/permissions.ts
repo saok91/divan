@@ -12,12 +12,16 @@ import {
   JobRefError,
   MSG_JOB_REF_PERMISSION_REQUIRED_FA,
   MSG_ORG_PERMISSION_REQUIRED_FA,
+  MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
   ORGANIZATION_READ_PERMISSION,
   ORGANIZATION_WRITE_PERMISSION,
   OrgUnitError,
   PERSON_READ_PERMISSION,
   PERSON_WRITE_PERMISSION,
+  PERSONNEL_EVENT_DRAFT_PERMISSION,
+  PERSONNEL_EVENT_FINALIZE_PERMISSION,
   PersonIdentityError,
+  PersonnelEventError,
 } from "./errors";
 
 export const MSG_PERSON_PERMISSION_REQUIRED_FA = "دسترسی ندارید.";
@@ -142,6 +146,42 @@ export async function assertActorHasJobReferenceWrite(
       "PERMISSION_DENIED",
       MSG_JOB_REF_PERMISSION_REQUIRED_FA,
       "job_reference_write_required",
+    );
+  }
+}
+
+export async function assertActorHasPersonnelEventDraft(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    PERSONNEL_EVENT_DRAFT_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new PersonnelEventError(
+      "PERMISSION_DENIED",
+      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+      "personnel_event_draft_required",
+    );
+  }
+}
+
+export async function assertActorHasPersonnelEventFinalize(
+  accountId: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<void> {
+  const has = await actorHoldsPermission(
+    accountId,
+    PERSONNEL_EVENT_FINALIZE_PERMISSION,
+    db,
+  );
+  if (!has) {
+    throw new PersonnelEventError(
+      "PERMISSION_DENIED",
+      MSG_PERSONNEL_EVENT_PERMISSION_REQUIRED_FA,
+      "personnel_event_finalize_required",
     );
   }
 }
