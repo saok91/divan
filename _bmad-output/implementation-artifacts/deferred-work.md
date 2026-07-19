@@ -1,3 +1,8 @@
+## Deferred from: code review of 4b-2-section-tabs-chrome-routing-leave-guards.md (2026-07-20)
+
+- Logout / authz-changed `router.replace` bypass leave-guard — story documents `requestNavigation` convention; wire session-exit channels in a later shell story
+- Dual surface labels (`route-announcer` `SURFACE_LABELS` vs `section-tab-surfaces.surfaceLabel`) — consolidate when 4b.3 renames nav surfaces
+
 ## Deferred from: code review of 4b-1-design-delta-tokens-collapsible-app-shell.md (2026-07-19)
 
 - `NAV_ICONS` parallel map + `ChevronRight` fallback for unknown href — sync/harden when Story 4b.3 updates IA catalog

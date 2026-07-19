@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import type { SidebarNavItem } from "@/components/app-sidebar";
+import { useLeaveGuard } from "@/components/leave-guard";
 import {
   Command,
   CommandEmpty,
@@ -56,7 +56,7 @@ export function CommandPalette({
   open,
   onOpenChange,
 }: CommandPaletteProps) {
-  const router = useRouter();
+  const { requestNavigation } = useLeaveGuard();
   const [query, setQuery] = React.useState("");
   const [personnelHits, setPersonnelHits] = React.useState<
     PersonnelSearchHit[]
@@ -121,9 +121,9 @@ export function CommandPalette({
   const navigate = React.useCallback(
     (href: string) => {
       handleOpenChange(false);
-      router.push(href);
+      void requestNavigation(href);
     },
-    [handleOpenChange, router],
+    [handleOpenChange, requestNavigation],
   );
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

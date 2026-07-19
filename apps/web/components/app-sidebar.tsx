@@ -20,6 +20,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { useLeaveGuardOptional } from "@/components/leave-guard";
 import {
   Tooltip,
   TooltipContent,
@@ -79,6 +80,7 @@ function useSidebarCollapsed(accountId: string): boolean {
 
 export function AppSidebar({ navItems, accountId }: AppSidebarProps) {
   const pathname = usePathname();
+  const leaveGuard = useLeaveGuardOptional();
   const asideRef = useRef<HTMLElement>(null);
   const collapsed = useSidebarCollapsed(accountId);
 
@@ -135,6 +137,16 @@ export function AppSidebar({ navItems, accountId }: AppSidebarProps) {
                 )}
                 aria-label={item.label}
                 aria-current={isActive ? "page" : undefined}
+                onNavigate={(event) => {
+                  // Same surface (e.g. /personnel vs /personnel/list): no remount, no leave dialog.
+                  if (isNavActive(pathname, item.href)) {
+                    event.preventDefault();
+                    return;
+                  }
+                  if (!leaveGuard?.isAnyDirty) return;
+                  event.preventDefault();
+                  void leaveGuard.requestNavigation(item.href);
+                }}
               >
                 <Icon
                   className="size-5 shrink-0"

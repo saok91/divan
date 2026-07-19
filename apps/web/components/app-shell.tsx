@@ -4,6 +4,7 @@ import {
   type SidebarNavItem,
 } from "@/components/app-sidebar";
 import { CommandPaletteHost } from "@/components/command-palette";
+import { LeaveGuardProvider } from "@/components/leave-guard";
 import { RouteAnnouncer } from "@/components/route-announcer";
 import { SkipLink } from "@/components/skip-link";
 import { UserMenu } from "@/components/user-menu";
@@ -51,51 +52,53 @@ export function AppShell({
 
       <ViewportGateFocusGuard />
 
-      <div className="app-shell-root">
-        <AccountThemeSync accountId={accountId} />
-        <SkipLink />
-        <RouteAnnouncer />
+      <LeaveGuardProvider>
+        <div className="app-shell-root">
+          <AccountThemeSync accountId={accountId} />
+          <SkipLink />
+          <RouteAnnouncer />
 
-        <header className="fixed inset-x-0 top-0 z-40 flex h-chrome-height items-center gap-4 bg-chrome px-4 text-chrome-foreground">
-          <p className="shrink-0 text-heading-sm">دیوان</p>
+          <header className="fixed inset-x-0 top-0 z-40 flex h-chrome-height items-center gap-4 bg-chrome px-4 text-chrome-foreground">
+            <p className="shrink-0 text-heading-sm">دیوان</p>
 
-          <div className="flex min-w-0 flex-1 justify-center">
-            <CommandPaletteHost navItems={navItems} />
+            <div className="flex min-w-0 flex-1 justify-center">
+              <CommandPaletteHost navItems={navItems} />
+            </div>
+
+            <UserMenu
+              className="shrink-0"
+              userLabel={userLabel}
+              accountId={accountId}
+            />
+          </header>
+
+          <div
+            id="banner-stack"
+            className="fixed inset-x-0 top-chrome-height z-[35] w-full"
+            data-banner-stack
+          >
+            {bannerSlot}
           </div>
 
-          <UserMenu
-            className="shrink-0"
-            userLabel={userLabel}
-            accountId={accountId}
-          />
-        </header>
+          <AppSidebar accountId={accountId} navItems={navItems} />
 
-        <div
-          id="banner-stack"
-          className="fixed inset-x-0 top-chrome-height z-[35] w-full"
-          data-banner-stack
-        >
-          {bannerSlot}
-        </div>
-
-        <AppSidebar accountId={accountId} navItems={navItems} />
-
-        <div
-          className="ps-sidebar-current-width motion-safe:transition-[padding-inline-start] motion-safe:duration-200 motion-safe:ease-out"
-          style={{
-            paddingTop:
-              "calc(var(--chrome-height) + var(--banner-stack-height, 0px))",
-          }}
-        >
-          <main
-            id="main-content"
-            tabIndex={-1}
-            className="min-h-[calc(100vh-var(--chrome-height)-var(--banner-stack-height,0px))] outline-none"
+          <div
+            className="ps-sidebar-current-width motion-safe:transition-[padding-inline-start] motion-safe:duration-200 motion-safe:ease-out"
+            style={{
+              paddingTop:
+                "calc(var(--chrome-height) + var(--banner-stack-height, 0px))",
+            }}
           >
-            {children}
-          </main>
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className="min-h-[calc(100vh-var(--chrome-height)-var(--banner-stack-height,0px))] outline-none"
+            >
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
+      </LeaveGuardProvider>
     </>
   );
 }

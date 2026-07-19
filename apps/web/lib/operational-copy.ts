@@ -36,9 +36,14 @@ export const operationalCopy = {
     "پیش‌نویس ذخیره‌نشده دارید. قبل از ادامه ذخیره یا دور بیندازید. نهایی‌سازی مسدود است.",
   authzChangedFinalizeBlocked: "نهایی‌سازی تا تأیید تغییر دسترسی ممکن نیست.",
 
-  /** Unsaved form — catalog until Epic 4 surfaces exist. */
+  /**
+   * Unsaved form / leave-guard (UX-DR25).
+   * Title fact; body keeps fact + next step (shortened for EXPERIENCE dialog).
+   */
+  leaveGuardTitle: "تغییرات ذخیره نشده‌اند.",
+  leaveGuardStay: "ماندن",
   unsavedForm:
-    "تغییرات ذخیره نشده‌اند. قبل از ترک صفحه آن‌ها را ذخیره یا لغو کنید.",
+    "تغییرات ذخیره نشده‌اند. قبل از ترک صفحه ذخیره کنید یا دور بیندازید.",
 
   loginPrompt: "برای ادامه وارد حساب کاربری شوید.",
   inactiveAccount: "این حساب غیرفعال است.",
@@ -143,7 +148,19 @@ export function staleRecalcMessage(pendingUntilLabel: string): string {
   return `داده به‌روز نیست — تا ${pendingUntilLabel} محاسبه نشده.`;
 }
 
-/** Short route landmark announce (EXPERIENCE landmarks). */
-export function routeAnnounce(surfaceLabel: string): string {
+/**
+ * Short route landmark announce (EXPERIENCE landmarks / UX-DR21).
+ * When a section tab is active: «سطح — تب».
+ */
+export function routeAnnounce(
+  surfaceLabel: string,
+  tabLabel?: string | null,
+): string {
+  if (tabLabel) return `${surfaceLabel} — ${tabLabel}`;
   return surfaceLabel;
+}
+
+/** Import-preview leave-guard body (batch id already Persian digits if needed). */
+export function leaveGuardImportPreviewMessage(batchId: string): string {
+  return `پیش‌نمایش دسته ${batchId} ذخیره نشده.`;
 }

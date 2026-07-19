@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
+import { useLeaveGuardRegistration } from "@/components/leave-guard";
 import { HeadcountCapacityPanel } from "@/components/personnel/headcount-capacity-panel";
 import {
   ConflictList,
@@ -155,6 +156,81 @@ export function PersonnelEventForm() {
   const [ackCodes, setAckCodes] = React.useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
+
+  /** Snapshot of last-saved (or initial empty) fields for leave-guard Discard. */
+  type FormSnapshot = {
+    personId: string;
+    employmentId: string;
+    eventType: string;
+    effectiveDate: string;
+    collaborationType: string;
+    teamId: string;
+    organizationalRoleId: string;
+    jobTitleId: string;
+    ladderId: string;
+    gradeId: string;
+    seniorityId: string;
+    clearSeniority: boolean;
+    preferredApprovalId: string;
+    terminationReason: string;
+    overrideReason: string;
+    currency: string;
+    changeType: string;
+    contractType: string;
+    compensationAmount: string;
+    draftId: string | null;
+    version: number;
+  };
+
+  const emptySnapshot = React.useCallback((): FormSnapshot => ({
+    personId: "",
+    employmentId: "",
+    eventType: "ScaffoldChangeRecorded",
+    effectiveDate: "",
+    collaborationType: "employee",
+    teamId: "",
+    organizationalRoleId: "",
+    jobTitleId: "",
+    ladderId: "",
+    gradeId: "",
+    seniorityId: "",
+    clearSeniority: false,
+    preferredApprovalId: "",
+    terminationReason: "contract_ended",
+    overrideReason: "",
+    currency: "IRR",
+    changeType: "",
+    contractType: "",
+    compensationAmount: "",
+    draftId: null,
+    version: 1,
+  }), []);
+
+  const lastSavedRef = React.useRef<FormSnapshot>(emptySnapshot());
+
+  const applySnapshot = React.useCallback((snap: FormSnapshot) => {
+    setPersonId(snap.personId);
+    setEmploymentId(snap.employmentId);
+    setEventType(snap.eventType);
+    setEffectiveDate(snap.effectiveDate);
+    setCollaborationType(snap.collaborationType);
+    setTeamId(snap.teamId);
+    setOrganizationalRoleId(snap.organizationalRoleId);
+    setJobTitleId(snap.jobTitleId);
+    setLadderId(snap.ladderId);
+    setGradeId(snap.gradeId);
+    setSeniorityId(snap.seniorityId);
+    setClearSeniority(snap.clearSeniority);
+    setPreferredApprovalId(snap.preferredApprovalId);
+    setTerminationReason(snap.terminationReason);
+    setOverrideReason(snap.overrideReason);
+    setCurrency(snap.currency);
+    setChangeType(snap.changeType);
+    setContractType(snap.contractType);
+    setCompensationAmount(snap.compensationAmount);
+    setDraftId(snap.draftId);
+    setVersion(snap.version);
+  }, []);
 
   React.useEffect(() => {
     setPreferredApprovalId("");
@@ -484,6 +560,29 @@ export function PersonnelEventForm() {
       setDirty(false);
       setDemoDraftSaved(true);
       setStatusMsg("پیش‌نویس ذخیره شد (غیررسمی — وضعیت فعلی تغییر نکرد).");
+      lastSavedRef.current = {
+        personId,
+        employmentId,
+        eventType,
+        effectiveDate,
+        collaborationType,
+        teamId,
+        organizationalRoleId,
+        jobTitleId,
+        ladderId,
+        gradeId,
+        seniorityId,
+        clearSeniority,
+        preferredApprovalId,
+        terminationReason,
+        overrideReason,
+        currency,
+        changeType,
+        contractType,
+        compensationAmount,
+        draftId: savedId ?? null,
+        version: savedVersion,
+      };
       return true;
     } catch (err) {
       const msg =
@@ -506,6 +605,12 @@ export function PersonnelEventForm() {
     gradeId,
     terminationReason,
     compensationAmount,
+    clearSeniority,
+    preferredApprovalId,
+    overrideReason,
+    currency,
+    changeType,
+    contractType,
     buildPayload,
     draftId,
     version,
@@ -520,16 +625,22 @@ export function PersonnelEventForm() {
     return () => registerPersonnelDraftSaveHandler(null);
   }, [registerPersonnelDraftSaveHandler, saveDraft]);
 
-  React.useEffect(() => {
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (dirty) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty]);
+  const onLeaveDiscard = React.useCallback(() => {
+    applySnapshot(lastSavedRef.current);
+    setDirty(false);
+    setConflicts([]);
+    setErrorMsg(null);
+    setStatusMsg(null);
+    setDemoDraftOpen(Boolean(lastSavedRef.current.draftId));
+  }, [applySnapshot, setDemoDraftOpen]);
+
+  // Shell leave-guard (sidebar / tabs / palette / history). beforeunload is centralized in LeaveGuardProvider.
+  useLeaveGuardRegistration({
+    id: "personnel-event-form",
+    isDirty: dirty,
+    onSave: saveDraft,
+    onDiscard: onLeaveDiscard,
+  });
 
   React.useEffect(() => {
     if (evaluateQuery.data?.conflicts) {
@@ -1468,20 +1579,9 @@ export function PersonnelEventForm() {
             type="button"
             variant="ghost"
             onClick={() => {
-              setPersonId("");
-              setEmploymentId("");
-              setEventType("ScaffoldChangeRecorded");
-              setEffectiveDate("");
-              setCollaborationType("employee");
-              setTeamId("");
-              setOrganizationalRoleId("");
-              setJobTitleId("");
-              setLadderId("");
-              setGradeId("");
-              setSeniorityId("");
-              setOverrideReason("");
-              setDraftId(null);
-              setVersion(1);
+              const cleared = emptySnapshot();
+              applySnapshot(cleared);
+              lastSavedRef.current = cleared;
               setDirty(false);
               setConflicts([]);
               setErrorMsg(null);

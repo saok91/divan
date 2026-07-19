@@ -17,6 +17,7 @@ function useIsClient() {
 
 /**
  * In-place theme swap only — no navigation, no unsaved-form guards.
+ * 4b.2 leave-guards must exempt sidebar collapse + theme toggle.
  * Focus stays on the control after toggle (native button retains focus).
  */
 export const ThemeToggle = React.forwardRef<HTMLButtonElement, ThemeToggleProps>(
