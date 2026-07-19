@@ -1,3 +1,8 @@
+## Deferred from: code review of 4b-1-design-delta-tokens-collapsible-app-shell.md (2026-07-19)
+
+- `NAV_ICONS` parallel map + `ChevronRight` fallback for unknown href — sync/harden when Story 4b.3 updates IA catalog
+- Collapsed 64px width vs `p-3` + `border-s-2` may clip focus ring / tighten hit target — visual QA polish
+
 ## Deferred from: code review of 4-14-reservation-expiry-exceptions-headcount-override.md (2026-07-19)
 
 - Unscoped `listOverrides` / `getOverride` (permission-only) — same IDOR-on-list/get class already tracked for drafts/approvals/exemptions

@@ -78,10 +78,10 @@ export function AppShell({
           {bannerSlot}
         </div>
 
-        <AppSidebar navItems={navItems} />
+        <AppSidebar accountId={accountId} navItems={navItems} />
 
         <div
-          className="ps-sidebar-width"
+          className="ps-sidebar-current-width motion-safe:transition-[padding-inline-start] motion-safe:duration-200 motion-safe:ease-out"
           style={{
             paddingTop:
               "calc(var(--chrome-height) + var(--banner-stack-height, 0px))",

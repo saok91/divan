@@ -53,10 +53,16 @@
   --status-badge-override-bg: #fff3bf;
   --status-badge-override-fg: #862e00;
 
-  /* Spacing + radius (DESIGN.md) */
+  /* Spacing + radius (DESIGN.md + 2026-07-19 delta) */
   --chrome-height: 56px;
   --banner-stack-height: 0px;
   --sidebar-width: 240px;
+  --sidebar-width-collapsed: 64px;
+  --sidebar-current-width: var(--sidebar-width);
+  --section-tabs-height: 44px;
+  --content-padding-inline: 24px;
+  --filter-row-height: 36px;
+  --tree-indent: 16px;
   --table-row-compact: 40px;
   --table-row-comfortable: 48px;
   --form-section-gap: 24px;
@@ -153,6 +159,12 @@
   --spacing-chrome-height: var(--chrome-height);
   --spacing-banner-stack-height: var(--banner-stack-height);
   --spacing-sidebar-width: var(--sidebar-width);
+  --spacing-sidebar-width-collapsed: var(--sidebar-width-collapsed);
+  --spacing-sidebar-current-width: var(--sidebar-current-width);
+  --spacing-section-tabs-height: var(--section-tabs-height);
+  --spacing-content-padding-inline: var(--content-padding-inline);
+  --spacing-filter-row-height: var(--filter-row-height);
+  --spacing-tree-indent: var(--tree-indent);
   --spacing-table-row-compact: var(--table-row-compact);
   --spacing-table-row-comfortable: var(--table-row-comfortable);
   --spacing-form-section-gap: var(--form-section-gap);
@@ -255,6 +267,15 @@
   .app-shell-root {
     display: block;
     min-height: 100vh;
+    --sidebar-current-width: var(--sidebar-width);
+  }
+
+  .app-shell-root[data-sidebar="collapsed"] {
+    --sidebar-current-width: var(--sidebar-width-collapsed);
+  }
+
+  .app-shell-root[data-sidebar="expanded"] {
+    --sidebar-current-width: var(--sidebar-width);
   }
 
   html[data-viewport-gate="active"] .min-viewport-gate {
