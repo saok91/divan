@@ -1,3 +1,8 @@
+## Deferred from: code review of 4b-5-access-administration-person-first-retrofit.md (2026-07-20)
+
+- Orphan role/scope IDs on an entitlement row stay in assign draft but are invisible in checkboxes (catalog gap) — needs product policy before silently dropping or surfacing them
+- `selfcheck:access-people` covers pure helpers only — leave-guard / dialog / multi-role filter behaviors unasserted
+
 ## Deferred from: code review of 4b-3-sidebar-ia-labels-role-landings.md (2026-07-20)
 
 - `PageAccessDeniedError` thrown by `assertPageAccess` has no App Router `error.tsx` boundary — layout `resolveAppPathAccess` normally shows AccessDenied first; mismatch between `x-divan-pathname` and page path could still surface an unhandled error (pre-existing pattern across gated pages)

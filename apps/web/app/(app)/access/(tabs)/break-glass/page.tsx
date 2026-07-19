@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { SectionTabPlaceholder } from "@/components/section-tab-placeholder";
+import { AccessBreakGlassPanel } from "@/components/access/access-break-glass-panel";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 export default async function AccessBreakGlassPage() {
@@ -9,6 +9,12 @@ export default async function AccessBreakGlassPage() {
   if (!session?.user?.accountId || !session.user.coarseRole) {
     redirect("/login");
   }
+
   assertPageAccess(session.user.coarseRole, "/access");
-  return <SectionTabPlaceholder />;
+
+  return (
+    <div className="p-6">
+      <AccessBreakGlassPanel currentAccountId={session.user.accountId} />
+    </div>
+  );
 }

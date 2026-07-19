@@ -3,6 +3,7 @@
 import { useId, useMemo, useState } from "react";
 
 import { JalaliDateTimePicker } from "@/components/jalali-date-picker";
+import { useLeaveGuardRegistration } from "@/components/leave-guard";
 import { Button } from "@/components/ui/button";
 import {
   formatJalaliDateTimeFromIso,
@@ -89,6 +90,27 @@ export function EntitlementGrantsPanel({
   const [recertifyBy, setRecertifyBy] = useState<GregorianDateTimeParts>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
+
+  const grantFormDirty =
+    subjectAccountId.length > 0 ||
+    accessRoleId.length > 0 ||
+    organizationalScopeId.length > 0 ||
+    Boolean(expiresAt.date || expiresAt.time) ||
+    Boolean(recertifyBy.date || recertifyBy.time) ||
+    kind !== "sensitive";
+
+  useLeaveGuardRegistration({
+    id: "access-entitlement-grants-request",
+    isDirty: grantFormDirty,
+    onDiscard: () => {
+      setSubjectAccountId("");
+      setAccessRoleId("");
+      setOrganizationalScopeId("");
+      setExpiresAt({});
+      setRecertifyBy({});
+      setKind("sensitive");
+    },
+  });
 
   const filterId = useId();
   const kindId = useId();
