@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { JobReferencePanel } from "@/components/organization/job-reference-panel";
-import { OrganizationPanel } from "@/components/organization/organization-panel";
+import { OrgHierarchyPanel } from "@/components/organization/org-hierarchy-panel";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 /**
- * Default organization tab — existing hierarchy + job reference (Story 4b.2).
+ * Default organization tab — hierarchy tree only (Story 4b.6).
  */
 export default async function OrganizationHierarchyPage() {
   const session = await auth();
@@ -17,9 +16,8 @@ export default async function OrganizationHierarchyPage() {
   assertPageAccess(session.user.coarseRole, "/organization");
 
   return (
-    <div className="space-y-10 p-6">
-      <OrganizationPanel />
-      <JobReferencePanel />
+    <div className="p-6">
+      <OrgHierarchyPanel />
     </div>
   );
 }

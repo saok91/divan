@@ -139,8 +139,14 @@ export const operationalCopy = {
   orgDeactivateEndRequired:
     "برای غیرفعال‌سازی باید تاریخ پایان اعتبار مشخص شود.",
 
-  /** Job reference master-data (Story 3.6). */
+  /** Job reference master-data (Story 3.6 / 4b.6). */
   jobRefListError: "بارگذاری مراجع شغلی ممکن نشد.",
+  jobRefRolesEmpty: "نقش سازمانی ثبت نشده. می‌توانید یک نقش ایجاد کنید.",
+  jobRefJobTitlesEmpty: "عنوان شغلی ثبت نشده. می‌توانید یک عنوان ایجاد کنید.",
+  jobRefSenioritiesEmpty: "ارشدیت ثبت نشده. می‌توانید یک ارشدیت ایجاد کنید.",
+  jobRefLaddersEmpty: "نردبانی ثبت نشده. می‌توانید یک نردبان ایجاد کنید.",
+  jobRefGradesEmpty: "گریدی برای این نردبان ثبت نشده.",
+  jobRefActionFailed: "عملیات مرجع شغلی انجام نشد.",
 } as const;
 
 /**

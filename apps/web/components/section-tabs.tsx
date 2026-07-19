@@ -33,7 +33,7 @@ function resolveActiveIndex(pathname: string, tabs: readonly SectionTabItem[]): 
 
 /**
  * Shared section-tabs chrome (UX-DR25). URL is source of truth via Link hrefs.
- * Hand-rolled tablist (not local-state-only like JobReferencePanel).
+ * Hand-rolled tablist (section-tabs chrome; Story 4b.2).
  */
 export function SectionTabs({
   ariaLabel,

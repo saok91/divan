@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { SectionTabPlaceholder } from "@/components/section-tab-placeholder";
+import { OrgSeniorityPanel } from "@/components/organization/org-seniority-panel";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 export default async function OrganizationSeniorityPage() {
@@ -10,5 +10,9 @@ export default async function OrganizationSeniorityPage() {
     redirect("/login");
   }
   assertPageAccess(session.user.coarseRole, "/organization");
-  return <SectionTabPlaceholder />;
+  return (
+    <div className="p-6">
+      <OrgSeniorityPanel />
+    </div>
+  );
 }

@@ -1,3 +1,8 @@
+## Deferred from: code review of 4b-6-organization-section-tabs-tree-navigators.md (2026-07-20)
+
+- tree-navigator selfcheck covers pure helpers only — DOM roles / keyboard / lazy-children integration unasserted (story Task 1 scope)
+- Client validation strings hardcoded Persian instead of `operationalCopy` in flat + ladder panels — same pattern as prior job-ref UI
+
 ## Deferred from: code review of 4b-5-access-administration-person-first-retrofit.md (2026-07-20)
 
 - Orphan role/scope IDs on an entitlement row stay in assign draft but are invisible in checkboxes (catalog gap) — needs product policy before silently dropping or surfacing them

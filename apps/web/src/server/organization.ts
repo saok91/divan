@@ -21,6 +21,7 @@ import {
   getHistoricalOrgHeadcountState,
   getOrgUnitById,
   listOrgUnits,
+  reparentOrgUnit,
   updateOrgUnitIdentity,
   type OrgUnitType,
 } from "@divan/person-employment";
@@ -310,6 +311,27 @@ export const organizationRouter = createTRPCRouter({
           code: input.code,
           nameFa: input.nameFa,
         });
+      } catch (err) {
+        mapOrgError(err);
+      }
+    }),
+
+  /** Thin wrap of domain reparentOrgUnit — zero rule changes (Story 4b.6). */
+  reparent: governedProcedure
+    .meta({
+      ...organizationWriteMeta,
+      operation: "organization.reparent",
+    })
+    .input(
+      z.object({
+        id: z.string().min(1),
+        newParentId: z.string().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertActorHasOrganizationWrite(ctx.session.accountId);
+      try {
+        return await reparentOrgUnit(input.id, input.newParentId);
       } catch (err) {
         mapOrgError(err);
       }

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { SectionTabPlaceholder } from "@/components/section-tab-placeholder";
+import { OrgLadderGradePanel } from "@/components/organization/org-ladder-grade-panel";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 export default async function OrganizationLadderGradePage() {
@@ -10,5 +10,9 @@ export default async function OrganizationLadderGradePage() {
     redirect("/login");
   }
   assertPageAccess(session.user.coarseRole, "/organization");
-  return <SectionTabPlaceholder />;
+  return (
+    <div className="p-6">
+      <OrgLadderGradePanel />
+    </div>
+  );
 }
