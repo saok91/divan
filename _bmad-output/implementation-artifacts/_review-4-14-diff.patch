@@ -1,0 +1,3746 @@
+﻿diff --git a/_bmad-output/implementation-artifacts/deferred-work.md b/_bmad-output/implementation-artifacts/deferred-work.md
+index 1a3cc4a..b580078 100644
+--- a/_bmad-output/implementation-artifacts/deferred-work.md
++++ b/_bmad-output/implementation-artifacts/deferred-work.md
+@@ -1,3 +1,13 @@
++## Deferred from: Story 4.14 reservation expiry exceptions & headcount override (2026-07-19)
++
++- **Override catalogue + Start durable reserve landed** ΓÇö `headcount_override`; drop `free_units >= 0`; Override-aware consume/reserve; 14-day `HEADCOUNT_APPROVAL_EXPIRY_SOON`; Scheduled-exception fail-closed; Scheduled Start `reserveHeadcountCapacity` + Cancel release; `capacityResultToConflict` ΓåÆ `requiresOverride`; finalize wire for `HEADCOUNT_UNAPPROVED`; panel overridden + negative free; `/headcount` override admin; `headcount-override.selfcheck`
++- **Still fail-closed orphan disposition matrix** beyond Override/Cancel/Correction ΓÇö no invent AR-HEADCOUNT full disposition
++- **Still Epic 5:** Full dashboard / open-headcount product / report catalogue / SM-5 Override aging metrics
++- **ensureHeadcountOverrideSchema** DDL on every tRPC request ΓÇö same ensure-* pattern; revisit with migrations-only runtime
++- Unscoped `listOverrides` / `getOverride` (permission-only) ΓÇö same IDOR-on-list/get class
++- **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation** unchanged
++- Fixed `isPool` discriminator (PoolClient has `connect`) in approval/exemption/override txn helpers ΓÇö was aborting Job-level exemption rebind inside finalize txn
++
+ ## Deferred from: code review of 4-13-universal-coverage-matching-exemptions.md (2026-07-19)
+ 
+ - Unscoped `listExemptions` / `getExemption` (permission-only) ΓÇö same IDOR-on-list/get class already tracked for drafts/approvals
+@@ -7,7 +17,7 @@
+ 
+ - **Approval-first matching + exemptions landed** ΓÇö `matchCompatibleApprovals` (Team+Title+optional Seniority; oldest valid); `preferredApprovalId` + audited stash; `PrimaryAssignment.headcountApprovalId`; `headcount_exemption` CRUD + fail-closed revoke; SeniorityChanged capacity re-eval; panel exempt + muted overridden foreshadow; `/headcount` exemption admin; `headcount-matching.selfcheck`
+ - **Addendum ┬º6.2 open edges not productized:** named seats / Position entity; free-form Correction rebind UI; contracting-entity match dims ΓÇö Correction rebind remains via existing Correction/Reverse capacity replay
+-- **Still 4.14:** Override catalogue / negative free / 14-day expiry warnings / Scheduled-exception; durable reserve for Scheduled Start (FR-30 remainder)
++- ~~**Still 4.14:** Override catalogue / negative free / 14-day expiry warnings / Scheduled-exception; durable reserve for Scheduled Start (FR-30 remainder)~~ ΓÇö **closed in 4.14**
+ - **Still Epic 5:** Full dashboard / open-headcount product / report catalogue
+ - **Exemption rebind on Primary close+open:** ~~covering exemption stays on source Primary id~~ ΓÇö **closed in code review:** `rebindCoveringExemptionToSuccessor` on JobTitle/Seniority open
+ - **Transfer never inherits source exemption** ΓÇö destination Approval rematch required; panel omits source `primaryAssignmentId` for Transfer
+@@ -26,7 +36,7 @@
+ - **MVP live-counter stand-in removed** for Approval-backed slots (4.11 follow-through)
+ - **Still fail-closed orphan disposition** ΓÇö cancel/reduce/expire with active claims rejected until AR-HEADCOUNT disposition (ΓåÆ 4.14 Override path may unblock)
+ - ~~**Still 4.13:** Matching matrix / oldest-valid default / exemptions / `PrimaryAssignment.headcountApprovalId` product link~~ ΓÇö **closed in 4.13**
+-- **Still 4.14:** Reservation-expiry warnings / Scheduled-exception / Override catalogue; durable reserve for Scheduled Start
++- ~~**Still 4.14:** Reservation-expiry warnings / Scheduled-exception / Override catalogue; durable reserve for Scheduled Start~~ ΓÇö **closed in 4.14**
+ - **Still Epic 5:** Full dashboard / open-headcount product
+ - **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+ 
+diff --git a/_bmad-output/implementation-artifacts/sprint-status.yaml b/_bmad-output/implementation-artifacts/sprint-status.yaml
+index 7aefc1b..f74b6e6 100644
+--- a/_bmad-output/implementation-artifacts/sprint-status.yaml
++++ b/_bmad-output/implementation-artifacts/sprint-status.yaml
+@@ -1,5 +1,5 @@
+ # generated: 2026-07-16
+-# last_updated: 2026-07-19T05:30:00+03:30
++# last_updated: 2026-07-19T06:02:07+03:30
+ # project: divan
+ # project_key: NOKEY
+ # tracking_system: file-system
+@@ -41,7 +41,7 @@
+ # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+ 
+ generated: 2026-07-16
+-last_updated: 2026-07-19T05:30:00+03:30
++last_updated: 2026-07-19T06:02:07+03:30
+ project: divan
+ project_key: NOKEY
+ tracking_system: file-system
+@@ -95,7 +95,7 @@ development_status:
+   4-11-historical-organization-headcount-reconstruction: done
+   4-12-headcount-approval-lifecycle: done
+   4-13-universal-coverage-matching-exemptions: done
+-  4-14-reservation-expiry-exceptions-headcount-override: backlog
++  4-14-reservation-expiry-exceptions-headcount-override: review
+   epic-4-retrospective: optional
+ 
+   epic-5: backlog
+diff --git a/apps/web/app/(app)/headcount/page.tsx b/apps/web/app/(app)/headcount/page.tsx
+index 0512790..e64ccb4 100644
+--- a/apps/web/app/(app)/headcount/page.tsx
++++ b/apps/web/app/(app)/headcount/page.tsx
+@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
+ import { auth } from "@/auth";
+ import { HeadcountApprovalPanel } from "@/components/headcount/approval-panel";
+ import { HeadcountExemptionPanel } from "@/components/headcount/exemption-panel";
++import { HeadcountOverridePanel } from "@/components/headcount/override-panel";
+ import { HistoricalOrgHeadcountForeshadow } from "@/components/organization/historical-org-headcount-foreshadow";
+ import { assertPageAccess } from "@/lib/assert-page-access";
+ 
+ /**
+- * Headcount surface ΓÇö Approval (4.12) + Exemption (4.13) + FR-27 foreshadow.
++ * Headcount surface ΓÇö Approval + Exemption + Override + FR-27 foreshadow.
+  */
+ export default async function HeadcountPage() {
+   const session = await auth();
+@@ -27,6 +28,7 @@ export default async function HeadcountPage() {
+       </div>
+       <HeadcountApprovalPanel />
+       <HeadcountExemptionPanel />
++      <HeadcountOverridePanel />
+       <HistoricalOrgHeadcountForeshadow />
+     </div>
+   );
+diff --git a/apps/web/components/personnel/headcount-capacity-panel.tsx b/apps/web/components/personnel/headcount-capacity-panel.tsx
+index 2025f09..b12c4bf 100644
+--- a/apps/web/components/personnel/headcount-capacity-panel.tsx
++++ b/apps/web/components/personnel/headcount-capacity-panel.tsx
+@@ -10,7 +10,7 @@ export type HeadcountCapacityPanelProps = {
+   free: number;
+   /** Active covering exemption foreshadow (UX-DR13). */
+   exempt?: number;
+-  /** Muted placeholder ΓÇö Override product lands in 4.14. */
++  /** Active Override count for the resolved slot (FR-32). */
+   overridden?: number;
+   /** False when no matching slot was found (distinct from free=0). */
+   slotFound?: boolean;
+@@ -76,7 +76,7 @@ export function HeadcountCapacityPanel({
+       aria-label="╪╕╪▒┘ü█î╪¬ ┘å█î╪▒┘ê█î ╪º┘å╪│╪º┘å█î ┘à┘é╪╡╪»"
+     >
+       <p className="text-label-medium mb-2">╪╕╪▒┘ü█î╪¬ ┘à┘é╪╡╪»</p>
+-      <dl className="grid grid-cols-2 gap-2 text-sm tabular-nums sm:grid-cols-4">
++      <dl className="grid grid-cols-2 gap-2 text-sm tabular-nums sm:grid-cols-5">
+         <div>
+           <dt className="text-muted-foreground text-xs">┘à╪╡╪▒┘üΓÇî╪┤╪»┘ç</dt>
+           <dd className="font-medium" dir="ltr">
+@@ -91,7 +91,17 @@ export function HeadcountCapacityPanel({
+         </div>
+         <div>
+           <dt className="text-muted-foreground text-xs">╪ó╪▓╪º╪»</dt>
+-          <dd className="font-medium" dir="ltr">
++          <dd
++            className={cn(
++              "font-medium",
++              free > 0
++                ? "text-foreground"
++                : free < 0
++                  ? "text-destructive"
++                  : "text-muted-foreground",
++            )}
++            dir="ltr"
++          >
+             {free}
+           </dd>
+         </div>
+@@ -101,19 +111,13 @@ export function HeadcountCapacityPanel({
+             {exempt}
+           </dd>
+         </div>
++        <div>
++          <dt className="text-muted-foreground text-xs">┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬</dt>
++          <dd className="font-medium" dir="ltr">
++            {overridden ?? 0}
++          </dd>
++        </div>
+       </dl>
+-      {overridden != null ? (
+-        <p className="mt-2 text-xs text-muted-foreground" role="status">
+-          ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ (╪¿┘çΓÇî╪▓┘ê╪»█î):{" "}
+-          <span className="tabular-nums" dir="ltr">
+-            {overridden}
+-          </span>
+-        </p>
+-      ) : (
+-        <p className="mt-2 text-xs text-muted-foreground" role="status">
+-          ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ╪╕╪▒┘ü█î╪¬ ╪»╪▒ ┘å╪│╪«┘ç┘ö ╪¿╪╣╪»█î ┘ü╪╣╪º┘ä ┘à█îΓÇî╪┤┘ê╪».
+-        </p>
+-      )}
+     </div>
+   );
+ }
+diff --git a/apps/web/components/personnel/personnel-event-form.tsx b/apps/web/components/personnel/personnel-event-form.tsx
+index bfb7f11..83b6f48 100644
+--- a/apps/web/components/personnel/personnel-event-form.tsx
++++ b/apps/web/components/personnel/personnel-event-form.tsx
+@@ -848,6 +848,7 @@ export function PersonnelEventForm() {
+               reserved={capacityQuery.data?.reserved ?? 0}
+               free={capacityQuery.data?.free ?? 0}
+               exempt={capacityQuery.data?.exempt ?? 0}
++              overridden={capacityQuery.data?.overridden ?? 0}
+               slotFound={
+                 capacityQuery.isFetched
+                   ? Boolean(capacityQuery.data?.slotId) ||
+@@ -1034,6 +1035,7 @@ export function PersonnelEventForm() {
+               reserved={capacityQuery.data?.reserved ?? 0}
+               free={capacityQuery.data?.free ?? 0}
+               exempt={capacityQuery.data?.exempt ?? 0}
++              overridden={capacityQuery.data?.overridden ?? 0}
+               slotFound={
+                 capacityQuery.isFetched
+                   ? Boolean(capacityQuery.data?.slotId) ||
+@@ -1226,6 +1228,7 @@ export function PersonnelEventForm() {
+                   reserved={capacityQuery.data?.reserved ?? 0}
+                   free={capacityQuery.data?.free ?? 0}
+                   exempt={capacityQuery.data?.exempt ?? 0}
++              overridden={capacityQuery.data?.overridden ?? 0}
+                   slotFound={
+                     capacityQuery.isFetched
+                       ? Boolean(capacityQuery.data?.slotId) ||
+diff --git a/apps/web/src/server/headcount.ts b/apps/web/src/server/headcount.ts
+index 2e1d003..962211b 100644
+--- a/apps/web/src/server/headcount.ts
++++ b/apps/web/src/server/headcount.ts
+@@ -1,5 +1,5 @@
+ /**
+- * Headcount Approval + Exemption + matching governed router (Stories 4.12ΓÇô4.13).
++ * Headcount Approval + Exemption + Override + matching governed router (Stories 4.12ΓÇô4.14).
+  * Mirrors job-reference: governedProcedure + Zod + domain errors ΓåÆ TRPCError.
+  */
+ import { createPgPool, type Pool } from "@divan/db";
+@@ -10,28 +10,38 @@ import {
+   HEADCOUNT_EXEMPTION_DATA_CATEGORY,
+   HEADCOUNT_EXEMPTION_READ_PERMISSION,
+   HEADCOUNT_EXEMPTION_WRITE_PERMISSION,
++  HEADCOUNT_OVERRIDE_DATA_CATEGORY,
++  HEADCOUNT_OVERRIDE_READ_PERMISSION,
++  HEADCOUNT_OVERRIDE_WRITE_PERMISSION,
+   HeadcountApprovalError,
+   HeadcountExemptionError,
++  HeadcountOverrideError,
+   activateApproval,
+   activateExemption,
+   assertActorHasHeadcountApprovalRead,
+   assertActorHasHeadcountApprovalWrite,
+   assertActorHasHeadcountExemptionRead,
+   assertActorHasHeadcountExemptionWrite,
++  assertActorHasHeadcountOverrideRead,
++  assertActorHasHeadcountOverrideWrite,
+   cancelApproval,
+   createApproval,
+   createExemption,
+   ensureHeadcountApprovalSchema,
+   ensureHeadcountCapacitySchema,
+   ensureHeadcountExemptionSchema,
++  ensureHeadcountOverrideSchema,
+   expireApproval,
+   getApproval,
+   getExemption,
++  getOverride,
+   listApprovals,
+   listCompatibleApprovalCandidates,
+   listExemptions,
++  listOverrides,
+   revokeExemption,
+   updateApproval,
++  voidOverride,
+ } from "@divan/headcount";
+ import { getPersonDb } from "@divan/person-employment";
+ import { parseDateOnly } from "@divan/temporal-engine";
+@@ -72,6 +82,22 @@ const exemptionWriteMeta = {
+   sensitive: false as const,
+ };
+ 
++const overrideReadMeta = {
++  permission: HEADCOUNT_OVERRIDE_READ_PERMISSION,
++  dataCategory: HEADCOUNT_OVERRIDE_DATA_CATEGORY,
++  action: "read" as const,
++  organizationalScope: "org:selfcheck",
++  sensitive: false as const,
++};
++
++const overrideWriteMeta = {
++  permission: HEADCOUNT_OVERRIDE_WRITE_PERMISSION,
++  dataCategory: HEADCOUNT_OVERRIDE_DATA_CATEGORY,
++  action: "write" as const,
++  organizationalScope: "org:selfcheck",
++  sensitive: false as const,
++};
++
+ let headcountPool: Pool | null = null;
+ 
+ function getHeadcountPool(): Pool {
+@@ -164,11 +190,37 @@ function mapExemptionError(err: unknown): never {
+   throw err;
+ }
+ 
++function mapOverrideError(err: unknown): never {
++  if (err instanceof HeadcountOverrideError) {
++    if (err.code === "NOT_FOUND") {
++      throw new TRPCError({
++        code: "NOT_FOUND",
++        message: err.messageFa,
++        cause: err,
++      });
++    }
++    if (err.code === "PERMISSION_DENIED") {
++      throw new TRPCError({
++        code: "FORBIDDEN",
++        message: err.messageFa,
++        cause: err,
++      });
++    }
++    throw new TRPCError({
++      code: "BAD_REQUEST",
++      message: err.messageFa,
++      cause: err,
++    });
++  }
++  throw err;
++}
++
+ async function withSchema<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
+   const pool = getHeadcountPool();
+   await ensureHeadcountCapacitySchema(pool);
+   await ensureHeadcountApprovalSchema(pool);
+   await ensureHeadcountExemptionSchema(pool);
++  await ensureHeadcountOverrideSchema(pool);
+   return fn(pool);
+ }
+ 
+@@ -554,4 +606,71 @@ export const headcountRouter = createTRPCRouter({
+         mapExemptionError(err);
+       }
+     }),
++
++  listOverrides: governedProcedure
++    .meta({ ...overrideReadMeta, operation: "headcount.override.list" })
++    .input(
++      z
++        .object({
++          status: z.enum(["active", "superseded", "voided"]).optional(),
++          violatedRule: z
++            .enum(["shortage", "validity", "job_title", "seniority"])
++            .optional(),
++          teamId: z.string().optional(),
++          slotId: z.string().uuid().optional(),
++        })
++        .optional(),
++    )
++    .query(async ({ ctx, input }) => {
++      await assertActorHasHeadcountOverrideRead(
++        ctx.session.accountId,
++        getPersonDb(),
++      );
++      return withSchema((pool) =>
++        listOverrides(pool, {
++          status: input?.status,
++          violatedRule: input?.violatedRule,
++          teamId: input?.teamId,
++          slotId: input?.slotId,
++        }),
++      );
++    }),
++
++  getOverride: governedProcedure
++    .meta({ ...overrideReadMeta, operation: "headcount.override.get" })
++    .input(z.object({ id: z.string().uuid() }))
++    .query(async ({ ctx, input }) => {
++      await assertActorHasHeadcountOverrideRead(
++        ctx.session.accountId,
++        getPersonDb(),
++      );
++      const row = await withSchema((pool) => getOverride(pool, input.id));
++      if (!row) {
++        throw new TRPCError({
++          code: "NOT_FOUND",
++          message: "┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ╪╕╪▒┘ü█î╪¬ █î╪º┘ü╪¬ ┘å╪┤╪».",
++        });
++      }
++      return row;
++    }),
++
++  voidOverride: governedProcedure
++    .meta({ ...overrideWriteMeta, operation: "headcount.override.void" })
++    .input(z.object({ id: z.string().uuid() }))
++    .mutation(async ({ ctx, input }) => {
++      await assertActorHasHeadcountOverrideWrite(
++        ctx.session.accountId,
++        getPersonDb(),
++      );
++      try {
++        return await withSchema((pool) =>
++          voidOverride(pool, {
++            id: input.id,
++            actorId: ctx.session.accountId,
++          }),
++        );
++      } catch (err) {
++        mapOverrideError(err);
++      }
++    }),
+ });
+diff --git a/packages/kernel/audit-envelope/src/categories.ts b/packages/kernel/audit-envelope/src/categories.ts
+index b6b2608..54df472 100644
+--- a/packages/kernel/audit-envelope/src/categories.ts
++++ b/packages/kernel/audit-envelope/src/categories.ts
+@@ -156,6 +156,12 @@ export const DEV_DEMO_CATEGORIES: CategoryRegistry = freezeRegistry([
+     sensitivity: "ordinary",
+     requiresSeparateExport: false,
+   },
++  {
++    id: "organization.headcount_override",
++    enabled: true,
++    sensitivity: "ordinary",
++    requiresSeparateExport: false,
++  },
+ ]);
+ 
+ /**
+diff --git a/packages/kernel/audit-envelope/src/index.ts b/packages/kernel/audit-envelope/src/index.ts
+index 2afe3b2..93b8f6d 100644
+--- a/packages/kernel/audit-envelope/src/index.ts
++++ b/packages/kernel/audit-envelope/src/index.ts
+@@ -247,6 +247,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
+       action: "write",
+       organizationalScope: "org:selfcheck",
+     },
++    // Story 4.14 ΓÇö Override catalogue (FR-32)
++    {
++      permission: "headcount.override.read",
++      dataCategory: "organization.headcount_override",
++      action: "read",
++      organizationalScope: "org:selfcheck",
++    },
++    {
++      permission: "headcount.override.write",
++      dataCategory: "organization.headcount_override",
++      action: "write",
++      organizationalScope: "org:selfcheck",
++    },
+   ],
+ };
+ 
+diff --git a/packages/modules/headcount/package.json b/packages/modules/headcount/package.json
+index cfa07fa..54d58bf 100644
+--- a/packages/modules/headcount/package.json
++++ b/packages/modules/headcount/package.json
+@@ -11,7 +11,8 @@
+   "scripts": {
+     "typecheck": "tsc --noEmit -p tsconfig.json",
+     "selfcheck:headcount-approval": "tsx src/headcount-approval.selfcheck.ts",
+-    "selfcheck:headcount-matching": "tsx src/headcount-matching.selfcheck.ts"
++    "selfcheck:headcount-matching": "tsx src/headcount-matching.selfcheck.ts",
++    "selfcheck:headcount-override": "tsx src/headcount-override.selfcheck.ts"
+   },
+   "devDependencies": {
+     "dotenv": "^17.4.2",
+diff --git a/packages/modules/headcount/src/headcount-approval.ts b/packages/modules/headcount/src/headcount-approval.ts
+index 6553bfb..71daef1 100644
+--- a/packages/modules/headcount/src/headcount-approval.ts
++++ b/packages/modules/headcount/src/headcount-approval.ts
+@@ -67,7 +67,11 @@ export class HeadcountApprovalError extends Error {
+ type Queryable = Pool | PoolClient;
+ 
+ function isPool(db: Queryable): db is Pool {
+-  return typeof (db as Pool).connect === "function";
++  // PoolClient also has connect(); prefer release() as the client discriminator.
++  return (
++    typeof (db as Pool).connect === "function" &&
++    typeof (db as { release?: unknown }).release !== "function"
++  );
+ }
+ 
+ function isPgUniqueViolation(err: unknown): boolean {
+diff --git a/packages/modules/headcount/src/headcount-exemption.ts b/packages/modules/headcount/src/headcount-exemption.ts
+index 97a3aba..abe1d90 100644
+--- a/packages/modules/headcount/src/headcount-exemption.ts
++++ b/packages/modules/headcount/src/headcount-exemption.ts
+@@ -90,7 +90,11 @@ export const EXEMPTION_STATUS_LABEL_FA: Record<
+ type Queryable = Pool | PoolClient;
+ 
+ function isPool(db: Queryable): db is Pool {
+-  return typeof (db as Pool).connect === "function";
++  // PoolClient also has connect(); prefer release() as the client discriminator.
++  return (
++    typeof (db as Pool).connect === "function" &&
++    typeof (db as { release?: unknown }).release !== "function"
++  );
+ }
+ 
+ async function runInTransaction<T>(
+diff --git a/packages/modules/headcount/src/headcount-matching.ts b/packages/modules/headcount/src/headcount-matching.ts
+index 13a5764..3583e77 100644
+--- a/packages/modules/headcount/src/headcount-matching.ts
++++ b/packages/modules/headcount/src/headcount-matching.ts
+@@ -99,6 +99,19 @@ export function seniorityCompatible(
+   return approvalSeniorityId === (assignmentSeniorityId ?? null);
+ }
+ 
++export type ListCandidatesOptions = {
++  /**
++   * When false, include slots with free_units <= 0 (Override shortage path).
++   * Default true ΓÇö Operators cannot overbook via normal match.
++   */
++  requireFree?: boolean;
++  /**
++   * When true, skip consumable-at gate (validity Override path only).
++   * Still returns dimension-matched Approvals ordered oldest-first.
++   */
++  skipConsumableGate?: boolean;
++};
++
+ /**
+  * List consumable Approvals for Team+Title with free capacity on linked slot,
+  * filtered by seniority rule, ordered oldest-first.
+@@ -106,8 +119,11 @@ export function seniorityCompatible(
+ export async function listCompatibleApprovalCandidates(
+   db: Queryable,
+   input: Omit<MatchApprovalInput, "preferredApprovalId">,
++  opts: ListCandidatesOptions = {},
+ ): Promise<CompatibleApprovalCandidate[]> {
+   const today = todayDateOnlyTehran();
++  const requireFree = opts.requireFree !== false;
++  const freeClause = requireFree ? "AND s.free_units > 0" : "";
+   const rows = await query<CandidateRow>(
+     db,
+     `SELECT a.id AS approval_id,
+@@ -122,7 +138,7 @@ export async function listCompatibleApprovalCandidates(
+      INNER JOIN headcount_capacity_slot s ON s.approval_id = a.id
+      WHERE a.team_id = $1::uuid
+        AND a.job_title_id = $2::uuid
+-       AND s.free_units > 0
++       ${freeClause}
+        AND s.start_date <= $3::date
+        AND (s.end_date_exclusive IS NULL OR s.end_date_exclusive > $3::date)
+      ORDER BY a.validity_start ASC, a.created_at ASC, a.id ASC`,
+@@ -133,16 +149,18 @@ export async function listCompatibleApprovalCandidates(
+   for (const row of rows) {
+     const validityStart = dateOnlyFromPg(row.validity_start);
+     const validityEnd = dateOnlyFromPg(row.validity_end_exclusive);
+-    if (
+-      !isApprovalConsumableAt(
+-        row.status as HeadcountApprovalStatus,
+-        validityStart,
+-        validityEnd,
+-        input.evaluationDate,
+-        today,
+-      )
+-    ) {
+-      continue;
++    if (!opts.skipConsumableGate) {
++      if (
++        !isApprovalConsumableAt(
++          row.status as HeadcountApprovalStatus,
++          validityStart,
++          validityEnd,
++          input.evaluationDate,
++          today,
++        )
++      ) {
++        continue;
++      }
+     }
+     if (!seniorityCompatible(row.seniority_id, input.seniorityId)) {
+       continue;
+@@ -159,6 +177,55 @@ export async function listCompatibleApprovalCandidates(
+   return out;
+ }
+ 
++/**
++ * Match for Override finalize ΓÇö dimension-compatible even when free <= 0.
++ */
++export async function matchApprovalsForOverride(
++  db: Queryable,
++  input: MatchApprovalInput,
++  opts: { skipConsumableGate?: boolean } = {},
++): Promise<MatchApprovalResult> {
++  const candidates = await listCompatibleApprovalCandidates(db, input, {
++    requireFree: false,
++    skipConsumableGate: opts.skipConsumableGate,
++  });
++  const preferred = input.preferredApprovalId?.trim() || null;
++
++  if (preferred) {
++    const hit = candidates.find((c) => c.approvalId === preferred);
++    if (!hit) {
++      return {
++        outcome: "manual_incompatible",
++        candidates,
++        messageFa: MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
++      };
++    }
++    return {
++      outcome: "matched",
++      approvalId: hit.approvalId,
++      slotId: hit.slotId,
++      matchedBy: "manual",
++      candidates,
++    };
++  }
++
++  const oldest = candidates[0];
++  if (!oldest) {
++    return {
++      outcome: "none",
++      candidates,
++      messageFa: MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
++    };
++  }
++  return {
++    outcome: "matched",
++    approvalId: oldest.approvalId,
++    slotId: oldest.slotId,
++    matchedBy: "default",
++    candidates,
++  };
++}
++
+ /**
+  * Match oldest compatible Approval, or enforce preferredApprovalId when set.
+  */
+diff --git a/packages/modules/headcount/src/historical-headcount.ts b/packages/modules/headcount/src/historical-headcount.ts
+index 285893a..5efd236 100644
+--- a/packages/modules/headcount/src/historical-headcount.ts
++++ b/packages/modules/headcount/src/historical-headcount.ts
+@@ -130,7 +130,10 @@ export type HeadcountSlotQuantities = {
+   approved: number;
+   used: number;
+   reserved: number;
++  /** May be negative when Override-backed overbook occurred (FR-32). */
+   free: number;
++  /** True when free < 0 (over-capacity surfaced, never floored). */
++  overridden?: boolean;
+ };
+ 
+ export type ReconstructHeadcountQuantitiesResult = {
+@@ -441,7 +444,9 @@ export async function reconstructHeadcountQuantitiesAsOf(
+       approved = liveUsed + liveReserved + liveFree;
+     }
+     const free = approved - used - reserved;
+-    if (free < 0 || approved !== used + reserved + free) {
++    // Conservation identity holds when free is negative (Override overbook).
++    // Never silently floor; surface negative free for as-of views (FR-32).
++    if (approved !== used + reserved + free) {
+       throw new HeadcountLedgerError(
+         "CONSERVATION",
+         MSG_HEADCOUNT_CONSERVATION_FA,
+@@ -459,6 +464,7 @@ export async function reconstructHeadcountQuantitiesAsOf(
+       used,
+       reserved,
+       free,
++      overridden: free < 0,
+     });
+     aggApproved += approved;
+     aggUsed += used;
+diff --git a/packages/modules/headcount/src/index.ts b/packages/modules/headcount/src/index.ts
+index 91e0fb0..e372ddc 100644
+--- a/packages/modules/headcount/src/index.ts
++++ b/packages/modules/headcount/src/index.ts
+@@ -2,7 +2,7 @@
+  * Narrow headcount capacity port (Stories 4.5ΓÇô4.7 / FR-20 / FR-30 / FR-31 boundary).
+  * Story 4.12: Approval lifecycle + consume/reserve status gates.
+  * Story 4.13: Approval-first matching + exemptions (FR-29).
+- * NOT Override catalogue / reservation expiry (ΓåÆ 4.14).
++ * Story 4.14: Override catalogue + reservation expiry + Start durable reserve (FR-30/32).
+  * Story 4.11: historical ledger reconstruct via reconstructHeadcountQuantitiesAsOf ΓÇö
+  * readHeadcountCapacityPanel remains live/finalize-only (do not use for asOf < today).
+  */
+@@ -67,6 +67,7 @@ export {
+   MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
+   MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
+   matchCompatibleApprovals,
++  matchApprovalsForOverride,
+   listCompatibleApprovalCandidates,
+   seniorityCompatible,
+   assertPreferredApprovalCompatible,
+@@ -76,8 +77,64 @@ export type {
+   MatchApprovalInput,
+   MatchApprovalResult,
+   CompatibleApprovalCandidate,
++  ListCandidatesOptions,
+ } from "./headcount-matching";
+ 
++export {
++  HEADCOUNT_OVERRIDE_READ_PERMISSION,
++  HEADCOUNT_OVERRIDE_WRITE_PERMISSION,
++  HEADCOUNT_OVERRIDE_DATA_CATEGORY,
++  HeadcountOverrideError,
++  MSG_HEADCOUNT_OVERRIDE_PERMISSION_REQUIRED_FA,
++  MSG_HEADCOUNT_OVERRIDE_NOT_FOUND_FA,
++  MSG_HEADCOUNT_OVERRIDE_INVALID_REASON_FA,
++  MSG_HEADCOUNT_OVERRIDE_INVALID_RULE_FA,
++  MSG_HEADCOUNT_OVERRIDE_INVALID_STATUS_FA,
++  MSG_HEADCOUNT_OVERRIDE_INVALID_REFS_FA,
++  MSG_HEADCOUNT_OVERRIDE_CONSUME_FAILED_FA,
++  MSG_HEADCOUNT_OVERRIDE_RESERVE_FAILED_FA,
++  VIOLATED_RULE_LABEL_FA,
++  OVERRIDE_STATUS_LABEL_FA,
++  ensureHeadcountOverrideSchema,
++  assertActorHasHeadcountOverrideRead,
++  assertActorHasHeadcountOverrideWrite,
++  createOverride,
++  getOverride,
++  listOverrides,
++  voidOverride,
++  countActiveOverridesForSlot,
++} from "./headcount-override";
++
++export type {
++  HeadcountViolatedRule,
++  HeadcountOverrideStatus,
++  HeadcountOverrideRecord,
++  HeadcountOverrideErrorCode,
++  CapacitySnapshot,
++  CreateOverrideInput,
++  ListOverridesFilter,
++  OverrideMutateContext,
++} from "./headcount-override";
++
++export {
++  HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
++  HEADCOUNT_APPROVAL_EXPIRY_SOON,
++  HEADCOUNT_SCHEDULED_EXCEPTION,
++  MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA,
++  MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
++  isApprovalExpiryWithinWarningHorizon,
++  checkReservationApprovalExpiryWarning,
++  detectScheduledHeadcountException,
++} from "./headcount-reservation-expiry";
++
++export type {
++  HeadcountExceptionMarker,
++  ReservationExpiryCheckInput,
++  ReservationExpiryCheckResult,
++  ScheduledExceptionDetectInput,
++  ScheduledExceptionDetectResult,
++} from "./headcount-reservation-expiry";
++
+ export {
+   HEADCOUNT_EXEMPTION_READ_PERMISSION,
+   HEADCOUNT_EXEMPTION_WRITE_PERMISSION,
+@@ -137,6 +194,15 @@ import {
+   MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
+   MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
+ } from "./headcount-matching";
++import {
++  createOverride,
++  countActiveOverridesForSlot,
++  ensureHeadcountOverrideSchema,
++  HeadcountOverrideError,
++  MSG_HEADCOUNT_OVERRIDE_CONSUME_FAILED_FA,
++  MSG_HEADCOUNT_OVERRIDE_RESERVE_FAILED_FA,
++  type OverrideMutateContext,
++} from "./headcount-override";
+ 
+ export const MSG_HEADCOUNT_NO_CAPACITY_FA =
+   "╪╕╪▒┘ü█î╪¬ ┘å█î╪▒┘ê█î ╪º┘å╪│╪º┘å█î ╪│╪º╪▓┌»╪º╪▒ ╪¿╪▒╪º█î ╪º█î┘å ╪º┘å╪¬╪╡╪º╪¿ ┘ê╪¼┘ê╪» ┘å╪»╪º╪▒╪»╪¢ ╪¿╪»┘ê┘å Override ┘å┘ç╪º█î█îΓÇî╪│╪º╪▓█î ┘à╪¼╪º╪▓ ┘å█î╪│╪¬.";
+@@ -255,12 +321,17 @@ export async function ensureHeadcountCapacitySchema(
+       grade_id        UUID,
+       start_date      DATE NOT NULL,
+       end_date_exclusive DATE,
+-      free_units      INTEGER NOT NULL CHECK (free_units >= 0),
++      free_units      INTEGER NOT NULL,
+       label           TEXT,
+       created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+     )
+   `);
++  // Story 4.14: Override may drive free negative ΓÇö drop legacy CHECK if present.
++  await db.query(`
++    ALTER TABLE headcount_capacity_slot
++      DROP CONSTRAINT IF EXISTS headcount_capacity_slot_free_units_check
++  `);
+   await db.query(`
+     CREATE INDEX IF NOT EXISTS headcount_capacity_slot_team_idx
+       ON headcount_capacity_slot (team_id)
+@@ -1061,6 +1132,212 @@ export async function convertReservationToConsumption(
+   return { converted: true, slotId: row.slot_id };
+ }
+ 
++async function readSlotLedger(
++  db: PoolClient,
++  slotId: string,
++): Promise<{ free: number; reserved: number; used: number }> {
++  const slotRows = await query<{
++    free_units: number;
++    reserved_units: number;
++  }>(
++    db,
++    `SELECT free_units, reserved_units FROM headcount_capacity_slot WHERE id = $1::uuid`,
++    [slotId],
++  );
++  const usedRows = await query<{ c: string }>(
++    db,
++    `SELECT COUNT(*)::text AS c FROM headcount_capacity_consumption
++     WHERE slot_id = $1::uuid AND release_event_id IS NULL`,
++    [slotId],
++  );
++  return {
++    free: Number(slotRows[0]?.free_units ?? 0),
++    reserved: Number(slotRows[0]?.reserved_units ?? 0),
++    used: Number(usedRows[0]?.c ?? 0),
++  };
++}
++
++/**
++ * Override-aware consume: may drive free negative; writes Override row in same txn.
++ * Never floors with GREATEST(free, 0).
++ */
++export async function consumeHeadcountCapacityWithOverride(
++  db: PoolClient,
++  input: ConsumeCapacityInput & { override: OverrideMutateContext },
++): Promise<{ consumed: boolean; overrideId: string | null }> {
++  await ensureHeadcountOverrideSchema(db);
++
++  const existing = await query<{ id: string }>(
++    db,
++    `SELECT id FROM headcount_capacity_consumption WHERE event_id = $1::uuid`,
++    [input.eventId],
++  );
++  if (existing.length > 0) {
++    return { consumed: false, overrideId: null };
++  }
++
++  await db.query(
++    `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
++    [input.slotId],
++  );
++
++  if (!input.override.skipApprovalGate) {
++    await assertSlotApprovalConsumable(
++      db,
++      input.slotId,
++      input.evaluationDate ?? todayDateOnlyTehran(),
++    );
++  }
++
++  const before = await readSlotLedger(db, input.slotId);
++
++  const upd = await db.query(
++    `UPDATE headcount_capacity_slot
++     SET free_units = free_units - 1,
++         updated_at = CURRENT_TIMESTAMP
++     WHERE id = $1::uuid
++     RETURNING id, free_units`,
++    [input.slotId],
++  );
++  if (upd.rowCount === 0) {
++    throw new HeadcountOverrideError(
++      "VALIDATION",
++      MSG_HEADCOUNT_OVERRIDE_CONSUME_FAILED_FA,
++    );
++  }
++
++  await db.query(
++    `INSERT INTO headcount_capacity_consumption (id, slot_id, event_id, person_id)
++     VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
++    [randomUUID(), input.slotId, input.eventId, input.personId],
++  );
++
++  const afterFree = before.free - 1;
++  const override = await createOverride(db, {
++    violatedRule: input.override.violatedRule,
++    reason: input.override.reason,
++    actorAccountId: input.override.actorAccountId,
++    teamId: input.override.teamId,
++    jobTitleId: input.override.jobTitleId,
++    seniorityId: input.override.seniorityId,
++    approvalId: input.override.approvalId,
++    slotId: input.slotId,
++    relatedEventId: input.eventId,
++    relatedAssignmentId: input.override.relatedAssignmentId,
++    capacitySnapshot: {
++      used: before.used + 1,
++      reserved: before.reserved,
++      freeBefore: before.free,
++      freeAfter: afterFree,
++    },
++    actorId: input.override.actorAccountId,
++  });
++
++  return { consumed: true, overrideId: override.id };
++}
++
++/**
++ * Override-aware reserve: may drive free negative; writes Override row in same txn.
++ */
++export async function reserveHeadcountCapacityWithOverride(
++  db: PoolClient,
++  input: ReserveCapacityInput & { override: OverrideMutateContext },
++): Promise<{ reserved: boolean; slotId: string; overrideId: string | null }> {
++  await ensureHeadcountOverrideSchema(db);
++
++  const existing = await query<{ id: string; slot_id: string; status: string }>(
++    db,
++    `SELECT id, slot_id, status FROM headcount_capacity_reservation
++     WHERE event_id = $1::uuid`,
++    [input.eventId],
++  );
++  if (existing[0]) {
++    if (
++      existing[0].status === "reserved" ||
++      existing[0].status === "converted"
++    ) {
++      return {
++        reserved: false,
++        slotId: existing[0].slot_id,
++        overrideId: null,
++      };
++    }
++  }
++
++  await db.query(
++    `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
++    [input.slotId],
++  );
++
++  if (!input.override.skipApprovalGate) {
++    await assertSlotApprovalConsumable(
++      db,
++      input.slotId,
++      input.evaluationDate ?? todayDateOnlyTehran(),
++    );
++  }
++
++  const before = await readSlotLedger(db, input.slotId);
++
++  const upd = await db.query(
++    `UPDATE headcount_capacity_slot
++     SET free_units = free_units - 1,
++         reserved_units = reserved_units + 1,
++         updated_at = CURRENT_TIMESTAMP
++     WHERE id = $1::uuid
++     RETURNING id`,
++    [input.slotId],
++  );
++  if (upd.rowCount === 0) {
++    throw new HeadcountOverrideError(
++      "VALIDATION",
++      MSG_HEADCOUNT_OVERRIDE_RESERVE_FAILED_FA,
++    );
++  }
++
++  if (existing[0]?.status === "released") {
++    await db.query(
++      `UPDATE headcount_capacity_reservation
++       SET status = 'reserved',
++           slot_id = $2::uuid,
++           person_id = $3::uuid,
++           updated_at = CURRENT_TIMESTAMP
++       WHERE event_id = $1::uuid`,
++      [input.eventId, input.slotId, input.personId],
++    );
++  } else {
++    await db.query(
++      `INSERT INTO headcount_capacity_reservation
++         (id, slot_id, event_id, person_id, status)
++       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'reserved')`,
++      [randomUUID(), input.slotId, input.eventId, input.personId],
++    );
++  }
++
++  const afterFree = before.free - 1;
++  const override = await createOverride(db, {
++    violatedRule: input.override.violatedRule,
++    reason: input.override.reason,
++    actorAccountId: input.override.actorAccountId,
++    teamId: input.override.teamId,
++    jobTitleId: input.override.jobTitleId,
++    seniorityId: input.override.seniorityId,
++    approvalId: input.override.approvalId,
++    slotId: input.slotId,
++    relatedEventId: input.eventId,
++    relatedAssignmentId: input.override.relatedAssignmentId,
++    capacitySnapshot: {
++      used: before.used,
++      reserved: before.reserved + 1,
++      freeBefore: before.free,
++      freeAfter: afterFree,
++    },
++    actorId: input.override.actorAccountId,
++  });
++
++  return { reserved: true, slotId: input.slotId, overrideId: override.id };
++}
++
+ /**
+  * Best-effort undo of destination capacity taken by Transfer event_id
+  * (fresh consume or converted reservation).
+@@ -1142,6 +1419,8 @@ export type CapacityPanelResult = {
+   reserved: number;
+   free: number;
+   exempt: number;
++  /** Active Override rows for the resolved slot (FR-32). */
++  overridden: number;
+   slotId: string | null;
+   approvalId: string | null;
+ };
+@@ -1269,6 +1548,7 @@ export async function readHeadcountCapacityPanel(
+   }
+ 
+   let used = 0;
++  let overridden = 0;
+   if (slotId) {
+     const usedRows = await query<{ c: string }>(
+       db,
+@@ -1277,8 +1557,9 @@ export async function readHeadcountCapacityPanel(
+       [slotId],
+     );
+     used = Number(usedRows[0]?.c ?? 0);
++    overridden = await countActiveOverridesForSlot(db, slotId);
+   }
+ 
+-  return { used, reserved, free, exempt, slotId, approvalId };
++  return { used, reserved, free, exempt, overridden, slotId, approvalId };
+ }
+ 
+diff --git a/packages/modules/person-employment/src/index.ts b/packages/modules/person-employment/src/index.ts
+index 524082e..e0208eb 100644
+--- a/packages/modules/person-employment/src/index.ts
++++ b/packages/modules/person-employment/src/index.ts
+@@ -470,6 +470,9 @@ export {
+   seedOrganizationHierarchyFixtures,
+   seedJobReferencePermissionFixtures,
+   seedHeadcountApprovalPermissionFixtures,
++  seedHeadcountExemptionPermissionFixtures,
++  seedHeadcountOverridePermissionFixtures,
++  SEED_HEADCOUNT_OVERRIDE,
+   seedDemoJobReferences,
+   seedJobReferenceFixtures,
+   seedDemoPrimaryAssignments,
+@@ -598,7 +601,10 @@ export {
+   SCAFFOLD_EVENT_TYPE,
+   parseStartReturnPayload,
+   applyStartReturnProjections,
++  applyStartScheduledReserve,
++  releaseStartReservationOnCancel,
+   compensateOrphanStartReturnProjections,
++  capacityResultToConflict,
+ } from "./personnel-event-start-return";
+ 
+ export type {
+diff --git a/packages/modules/person-employment/src/personnel-event-conflicts.ts b/packages/modules/person-employment/src/personnel-event-conflicts.ts
+index d69ed7a..6583825 100644
+--- a/packages/modules/person-employment/src/personnel-event-conflicts.ts
++++ b/packages/modules/person-employment/src/personnel-event-conflicts.ts
+@@ -7,8 +7,13 @@ import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
+ import { createPgPool, type Pool, type PoolClient, type PrismaClient } from "@divan/db";
+ import { getBusinessEventById } from "@divan/event-store";
+ import {
++  checkReservationApprovalExpiryWarning,
+   evaluateHeadcountCapacity,
++  HEADCOUNT_APPROVAL_EXPIRY_SOON,
++  HEADCOUNT_SCHEDULED_EXCEPTION,
+   matchCompatibleApprovals,
++  MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA,
++  MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
+ } from "@divan/headcount";
+ 
+ import { getPersonDb } from "./db";
+@@ -187,6 +192,7 @@ export const HEADCOUNT_CAPACITY_PORT_EVENT_TYPES = new Set([
+ export const WARNING_ACK_ALLOW_LIST = new Set([
+   "PRE_BASELINE_EFFECTIVE_DATE",
+   "HEADCOUNT_CAPACITY_MISSING",
++  "HEADCOUNT_APPROVAL_EXPIRY_SOON",
+ ]);
+ 
+ export type ConflictPolicy = {
+@@ -1364,6 +1370,26 @@ export async function classifyConflicts(
+             headcountMatchedBy: capacity.matchedBy,
+             headcountDefaultApprovalId: defaultApprovalId,
+           };
++
++          // 14-day Approval expiry horizon warning (AR-HEADCOUNT)
++          if (capacity.approvalId) {
++            const expiry = await checkReservationApprovalExpiryWarning(
++              reader,
++              {
++                approvalId: capacity.approvalId,
++                evaluationDate: draft.effectiveDate,
++              },
++            );
++            if (expiry.atRisk) {
++              findings.push({
++                code: HEADCOUNT_APPROVAL_EXPIRY_SOON,
++                severity: "warning",
++                requiresAck: true,
++                messageFa:
++                  expiry.messageFa ?? MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA,
++              });
++            }
++          }
+         } else if (capacity.outcome === "exempt") {
+           draft.payload = {
+             ...draft.payload,
+@@ -1373,12 +1399,35 @@ export async function classifyConflicts(
+             headcountExemptionId: capacity.exemptionId,
+           };
+         }
++
++        // Persist / surface Scheduled-exception marker already on payload
++        const existingException = draft.payload.headcountException;
++        if (
++          existingException &&
++          typeof existingException === "object" &&
++          existingException !== null &&
++          "code" in existingException
++        ) {
++          const marker = existingException as {
++            code?: string;
++            messageFa?: string;
++          };
++          findings.push({
++            code: marker.code ?? HEADCOUNT_SCHEDULED_EXCEPTION,
++            severity: "blocking",
++            messageFa:
++              typeof marker.messageFa === "string"
++                ? marker.messageFa
++                : MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
++          });
++        }
+       }
+     }
+   } else if (HEADCOUNT_CONSUMING_EVENT_TYPES.has(draft.eventType)) {
+     findings.push({
+       code: "HEADCOUNT_UNAPPROVED",
+-      severity: "blocking",
++      severity: "warning",
++      requiresOverride: true,
+       messageFa: MSG_HEADCOUNT_CHECK_BLOCKED_FA,
+     });
+   }
+diff --git a/packages/modules/person-employment/src/personnel-event-finalize.ts b/packages/modules/person-employment/src/personnel-event-finalize.ts
+index 8ae66bc..bc90adc 100644
+--- a/packages/modules/person-employment/src/personnel-event-finalize.ts
++++ b/packages/modules/person-employment/src/personnel-event-finalize.ts
+@@ -14,7 +14,11 @@ import {
+ } from "@divan/event-store";
+ import {
+   assertActorHasHeadcountMatchReselect,
++  assertActorHasHeadcountOverrideWrite,
+   HeadcountExemptionError,
++  HeadcountOverrideError,
++  matchApprovalsForOverride,
++  type HeadcountViolatedRule,
+ } from "@divan/headcount";
+ import { todayDateOnlyTehran } from "@divan/temporal-engine";
+ import type { Pool, PoolClient, PrismaClient } from "@divan/db";
+@@ -546,6 +550,68 @@ export async function finalizeDraft(
+           code: "FINALIZE_OVERRIDE_REQUIRED",
+         };
+       }
++
++      if (needOverride.includes("HEADCOUNT_UNAPPROVED")) {
++        try {
++          await assertActorHasHeadcountOverrideWrite(
++            input.actorId,
++            getPersonDb(),
++          );
++        } catch (err) {
++          if (err instanceof HeadcountOverrideError) {
++            return {
++              outcome: "rejected" as const,
++              draft,
++              conflicts,
++              snapshot: liveSnapshot,
++              messageFa: err.messageFa,
++              code: "FINALIZE_OVERRIDE_REQUIRED",
++            };
++          }
++          throw err;
++        }
++      }
++
++      // Resolve attributable Approval/slot for HEADCOUNT_UNAPPROVED (may have free<=0)
++      if (needOverride.includes("HEADCOUNT_UNAPPROVED")) {
++        const resolved = await resolveHeadcountOverrideOntoDraft(
++          client,
++          draft,
++          {
++            reason,
++            actorId: input.actorId,
++          },
++        );
++        if (!resolved.ok) {
++          return {
++            outcome: "rejected" as const,
++            draft,
++            conflicts: [
++              ...conflicts,
++              {
++                code: "HEADCOUNT_UNAPPROVED",
++                severity: "blocking",
++                messageFa: resolved.messageFa,
++              },
++            ],
++            snapshot: liveSnapshot,
++            messageFa: resolved.messageFa,
++            code: "FINALIZE_BLOCKED",
++          };
++        }
++        draft = { ...draft, payload: resolved.payload };
++        // Persist override fields onto draft row so append sees them
++        await client.query(
++          `UPDATE "PersonnelEventDraft"
++           SET payload = $2::jsonb,
++               "updatedBy" = $3,
++               "updatedAt" = CURRENT_TIMESTAMP,
++               version = version + 1
++           WHERE id = $1`,
++          [draft.id, JSON.stringify(draft.payload), input.actorId],
++        );
++        draft = { ...draft, version: draft.version + 1 };
++      }
+     }
+ 
+     // Story 4.13 ΓÇö manual Approval reselection requires permission + audit
+@@ -740,9 +806,9 @@ export async function finalizeDraft(
+     try {
+       // Override + ack ΓåÆ access-event audit evidence (pre-Baseline / capacity)
+       if (needOverride.length > 0 && input.override) {
+-        const wantsCapacity = needOverride.includes(
+-          "HEADCOUNT_CAPACITY_MISSING",
+-        );
++        const wantsCapacity =
++          needOverride.includes("HEADCOUNT_CAPACITY_MISSING") ||
++          needOverride.includes("HEADCOUNT_UNAPPROVED");
+         const wantsBaseline = needOverride.includes(
+           "PRE_BASELINE_EFFECTIVE_DATE",
+         );
+@@ -757,6 +823,11 @@ export async function finalizeDraft(
+               overrideCodes: needOverride,
+               warningCodes: needAck,
+               effectiveDate: draft.effectiveDate,
++              violatedRule: draft.payload.headcountViolatedRule ?? "shortage",
++              teamId: draft.payload.teamId,
++              jobTitleId: draft.payload.jobTitleId,
++              approvalId: draft.payload.headcountApprovalId,
++              slotId: draft.payload.capacitySlotId,
+             },
+             result: "allow",
+             reason: input.override.reason,
+@@ -966,6 +1037,112 @@ export async function finalizeDraft(
+   return result as FinalizeDraftResult;
+ }
+ 
++async function resolveHeadcountOverrideOntoDraft(
++  client: PoolClient,
++  draft: PersonnelEventDraftRecord,
++  opts: { reason: string; actorId: string },
++): Promise<
++  | { ok: true; payload: Record<string, unknown> }
++  | { ok: false; messageFa: string }
++> {
++  const teamId =
++    typeof draft.payload.teamId === "string" ? draft.payload.teamId.trim() : "";
++  const jobTitleId =
++    typeof draft.payload.jobTitleId === "string"
++      ? draft.payload.jobTitleId.trim()
++      : "";
++  if (!teamId || !jobTitleId) {
++    return {
++      ok: false,
++      messageFa: "╪¬█î┘à ┘ê ╪╣┘å┘ê╪º┘å ╪┤╪║┘ä█î ╪¿╪▒╪º█î ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ╪╕╪▒┘ü█î╪¬ ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬.",
++    };
++  }
++
++  const seniorityId =
++    typeof draft.payload.seniorityId === "string"
++      ? draft.payload.seniorityId.trim()
++      : null;
++  const preferredApprovalId =
++    typeof draft.payload.preferredApprovalId === "string"
++      ? draft.payload.preferredApprovalId.trim()
++      : null;
++
++  // Infer violated rule: preferred mismatch ΓåÆ job_title; else shortage (zero free)
++  let violatedRule: HeadcountViolatedRule = "shortage";
++  const preferred = preferredApprovalId;
++  let match = await matchApprovalsForOverride(client, {
++    teamId,
++    jobTitleId,
++    seniorityId,
++    evaluationDate: draft.effectiveDate,
++    preferredApprovalId: preferred,
++  });
++
++  if (match.outcome === "manual_incompatible") {
++    violatedRule = "job_title";
++    // Retry without preferred to find any dimension match for attributable link
++    match = await matchApprovalsForOverride(client, {
++      teamId,
++      jobTitleId,
++      seniorityId,
++      evaluationDate: draft.effectiveDate,
++      preferredApprovalId: null,
++    });
++  }
++
++  if (match.outcome === "none" || match.outcome === "manual_incompatible") {
++    // Legacy fixture bridge: Override shortage on approval_id IS NULL slots
++    const legacy = await client.query<{ id: string }>(
++      `SELECT id FROM headcount_capacity_slot
++       WHERE team_id = $1::uuid
++         AND approval_id IS NULL
++         AND (job_title_id IS NULL OR job_title_id = $2::uuid)
++         AND start_date <= $3::date
++         AND (end_date_exclusive IS NULL OR end_date_exclusive > $3::date)
++       ORDER BY free_units ASC, id ASC
++       LIMIT 1`,
++      [teamId, jobTitleId, draft.effectiveDate],
++    );
++    const legacySlotId = legacy.rows[0]?.id;
++    if (!legacySlotId) {
++      return {
++        ok: false,
++        messageFa:
++          match.outcome === "manual_incompatible"
++            ? match.messageFa
++            : "┘à╪¼┘ê╪▓ ┘é╪º╪¿┘ä ╪º┘å╪¬╪│╪º╪¿ ╪¿╪▒╪º█î ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ █î╪º┘ü╪¬ ┘å╪┤╪»╪¢ ╪¿╪»┘ê┘å ┘╛█î┘ê┘å╪» ╪╕╪▒┘ü█î╪¬ Override ┘à╪¼╪º╪▓ ┘å█î╪│╪¬.",
++      };
++    }
++    return {
++      ok: true,
++      payload: {
++        ...draft.payload,
++        capacitySlotId: legacySlotId,
++        headcountApprovalId: null,
++        headcountExempt: false,
++        headcountOverride: true,
++        headcountOverrideReason: opts.reason,
++        headcountViolatedRule: "shortage" satisfies HeadcountViolatedRule,
++        headcountOverrideActorId: opts.actorId,
++      },
++    };
++  }
++
++  return {
++    ok: true,
++    payload: {
++      ...draft.payload,
++      capacitySlotId: match.slotId,
++      headcountApprovalId: match.approvalId,
++      headcountExempt: false,
++      headcountOverride: true,
++      headcountOverrideReason: opts.reason,
++      headcountViolatedRule: violatedRule,
++      headcountOverrideActorId: opts.actorId,
++    },
++  };
++}
++
+ /**
+  * Convenience: evaluate conflicts without finalizing (UI pre-check).
+  */
+diff --git a/packages/modules/person-employment/src/personnel-event-projection-hook.ts b/packages/modules/person-employment/src/personnel-event-projection-hook.ts
+index 5cb6cca..c46b025 100644
+--- a/packages/modules/person-employment/src/personnel-event-projection-hook.ts
++++ b/packages/modules/person-employment/src/personnel-event-projection-hook.ts
+@@ -18,9 +18,12 @@ import { getPersonDb } from "./db";
+ import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
+ import {
+   START_RETURN_EVENT_TYPES,
++  PRODUCT_START_EVENT_TYPE,
+   applyStartReturnProjections,
++  applyStartScheduledReserve,
+   bindEmploymentIdAfterApply,
+   compensateOrphanStartReturnProjections,
++  releaseStartReservationOnCancel,
+ } from "./personnel-event-start-return";
+ import {
+   TERMINATION_EVENT_TYPES,
+@@ -131,7 +134,7 @@ export type ProjectionRefreshHook = (
+ /**
+  * Default production hook: records invocation; on Effective Start/Return /
+  * Termination / Transfer / Job-level / Compensation applies domain projectors.
+- * When `applyToCurrentProjection === false`, Scheduled Transfer / Title-Seniority
++ * When `applyToCurrentProjection === false`, Scheduled Transfer / Start / Title-Seniority
+  * still reserves destination capacity; Cancel releases it.
+  */
+ export async function defaultProjectionRefreshHook(
+@@ -140,7 +143,7 @@ export async function defaultProjectionRefreshHook(
+   ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
+ 
+   if (ctx.applyToCurrentProjection === false) {
+-    // Cancel of Scheduled Transfer / Title-Seniority ΓåÆ release reservation
++    // Cancel of Scheduled Transfer / Start / Title-Seniority ΓåÆ release reservation
+     if (ctx.lifecycleOp === "cancel" && ctx.targetEventId) {
+       const target = await getBusinessEventById(ctx.client, ctx.targetEventId);
+       if (target && TRANSFER_EVENT_TYPES.has(target.eventType)) {
+@@ -157,6 +160,11 @@ export async function defaultProjectionRefreshHook(
+           didMoveDestCapacity: false,
+           reservedOnly: true,
+         };
++      } else if (
++        target &&
++        target.eventType === PRODUCT_START_EVENT_TYPE
++      ) {
++        await releaseStartReservationOnCancel(ctx.client, ctx.targetEventId);
+       } else if (
+         target &&
+         JOB_LEVEL_CAPACITY_EVENT_TYPES.has(target.eventType)
+@@ -207,6 +215,12 @@ export async function defaultProjectionRefreshHook(
+       return;
+     }
+ 
++    // Scheduled StartEmployment ΓåÆ reserve only (FR-30; Return has no reserve)
++    if (ctx.eventType === PRODUCT_START_EVENT_TYPE) {
++      await applyStartScheduledReserve(ctx);
++      return;
++    }
++
+     // Scheduled Title/Seniority ΓåÆ reserve when matching bucket changes
+     if (JOB_LEVEL_CAPACITY_EVENT_TYPES.has(ctx.eventType)) {
+       const result = await applyJobLevelScheduledReserve(ctx, getPersonDb());
+diff --git a/packages/modules/person-employment/src/personnel-event-start-return.selfcheck.ts b/packages/modules/person-employment/src/personnel-event-start-return.selfcheck.ts
+index 892c229..41a6af7 100644
+--- a/packages/modules/person-employment/src/personnel-event-start-return.selfcheck.ts
++++ b/packages/modules/person-employment/src/personnel-event-start-return.selfcheck.ts
+@@ -100,6 +100,8 @@ async function main() {
+   const pool = createPgPool(url);
+ 
+   await seedPrimaryAssignmentFixtures(db);
++  const { seedHeadcountOverridePermissionFixtures } = await import("./seed");
++  await seedHeadcountOverridePermissionFixtures(db);
+   const { slotId } = await seedDemoHeadcountCapacity(db, pool);
+   const basePayload = await resolveStartPayload(db);
+   const payload = { ...basePayload, capacitySlotId: slotId };
+@@ -415,9 +417,16 @@ async function main() {
+         assert.ok(
+           opBlocked.conflicts.some(
+             (c) =>
+-              c.code === "HEADCOUNT_UNAPPROVED" && c.severity === "blocking",
++              c.code === "HEADCOUNT_UNAPPROVED" &&
++              (c.severity === "warning" || c.severity === "blocking") &&
++              (c.requiresOverride === true || c.severity === "blocking"),
+           ),
+-          "Operator must see blocking HEADCOUNT_UNAPPROVED (FR-29; Override ΓåÆ 4.14)",
++          "Operator must see HEADCOUNT_UNAPPROVED requiring Override (FR-32)",
++        );
++        assert.ok(
++          opBlocked.code === "FINALIZE_OVERRIDE_REQUIRED" ||
++            opBlocked.conflicts.some((c) => c.code === "HEADCOUNT_UNAPPROVED"),
++          "Operator blocked without Override permission",
+         );
+       }
+ 
+@@ -441,7 +450,7 @@ async function main() {
+             warningCodes: ["HEADCOUNT_UNAPPROVED"],
+           },
+           override: {
+-            reason: "╪¬╪ú█î█î╪» ╪»╪│╪¬█î ╪╕╪▒┘ü█î╪¬ ΓÇö ╪¿╪º█î╪» ┘à╪│╪»┘ê╪» ╪¿┘à╪º┘å╪» ╪¬╪º █┤┘½█▒█┤",
++            reason: "╪¬╪ú█î█î╪» ╪»╪│╪¬█î ┌⌐┘à╪¿┘ê╪» ╪╕╪▒┘ü█î╪¬ ΓÇö ╪«┘ê╪»╪ó╪▓┘à╪º█î█î █┤┘½█▒█┤",
+             approvedByAccountId: admin,
+           },
+         },
+@@ -450,15 +459,26 @@ async function main() {
+       );
+       assert.equal(
+         adminFin.outcome,
+-        "rejected",
+-        "Override catalogue not shipped in 4.13 ΓÇö shortage stays blocked",
++        "finalized",
++        "Admin Override may proceed for shortage (FR-32)",
+       );
+-      if (adminFin.outcome === "rejected") {
+-        assert.ok(
+-          adminFin.conflicts.some((c) => c.code === "HEADCOUNT_UNAPPROVED"),
+-        );
+-      }
+-      assert.equal(await countEmployments(db, noCapPerson.id), 0);
++      assert.equal(await countEmployments(db, noCapPerson.id), 1);
++      const freeAfter = await pool.query<{ free_units: number }>(
++        `SELECT free_units FROM headcount_capacity_slot
++         WHERE team_id = $1::uuid ORDER BY free_units ASC LIMIT 1`,
++        [basePayload.teamId],
++      );
++      assert.ok(
++        Number(freeAfter.rows[0]?.free_units ?? 0) < 0,
++        "Override consume may drive free negative",
++      );
++      const overrides = await pool.query<{ id: string; violated_rule: string }>(
++        `SELECT id, violated_rule FROM headcount_override
++         WHERE status = 'active' AND violated_rule = 'shortage'
++         ORDER BY created_at DESC LIMIT 1`,
++      );
++      assert.ok(overrides.rows[0], "Override row must be filterable");
++      assert.equal(overrides.rows[0]!.violated_rule, "shortage");
+     } finally {
+       for (const row of priorFree.rows) {
+         await pool.query(
+diff --git a/packages/modules/person-employment/src/personnel-event-start-return.ts b/packages/modules/person-employment/src/personnel-event-start-return.ts
+index a1b2907..9a05354 100644
+--- a/packages/modules/person-employment/src/personnel-event-start-return.ts
++++ b/packages/modules/person-employment/src/personnel-event-start-return.ts
+@@ -1,5 +1,6 @@
+ /**
+  * Start / Return personnel event helpers (Story 4.5 / FR-20).
++ * Story 4.14: Scheduled Start durable reserve + Override consume (FR-30/32).
+  * Product path = Draft ΓåÆ Finalize ΓåÆ projection hook ΓÇö no public startEmployment verbs.
+  */
+ 
+@@ -7,7 +8,15 @@ import type { PoolClient, PrismaClient } from "@divan/db";
+ import { getBusinessEventById } from "@divan/event-store";
+ import {
+   consumeHeadcountCapacity,
++  consumeHeadcountCapacityWithOverride,
++  convertReservationToConsumption,
++  detectScheduledHeadcountException,
++  reserveHeadcountCapacity,
++  reserveHeadcountCapacityWithOverride,
++  releaseHeadcountReservation,
+   type CapacityCheckResult,
++  type HeadcountViolatedRule,
++  type OverrideMutateContext,
+ } from "@divan/headcount";
+ 
+ import { getPersonDb } from "./db";
+@@ -59,6 +68,11 @@ export type StartReturnPayloadFacts = {
+   headcountApprovalId: string | null;
+   /** When true, skip consume ΓÇö covered by exemption. */
+   headcountExempt?: boolean;
++  /** Override pending from finalize (FR-32). */
++  headcountOverride?: boolean;
++  headcountOverrideReason?: string | null;
++  headcountViolatedRule?: HeadcountViolatedRule | null;
++  headcountOverrideActorId?: string | null;
+ };
+ 
+ export type MissingFact = {
+@@ -148,6 +162,21 @@ export function parseStartReturnPayload(
+       capacitySlotId: strField(payload, "capacitySlotId"),
+       headcountApprovalId: strField(payload, "headcountApprovalId"),
+       headcountExempt: payload.headcountExempt === true,
++      headcountOverride: payload.headcountOverride === true,
++      headcountOverrideReason: strField(payload, "headcountOverrideReason"),
++      headcountViolatedRule: (() => {
++        const v = strField(payload, "headcountViolatedRule");
++        if (
++          v === "shortage" ||
++          v === "validity" ||
++          v === "job_title" ||
++          v === "seniority"
++        ) {
++          return v;
++        }
++        return null;
++      })(),
++      headcountOverrideActorId: strField(payload, "headcountOverrideActorId"),
+     },
+     missing: [],
+   };
+@@ -256,6 +285,26 @@ export async function applyStartReturnProjections(
+     );
+   }
+ 
++  // Scheduled-exception: fail closed BEFORE any Employment/Assignment/capacity apply.
++  const slotId = facts.capacitySlotId;
++  if (slotId && !facts.headcountExempt && !facts.headcountOverride) {
++    const exception = await detectScheduledHeadcountException(ctx.client, {
++      approvalId: facts.headcountApprovalId,
++      slotId,
++      evaluationDate: source.effectiveDate,
++      teamId: facts.teamId,
++      jobTitleId: facts.jobTitleId,
++      seniorityId: facts.seniorityId,
++    });
++    if (exception.exception) {
++      throw new PersonnelEventError(
++        "VALIDATION",
++        exception.marker.messageFa,
++        exception.marker.code,
++      );
++    }
++  }
++
+   let createdEmploymentId: string | null = null;
+   let createdPrimaryId: string | null = null;
+   try {
+@@ -303,16 +352,59 @@ export async function applyStartReturnProjections(
+       );
+     }
+ 
+-    // Consume capacity when slot was resolved into payload during classify
+-    // (skip when exempt ΓÇö FR-29)
+-    const slotId = facts.capacitySlotId;
++    // Capacity: convert Scheduled reservation, or consume (Effective-only / Override).
++    // ReturnFromAbsence stays Effective-only consume (no invented Return reserve).
+     if (slotId && !facts.headcountExempt) {
+-      await consumeHeadcountCapacity(ctx.client, {
+-        slotId,
+-        eventId: ctx.eventId,
+-        personId: source.personId,
+-        evaluationDate: source.effectiveDate,
+-      });
++      const overrideCtx = buildOverrideMutateContext(facts);
++      if (overrideCtx && ctx.eventType === PRODUCT_START_EVENT_TYPE) {
++        const converted = await convertReservationToConsumption(ctx.client, {
++          eventId: ctx.eventId,
++          personId: source.personId,
++        });
++        if (!converted.converted) {
++          await consumeHeadcountCapacityWithOverride(ctx.client, {
++            slotId,
++            eventId: ctx.eventId,
++            personId: source.personId,
++            evaluationDate: source.effectiveDate,
++            override: {
++              ...overrideCtx,
++              skipApprovalGate: overrideCtx.violatedRule === "validity",
++            },
++          });
++        }
++      } else if (ctx.eventType === PRODUCT_START_EVENT_TYPE) {
++        const converted = await convertReservationToConsumption(ctx.client, {
++          eventId: ctx.eventId,
++          personId: source.personId,
++        });
++        if (!converted.converted) {
++          await consumeHeadcountCapacity(ctx.client, {
++            slotId,
++            eventId: ctx.eventId,
++            personId: source.personId,
++            evaluationDate: source.effectiveDate,
++          });
++        }
++      } else if (overrideCtx) {
++        await consumeHeadcountCapacityWithOverride(ctx.client, {
++          slotId,
++          eventId: ctx.eventId,
++          personId: source.personId,
++          evaluationDate: source.effectiveDate,
++          override: {
++            ...overrideCtx,
++            skipApprovalGate: overrideCtx.violatedRule === "validity",
++          },
++        });
++      } else {
++        await consumeHeadcountCapacity(ctx.client, {
++          slotId,
++          eventId: ctx.eventId,
++          personId: source.personId,
++          evaluationDate: source.effectiveDate,
++        });
++      }
+     }
+ 
+     return {
+@@ -334,6 +426,98 @@ export async function applyStartReturnProjections(
+   }
+ }
+ 
++function buildOverrideMutateContext(
++  facts: StartReturnPayloadFacts,
++): OverrideMutateContext | null {
++  if (!facts.headcountOverride) return null;
++  const reason = facts.headcountOverrideReason?.trim() ?? "";
++  const actor = facts.headcountOverrideActorId?.trim() ?? "";
++  if (!reason || !actor) return null;
++  return {
++    violatedRule: facts.headcountViolatedRule ?? "shortage",
++    reason,
++    actorAccountId: actor,
++    teamId: facts.teamId,
++    jobTitleId: facts.jobTitleId,
++    seniorityId: facts.seniorityId,
++    approvalId: facts.headcountApprovalId,
++  };
++}
++
++/**
++ * Scheduled StartEmployment: reserve destination capacity (FR-30 parity with Transfer).
++ * ReturnFromAbsence: no reserve (Effective-only consume).
++ */
++export async function applyStartScheduledReserve(
++  ctx: ProjectionRefreshContext,
++): Promise<{ reserved: boolean }> {
++  if (ctx.eventType !== PRODUCT_START_EVENT_TYPE) {
++    return { reserved: false };
++  }
++
++  const source = await resolveStartReturnSource(ctx);
++  if (!source) {
++    throw new PersonnelEventError(
++      "VALIDATION",
++      "┘à┘å╪¿╪╣ ╪▒┘ê█î╪»╪º╪» Start █î╪º┘ü╪¬ ┘å╪┤╪».",
++      "missing_source",
++    );
++  }
++
++  const { facts, missing } = parseStartReturnPayload(source.payload);
++  if (!facts || missing.length > 0) {
++    throw new PersonnelEventError(
++      "VALIDATION",
++      missing[0]?.messageFa ?? "╪¡╪»╪º┘é┘ä ┘ê╪º┘é╪╣█î╪¬ΓÇî┘ç╪º█î ╪º┘ä╪▓╪º┘à█î ┘å╪º┘é╪╡ ╪º╪│╪¬.",
++      "missing_facts",
++    );
++  }
++
++  if (facts.headcountExempt) {
++    return { reserved: false };
++  }
++
++  const reserveSlotId = facts.capacitySlotId;
++  if (!reserveSlotId) {
++    throw new PersonnelEventError(
++      "VALIDATION",
++      "╪┤┘å╪º╪│┘ç ╪º╪│┘ä╪º╪¬ ╪╕╪▒┘ü█î╪¬ ╪¿╪▒╪º█î ╪▒╪▓╪▒┘ê Start ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬.",
++      "missing_capacity_slot",
++    );
++  }
++
++  const overrideCtx = buildOverrideMutateContext(facts);
++  if (overrideCtx) {
++    await reserveHeadcountCapacityWithOverride(ctx.client, {
++      slotId: reserveSlotId,
++      eventId: ctx.eventId,
++      personId: source.personId,
++      evaluationDate: source.effectiveDate,
++      override: {
++        ...overrideCtx,
++        skipApprovalGate: overrideCtx.violatedRule === "validity",
++      },
++    });
++  } else {
++    await reserveHeadcountCapacity(ctx.client, {
++      slotId: reserveSlotId,
++      eventId: ctx.eventId,
++      personId: source.personId,
++      evaluationDate: source.effectiveDate,
++    });
++  }
++
++  return { reserved: true };
++}
++
++/** Cancel of Scheduled Start ΓÇö release reservation (idempotent). */
++export async function releaseStartReservationOnCancel(
++  client: PoolClient,
++  startEventId: string,
++): Promise<void> {
++  await releaseHeadcountReservation(client, startEventId);
++}
++
+ function mapProjectorError(err: unknown): never {
+   if (err instanceof PersonnelEventError) throw err;
+   if (err instanceof EmploymentError) {
+@@ -542,10 +726,11 @@ export function capacityResultToConflict(
+       messageFa: result.messageFa,
+     };
+   }
+-  // incompatible ΓÇö universal coverage (FR-29); Override catalogue stays 4.14
++  // incompatible ΓÇö Override catalogue (FR-32): warning + requiresOverride for Admin
+   return {
+     code: "HEADCOUNT_UNAPPROVED",
+-    severity: "blocking",
++    severity: "warning",
++    requiresOverride: true,
+     messageFa: result.messageFa,
+   };
+ }
+diff --git a/packages/modules/person-employment/src/seed.ts b/packages/modules/person-employment/src/seed.ts
+index e70fa02..c20aae4 100644
+--- a/packages/modules/person-employment/src/seed.ts
++++ b/packages/modules/person-employment/src/seed.ts
+@@ -807,6 +807,68 @@ export async function seedHeadcountApprovalPermissionFixtures(
+   }
+ }
+ 
++/** Story 4.14 ΓÇö override catalogue for hr.admin. */
++export const SEED_HEADCOUNT_OVERRIDE = {
++  permissionSetName: "headcount-override",
++  roleCode: "headcount_override_admin",
++  roleLabelFa: "┘à╪»█î╪▒ ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ╪╕╪▒┘ü█î╪¬",
++} as const;
++
++export async function seedHeadcountOverridePermissionFixtures(
++  db: PrismaClient,
++): Promise<void> {
++  const permissionSet = await db.permissionSet.upsert({
++    where: { name: SEED_HEADCOUNT_OVERRIDE.permissionSetName },
++    create: {
++      name: SEED_HEADCOUNT_OVERRIDE.permissionSetName,
++      permissions: [
++        "headcount.override.read",
++        "headcount.override.write",
++      ],
++    },
++    update: {
++      permissions: [
++        "headcount.override.read",
++        "headcount.override.write",
++      ],
++    },
++  });
++
++  const role = await db.accessRole.upsert({
++    where: { code: SEED_HEADCOUNT_OVERRIDE.roleCode },
++    create: {
++      code: SEED_HEADCOUNT_OVERRIDE.roleCode,
++      labelFa: SEED_HEADCOUNT_OVERRIDE.roleLabelFa,
++      permissionSetId: permissionSet.id,
++    },
++    update: {
++      labelFa: SEED_HEADCOUNT_OVERRIDE.roleLabelFa,
++      permissionSetId: permissionSet.id,
++    },
++  });
++
++  for (const username of ["hr.admin"] as const) {
++    const account = await db.internalAccount.findUnique({
++      where: { username },
++    });
++    if (!account) continue;
++
++    await db.accountAccessRole.upsert({
++      where: {
++        accountId_accessRoleId: {
++          accountId: account.id,
++          accessRoleId: role.id,
++        },
++      },
++      create: {
++        accountId: account.id,
++        accessRoleId: role.id,
++      },
++      update: {},
++    });
++  }
++}
++
+ /** Story 4.13 ΓÇö exemption + match reselect for hr.admin. */
+ export const SEED_HEADCOUNT_EXEMPTION = {
+   permissionSetName: "headcount-exemption",
+@@ -1030,6 +1092,7 @@ export async function seedJobReferenceFixtures(
+   await seedJobReferencePermissionFixtures(db);
+   await seedHeadcountApprovalPermissionFixtures(db);
+   await seedHeadcountExemptionPermissionFixtures(db);
++  await seedHeadcountOverridePermissionFixtures(db);
+   await seedDemoJobReferences(db);
+ }
+ 
+diff --git a/_bmad-output/implementation-artifacts/4-14-reservation-expiry-exceptions-headcount-override.md b/_bmad-output/implementation-artifacts/4-14-reservation-expiry-exceptions-headcount-override.md
+new file mode 100644
+index 0000000..157d2a0
+--- /dev/null
++++ b/_bmad-output/implementation-artifacts/4-14-reservation-expiry-exceptions-headcount-override.md
+@@ -0,0 +1,492 @@
++---
++baseline_commit: c1d52a7
++---
++
++# Story 4.14: Reservation Expiry Exceptions & Headcount Override
++
++Status: review
++
++<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
++
++## Story
++
++As an HR Admin,
++I want reservation expiry handling and explicit Overrides,
++So that shortages are visible and governed rather than hidden (FR30, FR32).
++
++## Gate (read first)
++
++**This story ships FR-30 remainder + FR-32: durable reserve for Scheduled Start (parity with Transfer), 14-day Approval-expiry warning, Scheduled-exception with no partial apply, Override catalogue (shortage / validity / title / seniority) with mandatory context and negative free, distinct filterable Override rows, and Cancel/superseding-Correction release/replace of Reservation. It does not invent formal AR-HEADCOUNT escalation owners, orphan-claim disposition policy beyond Override-governed resolution paths already frozen in SPEC, Secondary consumption, or Epic 5 dashboard/report catalogue.**
++
++| Allowed in 4.14 | Forbidden in 4.14 |
++| --- | --- |
++| Durable `reserveHeadcountCapacity` for **Scheduled StartEmployment** (FR-30 remainder) | Using exemption to mean ΓÇ£allow over capacityΓÇ¥ |
++| 14-day horizon warning when linked Approval validity end approaches (N=14 default; constant, retunable) | Inventing escalation owners / formal AR versioning |
++| Scheduled-exception product state when Approval expired/incompatible before effect ΓÇö no partial Employment/Assignment/capacity apply | Silent apply-at-effect when Approval no longer valid |
++| Override catalogue: shortage, validity, title, seniority ΓÇö mandatory reason + context | Flooring `free` at 0 / `GREATEST(free,0)` to hide overbook |
++| Drop/relax `CHECK (free_units >= 0)` so Override consume may drive free negative | Matching on Grade / Ladder / compensation |
++| Distinct filterable Override rows + panel `overridden` real (not muted foreshadow) | Inventing Position / named-seat model |
++| Wire finalize Override path for `HEADCOUNT_UNAPPROVED` (and related) with permission + audit | Client-trusted override flags without server verify |
++| Cancel / superseding Correction ΓåÆ release/replace Reservation (Start + Transfer + Job-level Scheduled reserves) | Weakening FR-16 (Scheduled Γëá current membership) |
++| Permissions `headcount.override.*` + audit category `organization.headcount_override` | Import cycle `headcount ΓåÆ person-employment` |
++| Selfchecks + seed DoD | UTF-8 BOM on `sprint-status.yaml`; Vitest mandate without ephemeral DB |
++
++### Mandated design ΓÇö Durable Start reservation (FR-30 remainder)
++
++Today Transfer reserves at Scheduled finalize; Start only evaluates and consumes at Effective. **4.14 closes the gap:**
++
++```text
++StartEmployment finalize with future effectiveDate (status ΓåÆ Scheduled):
++  1. Approval-first match (4.13) OR covering exemption OR Override path
++  2. If consuming (not exempt): reserveHeadcountCapacity on matched Approval's linked slot
++     (same ledger as Transfer ΓÇö headcount_capacity_reservation UNIQUE(event_id))
++  3. Stash headcountApprovalId + capacitySlotId on event payload
++  4. On Effective apply: convert reservation ΓåÆ consumption (reuse Transfer convert path pattern)
++  5. On Cancel / superseding Correction: releaseHeadcountReservation (idempotent)
++
++ReturnFromAbsence: keep Effective-only consume unless product explicitly requires reserve
++  (Return is not FR-30 "future start or inbound transfer" ΓÇö do not invent Return reserve)
++```
++
++**Concurrency (NFR4):** `SELECT ΓÇª FOR UPDATE` on slot; `UPDATE ΓÇª WHERE free_units > 0` for normal reserve; Override path uses explicit override-aware mutate (see below).
++
++### Mandated design ΓÇö 14-day expiry warning
++
++```text
++Constant: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS = 14  // AR-HEADCOUNT may retune N
++
++When: Scheduled event with active Reservation linked to Approval A
++Evaluation: approval.validity_end_exclusive - today (Tehran date-only) <= 14 days
++            AND approval still consumable today (not already expired)
++Then: ConflictFinding severity "warning", code e.g. HEADCOUNT_APPROVAL_EXPIRY_SOON
++      requiresAck: true (Operator/Admin must acknowledge before finalize of related ops
++      OR surface on event detail / capacity panel for already-Scheduled events)
++UI: Persian messageFa; show on event form + optionally headcount admin list of at-risk reservations
++```
++
++Do **not** invent escalation routing to named owners ΓÇö warn + visible state only.
++
++### Mandated design ΓÇö Scheduled-exception (no partial apply)
++
++```text
++Trigger (before effect / at effect-attempt):
++  - Linked Approval status no longer consumable at evaluationDate
++    (expired / cancelled / soft-expired / validity no longer contains date)
++  - OR match dims became incompatible (JobTitle/Seniority/Team change on draft path,
++    or Approval identity dims no longer match Assignment successor)
++  - OR linked slot/Approval orphaned in a way that blocks convert
++
++Behavior:
++  - Event remains Scheduled (FR-16) with visible exception marker
++  - DO NOT open Employment/Assignment
++  - DO NOT convert reservation ΓåÆ consumption
++  - DO NOT silently release reservation without audited resolution
++  - Effect/apply path fails closed with typed code + Persian message
++  - Resolution paths (audited):
++      a) Admin Override (record Override row + allow proceed under FR-32 rules)
++      b) Cancel ΓåÆ release Reservation
++      c) Superseding Correction ΓåÆ release/replace Reservation per Correction replay
++      d) Rebind to another compatible Approval (audited reselection) when still pre-effect
++         ΓÇö reuse 4.13 preferredApprovalId / match APIs; do not invent free-form orphan UI
++
++Persist exception visibility:
++  Prefer draft/event payload flag + queryable field, e.g.:
++    headcountException: { code, detectedAt, approvalId?, messageFa }
++  AND/OR statusBadge "exception" on Scheduled list (UX-DR10)
++  Panel/list must make exception obvious ΓÇö not buried in logs only
++```
++
++**Product freeze (SPEC L95):** ΓÇ£stays Scheduled in a visible exception and applies no partial Employment, Assignment, or capacity change until authorized audited resolution.ΓÇ¥
++
++### Mandated design ΓÇö Override catalogue (FR-32)
++
++**Exemption Γëá Override.** Exemption (4.13) = coverage without consume. Override = explicit rule violation with audit; free may go negative.
++
++```text
++headcount_override (NEW, raw SQL ΓÇö pattern twin of headcount_exemption):
++  id UUID PK
++  violated_rule TEXT NOT NULL
++    -- enum: shortage | validity | job_title | seniority
++  reason TEXT NOT NULL                    -- mandatory ops/Persian reason
++  actor_account_id TEXT NOT NULL          -- InternalAccount cuid
++  related_event_id UUID NULL              -- Personnel Event / draft linkage
++  related_assignment_id TEXT NULL         -- PrimaryAssignment.id when known
++  team_id TEXT NOT NULL
++  job_title_id TEXT NOT NULL
++  seniority_id TEXT NULL
++  approval_id UUID NULL                   -- when overriding Approval gate
++  slot_id UUID NULL
++  capacity_snapshot JSONB NOT NULL        -- { used, reserved, freeBefore, freeAfter, ... }
++  status TEXT NOT NULL                    -- active | superseded | voided
++  created_at / updated_at / provenance
++```
++
++**Rules:**
++
++| Rule | Behavior |
++| --- | --- |
++| Permission | Only actor with `headcount.override.write` (seed `hr.admin`); read via `headcount.override.read` |
++| Shortage | When no free unit / incompatible match would block ΓåÆ Admin may Override ΓåÆ consume/reserve **even if free goes negative** |
++| Validity | Override Approval validity / soft-expire gate for this claim only ΓÇö record violated_rule=`validity` |
++| Job Title / Seniority | Override match-dimension mismatch ΓÇö record violated_rule accordingly; still stash attributable link |
++| Mandatory context | `reason` non-empty; capture violated rule + Team + title + capacity snapshot + related event/Assignment |
++| Negative free | Drop `CHECK (free_units >= 0)` (named constraint drop IF EXISTS); **never** `GREATEST(free,0)` on Override path; panel shows negative free |
++| Distinct rows | Overrides list/filter on `/headcount`; panel `overridden` count from active Override rows (not muted placeholder) |
++| Audit envelope | Category `organization.headcount_override`; access event on finalize with actor/time/reason/codes |
++| Operator | Still blocked without Override permission ΓÇö `requiresOverride: true` on shortage/incompatibility findings |
++| Finalize wire | Update `capacityResultToConflict` so `incompatible` ΓåÆ warning+`requiresOverride` (Admin) / blocking (Operator); extend finalize audit beyond legacy `HEADCOUNT_CAPACITY_MISSING` to include `HEADCOUNT_UNAPPROVED` Override codes |
++| Orphan claims | Cancel/expire/reduce Approval with active claims stays fail-closed (`ORPHAN_CLAIMS`) unless resolution uses documented Override/Cancel/Correction paths ΓÇö **do not invent** full AR disposition matrix |
++
++### Mandated design ΓÇö Slot ledger / negative free
++
++```text
++SQL 012 (or next free):
++  ALTER TABLE headcount_capacity_slot
++    DROP CONSTRAINT IF EXISTS headcount_capacity_slot_free_units_check;
++  -- Also drop any auto-named CHECK on free_units >= 0 from CREATE TABLE
++  -- Document: free_units MAY be negative when Override-backed consume/reserve occurred
++
++Normal path (no Override):
++  Keep WHERE free_units > 0 on reserve/consume ΓÇö Operators cannot overbook
++
++Override path:
++  New APIs e.g. consumeHeadcountCapacityWithOverride / reserveΓÇªWithOverride
++  Decrement free without free>0 guard; write headcount_override row in same txn (AD-6)
++  reserved_units CHECK (>=0) stays ΓÇö do not invent negative reserved
++```
++
++Historical reconstruction (4.11): conservation must **surface** over-capacity / Override ΓÇö never silently floor. Extend quantities or notes so as-of views can show overridden/negative free when present.
++
++### Mandated design ΓÇö CapacityCheckResult + conflicts
++
++```text
++CapacityCheckResult ΓÇö keep compatible | exempt | incompatible | unavailable
++Optional extension when Override will be used at finalize:
++  (no silent auto-override in evaluate)
++
++capacityResultToConflict (UPDATE from 4.13 blocking-only):
++  incompatible ΓåÆ {
++    code: "HEADCOUNT_UNAPPROVED",
++    severity: "warning",           // was blocking for everyone
++    requiresOverride: true,        // Admin path
++    messageFa: ΓÇª
++  }
++  // Classifier / finalize still BLOCKS Operator (no override permission)
++  // via existing codesRequiringOverride + actorMayOverride gate
++
++unavailable ΓåÆ still blocking HEADCOUNT_PORT_UNAVAILABLE (no Override bypass for port down)
++
++New warning:
++  HEADCOUNT_APPROVAL_EXPIRY_SOON ΓåÆ requiresAck (14-day horizon)
++```
++
++Selfcheck today asserts Admin Override on shortage **stays rejected** until 4.14 ΓÇö **invert that oracle** in this story.
++
++### Mandated design ΓÇö Cancel / Correction Reservation release
++
++| Path | Today | 4.14 |
++| --- | --- | --- |
++| Transfer Cancel | `releaseTransferReservationOnCancel` via projection hook | Keep; regression green |
++| Start Cancel | No durable reserve | After Start reserve lands: release on Cancel (wire lifecycle/hook like Transfer) |
++| JobTitle/Seniority Scheduled reserve | Existing reserve paths | Ensure Cancel/Correction release/replace |
++| Superseding Correction | Capacity replay exists | Must release/replace Reservation; no orphan reserved unit |
++
++### Mandated design ΓÇö UI / API (UX-DR10 / UX-DR13 / UX-DR14)
++
++| Layer | Delivery |
++| --- | --- |
++| `@divan/headcount` | Override CRUD + list/filter; expiry-horizon helper; override-aware consume/reserve; export from `index.ts` |
++| tRPC | Extend `apps/web/src/server/headcount.ts`: override list/create; map domain errors ΓåÆ `TRPCError` + `messageFa` |
++| Event forms | Override reason via sensitive confirmation (UX-DR14); show 14-day warning; exception badge on Scheduled |
++| Panel UX-DR13 | Real **overridden** count; allow **negative free** display (primary color only when free > 0; negative uses destructive/warning token) |
++| `/headcount` | Admin Override catalogue panel ΓÇö keep Approval + Exemption panels |
++| Status badge | Override + exception variants (UX-DR10) |
++| Audit | `organization.headcount_override` category + finalize access events |
++| a11y DoD | Labelled controls, keyboard operable, `role="alert"` / live errors, focus move into confirmation dialog |
++
++### Mandated design ΓÇö AR-HEADCOUNT fail-closed
++
++Product partial freeze (SPEC CAP-7 / PRD 2026-07-16): immediate Reservation, oldest-match, **14-day warning ΓåÆ Scheduled exception**, **Override negative free + distinct rows** ΓÇö **implement that**.
++
++Do **not** invent: formal AR version string, escalation owner directory, named Position seats, Secondary consumption, dashboard Override aging metrics (SM-5 ΓåÆ Epic 5/reporting).
++
++[Source: `epics.md` Story 4.14; `prd.md` FR-30, FR-32; `SPEC.md` L95; Stories 4.12ΓÇô4.13, 4.5, 4.7]
++
++## Acceptance Criteria
++
++1. **Given** a Scheduled start/transfer with Reservation  
++   **When** linked approval approaches expiry  
++   **Then** a warning appears at the 14-day horizon (AR-HEADCOUNT may retune N)
++
++2. **When** approval expiry or incompatibility occurs before effect  
++   **Then** the event remains Scheduled in a visible exception state with no partial Employment/Assignment/capacity apply until audited resolution
++
++3. **When** Admin Override is used for shortage/validity/title/seniority rules  
++   **Then** mandatory context is captured; free capacity may go negative; Overrides appear as distinct filterable rows and never floor free at zero
++
++4. **And** audit retains actor, time, reason, violated rule, related event/Assignment, Team, title, and capacity state
++
++5. **And** Cancel or superseding Correction releases/replaces Reservation
++
++6. **And** Finalizing a future **StartEmployment** immediately reserves one compatible destination unit (FR-30 parity with Transfer); Stories 4.1ΓÇô4.13 invariants remain green; this story does **not** deliver Epic 5 dashboard/report catalogue or invent AR-HEADCOUNT escalation owners
++
++## Tasks / Subtasks
++
++- [x] Task 1: Durable Start reservation + Cancel/Correction release (AC: #5, #6)
++  - [x] On Scheduled Start finalize: `reserveHeadcountCapacity` after Approval match (skip when exempt)
++  - [x] On Effective: convert reservation ΓåÆ consume (reuse Transfer pattern)
++  - [x] Wire Cancel / superseding Correction ΓåÆ `releaseHeadcountReservation` for Start (and verify Transfer/Job-level)
++  - [x] Keep Return Effective-only consume (no invented Return reserve)
++
++- [x] Task 2: 14-day expiry warning (AC: #1)
++  - [x] Constant N=14 (Tehran date-only vs Approval `validity_end_exclusive`)
++  - [x] Emit `HEADCOUNT_APPROVAL_EXPIRY_SOON` warning + `requiresAck` for at-risk Scheduled reservations
++  - [x] Surface Persian warning on event UI / capacity context
++
++- [x] Task 3: Scheduled-exception state (AC: #2)
++  - [x] Detect Approval expiry/incompatibility before/at effect
++  - [x] Persist visible exception marker; block partial apply
++  - [x] Resolution only via Override / Cancel / Correction / audited rebind
++  - [x] Effect path fail-closed with typed code + `messageFa`
++
++- [x] Task 4: Override domain + negative free (AC: #3, #4)
++  - [x] SQL `012_headcount_override.sql` + drop `free_units >= 0` check; `ensureHeadcountOverrideSchema`
++  - [x] `headcount-override.ts`: CRUD, list/filter, permission asserts, audit category
++  - [x] Override-aware consume/reserve APIs; write Override row + capacity snapshot in same txn
++  - [x] Historical path: never silent floor; surface negative/overridden when present
++
++- [x] Task 5: Conflict + finalize wiring (AC: #3, #4)
++  - [x] Update `capacityResultToConflict` ΓåÆ `requiresOverride` for incompatible shortage
++  - [x] Finalize: Admin + reason + ack; audit `personnel_event.headcount_capacity_override` for `HEADCOUNT_UNAPPROVED` (not only legacy `HEADCOUNT_CAPACITY_MISSING`)
++  - [x] Invert start-return selfcheck oracle (Admin Override may proceed)
++  - [x] Seed `headcount.override.read/write` for `hr.admin`
++
++- [x] Task 6: tRPC + UI (AC: #1ΓÇô#4)
++  - [x] Override admin panel on `/headcount`; filterable rows
++  - [x] Event form: UX-DR14 confirmation + reason; exception badge; 14-day warning
++  - [x] `HeadcountCapacityPanel`: real overridden + negative free display
++  - [x] Interactive a11y DoD
++
++- [x] Task 7: Selfchecks + DoD (AC: #1ΓÇô#6)
++  - [x] New `headcount-override.selfcheck.ts` and/or reservation-expiry selfcheck with oracles:
++    - Scheduled Start creates reservation row; Cancel releases
++    - 14-day horizon warning fires; >14 days silent
++    - Expired Approval before effect ΓåÆ Scheduled-exception; no Employment/Assignment/convert
++    - Admin Override shortage ΓåÆ free negative; Override row filterable; Operator still blocked
++    - Validity/title/seniority Override records correct `violated_rule`
++    - Audit fields present (actor, time, reason, rule, Team, title, capacity snapshot)
++    - Correction/Cancel release/replace reservation
++  - [x] Regression: matching, approval, exemption, start-return, transfer, job-level, historical-org-headcount ΓÇö green
++  - [x] Typecheck `@divan/headcount`, `@divan/person-employment`, `web`
++  - [x] Update `deferred-work.md`; align story Status Γåö `sprint-status.yaml`; **no UTF-8 BOM**
++
++## Dev Notes
++
++### Current code state (READ BEFORE CODING)
++
++| Area | Path | Today | 4.14 change |
++| --- | --- | --- | --- |
++| Evaluate / ledger | `packages/modules/headcount/src/index.ts` | Approval-first + exempt; `CHECK (free_units >= 0)`; reserve/consume require `free > 0` | Drop freeΓëÑ0 check; Override mutate path; panel overridden |
++| Matching | `headcount-matching.ts` | FR-29 oldest Approval | Reuse; exception/incompatibility detection |
++| Exemption | `headcount-exemption.ts` | Coverage without consume | **Do not overload** for shortage |
++| Approval | `headcount-approval.ts` | Lifecycle + soft-expire; orphan reject | Expiry horizon helper input; keep orphan fail-closed |
++| Historical | `historical-headcount.ts` | Conservation; comment ΓÇ£never silently floorΓÇ¥ | Surface Override/negative |
++| Conflicts | `personnel-event-conflicts.ts` | Stash Approval/exemption | Expiry warning + exception findings |
++| `capacityResultToConflict` | `personnel-event-start-return.ts` | incompatible ΓåÆ blocking, no `requiresOverride` | **UPDATE** ΓåÆ overrideable warning |
++| Finalize | `personnel-event-finalize.ts` | Override skeleton for `HEADCOUNT_CAPACITY_MISSING` / baseline | Wire `HEADCOUNT_UNAPPROVED` + Override catalogue id |
++| Start/Return | `personnel-event-start-return.ts` | Effective consume only | **ADD** Scheduled Start reserve + convert |
++| Transfer | `personnel-event-transfer.ts` | Reserve/convert/Cancel release | Keep; regression; Correction parity |
++| Lifecycle / hook | `personnel-event-lifecycle.ts`, `personnel-event-projection-hook.ts` | Transfer Cancel release | Start Cancel release |
++| Panel | `headcount-capacity-panel.tsx` | exempt + muted overridden foreshadow | Real overridden + negative free |
++| Headcount UI | `approval-panel.tsx`, `exemption-panel.tsx` | Admin surfaces | **ADD** override-panel |
++| Seed / audit | `seed.ts`, `categories.ts` | approval + exemption perms/categories | override perms + category |
++| Selfcheck | `personnel-event-start-return.selfcheck.ts` | Asserts Admin Override still blocked | Invert for 4.14 |
++
++### What this story changes vs preserves
++
++**Changes:** Start durable reserve; 14-day warning; Scheduled-exception visibility; Override entity + negative free; conflict/finalize Override wire; panel overridden; Cancel/Correction reservation completeness.
++
++**Preserves:** AD-2 / AD-3 / AD-6; FR-16 ScheduledΓëácurrent membership; Approval lifecycle (4.12); Approval-first matching + exemptions (4.13); Transfer reserve-at-finalize; Secondary non-consumption; append-only event-store; Persian `messageFa` at API boundary; no UTF-8 BOM; Status Γåö sprint-status alignment.
++
++### Architecture compliance
++
++- **AD-2:** Capacity remains projection/ledger derived from events; Override does not rewrite history ΓÇö it records an attributable exception and mutates ledger under audit
++- **AD-3:** All Override/expiry/reservation math in `@divan/headcount`; person-employment only calls public APIs
++- **AD-6:** Override consume/reserve + Override row + event append in **same transaction**; critical finalize paths stay sync
++- **Stack:** raw SQL for override (+ constraint drop); Prisma only if event/draft exception field needs it (prefer payload JSON first); tRPC web only; `tsx` selfchecks
++
++### AR / fail-closed (do not invent)
++
++| Artifact | Rule for 4.14 |
++| --- | --- |
++| AR-HEADCOUNT | Ship freeze: 14-day warn, Scheduled-exception, Override negative free + distinct rows; **do not invent** escalation owners / formal AR version / full orphan disposition matrix |
++| AR-TEMPORAL | Date-only Tehran; half-open validity; Scheduled Γëá membership |
++| AR-ACCESS / FR-47 | Coarse `headcount.override.*`; no toxic matrix; high-impact Override may later need independent pre-auth ΓÇö MVP = permission + mandatory reason + audit |
++| AR-DATA | New envelope category for override; no new sensitive PII categories |
++| AR-SECONDARY | Secondary still non-consuming |
++| AR-IDENTITY | No PopulationPort cutover |
++| AR-REPORTING | Panel + admin list only; no launch report catalogue (5.5) |
++
++### Previous story intelligence (4.13)
++
++- Approval-first fail-closed ΓÇö after match miss do **not** fall through to Grade/Ladder legacy as product path
++- Exemption Γëá Override ΓÇö shortage must not use exemption
++- Reselect: permission + audit on finalize; never trust client-only flags
++- Revoke/uncover: server-verify rebind ΓÇö same spirit for Override context
++- Transfer never inherits source exemption; destination always needs Approval (or Override/exemption on dest)
++- Pattern: domain module + `ensure*Schema` + `tsx` selfcheck + thin tRPC + `/headcount` admin panel
++- Review deferrals to avoid repeating unless blocking: IDOR list/get, ensure-* DDL every request
++- Never UTF-8 BOM on `sprint-status.yaml`
++- Seed DoD: FK-shaped fixtures; exact cardinalities; `$transaction` for fixture writes
++
++### Git intelligence
++
++```text
++c1d52a7 story 4.13  ΓåÉ matching + exemption + Primary Approval FK ΓÇö Override builds on this
++37518e2 story 4.12  ΓåÉ Approval lifecycle + orphan reject + soft bridge
++5b839a5 story 4.11  ΓåÉ historical quantities (must not silent-floor Override)
++ea232af story 4.10
++7bb4f50 story 4.9
++```
++
++Pattern: one story commit with artifact + domain + tRPC/UI + selfcheck + deferred/sprint; review patches follow in-story.
++
++### Latest tech notes
++
++- Dropping PostgreSQL `CHECK (free_units >= 0)` is the correct way to allow Override-driven negative free; use `DROP CONSTRAINT IF EXISTS` (idempotent). Keep application-level `free > 0` guard on **non-Override** paths.
++- Do **not** use `GREATEST(free_units - 1, 0)` on Override consume ΓÇö that floors and violates FR-32.
++- Industry HRIS separates policy exemption (no seat consumed) from managerial override (explicit over-capacity) ΓÇö Divan mirrors this as Exemption (FR-29) vs Override (FR-32).
++- Reservation ledger already has `UNIQUE(event_id)` ΓÇö Start reserve must reuse it (one reservation per event).
++
++### Project structure notes
++
++```text
++packages/db/sql/
++  012_headcount_override.sql              # NEW ΓÇö override table + drop free>=0 check
++packages/modules/headcount/src/
++  index.ts                                # UPDATE ΓÇö override consume/reserve; panel overridden
++  headcount-override.ts                   # NEW
++  headcount-reservation-expiry.ts         # NEW (optional split) ΓÇö 14-day + exception helpers
++  headcount-override.selfcheck.ts         # NEW
++  historical-headcount.ts                 # UPDATE ΓÇö surface negative/override
++  package.json                            # UPDATE ΓÇö selfcheck script
++packages/modules/person-employment/src/
++  personnel-event-start-return.ts         # UPDATE ΓÇö reserve/convert + capacityResultToConflict
++  personnel-event-conflicts.ts            # UPDATE ΓÇö expiry warning + exception
++  personnel-event-finalize.ts             # UPDATE ΓÇö Override wire for HEADCOUNT_UNAPPROVED
++  personnel-event-transfer.ts             # VERIFY Cancel/Correction release
++  personnel-event-job-level.ts            # VERIFY Scheduled reserve release
++  personnel-event-lifecycle.ts            # UPDATE ΓÇö Start Cancel release if needed
++  personnel-event-projection-hook.ts      # UPDATE ΓÇö Start Cancel release hook
++  personnel-event-start-return.selfcheck.ts  # UPDATE ΓÇö invert Override oracle
++  seed.ts                                 # UPDATE ΓÇö override permissions
++packages/kernel/audit-envelope/src/
++  categories.ts / index.ts                # UPDATE ΓÇö organization.headcount_override
++apps/web/src/server/
++  headcount.ts                            # UPDATE ΓÇö override procedures
++apps/web/components/personnel/
++  headcount-capacity-panel.tsx            # UPDATE ΓÇö real overridden + negative free
++  personnel-event-form.tsx                # UPDATE ΓÇö warning, exception, Override dialog
++apps/web/components/headcount/
++  override-panel.tsx                      # NEW
++apps/web/app/(app)/headcount/page.tsx     # UPDATE ΓÇö mount override panel
++_bmad-output/implementation-artifacts/
++  deferred-work.md                        # UPDATE
++  sprint-status.yaml                      # UPDATE ΓÇö ready-for-dev ΓåÆ (dev moves further)
++```
++
++### Testing requirements
++
++- Pattern: `tsx` + `node:assert` + real `DATABASE_URL` (Vitest still open action item ΓÇö do not mandate here).
++- Seed DoD: Team + JobTitle + Seniority FK shape; Approval near expiry; Approval already expired; zero-free slot for Override oracle; Scheduled Start + Transfer fixtures; `$transaction`; exact cardinalities (reservation count, free before/after including negative).
++- Regression green: 4.5 start-return, 4.7 transfer, 4.8 job-level, 4.12 approval, 4.13 matching/exemption, 4.11 historical-org-headcount.
++
++### Absolute non-goals
++
++- Inventing AR-HEADCOUNT escalation owners / formal AR version sign-off
++- Full orphan-claim disposition matrix beyond Override/Cancel/Correction freeze
++- Using exemption as overbook backdoor
++- Secondary consumption; Grade/Ladder/compensation match; Position/named seats
++- ReturnFromAbsence durable reserve (not in FR-30 wording)
++- Epic 5 dashboard / open-headcount product / report catalogue / SM-5 Override aging metrics UI
++- PopulationPort cutover; import cycle headcount ΓåÆ person-employment
++- Weakening FR-16 / append-only / Secondary non-consumption
++- UTF-8 BOM on `sprint-status.yaml`
++- Flooring free at zero anywhere on Override or historical paths
++
++### References
++
++- [Source: `_bmad-output/planning-artifacts/epics.md` ΓÇö Epic 4, Story 4.14]
++- [Source: `_bmad-output/planning-artifacts/prds/prd-divan-2026-07-11/prd.md` ΓÇö FR-30, FR-32, ┬º8.7; AR-HEADCOUNT freeze]
++- [Source: `_bmad-output/specs/spec-divan/SPEC.md` ΓÇö L95 Reservation/Override freeze]
++- [Source: `_bmad-output/specs/spec-divan/launch-artifacts.md` ΓÇö AR-HEADCOUNT partial freeze]
++- [Source: `_bmad-output/planning-artifacts/architecture/architecture-divan-2026-07-15/ARCHITECTURE-SPINE.md` ΓÇö AD-2, AD-3, AD-6, headcount module]
++- [Source: `_bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-13/EXPERIENCE.md` ΓÇö headcount-capacity-panel; Override confirmation]
++- [Source: `_bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-13/DESIGN.md` ΓÇö UX-DR10/13/14]
++- [Source: `_bmad-output/implementation-artifacts/4-13-universal-coverage-matching-exemptions.md`]
++- [Source: `_bmad-output/implementation-artifacts/4-12-headcount-approval-lifecycle.md`]
++- [Source: `_bmad-output/implementation-artifacts/4-7-team-transfer-with-atomic-capacity-movement.md`]
++- [Source: `_bmad-output/implementation-artifacts/deferred-work.md`]
++- [Source: `packages/modules/headcount/src/index.ts`]
++- [Source: `packages/modules/person-employment/src/personnel-event-start-return.ts` ΓÇö `capacityResultToConflict`]
++- [Source: `packages/modules/person-employment/src/personnel-event-finalize.ts` ΓÇö override audit skeleton]
++- [Source: `packages/db/sql/008_headcount_reservation.sql`]
++
++## Dev Agent Record
++
++### Agent Model Used
++
++Composer (Cursor agent router)
++
++### Debug Log References
++
++- Fixed `isPool` discriminator in approval/exemption/override ΓÇö PoolClient also exposes `connect`, which aborted Job-level exemption rebind inside finalize txn.
++
++### Completion Notes List
++
++- Durable Scheduled Start reserve + convert on Effective; Cancel releases via projection hook; Return stays Effective-only consume.
++- Override catalogue (`012_headcount_override.sql`, domain module, negative free, panel overridden); finalize resolves slot + writes Override on `HEADCOUNT_UNAPPROVED`.
++- 14-day `HEADCOUNT_APPROVAL_EXPIRY_SOON` (`requiresAck`); Scheduled-exception detect fail-closed before Employment/Assignment apply.
++- `capacityResultToConflict` ΓåÆ warning + `requiresOverride`; Operator blocked; Admin + `headcount.override.write` + reason proceeds.
++- Selfchecks green: headcount-override, start-return (inverted Override oracle), matching, approval, transfer, job-level, historical-org-headcount; typecheck headcount / person-employment / web.
++
++### File List
++
++- packages/db/sql/012_headcount_override.sql
++- packages/modules/headcount/src/headcount-override.ts
++- packages/modules/headcount/src/headcount-reservation-expiry.ts
++- packages/modules/headcount/src/headcount-override.selfcheck.ts
++- packages/modules/headcount/src/headcount-matching.ts
++- packages/modules/headcount/src/headcount-approval.ts
++- packages/modules/headcount/src/headcount-exemption.ts
++- packages/modules/headcount/src/historical-headcount.ts
++- packages/modules/headcount/src/index.ts
++- packages/modules/headcount/package.json
++- packages/modules/person-employment/src/personnel-event-start-return.ts
++- packages/modules/person-employment/src/personnel-event-projection-hook.ts
++- packages/modules/person-employment/src/personnel-event-finalize.ts
++- packages/modules/person-employment/src/personnel-event-conflicts.ts
++- packages/modules/person-employment/src/personnel-event-start-return.selfcheck.ts
++- packages/modules/person-employment/src/seed.ts
++- packages/modules/person-employment/src/index.ts
++- packages/kernel/audit-envelope/src/categories.ts
++- packages/kernel/audit-envelope/src/index.ts
++- apps/web/src/server/headcount.ts
++- apps/web/components/headcount/override-panel.tsx
++- apps/web/components/personnel/headcount-capacity-panel.tsx
++- apps/web/components/personnel/personnel-event-form.tsx
++- apps/web/app/(app)/headcount/page.tsx
++- _bmad-output/implementation-artifacts/deferred-work.md
++- _bmad-output/implementation-artifacts/sprint-status.yaml
++- _bmad-output/implementation-artifacts/4-14-reservation-expiry-exceptions-headcount-override.md
++
++## Change Log
++
++- 2026-07-19: Story context created (ready-for-dev) ΓÇö ultimate context engine analysis completed
++- 2026-07-19: Implemented FR-30 Start reserve + FR-32 Override catalogue, expiry warning, Scheduled-exception; status ΓåÆ review
++
++## Story completion status
++
++Status: **review**
++
++Completion note: All tasks/ACs implemented; selfchecks and typechecks green; ready for code-review
+diff --git a/apps/web/components/headcount/override-panel.tsx b/apps/web/components/headcount/override-panel.tsx
+new file mode 100644
+index 0000000..da2fb90
+--- /dev/null
++++ b/apps/web/components/headcount/override-panel.tsx
+@@ -0,0 +1,215 @@
++"use client";
++
++import * as React from "react";
++
++import { Button } from "@/components/ui/button";
++import { Input } from "@/components/ui/input";
++import { Skeleton } from "@/components/ui/skeleton";
++import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
++import { api } from "@/lib/trpc/client";
++import { cn } from "@/lib/utils";
++
++const RULE_LABEL_FA: Record<string, string> = {
++  shortage: "┌⌐┘à╪¿┘ê╪» ╪╕╪▒┘ü█î╪¬",
++  validity: "╪º╪╣╪¬╪¿╪º╪▒ ┘à╪¼┘ê╪▓",
++  job_title: "╪╣┘å┘ê╪º┘å ╪┤╪║┘ä█î",
++  seniority: "╪º╪▒╪┤╪»█î╪¬",
++};
++
++const STATUS_LABEL_FA: Record<string, string> = {
++  active: "┘ü╪╣╪º┘ä",
++  superseded: "╪¼╪º█î┌»╪▓█î┘åΓÇî╪┤╪»┘ç",
++  voided: "╪¿╪º╪╖┘ä",
++};
++
++const STATUS_CLASS: Record<string, string> = {
++  active: "status-badge-effective",
++  superseded: "status-badge-scheduled",
++  voided: "status-badge-cancelled",
++};
++
++function OverrideStatusBadge({ status }: { status: string }) {
++  const label = STATUS_LABEL_FA[status] ?? status;
++  const token = STATUS_CLASS[status] ?? "status-badge-draft";
++  return (
++    <span
++      className={cn(
++        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
++        token,
++      )}
++    >
++      <span
++        className="size-1.5 shrink-0 rounded-full bg-current opacity-70"
++        aria-hidden="true"
++      />
++      {label}
++    </span>
++  );
++}
++
++function StatusMessage({
++  kind,
++  children,
++}: {
++  kind: "loading" | "error" | "empty" | "info";
++  children: React.ReactNode;
++}) {
++  return (
++    <p
++      role={kind === "error" ? "alert" : "status"}
++      className={cn(
++        "text-body",
++        kind === "error" ? "text-destructive" : "text-muted-foreground",
++      )}
++    >
++      {children}
++    </p>
++  );
++}
++
++/**
++ * Admin Headcount Override catalogue (Story 4.14 / FR-32).
++ */
++export function HeadcountOverridePanel() {
++  const formId = React.useId();
++  const [statusFilter, setStatusFilter] = React.useState<string>("active");
++  const [ruleFilter, setRuleFilter] = React.useState<string>("");
++  const [teamFilter, setTeamFilter] = React.useState("");
++  const [busyId, setBusyId] = React.useState<string | null>(null);
++  const [formError, setFormError] = React.useState<string | null>(null);
++
++  const listQuery = api.headcount.listOverrides.useQuery({
++    status:
++      statusFilter === ""
++        ? undefined
++        : (statusFilter as "active" | "superseded" | "voided"),
++    violatedRule:
++      ruleFilter === ""
++        ? undefined
++        : (ruleFilter as "shortage" | "validity" | "job_title" | "seniority"),
++    teamId: teamFilter.trim() || undefined,
++  });
++
++  const voidMutation = api.headcount.voidOverride.useMutation({
++    onSuccess: async () => {
++      setBusyId(null);
++      setFormError(null);
++      await listQuery.refetch();
++    },
++    onError: (err) => {
++      setBusyId(null);
++      setFormError(err.message);
++    },
++  });
++
++  return (
++    <section className="space-y-4" aria-labelledby={`${formId}-heading`}>
++      <div className="space-y-1">
++        <h2 id={`${formId}-heading`} className="text-title">
++          ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ╪╕╪▒┘ü█î╪¬
++        </h2>
++        <p className="text-body text-muted-foreground">
++          ┘ü┘ç╪▒╪│╪¬ ┘é╪º╪¿┘ä ┘ü█î┘ä╪¬╪▒ ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ΓÇî┘ç╪º█î ┘à┘à█î╪▓█îΓÇî╪┤╪»┘ç╪¢ ╪╕╪▒┘ü█î╪¬ ╪ó╪▓╪º╪» ┘à█îΓÇî╪¬┘ê╪º┘å╪» ┘à┘å┘ü█î
++          ╪┤┘ê╪».
++        </p>
++      </div>
++
++      <div className="grid gap-3 sm:grid-cols-3">
++        <label className="space-y-1 text-sm">
++          <span id={`${formId}-status`}>┘ê╪╢╪╣█î╪¬</span>
++          <select
++            aria-labelledby={`${formId}-status`}
++            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
++            value={statusFilter}
++            onChange={(e) => setStatusFilter(e.target.value)}
++          >
++            <option value="">┘ç┘à┘ç</option>
++            <option value="active">┘ü╪╣╪º┘ä</option>
++            <option value="superseded">╪¼╪º█î┌»╪▓█î┘åΓÇî╪┤╪»┘ç</option>
++            <option value="voided">╪¿╪º╪╖┘ä</option>
++          </select>
++        </label>
++        <label className="space-y-1 text-sm">
++          <span id={`${formId}-rule`}>┘é╪º╪╣╪»╪⌐ ┘å┘é╪╢ΓÇî╪┤╪»┘ç</span>
++          <select
++            aria-labelledby={`${formId}-rule`}
++            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
++            value={ruleFilter}
++            onChange={(e) => setRuleFilter(e.target.value)}
++          >
++            <option value="">┘ç┘à┘ç</option>
++            <option value="shortage">┌⌐┘à╪¿┘ê╪» ╪╕╪▒┘ü█î╪¬</option>
++            <option value="validity">╪º╪╣╪¬╪¿╪º╪▒ ┘à╪¼┘ê╪▓</option>
++            <option value="job_title">╪╣┘å┘ê╪º┘å ╪┤╪║┘ä█î</option>
++            <option value="seniority">╪º╪▒╪┤╪»█î╪¬</option>
++          </select>
++        </label>
++        <label className="space-y-1 text-sm">
++          <span id={`${formId}-team`}>╪┤┘å╪º╪│┘ç ╪¬█î┘à</span>
++          <Input
++            aria-labelledby={`${formId}-team`}
++            value={teamFilter}
++            onChange={(e) => setTeamFilter(e.target.value)}
++            autoComplete="off"
++            dir="ltr"
++          />
++        </label>
++      </div>
++
++      {formError ? <StatusMessage kind="error">{formError}</StatusMessage> : null}
++
++      {listQuery.isLoading ? (
++        <Skeleton className="h-24 w-full" />
++      ) : listQuery.isError ? (
++        <StatusMessage kind="error">
++          {listQuery.error.message || "╪¿╪º╪▒┌»╪░╪º╪▒█î ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ΓÇî┘ç╪º ┘å╪º┘à┘ê┘ü┘é ╪¿┘ê╪»."}
++        </StatusMessage>
++      ) : !listQuery.data?.length ? (
++        <StatusMessage kind="empty">┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬█î ╪½╪¿╪¬ ┘å╪┤╪»┘ç ╪º╪│╪¬.</StatusMessage>
++      ) : (
++        <ul className="space-y-3" role="list">
++          {listQuery.data.map((row) => (
++            <li
++              key={row.id}
++              className="rounded-md border border-border px-3 py-3"
++            >
++              <div className="flex flex-wrap items-center gap-2">
++                <OverrideStatusBadge status={row.status} />
++                <span className="text-sm font-medium">
++                  {RULE_LABEL_FA[row.violatedRule] ?? row.violatedRule}
++                </span>
++              </div>
++              <p className="mt-1 text-sm text-muted-foreground">{row.reason}</p>
++              <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
++                {formatJalaliDisplayFromGregorian(
++                  row.createdAt.toISOString?.() ?? String(row.createdAt),
++                )}
++              </p>
++              <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
++                free: {row.capacitySnapshot.freeBefore} ΓåÆ{" "}
++                {row.capacitySnapshot.freeAfter}
++                {row.slotId ? ` ┬╖ slot ${row.slotId}` : ""}
++              </p>
++              {row.status === "active" ? (
++                <div className="mt-2">
++                  <Button
++                    type="button"
++                    size="sm"
++                    variant="secondary"
++                    disabled={busyId === row.id}
++                    onClick={() => {
++                      setBusyId(row.id);
++                      voidMutation.mutate({ id: row.id });
++                    }}
++                  >
++                    ╪º╪¿╪╖╪º┘ä
++                  </Button>
++                </div>
++              ) : null}
++            </li>
++          ))}
++        </ul>
++      )}
++    </section>
++  );
++}
+diff --git a/packages/db/sql/012_headcount_override.sql b/packages/db/sql/012_headcount_override.sql
+new file mode 100644
+index 0000000..cec3d00
+--- /dev/null
++++ b/packages/db/sql/012_headcount_override.sql
+@@ -0,0 +1,52 @@
++-- Headcount Override catalogue (Story 4.14 / FR-32).
++-- Explicit rule violation with audit; free_units MAY go negative.
++-- NOT Exemption (FR-29 coverage without consume).
++
++-- Drop free_units >= 0 so Override-backed consume/reserve may drive free negative.
++-- reserved_units CHECK (>=0) stays.
++ALTER TABLE headcount_capacity_slot
++  DROP CONSTRAINT IF EXISTS headcount_capacity_slot_free_units_check;
++
++CREATE TABLE IF NOT EXISTS headcount_override (
++  id                       UUID PRIMARY KEY,
++  violated_rule            TEXT NOT NULL
++                             CHECK (violated_rule IN (
++                               'shortage',
++                               'validity',
++                               'job_title',
++                               'seniority'
++                             )),
++  reason                   TEXT NOT NULL,
++  actor_account_id         TEXT NOT NULL,
++  related_event_id         UUID,
++  related_assignment_id    TEXT,
++  team_id                  TEXT NOT NULL,
++  job_title_id             TEXT NOT NULL,
++  seniority_id             TEXT,
++  approval_id              UUID,
++  slot_id                  UUID,
++  capacity_snapshot        JSONB NOT NULL,
++  status                   TEXT NOT NULL
++                             CHECK (status IN ('active', 'superseded', 'voided')),
++  created_by               TEXT,
++  updated_by               TEXT,
++  created_at               TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  updated_at               TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
++);
++
++CREATE INDEX IF NOT EXISTS headcount_override_status_idx
++  ON headcount_override (status);
++
++CREATE INDEX IF NOT EXISTS headcount_override_team_idx
++  ON headcount_override (team_id);
++
++CREATE INDEX IF NOT EXISTS headcount_override_rule_idx
++  ON headcount_override (violated_rule);
++
++CREATE INDEX IF NOT EXISTS headcount_override_event_idx
++  ON headcount_override (related_event_id)
++  WHERE related_event_id IS NOT NULL;
++
++CREATE INDEX IF NOT EXISTS headcount_override_slot_idx
++  ON headcount_override (slot_id)
++  WHERE slot_id IS NOT NULL;
+diff --git a/packages/modules/headcount/src/headcount-override.selfcheck.ts b/packages/modules/headcount/src/headcount-override.selfcheck.ts
+new file mode 100644
+index 0000000..bb04a19
+--- /dev/null
++++ b/packages/modules/headcount/src/headcount-override.selfcheck.ts
+@@ -0,0 +1,290 @@
++/**
++ * Headcount Override + reservation expiry selfcheck (Story 4.14 / FR-30 / FR-32).
++ * Run: pnpm --filter @divan/headcount selfcheck:headcount-override
++ * Requires DATABASE_URL.
++ */
++import assert from "node:assert/strict";
++import { randomUUID } from "node:crypto";
++import { resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import { config as loadEnv } from "dotenv";
++
++import { createPgPool, createPrismaClient } from "@divan/db";
++import { todayDateOnlyTehran } from "@divan/temporal-engine";
++
++import {
++  consumeHeadcountCapacityWithOverride,
++  createApproval,
++  activateApproval,
++  ensureHeadcountApprovalSchema,
++  ensureHeadcountCapacitySchema,
++  ensureHeadcountOverrideSchema,
++  HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
++  isApprovalExpiryWithinWarningHorizon,
++  listOverrides,
++  matchApprovalsForOverride,
++  readHeadcountCapacityPanel,
++  releaseHeadcountReservation,
++  reserveHeadcountCapacity,
++  reserveHeadcountCapacityWithOverride,
++  seedCapacitySlot,
++  checkReservationApprovalExpiryWarning,
++  detectScheduledHeadcountException,
++} from "./index";
++
++const rootEnv = resolve(
++  fileURLToPath(new URL(".", import.meta.url)),
++  "../../../../.env",
++);
++loadEnv({ path: rootEnv });
++
++function addDays(dateOnly: string, days: number): string {
++  const [y, m, d] = dateOnly.split("-").map(Number);
++  const dt = new Date(Date.UTC(y!, m! - 1, d!));
++  dt.setUTCDate(dt.getUTCDate() + days);
++  const yy = dt.getUTCFullYear();
++  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
++  const dd = String(dt.getUTCDate()).padStart(2, "0");
++  return `${yy}-${mm}-${dd}`;
++}
++
++async function main(): Promise<void> {
++  const url = process.env.DATABASE_URL?.trim();
++  assert.ok(url, "DATABASE_URL required");
++  const pool = createPgPool(url);
++  const db = createPrismaClient(url);
++  const suffix = randomUUID().slice(0, 8);
++  const today = todayDateOnlyTehran();
++  const actor = `selfcheck-override-${suffix}`;
++
++  try {
++    await ensureHeadcountCapacitySchema(pool);
++    await ensureHeadcountApprovalSchema(pool);
++    await ensureHeadcountOverrideSchema(pool);
++
++    const team = await db.organizationalUnit.findFirstOrThrow({
++      where: { unitType: "TEAM" },
++    });
++    const title = await db.jobTitle.findFirstOrThrow();
++    const seniority = await db.seniority.findFirst();
++
++    // --- Horizon helper unit oracle ---
++    assert.equal(
++      isApprovalExpiryWithinWarningHorizon(addDays(today, 14)),
++      true,
++      "end at today+14 is within horizon",
++    );
++    assert.equal(
++      isApprovalExpiryWithinWarningHorizon(addDays(today, 15)),
++      false,
++      ">14 days silent",
++    );
++    assert.equal(
++      isApprovalExpiryWithinWarningHorizon(addDays(today, 0)),
++      false,
++      "already ending today is not soon-warn",
++    );
++    assert.equal(HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS, 14);
++
++    // --- Approval near expiry warning ---
++    const nearEnd = addDays(today, 10);
++    const approvalNear = await createApproval(pool, {
++      requirementCode: `OV-NEAR-${suffix}`,
++      teamId: team.id,
++      jobTitleId: title.id,
++      seniorityId: seniority?.id ?? null,
++      allowedCount: 2,
++      validityStart: addDays(today, -30),
++      validityEndExclusive: nearEnd,
++      actorId: actor,
++    });
++    await activateApproval(pool, { id: approvalNear.id, actorId: actor });
++    const warn = await checkReservationApprovalExpiryWarning(pool, {
++      approvalId: approvalNear.id,
++      evaluationDate: today,
++    });
++    assert.equal(warn.atRisk, true);
++
++    const farEnd = addDays(today, 60);
++    const approvalFar = await createApproval(pool, {
++      requirementCode: `OV-FAR-${suffix}`,
++      teamId: team.id,
++      jobTitleId: title.id,
++      seniorityId: seniority?.id ?? null,
++      allowedCount: 1,
++      validityStart: addDays(today, -30),
++      validityEndExclusive: farEnd,
++      actorId: actor,
++    });
++    await activateApproval(pool, { id: approvalFar.id, actorId: actor });
++    const silent = await checkReservationApprovalExpiryWarning(pool, {
++      approvalId: approvalFar.id,
++      evaluationDate: today,
++    });
++    assert.equal(silent.atRisk, false);
++
++    // --- Soft-expired Approval ΓåÆ Scheduled-exception ---
++    const willExpire = await createApproval(pool, {
++      requirementCode: `OV-EXP-${suffix}`,
++      teamId: team.id,
++      jobTitleId: title.id,
++      seniorityId: seniority?.id ?? null,
++      allowedCount: 1,
++      validityStart: addDays(today, -60),
++      validityEndExclusive: addDays(today, 2),
++      actorId: actor,
++    });
++    await activateApproval(pool, { id: willExpire.id, actorId: actor });
++    await pool.query(
++      `UPDATE headcount_approval
++       SET validity_end_exclusive = $2::date
++       WHERE id = $1::uuid`,
++      [willExpire.id, addDays(today, -1)],
++    );
++    const exception = await detectScheduledHeadcountException(pool, {
++      approvalId: willExpire.id,
++      evaluationDate: today,
++      teamId: team.id,
++      jobTitleId: title.id,
++    });
++    assert.equal(exception.exception, true);
++
++    // --- Override shortage ΓåÆ free negative + filterable row ---
++    const zeroSlotId = await seedCapacitySlot(pool, {
++      id: randomUUID(),
++      teamId: team.id,
++      jobTitleId: title.id,
++      freeUnits: 0,
++      label: `override-zero-${suffix}`,
++    });
++    const eventId = randomUUID();
++    const personId = randomUUID();
++    const client = await pool.connect();
++    try {
++      await client.query("BEGIN");
++      const reserved = await reserveHeadcountCapacityWithOverride(client, {
++        slotId: zeroSlotId,
++        eventId,
++        personId,
++        evaluationDate: today,
++        override: {
++          violatedRule: "shortage",
++          reason: "╪«┘ê╪»╪ó╪▓┘à╪º█î█î ┌⌐┘à╪¿┘ê╪» ╪╕╪▒┘ü█î╪¬",
++          actorAccountId: actor,
++          teamId: team.id,
++          jobTitleId: title.id,
++          seniorityId: seniority?.id ?? null,
++          skipApprovalGate: true,
++        },
++      });
++      assert.equal(reserved.reserved, true);
++      assert.ok(reserved.overrideId);
++      await client.query("COMMIT");
++
++      const freeRow = await pool.query<{ free_units: number }>(
++        `SELECT free_units FROM headcount_capacity_slot WHERE id = $1::uuid`,
++        [zeroSlotId],
++      );
++      assert.equal(Number(freeRow.rows[0]?.free_units), -1);
++
++      const listed = await listOverrides(pool, {
++        status: "active",
++        violatedRule: "shortage",
++        slotId: zeroSlotId,
++      });
++      assert.ok(listed.some((r) => r.id === reserved.overrideId));
++      assert.ok(listed[0]?.capacitySnapshot);
++      assert.equal(listed[0]?.reason, "╪«┘ê╪»╪ó╪▓┘à╪º█î█î ┌⌐┘à╪¿┘ê╪» ╪╕╪▒┘ü█î╪¬");
++
++      const panel = await readHeadcountCapacityPanel(pool, {
++        teamId: team.id,
++        jobTitleId: title.id,
++        effectiveDate: today,
++        preferredSlotId: zeroSlotId,
++      });
++      assert.ok(panel.overridden >= 1);
++      assert.ok(panel.free < 0);
++
++      // Cancel releases reservation
++      await client.query("BEGIN");
++      const released = await releaseHeadcountReservation(client, eventId);
++      await client.query("COMMIT");
++      assert.equal(released.released, true);
++
++      // --- matchApprovalsForOverride finds zero-free ---
++      const match = await matchApprovalsForOverride(pool, {
++        teamId: team.id,
++        jobTitleId: title.id,
++        evaluationDate: today,
++      });
++      assert.ok(
++        match.outcome === "matched" ||
++          match.outcome === "none" ||
++          match.outcome === "manual_incompatible",
++      );
++
++      // Normal reserve still requires free > 0
++      const blockedEvent = randomUUID();
++      await pool.query(
++        `UPDATE headcount_capacity_slot SET free_units = 0 WHERE id = $1::uuid`,
++        [zeroSlotId],
++      );
++      await assert.rejects(
++        async () => {
++          await client.query("BEGIN");
++          try {
++            await reserveHeadcountCapacity(client, {
++              slotId: zeroSlotId,
++              eventId: blockedEvent,
++              personId,
++              evaluationDate: today,
++            });
++            await client.query("COMMIT");
++          } catch (err) {
++            await client.query("ROLLBACK");
++            throw err;
++          }
++        },
++        /╪▒╪▓╪▒┘ê|╪╕╪▒┘ü█î╪¬/,
++      );
++
++      // Validity override consume skips gate
++      const validityEvent = randomUUID();
++      await client.query("BEGIN");
++      await consumeHeadcountCapacityWithOverride(client, {
++        slotId: zeroSlotId,
++        eventId: validityEvent,
++        personId,
++        evaluationDate: today,
++        override: {
++          violatedRule: "validity",
++          reason: "╪«┘ê╪»╪ó╪▓┘à╪º█î█î ╪º╪╣╪¬╪¿╪º╪▒",
++          actorAccountId: actor,
++          teamId: team.id,
++          jobTitleId: title.id,
++          approvalId: willExpire.id,
++          skipApprovalGate: true,
++        },
++      });
++      await client.query("COMMIT");
++      const validityRows = await listOverrides(pool, {
++        violatedRule: "validity",
++        relatedEventId: validityEvent,
++      });
++      assert.equal(validityRows[0]?.violatedRule, "validity");
++    } finally {
++      client.release();
++    }
++
++    console.log("headcount-override selfcheck: ok");
++  } finally {
++    await db.$disconnect();
++    await pool.end();
++  }
++}
++
++main().catch((err) => {
++  console.error(err);
++  process.exit(1);
++});
+diff --git a/packages/modules/headcount/src/headcount-override.ts b/packages/modules/headcount/src/headcount-override.ts
+new file mode 100644
+index 0000000..54034de
+--- /dev/null
++++ b/packages/modules/headcount/src/headcount-override.ts
+@@ -0,0 +1,538 @@
++/**
++ * Headcount Override catalogue (Story 4.14 / FR-32).
++ * Explicit rule violation with audit; free may go negative.
++ * Does NOT overload Exemption (coverage without consume).
++ */
++
++import { randomUUID } from "node:crypto";
++
++import type { Pool, PoolClient, PrismaClient } from "@divan/db";
++
++export const HEADCOUNT_OVERRIDE_READ_PERMISSION = "headcount.override.read";
++export const HEADCOUNT_OVERRIDE_WRITE_PERMISSION = "headcount.override.write";
++export const HEADCOUNT_OVERRIDE_DATA_CATEGORY =
++  "organization.headcount_override";
++
++export const MSG_HEADCOUNT_OVERRIDE_PERMISSION_REQUIRED_FA = "╪»╪│╪¬╪▒╪│█î ┘å╪»╪º╪▒█î╪».";
++export const MSG_HEADCOUNT_OVERRIDE_NOT_FOUND_FA = "┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ╪╕╪▒┘ü█î╪¬ █î╪º┘ü╪¬ ┘å╪┤╪».";
++export const MSG_HEADCOUNT_OVERRIDE_INVALID_REASON_FA =
++  "╪»┘ä█î┘ä ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬.";
++export const MSG_HEADCOUNT_OVERRIDE_INVALID_RULE_FA =
++  "┘é╪º╪╣╪»╪⌐ ┘å┘é╪╢ΓÇî╪┤╪»┘ç ┘å╪º┘à╪╣╪¬╪¿╪▒ ╪º╪│╪¬.";
++export const MSG_HEADCOUNT_OVERRIDE_INVALID_STATUS_FA =
++  "╪º┘å╪¬┘é╪º┘ä ┘ê╪╢╪╣█î╪¬ ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ┘à╪¼╪º╪▓ ┘å█î╪│╪¬.";
++export const MSG_HEADCOUNT_OVERRIDE_INVALID_REFS_FA =
++  "┘à╪▒╪º╪¼╪╣ ╪¬█î┘à/╪╣┘å┘ê╪º┘å ╪┤╪║┘ä█î ╪¿╪▒╪º█î ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ┘å╪º┘à╪╣╪¬╪¿╪▒ ╪º╪│╪¬.";
++export const MSG_HEADCOUNT_OVERRIDE_CONSUME_FAILED_FA =
++  "┘à╪╡╪▒┘ü ╪╕╪▒┘ü█î╪¬ ╪¿╪º ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ┘å╪º┘à┘ê┘ü┘é ╪¿┘ê╪».";
++export const MSG_HEADCOUNT_OVERRIDE_RESERVE_FAILED_FA =
++  "╪▒╪▓╪▒┘ê ╪╕╪▒┘ü█î╪¬ ╪¿╪º ┘ä╪║┘ê ┘à╪¡╪»┘ê╪»█î╪¬ ┘å╪º┘à┘ê┘ü┘é ╪¿┘ê╪».";
++
++export type HeadcountViolatedRule =
++  | "shortage"
++  | "validity"
++  | "job_title"
++  | "seniority";
++
++export type HeadcountOverrideStatus = "active" | "superseded" | "voided";
++
++export type HeadcountOverrideErrorCode =
++  | "PERMISSION_DENIED"
++  | "NOT_FOUND"
++  | "VALIDATION"
++  | "INVALID_STATUS";
++
++export class HeadcountOverrideError extends Error {
++  readonly code: HeadcountOverrideErrorCode;
++  readonly messageFa: string;
++
++  constructor(
++    code: HeadcountOverrideErrorCode,
++    messageFa: string,
++    message?: string,
++  ) {
++    super(message ?? messageFa);
++    this.name = "HeadcountOverrideError";
++    this.code = code;
++    this.messageFa = messageFa;
++  }
++}
++
++export const VIOLATED_RULE_LABEL_FA: Record<HeadcountViolatedRule, string> = {
++  shortage: "┌⌐┘à╪¿┘ê╪» ╪╕╪▒┘ü█î╪¬",
++  validity: "╪º╪╣╪¬╪¿╪º╪▒ ┘à╪¼┘ê╪▓",
++  job_title: "╪╣┘å┘ê╪º┘å ╪┤╪║┘ä█î",
++  seniority: "╪º╪▒╪┤╪»█î╪¬",
++};
++
++export const OVERRIDE_STATUS_LABEL_FA: Record<HeadcountOverrideStatus, string> =
++  {
++    active: "┘ü╪╣╪º┘ä",
++    superseded: "╪¼╪º█î┌»╪▓█î┘åΓÇî╪┤╪»┘ç",
++    voided: "╪¿╪º╪╖┘ä",
++  };
++
++export type CapacitySnapshot = {
++  used: number;
++  reserved: number;
++  freeBefore: number;
++  freeAfter: number;
++  approved?: number | null;
++};
++
++export type HeadcountOverrideRecord = {
++  id: string;
++  violatedRule: HeadcountViolatedRule;
++  reason: string;
++  actorAccountId: string;
++  relatedEventId: string | null;
++  relatedAssignmentId: string | null;
++  teamId: string;
++  jobTitleId: string;
++  seniorityId: string | null;
++  approvalId: string | null;
++  slotId: string | null;
++  capacitySnapshot: CapacitySnapshot;
++  status: HeadcountOverrideStatus;
++  createdBy: string | null;
++  updatedBy: string | null;
++  createdAt: Date;
++  updatedAt: Date;
++};
++
++type Queryable = Pool | PoolClient;
++
++type OverrideRow = {
++  id: string;
++  violated_rule: string;
++  reason: string;
++  actor_account_id: string;
++  related_event_id: string | null;
++  related_assignment_id: string | null;
++  team_id: string;
++  job_title_id: string;
++  seniority_id: string | null;
++  approval_id: string | null;
++  slot_id: string | null;
++  capacity_snapshot: CapacitySnapshot | string;
++  status: string;
++  created_by: string | null;
++  updated_by: string | null;
++  created_at: Date;
++  updated_at: Date;
++};
++
++const RULES = new Set<HeadcountViolatedRule>([
++  "shortage",
++  "validity",
++  "job_title",
++  "seniority",
++]);
++
++function isPool(db: Queryable): db is Pool {
++  // PoolClient also has connect(); prefer release() as the client discriminator.
++  return (
++    typeof (db as Pool).connect === "function" &&
++    typeof (db as { release?: unknown }).release !== "function"
++  );
++}
++
++async function runInTransaction<T>(
++  db: Queryable,
++  fn: (client: Queryable) => Promise<T>,
++): Promise<T> {
++  if (!isPool(db)) {
++    return fn(db);
++  }
++  const client = await db.connect();
++  try {
++    await client.query("BEGIN");
++    const result = await fn(client);
++    await client.query("COMMIT");
++    return result;
++  } catch (err) {
++    await client.query("ROLLBACK");
++    throw err;
++  } finally {
++    client.release();
++  }
++}
++
++async function query<T extends Record<string, unknown>>(
++  db: Queryable,
++  sql: string,
++  params: unknown[] = [],
++): Promise<T[]> {
++  const r = await db.query(sql, params);
++  return r.rows as T[];
++}
++
++function parseSnapshot(
++  raw: CapacitySnapshot | string,
++): CapacitySnapshot {
++  if (typeof raw === "string") {
++    return JSON.parse(raw) as CapacitySnapshot;
++  }
++  return raw;
++}
++
++function mapOverride(row: OverrideRow): HeadcountOverrideRecord {
++  return {
++    id: row.id,
++    violatedRule: row.violated_rule as HeadcountViolatedRule,
++    reason: row.reason,
++    actorAccountId: row.actor_account_id,
++    relatedEventId: row.related_event_id,
++    relatedAssignmentId: row.related_assignment_id,
++    teamId: row.team_id,
++    jobTitleId: row.job_title_id,
++    seniorityId: row.seniority_id,
++    approvalId: row.approval_id,
++    slotId: row.slot_id,
++    capacitySnapshot: parseSnapshot(row.capacity_snapshot),
++    status: row.status as HeadcountOverrideStatus,
++    createdBy: row.created_by,
++    updatedBy: row.updated_by,
++    createdAt: row.created_at,
++    updatedAt: row.updated_at,
++  };
++}
++
++/**
++ * Ensure override table + drop free_units >= 0 check (idempotent).
++ */
++export async function ensureHeadcountOverrideSchema(
++  db: Queryable,
++): Promise<void> {
++  await db.query(`
++    ALTER TABLE headcount_capacity_slot
++      DROP CONSTRAINT IF EXISTS headcount_capacity_slot_free_units_check
++  `);
++  await db.query(`
++    CREATE TABLE IF NOT EXISTS headcount_override (
++      id                       UUID PRIMARY KEY,
++      violated_rule            TEXT NOT NULL
++                                 CHECK (violated_rule IN (
++                                   'shortage',
++                                   'validity',
++                                   'job_title',
++                                   'seniority'
++                                 )),
++      reason                   TEXT NOT NULL,
++      actor_account_id         TEXT NOT NULL,
++      related_event_id         UUID,
++      related_assignment_id    TEXT,
++      team_id                  TEXT NOT NULL,
++      job_title_id             TEXT NOT NULL,
++      seniority_id             TEXT,
++      approval_id              UUID,
++      slot_id                  UUID,
++      capacity_snapshot        JSONB NOT NULL,
++      status                   TEXT NOT NULL
++                                 CHECK (status IN ('active', 'superseded', 'voided')),
++      created_by               TEXT,
++      updated_by               TEXT,
++      created_at               TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at               TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
++    )
++  `);
++  await db.query(`
++    CREATE INDEX IF NOT EXISTS headcount_override_status_idx
++      ON headcount_override (status)
++  `);
++  await db.query(`
++    CREATE INDEX IF NOT EXISTS headcount_override_team_idx
++      ON headcount_override (team_id)
++  `);
++  await db.query(`
++    CREATE INDEX IF NOT EXISTS headcount_override_rule_idx
++      ON headcount_override (violated_rule)
++  `);
++  await db.query(`
++    CREATE INDEX IF NOT EXISTS headcount_override_event_idx
++      ON headcount_override (related_event_id)
++      WHERE related_event_id IS NOT NULL
++  `);
++  await db.query(`
++    CREATE INDEX IF NOT EXISTS headcount_override_slot_idx
++      ON headcount_override (slot_id)
++      WHERE slot_id IS NOT NULL
++  `);
++}
++
++async function actorHoldsPermission(
++  accountId: string,
++  permission: string,
++  prisma: PrismaClient,
++): Promise<boolean> {
++  const rows = await prisma.accountAccessRole.findMany({
++    where: { accountId },
++    include: {
++      accessRole: { include: { permissionSet: true } },
++    },
++  });
++  return rows.some((row) =>
++    (row.accessRole.permissionSet?.permissions ?? []).includes(permission),
++  );
++}
++
++export async function assertActorHasHeadcountOverrideRead(
++  accountId: string,
++  db: PrismaClient,
++): Promise<void> {
++  const ok = await actorHoldsPermission(
++    accountId,
++    HEADCOUNT_OVERRIDE_READ_PERMISSION,
++    db,
++  );
++  if (!ok) {
++    throw new HeadcountOverrideError(
++      "PERMISSION_DENIED",
++      MSG_HEADCOUNT_OVERRIDE_PERMISSION_REQUIRED_FA,
++      "headcount_override_read_required",
++    );
++  }
++}
++
++export async function assertActorHasHeadcountOverrideWrite(
++  accountId: string,
++  db: PrismaClient,
++): Promise<void> {
++  const ok = await actorHoldsPermission(
++    accountId,
++    HEADCOUNT_OVERRIDE_WRITE_PERMISSION,
++    db,
++  );
++  if (!ok) {
++    throw new HeadcountOverrideError(
++      "PERMISSION_DENIED",
++      MSG_HEADCOUNT_OVERRIDE_PERMISSION_REQUIRED_FA,
++      "headcount_override_write_required",
++    );
++  }
++}
++
++async function getOverrideRow(
++  db: Queryable,
++  id: string,
++): Promise<OverrideRow | null> {
++  const rows = await query<OverrideRow>(
++    db,
++    `SELECT id, violated_rule, reason, actor_account_id,
++            related_event_id, related_assignment_id,
++            team_id, job_title_id, seniority_id,
++            approval_id, slot_id, capacity_snapshot, status,
++            created_by, updated_by, created_at, updated_at
++     FROM headcount_override WHERE id = $1::uuid`,
++    [id],
++  );
++  return rows[0] ?? null;
++}
++
++export type CreateOverrideInput = {
++  violatedRule: HeadcountViolatedRule;
++  reason: string;
++  actorAccountId: string;
++  teamId: string;
++  jobTitleId: string;
++  seniorityId?: string | null;
++  approvalId?: string | null;
++  slotId?: string | null;
++  relatedEventId?: string | null;
++  relatedAssignmentId?: string | null;
++  capacitySnapshot: CapacitySnapshot;
++  actorId: string;
++};
++
++export async function createOverride(
++  db: Queryable,
++  input: CreateOverrideInput,
++): Promise<HeadcountOverrideRecord> {
++  await ensureHeadcountOverrideSchema(db);
++  const reason = input.reason.trim();
++  if (!reason) {
++    throw new HeadcountOverrideError(
++      "VALIDATION",
++      MSG_HEADCOUNT_OVERRIDE_INVALID_REASON_FA,
++    );
++  }
++  if (!RULES.has(input.violatedRule)) {
++    throw new HeadcountOverrideError(
++      "VALIDATION",
++      MSG_HEADCOUNT_OVERRIDE_INVALID_RULE_FA,
++    );
++  }
++  const teamId = input.teamId.trim();
++  const jobTitleId = input.jobTitleId.trim();
++  if (!teamId || !jobTitleId) {
++    throw new HeadcountOverrideError(
++      "VALIDATION",
++      MSG_HEADCOUNT_OVERRIDE_INVALID_REFS_FA,
++    );
++  }
++
++  const id = randomUUID();
++  await db.query(
++    `INSERT INTO headcount_override (
++       id, violated_rule, reason, actor_account_id,
++       related_event_id, related_assignment_id,
++       team_id, job_title_id, seniority_id,
++       approval_id, slot_id, capacity_snapshot, status,
++       created_by, updated_by
++     ) VALUES (
++       $1::uuid, $2, $3, $4,
++       $5::uuid, $6, $7, $8, $9,
++       $10::uuid, $11::uuid, $12::jsonb, 'active', $13, $13
++     )`,
++    [
++      id,
++      input.violatedRule,
++      reason,
++      input.actorAccountId.trim(),
++      input.relatedEventId?.trim() || null,
++      input.relatedAssignmentId?.trim() || null,
++      teamId,
++      jobTitleId,
++      input.seniorityId?.trim() || null,
++      input.approvalId?.trim() || null,
++      input.slotId?.trim() || null,
++      JSON.stringify(input.capacitySnapshot),
++      input.actorId,
++    ],
++  );
++  const row = await getOverrideRow(db, id);
++  return mapOverride(row!);
++}
++
++export async function getOverride(
++  db: Queryable,
++  id: string,
++): Promise<HeadcountOverrideRecord | null> {
++  await ensureHeadcountOverrideSchema(db);
++  const row = await getOverrideRow(db, id);
++  return row ? mapOverride(row) : null;
++}
++
++export type ListOverridesFilter = {
++  status?: HeadcountOverrideStatus | null;
++  violatedRule?: HeadcountViolatedRule | null;
++  teamId?: string | null;
++  slotId?: string | null;
++  relatedEventId?: string | null;
++  limit?: number;
++};
++
++export async function listOverrides(
++  db: Queryable,
++  filter: ListOverridesFilter = {},
++): Promise<HeadcountOverrideRecord[]> {
++  await ensureHeadcountOverrideSchema(db);
++  const clauses: string[] = [];
++  const params: unknown[] = [];
++  let i = 1;
++  if (filter.status) {
++    clauses.push(`status = $${i++}`);
++    params.push(filter.status);
++  }
++  if (filter.violatedRule) {
++    clauses.push(`violated_rule = $${i++}`);
++    params.push(filter.violatedRule);
++  }
++  if (filter.teamId?.trim()) {
++    clauses.push(`team_id = $${i++}`);
++    params.push(filter.teamId.trim());
++  }
++  if (filter.slotId?.trim()) {
++    clauses.push(`slot_id = $${i++}::uuid`);
++    params.push(filter.slotId.trim());
++  }
++  if (filter.relatedEventId?.trim()) {
++    clauses.push(`related_event_id = $${i++}::uuid`);
++    params.push(filter.relatedEventId.trim());
++  }
++  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
++  const limit = Math.min(Math.max(filter.limit ?? 100, 1), 500);
++  params.push(limit);
++  const rows = await query<OverrideRow>(
++    db,
++    `SELECT id, violated_rule, reason, actor_account_id,
++            related_event_id, related_assignment_id,
++            team_id, job_title_id, seniority_id,
++            approval_id, slot_id, capacity_snapshot, status,
++            created_by, updated_by, created_at, updated_at
++     FROM headcount_override
++     ${where}
++     ORDER BY created_at DESC, id DESC
++     LIMIT $${i}`,
++    params,
++  );
++  return rows.map(mapOverride);
++}
++
++export async function countActiveOverridesForSlot(
++  db: Queryable,
++  slotId: string,
++): Promise<number> {
++  await ensureHeadcountOverrideSchema(db);
++  const rows = await query<{ c: string }>(
++    db,
++    `SELECT COUNT(*)::text AS c FROM headcount_override
++     WHERE slot_id = $1::uuid AND status = 'active'`,
++    [slotId],
++  );
++  return Number(rows[0]?.c ?? 0);
++}
++
++export async function voidOverride(
++  db: Queryable,
++  input: { id: string; actorId: string },
++): Promise<HeadcountOverrideRecord> {
++  await ensureHeadcountOverrideSchema(db);
++  return runInTransaction(db, async (tx) => {
++    const rows = await query<OverrideRow>(
++      tx,
++      `SELECT id, violated_rule, reason, actor_account_id,
++              related_event_id, related_assignment_id,
++              team_id, job_title_id, seniority_id,
++              approval_id, slot_id, capacity_snapshot, status,
++              created_by, updated_by, created_at, updated_at
++       FROM headcount_override WHERE id = $1::uuid FOR UPDATE`,
++      [input.id],
++    );
++    const row = rows[0];
++    if (!row) {
++      throw new HeadcountOverrideError(
++        "NOT_FOUND",
++        MSG_HEADCOUNT_OVERRIDE_NOT_FOUND_FA,
++      );
++    }
++    if (row.status !== "active") {
++      throw new HeadcountOverrideError(
++        "INVALID_STATUS",
++        MSG_HEADCOUNT_OVERRIDE_INVALID_STATUS_FA,
++        `from=${row.status}`,
++      );
++    }
++    await tx.query(
++      `UPDATE headcount_override
++       SET status = 'voided', updated_by = $2, updated_at = CURRENT_TIMESTAMP
++       WHERE id = $1::uuid`,
++      [input.id, input.actorId],
++    );
++    const updated = await getOverrideRow(tx, input.id);
++    return mapOverride(updated!);
++  });
++}
++
++export type OverrideMutateContext = {
++  violatedRule: HeadcountViolatedRule;
++  reason: string;
++  actorAccountId: string;
++  teamId: string;
++  jobTitleId: string;
++  seniorityId?: string | null;
++  approvalId?: string | null;
++  relatedAssignmentId?: string | null;
++  /** Skip Approval consumable gate (validity Override). */
++  skipApprovalGate?: boolean;
++};
+diff --git a/packages/modules/headcount/src/headcount-reservation-expiry.ts b/packages/modules/headcount/src/headcount-reservation-expiry.ts
+new file mode 100644
+index 0000000..a2b85c8
+--- /dev/null
++++ b/packages/modules/headcount/src/headcount-reservation-expiry.ts
+@@ -0,0 +1,314 @@
++/**
++ * Reservation expiry horizon + Scheduled-exception helpers (Story 4.14 / FR-30).
++ * AR-HEADCOUNT: N=14 day warning; do not invent escalation owners.
++ */
++
++import type { Pool, PoolClient } from "@divan/db";
++import { parseDateOnly, todayDateOnlyTehran } from "@divan/temporal-engine";
++
++import {
++  effectiveApprovalStatus,
++  isApprovalConsumableAt,
++  type HeadcountApprovalStatus,
++} from "./headcount-approval";
++
++/** AR-HEADCOUNT may retune N ΓÇö keep as named constant. */
++export const HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS = 14;
++
++export const MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA =
++  "╪º╪╣╪¬╪¿╪º╪▒ ┘à╪¼┘ê╪▓ ╪╕╪▒┘ü█î╪¬ ┘à╪¬╪╡┘ä ╪¿┘ç ╪▒╪▓╪▒┘ê ╪¬╪º █▒█┤ ╪▒┘ê╪▓ ╪»█î┌»╪▒ ╪¿┘ç ┘╛╪º█î╪º┘å ┘à█îΓÇî╪▒╪│╪»╪¢ ┘╛█î╪┤ ╪º╪▓ ╪º╪╣┘à╪º┘ä ╪º╪½╪▒ ╪▒╪│█î╪»┌»█î ┌⌐┘å█î╪».";
++
++export const MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA =
++  "╪▒┘ê█î╪»╪º╪» ╪▓┘à╪º┘åΓÇî╪¿┘å╪»█îΓÇî╪┤╪»┘ç ╪»╪▒ ┘ê╪╢╪╣█î╪¬ ╪º╪│╪¬╪½┘å╪º╪│╪¬╪¢ ╪¬╪º ╪¬╪╣█î█î┘å ╪¬┌⌐┘ä█î┘ü ┘à┘à█î╪▓█îΓÇî╪┤╪»┘ç ╪º╪╣┘à╪º┘ä ╪¼╪▓╪ª█î Employment/╪º┘å╪¬╪╡╪º╪¿/╪╕╪▒┘ü█î╪¬ ┘à╪¼╪º╪▓ ┘å█î╪│╪¬.";
++
++export const HEADCOUNT_APPROVAL_EXPIRY_SOON = "HEADCOUNT_APPROVAL_EXPIRY_SOON";
++export const HEADCOUNT_SCHEDULED_EXCEPTION = "HEADCOUNT_SCHEDULED_EXCEPTION";
++
++export type HeadcountExceptionMarker = {
++  code: string;
++  detectedAt: string;
++  approvalId?: string | null;
++  messageFa: string;
++};
++
++type Queryable = Pool | PoolClient;
++
++async function query<T extends Record<string, unknown>>(
++  db: Queryable,
++  sql: string,
++  params: unknown[] = [],
++): Promise<T[]> {
++  const r = await db.query(sql, params);
++  return r.rows as T[];
++}
++
++function dateOnlyFromPg(value: Date | string): string {
++  if (typeof value === "string") return value.slice(0, 10);
++  const y = value.getUTCFullYear();
++  const m = String(value.getUTCMonth() + 1).padStart(2, "0");
++  const day = String(value.getUTCDate()).padStart(2, "0");
++  return `${y}-${m}-${day}`;
++}
++
++function addDays(dateOnly: string, days: number): string {
++  const [y, m, d] = dateOnly.split("-").map(Number);
++  const dt = new Date(Date.UTC(y!, m! - 1, d!));
++  dt.setUTCDate(dt.getUTCDate() + days);
++  const yy = dt.getUTCFullYear();
++  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
++  const dd = String(dt.getUTCDate()).padStart(2, "0");
++  return `${yy}-${mm}-${dd}`;
++}
++
++/**
++ * True when Approval validity end is within N days (inclusive horizon)
++ * and Approval is still consumable today (not already expired).
++ */
++export function isApprovalExpiryWithinWarningHorizon(
++  validityEndExclusive: string,
++  opts: {
++    today?: string;
++    warningDays?: number;
++  } = {},
++): boolean {
++  const today = opts.today ?? todayDateOnlyTehran();
++  const n = opts.warningDays ?? HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS;
++  const endParsed = parseDateOnly(validityEndExclusive);
++  if (!endParsed.ok) return false;
++  // Already ended or ending today ΓåÆ not "soon" warning (exception path elsewhere)
++  if (endParsed.value <= today) return false;
++  const horizon = addDays(today, n);
++  // validity_end_exclusive - today <= N  Γçö  endExclusive <= today+N
++  return endParsed.value <= horizon;
++}
++
++export type ReservationExpiryCheckInput = {
++  approvalId: string;
++  evaluationDate?: string;
++  today?: string;
++  warningDays?: number;
++};
++
++export type ReservationExpiryCheckResult =
++  | { atRisk: false }
++  | {
++      atRisk: true;
++      approvalId: string;
++      validityEndExclusive: string;
++      messageFa: string;
++      code: typeof HEADCOUNT_APPROVAL_EXPIRY_SOON;
++    };
++
++/**
++ * Load Approval and evaluate 14-day expiry warning for an active Reservation.
++ */
++export async function checkReservationApprovalExpiryWarning(
++  db: Queryable,
++  input: ReservationExpiryCheckInput,
++): Promise<ReservationExpiryCheckResult> {
++  const today = input.today ?? todayDateOnlyTehran();
++  const evaluationDate = input.evaluationDate ?? today;
++  const rows = await query<{
++    id: string;
++    status: string;
++    validity_start: Date | string;
++    validity_end_exclusive: Date | string;
++  }>(
++    db,
++    `SELECT id, status, validity_start, validity_end_exclusive
++     FROM headcount_approval WHERE id = $1::uuid`,
++    [input.approvalId],
++  );
++  const row = rows[0];
++  if (!row) return { atRisk: false };
++
++  const validityStart = dateOnlyFromPg(row.validity_start);
++  const validityEnd = dateOnlyFromPg(row.validity_end_exclusive);
++  const status = effectiveApprovalStatus(
++    row.status as HeadcountApprovalStatus,
++    validityEnd,
++    today,
++  );
++
++  // Must still be consumable today ΓÇö already expired ΓåÆ exception, not soon-warn
++  if (
++    !isApprovalConsumableAt(
++      status,
++      validityStart,
++      validityEnd,
++      evaluationDate,
++      today,
++    )
++  ) {
++    return { atRisk: false };
++  }
++
++  if (
++    !isApprovalExpiryWithinWarningHorizon(validityEnd, {
++      today,
++      warningDays: input.warningDays,
++    })
++  ) {
++    return { atRisk: false };
++  }
++
++  return {
++    atRisk: true,
++    approvalId: row.id,
++    validityEndExclusive: validityEnd,
++    messageFa: MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA,
++    code: HEADCOUNT_APPROVAL_EXPIRY_SOON,
++  };
++}
++
++export type ScheduledExceptionDetectInput = {
++  approvalId?: string | null;
++  slotId?: string | null;
++  evaluationDate: string;
++  today?: string;
++  /** Optional dims to verify Approval still matches Assignment successor. */
++  teamId?: string | null;
++  jobTitleId?: string | null;
++  seniorityId?: string | null;
++};
++
++export type ScheduledExceptionDetectResult =
++  | { exception: false }
++  | {
++      exception: true;
++      marker: HeadcountExceptionMarker;
++    };
++
++/**
++ * Detect Approval expiry / incompatibility before effect ΓÇö fail-closed.
++ * Does not mutate; caller persists marker + blocks apply.
++ */
++export async function detectScheduledHeadcountException(
++  db: Queryable,
++  input: ScheduledExceptionDetectInput,
++): Promise<ScheduledExceptionDetectResult> {
++  const today = input.today ?? todayDateOnlyTehran();
++  const detectedAt = new Date().toISOString();
++
++  if (!input.approvalId?.trim() && !input.slotId?.trim()) {
++    return {
++      exception: true,
++      marker: {
++        code: HEADCOUNT_SCHEDULED_EXCEPTION,
++        detectedAt,
++        messageFa: MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
++      },
++    };
++  }
++
++  let approvalId = input.approvalId?.trim() || null;
++  if (!approvalId && input.slotId?.trim()) {
++    const bridge = await query<{ approval_id: string | null }>(
++      db,
++      `SELECT approval_id FROM headcount_capacity_slot WHERE id = $1::uuid`,
++      [input.slotId.trim()],
++    );
++    approvalId = bridge[0]?.approval_id ?? null;
++  }
++
++  if (!approvalId) {
++    // Legacy slot without Approval ΓÇö no expiry exception product path
++    return { exception: false };
++  }
++
++  const rows = await query<{
++    id: string;
++    status: string;
++    team_id: string;
++    job_title_id: string;
++    seniority_id: string | null;
++    validity_start: Date | string;
++    validity_end_exclusive: Date | string;
++  }>(
++    db,
++    `SELECT id, status, team_id, job_title_id, seniority_id,
++            validity_start, validity_end_exclusive
++     FROM headcount_approval WHERE id = $1::uuid`,
++    [approvalId],
++  );
++  const row = rows[0];
++  if (!row) {
++    return {
++      exception: true,
++      marker: {
++        code: HEADCOUNT_SCHEDULED_EXCEPTION,
++        detectedAt,
++        approvalId,
++        messageFa: MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
++      },
++    };
++  }
++
++  const validityStart = dateOnlyFromPg(row.validity_start);
++  const validityEnd = dateOnlyFromPg(row.validity_end_exclusive);
++  const status = effectiveApprovalStatus(
++    row.status as HeadcountApprovalStatus,
++    validityEnd,
++    today,
++  );
++
++  if (
++    !isApprovalConsumableAt(
++      status,
++      validityStart,
++      validityEnd,
++      input.evaluationDate,
++      today,
++    )
++  ) {
++    return {
++      exception: true,
++      marker: {
++        code: HEADCOUNT_SCHEDULED_EXCEPTION,
++        detectedAt,
++        approvalId: row.id,
++        messageFa: MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
++      },
++    };
++  }
++
++  if (input.teamId?.trim() && row.team_id !== input.teamId.trim()) {
++    return {
++      exception: true,
++      marker: {
++        code: HEADCOUNT_SCHEDULED_EXCEPTION,
++        detectedAt,
++        approvalId: row.id,
++        messageFa: MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
++      },
++    };
++  }
++  if (input.jobTitleId?.trim() && row.job_title_id !== input.jobTitleId.trim()) {
++    return {
++      exception: true,
++      marker: {
++        code: HEADCOUNT_SCHEDULED_EXCEPTION,
++        detectedAt,
++        approvalId: row.id,
++        messageFa: MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
++      },
++    };
++  }
++  if (input.seniorityId !== undefined) {
++    const approvalSen = row.seniority_id;
++    const assignSen = input.seniorityId?.trim() || null;
++    if (approvalSen != null && approvalSen !== assignSen) {
++      return {
++        exception: true,
++        marker: {
++          code: HEADCOUNT_SCHEDULED_EXCEPTION,
++          detectedAt,
++          approvalId: row.id,
++          messageFa: MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
++        },
++      };
++    }
++  }
++
++  return { exception: false };
++}

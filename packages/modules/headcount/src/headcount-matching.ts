@@ -99,6 +99,19 @@ export function seniorityCompatible(
   return approvalSeniorityId === (assignmentSeniorityId ?? null);
 }
 
+export type ListCandidatesOptions = {
+  /**
+   * When false, include slots with free_units <= 0 (Override shortage path).
+   * Default true — Operators cannot overbook via normal match.
+   */
+  requireFree?: boolean;
+  /**
+   * When true, skip consumable-at gate (validity Override path only).
+   * Still returns dimension-matched Approvals ordered oldest-first.
+   */
+  skipConsumableGate?: boolean;
+};
+
 /**
  * List consumable Approvals for Team+Title with free capacity on linked slot,
  * filtered by seniority rule, ordered oldest-first.
@@ -106,8 +119,11 @@ export function seniorityCompatible(
 export async function listCompatibleApprovalCandidates(
   db: Queryable,
   input: Omit<MatchApprovalInput, "preferredApprovalId">,
+  opts: ListCandidatesOptions = {},
 ): Promise<CompatibleApprovalCandidate[]> {
   const today = todayDateOnlyTehran();
+  const requireFree = opts.requireFree !== false;
+  const freeClause = requireFree ? "AND s.free_units > 0" : "";
   const rows = await query<CandidateRow>(
     db,
     `SELECT a.id AS approval_id,
@@ -122,7 +138,7 @@ export async function listCompatibleApprovalCandidates(
      INNER JOIN headcount_capacity_slot s ON s.approval_id = a.id
      WHERE a.team_id = $1::uuid
        AND a.job_title_id = $2::uuid
-       AND s.free_units > 0
+       ${freeClause}
        AND s.start_date <= $3::date
        AND (s.end_date_exclusive IS NULL OR s.end_date_exclusive > $3::date)
      ORDER BY a.validity_start ASC, a.created_at ASC, a.id ASC`,
@@ -133,16 +149,18 @@ export async function listCompatibleApprovalCandidates(
   for (const row of rows) {
     const validityStart = dateOnlyFromPg(row.validity_start);
     const validityEnd = dateOnlyFromPg(row.validity_end_exclusive);
-    if (
-      !isApprovalConsumableAt(
-        row.status as HeadcountApprovalStatus,
-        validityStart,
-        validityEnd,
-        input.evaluationDate,
-        today,
-      )
-    ) {
-      continue;
+    if (!opts.skipConsumableGate) {
+      if (
+        !isApprovalConsumableAt(
+          row.status as HeadcountApprovalStatus,
+          validityStart,
+          validityEnd,
+          input.evaluationDate,
+          today,
+        )
+      ) {
+        continue;
+      }
     }
     if (!seniorityCompatible(row.seniority_id, input.seniorityId)) {
       continue;
@@ -157,6 +175,55 @@ export async function listCompatibleApprovalCandidates(
     });
   }
   return out;
+}
+
+/**
+ * Match for Override finalize — dimension-compatible even when free <= 0.
+ */
+export async function matchApprovalsForOverride(
+  db: Queryable,
+  input: MatchApprovalInput,
+  opts: { skipConsumableGate?: boolean } = {},
+): Promise<MatchApprovalResult> {
+  const candidates = await listCompatibleApprovalCandidates(db, input, {
+    requireFree: false,
+    skipConsumableGate: opts.skipConsumableGate,
+  });
+  const preferred = input.preferredApprovalId?.trim() || null;
+
+  if (preferred) {
+    const hit = candidates.find((c) => c.approvalId === preferred);
+    if (!hit) {
+      return {
+        outcome: "manual_incompatible",
+        candidates,
+        messageFa: MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
+      };
+    }
+    return {
+      outcome: "matched",
+      approvalId: hit.approvalId,
+      slotId: hit.slotId,
+      matchedBy: "manual",
+      candidates,
+    };
+  }
+
+  const oldest = candidates[0];
+  if (!oldest) {
+    return {
+      outcome: "none",
+      candidates,
+      messageFa: MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
+    };
+  }
+  return {
+    outcome: "matched",
+    approvalId: oldest.approvalId,
+    slotId: oldest.slotId,
+    matchedBy: "default",
+    candidates,
+  };
 }
 
 /**

@@ -67,7 +67,11 @@ export class HeadcountApprovalError extends Error {
 type Queryable = Pool | PoolClient;
 
 function isPool(db: Queryable): db is Pool {
-  return typeof (db as Pool).connect === "function";
+  // PoolClient also has connect(); prefer release() as the client discriminator.
+  return (
+    typeof (db as Pool).connect === "function" &&
+    typeof (db as { release?: unknown }).release !== "function"
+  );
 }
 
 function isPgUniqueViolation(err: unknown): boolean {

@@ -247,6 +247,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 4.14 — Override catalogue (FR-32)
+    {
+      permission: "headcount.override.read",
+      dataCategory: "organization.headcount_override",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "headcount.override.write",
+      dataCategory: "organization.headcount_override",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 

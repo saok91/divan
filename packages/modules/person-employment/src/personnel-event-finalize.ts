@@ -14,7 +14,11 @@ import {
 } from "@divan/event-store";
 import {
   assertActorHasHeadcountMatchReselect,
+  assertActorHasHeadcountOverrideWrite,
   HeadcountExemptionError,
+  HeadcountOverrideError,
+  matchApprovalsForOverride,
+  type HeadcountViolatedRule,
 } from "@divan/headcount";
 import { todayDateOnlyTehran } from "@divan/temporal-engine";
 import type { Pool, PoolClient, PrismaClient } from "@divan/db";
@@ -546,6 +550,68 @@ export async function finalizeDraft(
           code: "FINALIZE_OVERRIDE_REQUIRED",
         };
       }
+
+      if (needOverride.includes("HEADCOUNT_UNAPPROVED")) {
+        try {
+          await assertActorHasHeadcountOverrideWrite(
+            input.actorId,
+            getPersonDb(),
+          );
+        } catch (err) {
+          if (err instanceof HeadcountOverrideError) {
+            return {
+              outcome: "rejected" as const,
+              draft,
+              conflicts,
+              snapshot: liveSnapshot,
+              messageFa: err.messageFa,
+              code: "FINALIZE_OVERRIDE_REQUIRED",
+            };
+          }
+          throw err;
+        }
+      }
+
+      // Resolve attributable Approval/slot for HEADCOUNT_UNAPPROVED (may have free<=0)
+      if (needOverride.includes("HEADCOUNT_UNAPPROVED")) {
+        const resolved = await resolveHeadcountOverrideOntoDraft(
+          client,
+          draft,
+          {
+            reason,
+            actorId: input.actorId,
+          },
+        );
+        if (!resolved.ok) {
+          return {
+            outcome: "rejected" as const,
+            draft,
+            conflicts: [
+              ...conflicts,
+              {
+                code: "HEADCOUNT_UNAPPROVED",
+                severity: "blocking",
+                messageFa: resolved.messageFa,
+              },
+            ],
+            snapshot: liveSnapshot,
+            messageFa: resolved.messageFa,
+            code: "FINALIZE_BLOCKED",
+          };
+        }
+        draft = { ...draft, payload: resolved.payload };
+        // Persist override fields onto draft row so append sees them
+        await client.query(
+          `UPDATE "PersonnelEventDraft"
+           SET payload = $2::jsonb,
+               "updatedBy" = $3,
+               "updatedAt" = CURRENT_TIMESTAMP,
+               version = version + 1
+           WHERE id = $1`,
+          [draft.id, JSON.stringify(draft.payload), input.actorId],
+        );
+        draft = { ...draft, version: draft.version + 1 };
+      }
     }
 
     // Story 4.13 — manual Approval reselection requires permission + audit
@@ -740,9 +806,9 @@ export async function finalizeDraft(
     try {
       // Override + ack → access-event audit evidence (pre-Baseline / capacity)
       if (needOverride.length > 0 && input.override) {
-        const wantsCapacity = needOverride.includes(
-          "HEADCOUNT_CAPACITY_MISSING",
-        );
+        const wantsCapacity =
+          needOverride.includes("HEADCOUNT_CAPACITY_MISSING") ||
+          needOverride.includes("HEADCOUNT_UNAPPROVED");
         const wantsBaseline = needOverride.includes(
           "PRE_BASELINE_EFFECTIVE_DATE",
         );
@@ -757,6 +823,11 @@ export async function finalizeDraft(
               overrideCodes: needOverride,
               warningCodes: needAck,
               effectiveDate: draft.effectiveDate,
+              violatedRule: draft.payload.headcountViolatedRule ?? "shortage",
+              teamId: draft.payload.teamId,
+              jobTitleId: draft.payload.jobTitleId,
+              approvalId: draft.payload.headcountApprovalId,
+              slotId: draft.payload.capacitySlotId,
             },
             result: "allow",
             reason: input.override.reason,
@@ -964,6 +1035,173 @@ export async function finalizeDraft(
     await enqueueRecalculationAfterCommit(pendingRecalc);
   }
   return result as FinalizeDraftResult;
+}
+
+async function resolveHeadcountOverrideOntoDraft(
+  client: PoolClient,
+  draft: PersonnelEventDraftRecord,
+  opts: { reason: string; actorId: string },
+): Promise<
+  | { ok: true; payload: Record<string, unknown> }
+  | { ok: false; messageFa: string }
+> {
+  const teamId =
+    typeof draft.payload.teamId === "string" ? draft.payload.teamId.trim() : "";
+  const jobTitleId =
+    typeof draft.payload.jobTitleId === "string"
+      ? draft.payload.jobTitleId.trim()
+      : "";
+  if (!teamId || !jobTitleId) {
+    return {
+      ok: false,
+      messageFa: "تیم و عنوان شغلی برای لغو محدودیت ظرفیت الزامی است.",
+    };
+  }
+
+  const seniorityId =
+    typeof draft.payload.seniorityId === "string"
+      ? draft.payload.seniorityId.trim()
+      : null;
+  const preferredApprovalId =
+    typeof draft.payload.preferredApprovalId === "string"
+      ? draft.payload.preferredApprovalId.trim()
+      : null;
+
+  let violatedRule: HeadcountViolatedRule = "shortage";
+  const preferred = preferredApprovalId;
+
+  let match = await matchApprovalsForOverride(
+    client,
+    {
+      teamId,
+      jobTitleId,
+      seniorityId,
+      evaluationDate: draft.effectiveDate,
+      preferredApprovalId: preferred,
+    },
+    { skipConsumableGate: false },
+  );
+
+  // Validity: dimension match only when consumable gate is skipped
+  if (match.outcome === "none") {
+    const validityMatch = await matchApprovalsForOverride(
+      client,
+      {
+        teamId,
+        jobTitleId,
+        seniorityId,
+        evaluationDate: draft.effectiveDate,
+        preferredApprovalId: preferred,
+      },
+      { skipConsumableGate: true },
+    );
+    if (
+      validityMatch.outcome === "matched" ||
+      validityMatch.outcome === "manual_incompatible"
+    ) {
+      if (validityMatch.outcome === "matched") {
+        violatedRule = "validity";
+        match = validityMatch;
+      }
+    }
+  }
+
+  if (match.outcome === "manual_incompatible" && preferred) {
+    const prefRows = await client.query<{
+      job_title_id: string;
+      seniority_id: string | null;
+    }>(
+      `SELECT job_title_id, seniority_id FROM headcount_approval
+       WHERE id = $1::uuid`,
+      [preferred],
+    );
+    const pref = prefRows.rows[0];
+    if (pref && pref.job_title_id === jobTitleId) {
+      violatedRule = "seniority";
+    } else {
+      violatedRule = "job_title";
+    }
+    match = await matchApprovalsForOverride(
+      client,
+      {
+        teamId,
+        jobTitleId,
+        seniorityId,
+        evaluationDate: draft.effectiveDate,
+        preferredApprovalId: null,
+      },
+      { skipConsumableGate: false },
+    );
+    if (match.outcome === "none") {
+      const validityRetry = await matchApprovalsForOverride(
+        client,
+        {
+          teamId,
+          jobTitleId,
+          seniorityId,
+          evaluationDate: draft.effectiveDate,
+          preferredApprovalId: null,
+        },
+        { skipConsumableGate: true },
+      );
+      if (validityRetry.outcome === "matched") {
+        // Keep title/seniority attribution from preferred mismatch; still link slot
+        match = validityRetry;
+      }
+    }
+  }
+
+  if (match.outcome === "none" || match.outcome === "manual_incompatible") {
+    // Legacy fixture bridge: Override shortage on approval_id IS NULL slots
+    const legacy = await client.query<{ id: string }>(
+      `SELECT id FROM headcount_capacity_slot
+       WHERE team_id = $1::uuid
+         AND approval_id IS NULL
+         AND (job_title_id IS NULL OR job_title_id = $2::uuid)
+         AND start_date <= $3::date
+         AND (end_date_exclusive IS NULL OR end_date_exclusive > $3::date)
+       ORDER BY free_units ASC, id ASC
+       LIMIT 1`,
+      [teamId, jobTitleId, draft.effectiveDate],
+    );
+    const legacySlotId = legacy.rows[0]?.id;
+    if (!legacySlotId) {
+      return {
+        ok: false,
+        messageFa:
+          match.outcome === "manual_incompatible"
+            ? match.messageFa
+            : "مجوز قابل انتساب برای لغو محدودیت یافت نشد؛ بدون پیوند ظرفیت Override مجاز نیست.",
+      };
+    }
+    return {
+      ok: true,
+      payload: {
+        ...draft.payload,
+        capacitySlotId: legacySlotId,
+        headcountApprovalId: null,
+        headcountExempt: false,
+        headcountOverride: true,
+        headcountOverrideReason: opts.reason,
+        headcountViolatedRule: "shortage" satisfies HeadcountViolatedRule,
+        headcountOverrideActorId: opts.actorId,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      ...draft.payload,
+      capacitySlotId: match.slotId,
+      headcountApprovalId: match.approvalId,
+      headcountExempt: false,
+      headcountOverride: true,
+      headcountOverrideReason: opts.reason,
+      headcountViolatedRule: violatedRule,
+      headcountOverrideActorId: opts.actorId,
+    },
+  };
 }
 
 /**

@@ -7,8 +7,16 @@ import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
 import { createPgPool, type Pool, type PoolClient, type PrismaClient } from "@divan/db";
 import { getBusinessEventById } from "@divan/event-store";
 import {
+  checkReservationApprovalExpiryWarning,
+  checkReservationExpiryByEventId,
+  detectScheduledHeadcountException,
   evaluateHeadcountCapacity,
+  getScheduledExceptionMarker,
+  HEADCOUNT_APPROVAL_EXPIRY_SOON,
+  HEADCOUNT_SCHEDULED_EXCEPTION,
   matchCompatibleApprovals,
+  MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA,
+  MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
 } from "@divan/headcount";
 
 import { getPersonDb } from "./db";
@@ -187,6 +195,7 @@ export const HEADCOUNT_CAPACITY_PORT_EVENT_TYPES = new Set([
 export const WARNING_ACK_ALLOW_LIST = new Set([
   "PRE_BASELINE_EFFECTIVE_DATE",
   "HEADCOUNT_CAPACITY_MISSING",
+  "HEADCOUNT_APPROVAL_EXPIRY_SOON",
 ]);
 
 export type ConflictPolicy = {
@@ -1364,6 +1373,50 @@ export async function classifyConflicts(
             headcountMatchedBy: capacity.matchedBy,
             headcountDefaultApprovalId: defaultApprovalId,
           };
+
+          // 14-day Approval expiry horizon warning (AR-HEADCOUNT)
+          if (capacity.approvalId) {
+            const expiry = await checkReservationApprovalExpiryWarning(
+              reader,
+              {
+                approvalId: capacity.approvalId,
+                evaluationDate: draft.effectiveDate,
+              },
+            );
+            if (expiry.atRisk) {
+              findings.push({
+                code: HEADCOUNT_APPROVAL_EXPIRY_SOON,
+                severity: "warning",
+                requiresAck: true,
+                messageFa:
+                  expiry.messageFa ?? MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA,
+              });
+            }
+          }
+
+          // Scheduled-exception: re-detect server-side (ignore client-forged markers)
+          const exception = await detectScheduledHeadcountException(reader, {
+            approvalId: capacity.approvalId,
+            slotId: capacity.slotId,
+            evaluationDate: draft.effectiveDate,
+            teamId: facts.teamId,
+            jobTitleId: facts.jobTitleId,
+            seniorityId: facts.seniorityId,
+          });
+          if (exception.exception) {
+            draft.payload = {
+              ...draft.payload,
+              headcountException: exception.marker,
+            };
+            findings.push({
+              code: exception.marker.code || HEADCOUNT_SCHEDULED_EXCEPTION,
+              severity: "warning",
+              requiresOverride: true,
+              messageFa:
+                exception.marker.messageFa ||
+                MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
+            });
+          }
         } else if (capacity.outcome === "exempt") {
           draft.payload = {
             ...draft.payload,
@@ -1378,9 +1431,55 @@ export async function classifyConflicts(
   } else if (HEADCOUNT_CONSUMING_EVENT_TYPES.has(draft.eventType)) {
     findings.push({
       code: "HEADCOUNT_UNAPPROVED",
-      severity: "blocking",
+      severity: "warning",
+      requiresOverride: true,
       messageFa: MSG_HEADCOUNT_CHECK_BLOCKED_FA,
     });
+  }
+
+  // Already-Scheduled reserved event linked on payload (detail / Correction target)
+  const linkedScheduledEventId =
+    typeof draft.payload.linkedScheduledEventId === "string"
+      ? draft.payload.linkedScheduledEventId.trim()
+      : typeof draft.payload.targetEventId === "string"
+        ? draft.payload.targetEventId.trim()
+        : "";
+  if (linkedScheduledEventId) {
+    const schedReader = opts.client ?? getConflictReadPool();
+    if (schedReader) {
+    const atRisk = await checkReservationExpiryByEventId(
+      schedReader,
+      linkedScheduledEventId,
+    );
+    if (atRisk.atRisk) {
+      const already = findings.some((f) => f.code === HEADCOUNT_APPROVAL_EXPIRY_SOON);
+      if (!already) {
+        findings.push({
+          code: HEADCOUNT_APPROVAL_EXPIRY_SOON,
+          severity: "warning",
+          requiresAck: true,
+          messageFa: atRisk.messageFa ?? MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA,
+        });
+      }
+    }
+    const persisted = await getScheduledExceptionMarker(
+      schedReader,
+      linkedScheduledEventId,
+    );
+    if (persisted) {
+      const already = findings.some(
+        (f) => f.code === HEADCOUNT_SCHEDULED_EXCEPTION || f.code === persisted.code,
+      );
+      if (!already) {
+        findings.push({
+          code: persisted.code || HEADCOUNT_SCHEDULED_EXCEPTION,
+          severity: "warning",
+          requiresOverride: true,
+          messageFa: persisted.messageFa || MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
+        });
+      }
+    }
+    }
   }
 
   // Irreconcilable same-day ordering (Story 4.4) — conservative detectable stub.

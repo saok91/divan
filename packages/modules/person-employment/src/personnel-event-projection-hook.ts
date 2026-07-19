@@ -18,9 +18,12 @@ import { getPersonDb } from "./db";
 import type { PersonnelEventDraftRecord } from "./personnel-event-draft";
 import {
   START_RETURN_EVENT_TYPES,
+  PRODUCT_START_EVENT_TYPE,
   applyStartReturnProjections,
+  applyStartScheduledReserve,
   bindEmploymentIdAfterApply,
   compensateOrphanStartReturnProjections,
+  releaseStartReservationOnCancel,
 } from "./personnel-event-start-return";
 import {
   TERMINATION_EVENT_TYPES,
@@ -131,7 +134,7 @@ export type ProjectionRefreshHook = (
 /**
  * Default production hook: records invocation; on Effective Start/Return /
  * Termination / Transfer / Job-level / Compensation applies domain projectors.
- * When `applyToCurrentProjection === false`, Scheduled Transfer / Title-Seniority
+ * When `applyToCurrentProjection === false`, Scheduled Transfer / Start / Title-Seniority
  * still reserves destination capacity; Cancel releases it.
  */
 export async function defaultProjectionRefreshHook(
@@ -140,8 +143,12 @@ export async function defaultProjectionRefreshHook(
   ctx.invoked = { eventId: ctx.eventId, eventType: ctx.eventType };
 
   if (ctx.applyToCurrentProjection === false) {
-    // Cancel of Scheduled Transfer / Title-Seniority → release reservation
-    if (ctx.lifecycleOp === "cancel" && ctx.targetEventId) {
+    // Cancel or superseding Correction of Scheduled Transfer / Start / Title-Seniority
+    // → release reservation (AC #5); do not leave orphan reserved units.
+    if (
+      (ctx.lifecycleOp === "cancel" || ctx.lifecycleOp === "correct") &&
+      ctx.targetEventId
+    ) {
       const target = await getBusinessEventById(ctx.client, ctx.targetEventId);
       if (target && TRANSFER_EVENT_TYPES.has(target.eventType)) {
         await releaseTransferReservationOnCancel(ctx.client, ctx.targetEventId);
@@ -157,6 +164,11 @@ export async function defaultProjectionRefreshHook(
           didMoveDestCapacity: false,
           reservedOnly: true,
         };
+      } else if (
+        target &&
+        target.eventType === PRODUCT_START_EVENT_TYPE
+      ) {
+        await releaseStartReservationOnCancel(ctx.client, ctx.targetEventId);
       } else if (
         target &&
         JOB_LEVEL_CAPACITY_EVENT_TYPES.has(target.eventType)
@@ -204,6 +216,12 @@ export async function defaultProjectionRefreshHook(
         didMoveDestCapacity: false,
         reservedOnly: true,
       };
+      return;
+    }
+
+    // Scheduled StartEmployment → reserve only (FR-30; Return has no reserve)
+    if (ctx.eventType === PRODUCT_START_EVENT_TYPE) {
+      await applyStartScheduledReserve(ctx);
       return;
     }
 

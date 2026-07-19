@@ -161,6 +161,25 @@ function assertSafePayload(payload: Record<string, unknown>): void {
   }
 }
 
+/** Server-only Override / exception keys — strip client-supplied values. */
+const SERVER_ONLY_HEADCOUNT_PAYLOAD_KEYS = [
+  "headcountOverride",
+  "headcountOverrideReason",
+  "headcountViolatedRule",
+  "headcountOverrideActorId",
+  "headcountException",
+] as const;
+
+export function stripClientTrustedHeadcountOverrideFields(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...payload };
+  for (const key of SERVER_ONLY_HEADCOUNT_PAYLOAD_KEYS) {
+    delete next[key];
+  }
+  return next;
+}
+
 function assertPlainPayload(payload: unknown): Record<string, unknown> {
   if (payload == null) return {};
   if (typeof payload !== "object" || Array.isArray(payload)) {
@@ -209,7 +228,9 @@ export async function createDraft(
 
   const eventType = assertValidEventType(input.eventType);
   const effectiveDate = assertValidEffectiveDate(input.effectiveDate);
-  const payload = assertPlainPayload(input.payload);
+  const payload = stripClientTrustedHeadcountOverrideFields(
+    assertPlainPayload(input.payload),
+  );
   assertSafePayload(payload);
 
   if (input.employmentId?.trim()) {
@@ -279,7 +300,9 @@ export async function updateDraft(
       : existing.effectiveDate;
   const payload =
     input.payload !== undefined
-      ? assertPlainPayload(input.payload)
+      ? stripClientTrustedHeadcountOverrideFields(
+          assertPlainPayload(input.payload),
+        )
       : existing.payload;
   assertSafePayload(payload);
 

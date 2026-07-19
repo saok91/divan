@@ -543,6 +543,11 @@ export function PersonnelEventForm() {
   );
   const overrideCodes = conflicts.filter((c) => c.requiresOverride);
   const needsOverride = overrideCodes.length > 0;
+  const hasScheduledException = conflicts.some(
+    (c) =>
+      c.code === "HEADCOUNT_SCHEDULED_EXCEPTION" ||
+      c.code?.includes("SCHEDULED_EXCEPTION"),
+  );
   const ackComplete = warningsNeedingAck.every((w) => ackCodes.has(w.code));
   const overrideComplete =
     !needsOverride || overrideReason.trim().length >= 3;
@@ -848,6 +853,7 @@ export function PersonnelEventForm() {
               reserved={capacityQuery.data?.reserved ?? 0}
               free={capacityQuery.data?.free ?? 0}
               exempt={capacityQuery.data?.exempt ?? 0}
+              overridden={capacityQuery.data?.overridden ?? 0}
               slotFound={
                 capacityQuery.isFetched
                   ? Boolean(capacityQuery.data?.slotId) ||
@@ -1034,6 +1040,7 @@ export function PersonnelEventForm() {
               reserved={capacityQuery.data?.reserved ?? 0}
               free={capacityQuery.data?.free ?? 0}
               exempt={capacityQuery.data?.exempt ?? 0}
+              overridden={capacityQuery.data?.overridden ?? 0}
               slotFound={
                 capacityQuery.isFetched
                   ? Boolean(capacityQuery.data?.slotId) ||
@@ -1226,6 +1233,7 @@ export function PersonnelEventForm() {
                   reserved={capacityQuery.data?.reserved ?? 0}
                   free={capacityQuery.data?.free ?? 0}
                   exempt={capacityQuery.data?.exempt ?? 0}
+              overridden={capacityQuery.data?.overridden ?? 0}
                   slotFound={
                     capacityQuery.isFetched
                       ? Boolean(capacityQuery.data?.slotId) ||
@@ -1420,6 +1428,11 @@ export function PersonnelEventForm() {
                   دلیل Override (فقط HR Admin){" "}
                   <span className="text-destructive">*</span>
                 </span>
+                {hasScheduledException ? (
+                  <div className="mb-2">
+                    <StatusBadge status="Exception" />
+                  </div>
+                ) : null}
                 <Input
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}

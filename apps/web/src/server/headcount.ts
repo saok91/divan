@@ -1,5 +1,5 @@
 /**
- * Headcount Approval + Exemption + matching governed router (Stories 4.12–4.13).
+ * Headcount Approval + Exemption + Override + matching governed router (Stories 4.12–4.14).
  * Mirrors job-reference: governedProcedure + Zod + domain errors → TRPCError.
  */
 import { createPgPool, type Pool } from "@divan/db";
@@ -10,28 +10,41 @@ import {
   HEADCOUNT_EXEMPTION_DATA_CATEGORY,
   HEADCOUNT_EXEMPTION_READ_PERMISSION,
   HEADCOUNT_EXEMPTION_WRITE_PERMISSION,
+  HEADCOUNT_OVERRIDE_DATA_CATEGORY,
+  HEADCOUNT_OVERRIDE_READ_PERMISSION,
+  HEADCOUNT_OVERRIDE_WRITE_PERMISSION,
   HeadcountApprovalError,
   HeadcountExemptionError,
+  HeadcountOverrideError,
   activateApproval,
   activateExemption,
   assertActorHasHeadcountApprovalRead,
   assertActorHasHeadcountApprovalWrite,
   assertActorHasHeadcountExemptionRead,
   assertActorHasHeadcountExemptionWrite,
+  assertActorHasHeadcountOverrideRead,
+  assertActorHasHeadcountOverrideWrite,
   cancelApproval,
   createApproval,
   createExemption,
   ensureHeadcountApprovalSchema,
   ensureHeadcountCapacitySchema,
   ensureHeadcountExemptionSchema,
+  ensureHeadcountOverrideSchema,
   expireApproval,
   getApproval,
   getExemption,
+  getOverride,
   listApprovals,
   listCompatibleApprovalCandidates,
   listExemptions,
+  listOverrides,
   revokeExemption,
   updateApproval,
+  voidOverride,
+  checkReservationExpiryByEventId,
+  getScheduledExceptionMarker,
+  ensureScheduledExceptionSchema,
 } from "@divan/headcount";
 import { getPersonDb } from "@divan/person-employment";
 import { parseDateOnly } from "@divan/temporal-engine";
@@ -67,6 +80,22 @@ const exemptionReadMeta = {
 const exemptionWriteMeta = {
   permission: HEADCOUNT_EXEMPTION_WRITE_PERMISSION,
   dataCategory: HEADCOUNT_EXEMPTION_DATA_CATEGORY,
+  action: "write" as const,
+  organizationalScope: "org:selfcheck",
+  sensitive: false as const,
+};
+
+const overrideReadMeta = {
+  permission: HEADCOUNT_OVERRIDE_READ_PERMISSION,
+  dataCategory: HEADCOUNT_OVERRIDE_DATA_CATEGORY,
+  action: "read" as const,
+  organizationalScope: "org:selfcheck",
+  sensitive: false as const,
+};
+
+const overrideWriteMeta = {
+  permission: HEADCOUNT_OVERRIDE_WRITE_PERMISSION,
+  dataCategory: HEADCOUNT_OVERRIDE_DATA_CATEGORY,
   action: "write" as const,
   organizationalScope: "org:selfcheck",
   sensitive: false as const,
@@ -164,11 +193,38 @@ function mapExemptionError(err: unknown): never {
   throw err;
 }
 
+function mapOverrideError(err: unknown): never {
+  if (err instanceof HeadcountOverrideError) {
+    if (err.code === "NOT_FOUND") {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: err.messageFa,
+        cause: err,
+      });
+    }
+    if (err.code === "PERMISSION_DENIED") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: err.messageFa,
+        cause: err,
+      });
+    }
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: err.messageFa,
+      cause: err,
+    });
+  }
+  throw err;
+}
+
 async function withSchema<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
   const pool = getHeadcountPool();
   await ensureHeadcountCapacitySchema(pool);
   await ensureHeadcountApprovalSchema(pool);
   await ensureHeadcountExemptionSchema(pool);
+  await ensureHeadcountOverrideSchema(pool);
+  await ensureScheduledExceptionSchema(pool);
   return fn(pool);
 }
 
@@ -553,5 +609,105 @@ export const headcountRouter = createTRPCRouter({
       } catch (err) {
         mapExemptionError(err);
       }
+    }),
+
+  listOverrides: governedProcedure
+    .meta({ ...overrideReadMeta, operation: "headcount.override.list" })
+    .input(
+      z
+        .object({
+          status: z.enum(["active", "superseded", "voided"]).optional(),
+          violatedRule: z
+            .enum(["shortage", "validity", "job_title", "seniority"])
+            .optional(),
+          teamId: z.string().optional(),
+          slotId: z.string().uuid().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertActorHasHeadcountOverrideRead(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      return withSchema((pool) =>
+        listOverrides(pool, {
+          status: input?.status,
+          violatedRule: input?.violatedRule,
+          teamId: input?.teamId,
+          slotId: input?.slotId,
+        }),
+      );
+    }),
+
+  getOverride: governedProcedure
+    .meta({ ...overrideReadMeta, operation: "headcount.override.get" })
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await assertActorHasHeadcountOverrideRead(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      const row = await withSchema((pool) => getOverride(pool, input.id));
+      if (!row) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "لغو محدودیت ظرفیت یافت نشد.",
+        });
+      }
+      return row;
+    }),
+
+  voidOverride: governedProcedure
+    .meta({ ...overrideWriteMeta, operation: "headcount.override.void" })
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertActorHasHeadcountOverrideWrite(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      try {
+        return await withSchema((pool) =>
+          voidOverride(pool, {
+            id: input.id,
+            actorId: ctx.session.accountId,
+          }),
+        );
+      } catch (err) {
+        mapOverrideError(err);
+      }
+    }),
+
+  reservationExpiryForEvent: governedProcedure
+    .meta({
+      ...overrideReadMeta,
+      operation: "headcount.reservation.expiry_for_event",
+    })
+    .input(z.object({ eventId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await assertActorHasHeadcountOverrideRead(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      return withSchema(async (pool) => {
+        await ensureScheduledExceptionSchema(pool);
+        return checkReservationExpiryByEventId(pool, input.eventId);
+      });
+    }),
+
+  scheduledExceptionForEvent: governedProcedure
+    .meta({
+      ...overrideReadMeta,
+      operation: "headcount.scheduled_exception.get",
+    })
+    .input(z.object({ eventId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await assertActorHasHeadcountOverrideRead(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      return withSchema((pool) =>
+        getScheduledExceptionMarker(pool, input.eventId),
+      );
     }),
 });

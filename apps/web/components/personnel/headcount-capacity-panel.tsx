@@ -10,7 +10,7 @@ export type HeadcountCapacityPanelProps = {
   free: number;
   /** Active covering exemption foreshadow (UX-DR13). */
   exempt?: number;
-  /** Muted placeholder — Override product lands in 4.14. */
+  /** Active Override count for the resolved slot (FR-32). */
   overridden?: number;
   /** False when no matching slot was found (distinct from free=0). */
   slotFound?: boolean;
@@ -76,7 +76,7 @@ export function HeadcountCapacityPanel({
       aria-label="ظرفیت نیروی انسانی مقصد"
     >
       <p className="text-label-medium mb-2">ظرفیت مقصد</p>
-      <dl className="grid grid-cols-2 gap-2 text-sm tabular-nums sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-2 text-sm tabular-nums sm:grid-cols-5">
         <div>
           <dt className="text-muted-foreground text-xs">مصرف‌شده</dt>
           <dd className="font-medium" dir="ltr">
@@ -91,7 +91,17 @@ export function HeadcountCapacityPanel({
         </div>
         <div>
           <dt className="text-muted-foreground text-xs">آزاد</dt>
-          <dd className="font-medium" dir="ltr">
+          <dd
+            className={cn(
+              "font-medium",
+              free > 0
+                ? "text-foreground"
+                : free < 0
+                  ? "text-destructive"
+                  : "text-muted-foreground",
+            )}
+            dir="ltr"
+          >
             {free}
           </dd>
         </div>
@@ -101,19 +111,13 @@ export function HeadcountCapacityPanel({
             {exempt}
           </dd>
         </div>
+        <div>
+          <dt className="text-muted-foreground text-xs">لغو محدودیت</dt>
+          <dd className="font-medium" dir="ltr">
+            {overridden ?? 0}
+          </dd>
+        </div>
       </dl>
-      {overridden != null ? (
-        <p className="mt-2 text-xs text-muted-foreground" role="status">
-          لغو محدودیت (به‌زودی):{" "}
-          <span className="tabular-nums" dir="ltr">
-            {overridden}
-          </span>
-        </p>
-      ) : (
-        <p className="mt-2 text-xs text-muted-foreground" role="status">
-          لغو محدودیت ظرفیت در نسخهٔ بعدی فعال می‌شود.
-        </p>
-      )}
     </div>
   );
 }

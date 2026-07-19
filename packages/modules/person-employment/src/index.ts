@@ -470,6 +470,9 @@ export {
   seedOrganizationHierarchyFixtures,
   seedJobReferencePermissionFixtures,
   seedHeadcountApprovalPermissionFixtures,
+  seedHeadcountExemptionPermissionFixtures,
+  seedHeadcountOverridePermissionFixtures,
+  SEED_HEADCOUNT_OVERRIDE,
   seedDemoJobReferences,
   seedJobReferenceFixtures,
   seedDemoPrimaryAssignments,
@@ -560,6 +563,7 @@ export {
   deleteDraft,
   listOpenDraftsForPerson,
   assertDraftEditable,
+  stripClientTrustedHeadcountOverrideFields,
 } from "./personnel-event-draft";
 
 export type {
@@ -598,7 +602,10 @@ export {
   SCAFFOLD_EVENT_TYPE,
   parseStartReturnPayload,
   applyStartReturnProjections,
+  applyStartScheduledReserve,
+  releaseStartReservationOnCancel,
   compensateOrphanStartReturnProjections,
+  capacityResultToConflict,
 } from "./personnel-event-start-return";
 
 export type {

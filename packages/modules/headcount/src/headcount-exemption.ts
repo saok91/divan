@@ -90,7 +90,11 @@ export const EXEMPTION_STATUS_LABEL_FA: Record<
 type Queryable = Pool | PoolClient;
 
 function isPool(db: Queryable): db is Pool {
-  return typeof (db as Pool).connect === "function";
+  // PoolClient also has connect(); prefer release() as the client discriminator.
+  return (
+    typeof (db as Pool).connect === "function" &&
+    typeof (db as { release?: unknown }).release !== "function"
+  );
 }
 
 async function runInTransaction<T>(

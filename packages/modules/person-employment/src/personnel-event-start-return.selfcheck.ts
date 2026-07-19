@@ -100,6 +100,8 @@ async function main() {
   const pool = createPgPool(url);
 
   await seedPrimaryAssignmentFixtures(db);
+  const { seedHeadcountOverridePermissionFixtures } = await import("./seed");
+  await seedHeadcountOverridePermissionFixtures(db);
   const { slotId } = await seedDemoHeadcountCapacity(db, pool);
   const basePayload = await resolveStartPayload(db);
   const payload = { ...basePayload, capacitySlotId: slotId };
@@ -415,9 +417,16 @@ async function main() {
         assert.ok(
           opBlocked.conflicts.some(
             (c) =>
-              c.code === "HEADCOUNT_UNAPPROVED" && c.severity === "blocking",
+              c.code === "HEADCOUNT_UNAPPROVED" &&
+              (c.severity === "warning" || c.severity === "blocking") &&
+              (c.requiresOverride === true || c.severity === "blocking"),
           ),
-          "Operator must see blocking HEADCOUNT_UNAPPROVED (FR-29; Override → 4.14)",
+          "Operator must see HEADCOUNT_UNAPPROVED requiring Override (FR-32)",
+        );
+        assert.ok(
+          opBlocked.code === "FINALIZE_OVERRIDE_REQUIRED" ||
+            opBlocked.conflicts.some((c) => c.code === "HEADCOUNT_UNAPPROVED"),
+          "Operator blocked without Override permission",
         );
       }
 
@@ -441,7 +450,7 @@ async function main() {
             warningCodes: ["HEADCOUNT_UNAPPROVED"],
           },
           override: {
-            reason: "تأیید دستی ظرفیت — باید مسدود بماند تا ۴٫۱۴",
+            reason: "تأیید دستی کمبود ظرفیت — خودآزمایی ۴٫۱۴",
             approvedByAccountId: admin,
           },
         },
@@ -450,15 +459,26 @@ async function main() {
       );
       assert.equal(
         adminFin.outcome,
-        "rejected",
-        "Override catalogue not shipped in 4.13 — shortage stays blocked",
+        "finalized",
+        "Admin Override may proceed for shortage (FR-32)",
       );
-      if (adminFin.outcome === "rejected") {
-        assert.ok(
-          adminFin.conflicts.some((c) => c.code === "HEADCOUNT_UNAPPROVED"),
-        );
-      }
-      assert.equal(await countEmployments(db, noCapPerson.id), 0);
+      assert.equal(await countEmployments(db, noCapPerson.id), 1);
+      const freeAfter = await pool.query<{ free_units: number }>(
+        `SELECT free_units FROM headcount_capacity_slot
+         WHERE team_id = $1::uuid ORDER BY free_units ASC LIMIT 1`,
+        [basePayload.teamId],
+      );
+      assert.ok(
+        Number(freeAfter.rows[0]?.free_units ?? 0) < 0,
+        "Override consume may drive free negative",
+      );
+      const overrides = await pool.query<{ id: string; violated_rule: string }>(
+        `SELECT id, violated_rule FROM headcount_override
+         WHERE status = 'active' AND violated_rule = 'shortage'
+         ORDER BY created_at DESC LIMIT 1`,
+      );
+      assert.ok(overrides.rows[0], "Override row must be filterable");
+      assert.equal(overrides.rows[0]!.violated_rule, "shortage");
     } finally {
       for (const row of priorFree.rows) {
         await pool.query(

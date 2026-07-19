@@ -8,7 +8,8 @@ export type StatusBadgeKind =
   | "Cancelled"
   | "Reversed"
   | "Draft"
-  | "Override";
+  | "Override"
+  | "Exception";
 
 const LABELS_FA: Record<StatusBadgeKind, string> = {
   Scheduled: "زمان‌بندی‌شده",
@@ -17,6 +18,7 @@ const LABELS_FA: Record<StatusBadgeKind, string> = {
   Reversed: "بازگشت‌خورده",
   Draft: "پیش‌نویس",
   Override: "لغو محدودیت",
+  Exception: "استثنا",
 };
 
 const TOKEN_CLASS: Record<StatusBadgeKind, string> = {
@@ -26,6 +28,7 @@ const TOKEN_CLASS: Record<StatusBadgeKind, string> = {
   Reversed: "status-badge-reversed",
   Draft: "status-badge-draft",
   Override: "status-badge-override",
+  Exception: "status-badge-reversed",
 };
 
 const STATUS_BADGE_KINDS = new Set<string>(Object.keys(LABELS_FA));

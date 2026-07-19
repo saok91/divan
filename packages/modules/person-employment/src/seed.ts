@@ -807,6 +807,68 @@ export async function seedHeadcountApprovalPermissionFixtures(
   }
 }
 
+/** Story 4.14 — override catalogue for hr.admin. */
+export const SEED_HEADCOUNT_OVERRIDE = {
+  permissionSetName: "headcount-override",
+  roleCode: "headcount_override_admin",
+  roleLabelFa: "مدیر لغو محدودیت ظرفیت",
+} as const;
+
+export async function seedHeadcountOverridePermissionFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  const permissionSet = await db.permissionSet.upsert({
+    where: { name: SEED_HEADCOUNT_OVERRIDE.permissionSetName },
+    create: {
+      name: SEED_HEADCOUNT_OVERRIDE.permissionSetName,
+      permissions: [
+        "headcount.override.read",
+        "headcount.override.write",
+      ],
+    },
+    update: {
+      permissions: [
+        "headcount.override.read",
+        "headcount.override.write",
+      ],
+    },
+  });
+
+  const role = await db.accessRole.upsert({
+    where: { code: SEED_HEADCOUNT_OVERRIDE.roleCode },
+    create: {
+      code: SEED_HEADCOUNT_OVERRIDE.roleCode,
+      labelFa: SEED_HEADCOUNT_OVERRIDE.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+    update: {
+      labelFa: SEED_HEADCOUNT_OVERRIDE.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+  });
+
+  for (const username of ["hr.admin"] as const) {
+    const account = await db.internalAccount.findUnique({
+      where: { username },
+    });
+    if (!account) continue;
+
+    await db.accountAccessRole.upsert({
+      where: {
+        accountId_accessRoleId: {
+          accountId: account.id,
+          accessRoleId: role.id,
+        },
+      },
+      create: {
+        accountId: account.id,
+        accessRoleId: role.id,
+      },
+      update: {},
+    });
+  }
+}
+
 /** Story 4.13 — exemption + match reselect for hr.admin. */
 export const SEED_HEADCOUNT_EXEMPTION = {
   permissionSetName: "headcount-exemption",
@@ -1030,6 +1092,7 @@ export async function seedJobReferenceFixtures(
   await seedJobReferencePermissionFixtures(db);
   await seedHeadcountApprovalPermissionFixtures(db);
   await seedHeadcountExemptionPermissionFixtures(db);
+  await seedHeadcountOverridePermissionFixtures(db);
   await seedDemoJobReferences(db);
 }
 

@@ -130,7 +130,10 @@ export type HeadcountSlotQuantities = {
   approved: number;
   used: number;
   reserved: number;
+  /** May be negative when Override-backed overbook occurred (FR-32). */
   free: number;
+  /** True when free < 0 (over-capacity surfaced, never floored). */
+  overridden?: boolean;
 };
 
 export type ReconstructHeadcountQuantitiesResult = {
@@ -441,7 +444,9 @@ export async function reconstructHeadcountQuantitiesAsOf(
       approved = liveUsed + liveReserved + liveFree;
     }
     const free = approved - used - reserved;
-    if (free < 0 || approved !== used + reserved + free) {
+    // Conservation identity holds when free is negative (Override overbook).
+    // Never silently floor; surface negative free for as-of views (FR-32).
+    if (approved !== used + reserved + free) {
       throw new HeadcountLedgerError(
         "CONSERVATION",
         MSG_HEADCOUNT_CONSERVATION_FA,
@@ -459,6 +464,7 @@ export async function reconstructHeadcountQuantitiesAsOf(
       used,
       reserved,
       free,
+      overridden: free < 0,
     });
     aggApproved += approved;
     aggUsed += used;

@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "selfcheck:headcount-approval": "tsx src/headcount-approval.selfcheck.ts",
-    "selfcheck:headcount-matching": "tsx src/headcount-matching.selfcheck.ts"
+    "selfcheck:headcount-matching": "tsx src/headcount-matching.selfcheck.ts",
+    "selfcheck:headcount-override": "tsx src/headcount-override.selfcheck.ts"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

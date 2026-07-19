@@ -1,5 +1,6 @@
 /**
  * Start / Return personnel event helpers (Story 4.5 / FR-20).
+ * Story 4.14: Scheduled Start durable reserve + Override consume (FR-30/32).
  * Product path = Draft → Finalize → projection hook — no public startEmployment verbs.
  */
 
@@ -7,7 +8,17 @@ import type { PoolClient, PrismaClient } from "@divan/db";
 import { getBusinessEventById } from "@divan/event-store";
 import {
   consumeHeadcountCapacity,
+  consumeHeadcountCapacityWithOverride,
+  convertReservationToConsumption,
+  detectScheduledHeadcountException,
+  ensureOverrideRowAfterConvert,
+  reserveHeadcountCapacity,
+  reserveHeadcountCapacityWithOverride,
+  releaseHeadcountReservation,
+  upsertScheduledExceptionMarker,
   type CapacityCheckResult,
+  type HeadcountViolatedRule,
+  type OverrideMutateContext,
 } from "@divan/headcount";
 
 import { getPersonDb } from "./db";
@@ -59,6 +70,11 @@ export type StartReturnPayloadFacts = {
   headcountApprovalId: string | null;
   /** When true, skip consume — covered by exemption. */
   headcountExempt?: boolean;
+  /** Override pending from finalize (FR-32). */
+  headcountOverride?: boolean;
+  headcountOverrideReason?: string | null;
+  headcountViolatedRule?: HeadcountViolatedRule | null;
+  headcountOverrideActorId?: string | null;
 };
 
 export type MissingFact = {
@@ -148,6 +164,21 @@ export function parseStartReturnPayload(
       capacitySlotId: strField(payload, "capacitySlotId"),
       headcountApprovalId: strField(payload, "headcountApprovalId"),
       headcountExempt: payload.headcountExempt === true,
+      headcountOverride: payload.headcountOverride === true,
+      headcountOverrideReason: strField(payload, "headcountOverrideReason"),
+      headcountViolatedRule: (() => {
+        const v = strField(payload, "headcountViolatedRule");
+        if (
+          v === "shortage" ||
+          v === "validity" ||
+          v === "job_title" ||
+          v === "seniority"
+        ) {
+          return v;
+        }
+        return null;
+      })(),
+      headcountOverrideActorId: strField(payload, "headcountOverrideActorId"),
     },
     missing: [],
   };
@@ -256,6 +287,45 @@ export async function applyStartReturnProjections(
     );
   }
 
+  // Scheduled-exception: fail closed BEFORE any Employment/Assignment/capacity apply.
+  // Validity Override with complete context may skip the consumable gate; incomplete
+  // Override flags never bypass the exception path or fall through to normal mutate.
+  const slotId = facts.capacitySlotId;
+  const overrideCtx = buildOverrideMutateContext(facts);
+  if (facts.headcountOverride && !overrideCtx) {
+    throw new PersonnelEventError(
+      "VALIDATION",
+      "دلیل و عامل لغو محدودیت ظرفیت برای ادامه الزامی است.",
+      "incomplete_headcount_override",
+    );
+  }
+
+  if (slotId && !facts.headcountExempt) {
+    const skipExceptionForValidityOverride =
+      overrideCtx != null && overrideCtx.violatedRule === "validity";
+    if (!skipExceptionForValidityOverride) {
+      const exception = await detectScheduledHeadcountException(ctx.client, {
+        approvalId: facts.headcountApprovalId,
+        slotId,
+        evaluationDate: source.effectiveDate,
+        teamId: facts.teamId,
+        jobTitleId: facts.jobTitleId,
+        seniorityId: facts.seniorityId,
+      });
+      if (exception.exception) {
+        await upsertScheduledExceptionMarker(ctx.client, {
+          eventId: ctx.eventId,
+          marker: exception.marker,
+        });
+        throw new PersonnelEventError(
+          "VALIDATION",
+          exception.marker.messageFa,
+          exception.marker.code,
+        );
+      }
+    }
+  }
+
   let createdEmploymentId: string | null = null;
   let createdPrimaryId: string | null = null;
   try {
@@ -303,16 +373,64 @@ export async function applyStartReturnProjections(
       );
     }
 
-    // Consume capacity when slot was resolved into payload during classify
-    // (skip when exempt — FR-29)
-    const slotId = facts.capacitySlotId;
+    // Capacity: convert Scheduled reservation, or consume (Effective-only / Override).
+    // ReturnFromAbsence stays Effective-only consume (no invented Return reserve).
     if (slotId && !facts.headcountExempt) {
-      await consumeHeadcountCapacity(ctx.client, {
-        slotId,
-        eventId: ctx.eventId,
-        personId: source.personId,
-        evaluationDate: source.effectiveDate,
-      });
+      if (overrideCtx && ctx.eventType === PRODUCT_START_EVENT_TYPE) {
+        const converted = await convertReservationToConsumption(ctx.client, {
+          eventId: ctx.eventId,
+          personId: source.personId,
+        });
+        if (converted.converted) {
+          await ensureOverrideRowAfterConvert(ctx.client, {
+            eventId: ctx.eventId,
+            slotId: converted.slotId ?? slotId,
+            override: overrideCtx,
+          });
+        } else {
+          await consumeHeadcountCapacityWithOverride(ctx.client, {
+            slotId,
+            eventId: ctx.eventId,
+            personId: source.personId,
+            evaluationDate: source.effectiveDate,
+            override: {
+              ...overrideCtx,
+              skipApprovalGate: overrideCtx.violatedRule === "validity",
+            },
+          });
+        }
+      } else if (ctx.eventType === PRODUCT_START_EVENT_TYPE) {
+        const converted = await convertReservationToConsumption(ctx.client, {
+          eventId: ctx.eventId,
+          personId: source.personId,
+        });
+        if (!converted.converted) {
+          await consumeHeadcountCapacity(ctx.client, {
+            slotId,
+            eventId: ctx.eventId,
+            personId: source.personId,
+            evaluationDate: source.effectiveDate,
+          });
+        }
+      } else if (overrideCtx) {
+        await consumeHeadcountCapacityWithOverride(ctx.client, {
+          slotId,
+          eventId: ctx.eventId,
+          personId: source.personId,
+          evaluationDate: source.effectiveDate,
+          override: {
+            ...overrideCtx,
+            skipApprovalGate: overrideCtx.violatedRule === "validity",
+          },
+        });
+      } else {
+        await consumeHeadcountCapacity(ctx.client, {
+          slotId,
+          eventId: ctx.eventId,
+          personId: source.personId,
+          evaluationDate: source.effectiveDate,
+        });
+      }
     }
 
     return {
@@ -332,6 +450,130 @@ export async function applyStartReturnProjections(
     }
     mapProjectorError(err);
   }
+}
+
+function buildOverrideMutateContext(
+  facts: StartReturnPayloadFacts,
+): OverrideMutateContext | null {
+  if (!facts.headcountOverride) return null;
+  const reason = facts.headcountOverrideReason?.trim() ?? "";
+  const actor = facts.headcountOverrideActorId?.trim() ?? "";
+  if (!reason || !actor) return null;
+  return {
+    violatedRule: facts.headcountViolatedRule ?? "shortage",
+    reason,
+    actorAccountId: actor,
+    teamId: facts.teamId,
+    jobTitleId: facts.jobTitleId,
+    seniorityId: facts.seniorityId,
+    approvalId: facts.headcountApprovalId,
+  };
+}
+
+/**
+ * Scheduled StartEmployment: reserve destination capacity (FR-30 parity with Transfer).
+ * ReturnFromAbsence: no reserve (Effective-only consume).
+ */
+export async function applyStartScheduledReserve(
+  ctx: ProjectionRefreshContext,
+): Promise<{ reserved: boolean }> {
+  if (ctx.eventType !== PRODUCT_START_EVENT_TYPE) {
+    return { reserved: false };
+  }
+
+  const source = await resolveStartReturnSource(ctx);
+  if (!source) {
+    throw new PersonnelEventError(
+      "VALIDATION",
+      "منبع رویداد Start یافت نشد.",
+      "missing_source",
+    );
+  }
+
+  const { facts, missing } = parseStartReturnPayload(source.payload);
+  if (!facts || missing.length > 0) {
+    throw new PersonnelEventError(
+      "VALIDATION",
+      missing[0]?.messageFa ?? "حداقل واقعیت‌های الزامی ناقص است.",
+      "missing_facts",
+    );
+  }
+
+  if (facts.headcountExempt) {
+    return { reserved: false };
+  }
+
+  const reserveSlotId = facts.capacitySlotId;
+  if (!reserveSlotId) {
+    throw new PersonnelEventError(
+      "VALIDATION",
+      "شناسه اسلات ظرفیت برای رزرو Start الزامی است.",
+      "missing_capacity_slot",
+    );
+  }
+
+  const overrideCtx = buildOverrideMutateContext(facts);
+  if (facts.headcountOverride && !overrideCtx) {
+    throw new PersonnelEventError(
+      "VALIDATION",
+      "دلیل و عامل لغو محدودیت ظرفیت برای رزرو الزامی است.",
+      "incomplete_headcount_override",
+    );
+  }
+
+  const skipExceptionForValidityOverride =
+    overrideCtx != null && overrideCtx.violatedRule === "validity";
+  if (!skipExceptionForValidityOverride) {
+    const exception = await detectScheduledHeadcountException(ctx.client, {
+      approvalId: facts.headcountApprovalId,
+      slotId: reserveSlotId,
+      evaluationDate: source.effectiveDate,
+      teamId: facts.teamId,
+      jobTitleId: facts.jobTitleId,
+      seniorityId: facts.seniorityId,
+    });
+    if (exception.exception) {
+      await upsertScheduledExceptionMarker(ctx.client, {
+        eventId: ctx.eventId,
+        marker: exception.marker,
+      });
+      throw new PersonnelEventError(
+        "VALIDATION",
+        exception.marker.messageFa,
+        exception.marker.code,
+      );
+    }
+  }
+
+  if (overrideCtx) {
+    await reserveHeadcountCapacityWithOverride(ctx.client, {
+      slotId: reserveSlotId,
+      eventId: ctx.eventId,
+      personId: source.personId,
+      evaluationDate: source.effectiveDate,
+      override: {
+        ...overrideCtx,
+        skipApprovalGate: overrideCtx.violatedRule === "validity",
+      },
+    });
+  } else {
+    await reserveHeadcountCapacity(ctx.client, {
+      slotId: reserveSlotId,
+      eventId: ctx.eventId,
+      personId: source.personId,
+      evaluationDate: source.effectiveDate,
+    });
+  }
+
+  return { reserved: true };
+}
+
+/** Cancel of Scheduled Start — release reservation (idempotent). */
+export async function releaseStartReservationOnCancel(
+  client: PoolClient,
+  startEventId: string,
+): Promise<void> {
+  await releaseHeadcountReservation(client, startEventId);
 }
 
 function mapProjectorError(err: unknown): never {
@@ -542,10 +784,11 @@ export function capacityResultToConflict(
       messageFa: result.messageFa,
     };
   }
-  // incompatible — universal coverage (FR-29); Override catalogue stays 4.14
+  // incompatible — Override catalogue (FR-32): warning + requiresOverride for Admin
   return {
     code: "HEADCOUNT_UNAPPROVED",
-    severity: "blocking",
+    severity: "warning",
+    requiresOverride: true,
     messageFa: result.messageFa,
   };
 }

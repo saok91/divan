@@ -1,3 +1,18 @@
+## Deferred from: code review of 4-14-reservation-expiry-exceptions-headcount-override.md (2026-07-19)
+
+- Unscoped `listOverrides` / `getOverride` (permission-only) — same IDOR-on-list/get class already tracked for drafts/approvals/exemptions
+- `ensureHeadcountOverrideSchema` DDL on every tRPC request — same ensure-* pattern; revisit with migrations-only runtime
+
+## Deferred from: Story 4.14 reservation expiry exceptions & headcount override (2026-07-19)
+
+- **Override catalogue + Start durable reserve landed** — `headcount_override`; drop `free_units >= 0`; Override-aware consume/reserve; 14-day `HEADCOUNT_APPROVAL_EXPIRY_SOON`; Scheduled-exception fail-closed; Scheduled Start `reserveHeadcountCapacity` + Cancel release; `capacityResultToConflict` → `requiresOverride`; finalize wire for `HEADCOUNT_UNAPPROVED`; panel overridden + negative free; `/headcount` override admin; `headcount-override.selfcheck`
+- **Still fail-closed orphan disposition matrix** beyond Override/Cancel/Correction — no invent AR-HEADCOUNT full disposition
+- **Still Epic 5:** Full dashboard / open-headcount product / report catalogue / SM-5 Override aging metrics
+- **ensureHeadcountOverrideSchema** DDL on every tRPC request — same ensure-* pattern; revisit with migrations-only runtime
+- Unscoped `listOverrides` / `getOverride` (permission-only) — same IDOR-on-list/get class
+- **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation** unchanged
+- Fixed `isPool` discriminator (PoolClient has `connect`) in approval/exemption/override txn helpers — was aborting Job-level exemption rebind inside finalize txn
+
 ## Deferred from: code review of 4-13-universal-coverage-matching-exemptions.md (2026-07-19)
 
 - Unscoped `listExemptions` / `getExemption` (permission-only) — same IDOR-on-list/get class already tracked for drafts/approvals
@@ -7,7 +22,7 @@
 
 - **Approval-first matching + exemptions landed** — `matchCompatibleApprovals` (Team+Title+optional Seniority; oldest valid); `preferredApprovalId` + audited stash; `PrimaryAssignment.headcountApprovalId`; `headcount_exemption` CRUD + fail-closed revoke; SeniorityChanged capacity re-eval; panel exempt + muted overridden foreshadow; `/headcount` exemption admin; `headcount-matching.selfcheck`
 - **Addendum §6.2 open edges not productized:** named seats / Position entity; free-form Correction rebind UI; contracting-entity match dims — Correction rebind remains via existing Correction/Reverse capacity replay
-- **Still 4.14:** Override catalogue / negative free / 14-day expiry warnings / Scheduled-exception; durable reserve for Scheduled Start (FR-30 remainder)
+- ~~**Still 4.14:** Override catalogue / negative free / 14-day expiry warnings / Scheduled-exception; durable reserve for Scheduled Start (FR-30 remainder)~~ — **closed in 4.14**
 - **Still Epic 5:** Full dashboard / open-headcount product / report catalogue
 - **Exemption rebind on Primary close+open:** ~~covering exemption stays on source Primary id~~ — **closed in code review:** `rebindCoveringExemptionToSuccessor` on JobTitle/Seniority open
 - **Transfer never inherits source exemption** — destination Approval rematch required; panel omits source `primaryAssignmentId` for Transfer
@@ -26,7 +41,7 @@
 - **MVP live-counter stand-in removed** for Approval-backed slots (4.11 follow-through)
 - **Still fail-closed orphan disposition** — cancel/reduce/expire with active claims rejected until AR-HEADCOUNT disposition (→ 4.14 Override path may unblock)
 - ~~**Still 4.13:** Matching matrix / oldest-valid default / exemptions / `PrimaryAssignment.headcountApprovalId` product link~~ — **closed in 4.13**
-- **Still 4.14:** Reservation-expiry warnings / Scheduled-exception / Override catalogue; durable reserve for Scheduled Start
+- ~~**Still 4.14:** Reservation-expiry warnings / Scheduled-exception / Override catalogue; durable reserve for Scheduled Start~~ — **closed in 4.14**
 - **Still Epic 5:** Full dashboard / open-headcount product
 - **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
 

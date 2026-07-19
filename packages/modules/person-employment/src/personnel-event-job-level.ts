@@ -8,13 +8,20 @@ import type { Pool, PoolClient, PrismaClient } from "@divan/db";
 import { getBusinessEventById } from "@divan/event-store";
 import {
   consumeHeadcountCapacity,
+  consumeHeadcountCapacityWithOverride,
   convertReservationToConsumption,
+  detectScheduledHeadcountException,
+  ensureOverrideRowAfterConvert,
   rebindCoveringExemptionToSuccessor,
   releaseHeadcountCapacity,
   releaseHeadcountReservation,
   reserveHeadcountCapacity,
+  reserveHeadcountCapacityWithOverride,
   undoHeadcountRelease,
   undoTransferDestinationCapacity,
+  upsertScheduledExceptionMarker,
+  type HeadcountViolatedRule,
+  type OverrideMutateContext,
 } from "@divan/headcount";
 
 import { getPersonDb } from "./db";
@@ -83,6 +90,10 @@ export type JobLevelOverlayFacts = {
   capacitySlotId: string | null;
   headcountApprovalId: string | null;
   headcountExempt?: boolean;
+  headcountOverride?: boolean;
+  headcountOverrideReason?: string | null;
+  headcountViolatedRule?: HeadcountViolatedRule | null;
+  headcountOverrideActorId?: string | null;
 };
 
 export type JobLevelSuccessorFacts = {
@@ -95,6 +106,10 @@ export type JobLevelSuccessorFacts = {
   capacitySlotId: string | null;
   headcountApprovalId: string | null;
   headcountExempt?: boolean;
+  headcountOverride?: boolean;
+  headcountOverrideReason?: string | null;
+  headcountViolatedRule?: HeadcountViolatedRule | null;
+  headcountOverrideActorId?: string | null;
   employmentId: string | null;
 };
 
@@ -240,8 +255,51 @@ export function parseJobLevelPayload(
       capacitySlotId: strField(payload, "capacitySlotId"),
       headcountApprovalId: strField(payload, "headcountApprovalId"),
       headcountExempt: payload.headcountExempt === true,
+      headcountOverride: payload.headcountOverride === true,
+      headcountOverrideReason: strField(payload, "headcountOverrideReason"),
+      headcountViolatedRule: (() => {
+        const v = strField(payload, "headcountViolatedRule");
+        if (
+          v === "shortage" ||
+          v === "validity" ||
+          v === "job_title" ||
+          v === "seniority"
+        ) {
+          return v;
+        }
+        return null;
+      })(),
+      headcountOverrideActorId: strField(payload, "headcountOverrideActorId"),
     },
     missing: [],
+  };
+}
+
+function buildJobLevelOverrideContext(
+  facts: Pick<
+    JobLevelSuccessorFacts,
+    | "teamId"
+    | "jobTitleId"
+    | "seniorityId"
+    | "headcountApprovalId"
+    | "headcountOverride"
+    | "headcountOverrideReason"
+    | "headcountViolatedRule"
+    | "headcountOverrideActorId"
+  >,
+): OverrideMutateContext | null {
+  if (!facts.headcountOverride) return null;
+  const reason = facts.headcountOverrideReason?.trim() ?? "";
+  const actor = facts.headcountOverrideActorId?.trim() ?? "";
+  if (!reason || !actor) return null;
+  return {
+    violatedRule: facts.headcountViolatedRule ?? "shortage",
+    reason,
+    actorAccountId: actor,
+    teamId: facts.teamId,
+    jobTitleId: facts.jobTitleId,
+    seniorityId: facts.seniorityId,
+    approvalId: facts.headcountApprovalId,
   };
 }
 
@@ -261,6 +319,10 @@ export function resolveSuccessorPrimary(
     capacitySlotId: overlay.capacitySlotId,
     headcountApprovalId: overlay.headcountApprovalId,
     headcountExempt: overlay.headcountExempt,
+    headcountOverride: overlay.headcountOverride,
+    headcountOverrideReason: overlay.headcountOverrideReason,
+    headcountViolatedRule: overlay.headcountViolatedRule,
+    headcountOverrideActorId: overlay.headcountOverrideActorId,
     employmentId: overlay.employmentId,
   };
 
@@ -328,6 +390,10 @@ export function jobLevelFactsAsStartFacts(
     capacitySlotId: facts.capacitySlotId,
     headcountApprovalId: facts.headcountApprovalId,
     headcountExempt: facts.headcountExempt,
+    headcountOverride: facts.headcountOverride,
+    headcountOverrideReason: facts.headcountOverrideReason,
+    headcountViolatedRule: facts.headcountViolatedRule,
+    headcountOverrideActorId: facts.headcountOverrideActorId,
   };
 }
 
@@ -585,12 +651,57 @@ export async function applyJobLevelScheduledReserve(
       );
     }
 
-    await reserveHeadcountCapacity(ctx.client, {
-      slotId,
-      eventId: ctx.eventId,
-      personId: source.personId,
-      evaluationDate: source.effectiveDate,
-    });
+    const overrideCtx = buildJobLevelOverrideContext(successor);
+    if (successor.headcountOverride && !overrideCtx) {
+      throw new PersonnelEventError(
+        "VALIDATION",
+        "دلیل و عامل لغو محدودیت ظرفیت برای رزرو الزامی است.",
+        "incomplete_headcount_override",
+      );
+    }
+    const skipExceptionForValidityOverride =
+      overrideCtx != null && overrideCtx.violatedRule === "validity";
+    if (!skipExceptionForValidityOverride) {
+      const exception = await detectScheduledHeadcountException(ctx.client, {
+        approvalId: successor.headcountApprovalId,
+        slotId,
+        evaluationDate: source.effectiveDate,
+        teamId: successor.teamId,
+        jobTitleId: successor.jobTitleId,
+        seniorityId: successor.seniorityId,
+      });
+      if (exception.exception) {
+        await upsertScheduledExceptionMarker(ctx.client, {
+          eventId: ctx.eventId,
+          marker: exception.marker,
+        });
+        throw new PersonnelEventError(
+          "VALIDATION",
+          exception.marker.messageFa,
+          exception.marker.code,
+        );
+      }
+    }
+
+    if (overrideCtx) {
+      await reserveHeadcountCapacityWithOverride(ctx.client, {
+        slotId,
+        eventId: ctx.eventId,
+        personId: source.personId,
+        evaluationDate: source.effectiveDate,
+        override: {
+          ...overrideCtx,
+          skipApprovalGate: overrideCtx.violatedRule === "validity",
+        },
+      });
+    } else {
+      await reserveHeadcountCapacity(ctx.client, {
+        slotId,
+        eventId: ctx.eventId,
+        personId: source.personId,
+        evaluationDate: source.effectiveDate,
+      });
+    }
   }
 
   return {
@@ -646,11 +757,52 @@ async function moveJobLevelCapacity(
       return { didReleaseSource, didMoveDest };
     }
 
+    const overrideCtx = buildJobLevelOverrideContext(successor);
+    if (successor.headcountOverride && !overrideCtx) {
+      throw new PersonnelEventError(
+        "VALIDATION",
+        "دلیل و عامل لغو محدودیت ظرفیت برای ادامه الزامی است.",
+        "incomplete_headcount_override",
+      );
+    }
+
+    const slotForDetect = successor.capacitySlotId;
+    const skipExceptionForValidityOverride =
+      overrideCtx != null && overrideCtx.violatedRule === "validity";
+    if (slotForDetect && !skipExceptionForValidityOverride) {
+      const exception = await detectScheduledHeadcountException(ctx.client, {
+        approvalId: successor.headcountApprovalId,
+        slotId: slotForDetect,
+        evaluationDate,
+        teamId: successor.teamId,
+        jobTitleId: successor.jobTitleId,
+        seniorityId: successor.seniorityId,
+      });
+      if (exception.exception) {
+        await upsertScheduledExceptionMarker(ctx.client, {
+          eventId: ctx.eventId,
+          marker: exception.marker,
+        });
+        throw new PersonnelEventError(
+          "VALIDATION",
+          exception.marker.messageFa,
+          exception.marker.code,
+        );
+      }
+    }
+
     const converted = await convertReservationToConsumption(ctx.client, {
       eventId: ctx.eventId,
       personId,
     });
     if (converted.converted) {
+      if (overrideCtx) {
+        await ensureOverrideRowAfterConvert(ctx.client, {
+          eventId: ctx.eventId,
+          slotId: converted.slotId ?? successor.capacitySlotId!,
+          override: overrideCtx,
+        });
+      }
       didMoveDest = true;
       return { didReleaseSource, didMoveDest };
     }
@@ -664,13 +816,30 @@ async function moveJobLevelCapacity(
       );
     }
 
-    const consumeResult = await consumeHeadcountCapacity(ctx.client, {
-      slotId,
-      eventId: ctx.eventId,
-      personId,
-      evaluationDate,
-    });
-    didMoveDest = consumeResult.consumed;
+    if (overrideCtx) {
+      const consumeResult = await consumeHeadcountCapacityWithOverride(
+        ctx.client,
+        {
+          slotId,
+          eventId: ctx.eventId,
+          personId,
+          evaluationDate,
+          override: {
+            ...overrideCtx,
+            skipApprovalGate: overrideCtx.violatedRule === "validity",
+          },
+        },
+      );
+      didMoveDest = consumeResult.consumed;
+    } else {
+      const consumeResult = await consumeHeadcountCapacity(ctx.client, {
+        slotId,
+        eventId: ctx.eventId,
+        personId,
+        evaluationDate,
+      });
+      didMoveDest = consumeResult.consumed;
+    }
     return { didReleaseSource, didMoveDest };
   } catch (err) {
     if (didMoveDest) {
@@ -779,6 +948,10 @@ export async function applyJobLevelProjections(
         headcountApprovalId:
           overlay.headcountApprovalId ?? existingDest.headcountApprovalId,
         headcountExempt: overlay.headcountExempt,
+        headcountOverride: overlay.headcountOverride,
+        headcountOverrideReason: overlay.headcountOverrideReason,
+        headcountViolatedRule: overlay.headcountViolatedRule,
+        headcountOverrideActorId: overlay.headcountOverrideActorId,
         employmentId,
       };
       if (

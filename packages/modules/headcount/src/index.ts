@@ -2,7 +2,7 @@
  * Narrow headcount capacity port (Stories 4.5–4.7 / FR-20 / FR-30 / FR-31 boundary).
  * Story 4.12: Approval lifecycle + consume/reserve status gates.
  * Story 4.13: Approval-first matching + exemptions (FR-29).
- * NOT Override catalogue / reservation expiry (→ 4.14).
+ * Story 4.14: Override catalogue + reservation expiry + Start durable reserve (FR-30/32).
  * Story 4.11: historical ledger reconstruct via reconstructHeadcountQuantitiesAsOf —
  * readHeadcountCapacityPanel remains live/finalize-only (do not use for asOf < today).
  */
@@ -67,6 +67,7 @@ export {
   MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
   MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
   matchCompatibleApprovals,
+  matchApprovalsForOverride,
   listCompatibleApprovalCandidates,
   seniorityCompatible,
   assertPreferredApprovalCompatible,
@@ -76,7 +77,69 @@ export type {
   MatchApprovalInput,
   MatchApprovalResult,
   CompatibleApprovalCandidate,
+  ListCandidatesOptions,
 } from "./headcount-matching";
+
+export {
+  HEADCOUNT_OVERRIDE_READ_PERMISSION,
+  HEADCOUNT_OVERRIDE_WRITE_PERMISSION,
+  HEADCOUNT_OVERRIDE_DATA_CATEGORY,
+  HeadcountOverrideError,
+  MSG_HEADCOUNT_OVERRIDE_PERMISSION_REQUIRED_FA,
+  MSG_HEADCOUNT_OVERRIDE_NOT_FOUND_FA,
+  MSG_HEADCOUNT_OVERRIDE_INVALID_REASON_FA,
+  MSG_HEADCOUNT_OVERRIDE_INVALID_RULE_FA,
+  MSG_HEADCOUNT_OVERRIDE_INVALID_STATUS_FA,
+  MSG_HEADCOUNT_OVERRIDE_INVALID_REFS_FA,
+  MSG_HEADCOUNT_OVERRIDE_CONSUME_FAILED_FA,
+  MSG_HEADCOUNT_OVERRIDE_RESERVE_FAILED_FA,
+  MSG_HEADCOUNT_OVERRIDE_VOID_LINKED_CLAIM_FA,
+  VIOLATED_RULE_LABEL_FA,
+  OVERRIDE_STATUS_LABEL_FA,
+  ensureHeadcountOverrideSchema,
+  assertActorHasHeadcountOverrideRead,
+  assertActorHasHeadcountOverrideWrite,
+  createOverride,
+  getOverride,
+  listOverrides,
+  voidOverride,
+  countActiveOverridesForSlot,
+} from "./headcount-override";
+
+export type {
+  HeadcountViolatedRule,
+  HeadcountOverrideStatus,
+  HeadcountOverrideRecord,
+  HeadcountOverrideErrorCode,
+  CapacitySnapshot,
+  CreateOverrideInput,
+  ListOverridesFilter,
+  OverrideMutateContext,
+} from "./headcount-override";
+
+export {
+  HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
+  HEADCOUNT_APPROVAL_EXPIRY_SOON,
+  HEADCOUNT_SCHEDULED_EXCEPTION,
+  MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA,
+  MSG_HEADCOUNT_SCHEDULED_EXCEPTION_FA,
+  isApprovalExpiryWithinWarningHorizon,
+  checkReservationApprovalExpiryWarning,
+  checkReservationExpiryByEventId,
+  detectScheduledHeadcountException,
+  upsertScheduledExceptionMarker,
+  getScheduledExceptionMarker,
+  clearScheduledExceptionMarker,
+  ensureScheduledExceptionSchema,
+} from "./headcount-reservation-expiry";
+
+export type {
+  HeadcountExceptionMarker,
+  ReservationExpiryCheckInput,
+  ReservationExpiryCheckResult,
+  ScheduledExceptionDetectInput,
+  ScheduledExceptionDetectResult,
+} from "./headcount-reservation-expiry";
 
 export {
   HEADCOUNT_EXEMPTION_READ_PERMISSION,
@@ -137,6 +200,15 @@ import {
   MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
   MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
 } from "./headcount-matching";
+import {
+  createOverride,
+  countActiveOverridesForSlot,
+  ensureHeadcountOverrideSchema,
+  HeadcountOverrideError,
+  MSG_HEADCOUNT_OVERRIDE_CONSUME_FAILED_FA,
+  MSG_HEADCOUNT_OVERRIDE_RESERVE_FAILED_FA,
+  type OverrideMutateContext,
+} from "./headcount-override";
 
 export const MSG_HEADCOUNT_NO_CAPACITY_FA =
   "ظرفیت نیروی انسانی سازگار برای این انتصاب وجود ندارد؛ بدون Override نهایی‌سازی مجاز نیست.";
@@ -255,11 +327,16 @@ export async function ensureHeadcountCapacitySchema(
       grade_id        UUID,
       start_date      DATE NOT NULL,
       end_date_exclusive DATE,
-      free_units      INTEGER NOT NULL CHECK (free_units >= 0),
+      free_units      INTEGER NOT NULL,
       label           TEXT,
       created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
+  `);
+  // Story 4.14: Override may drive free negative — drop legacy CHECK if present.
+  await db.query(`
+    ALTER TABLE headcount_capacity_slot
+      DROP CONSTRAINT IF EXISTS headcount_capacity_slot_free_units_check
   `);
   await db.query(`
     CREATE INDEX IF NOT EXISTS headcount_capacity_slot_team_idx
@@ -1061,6 +1138,258 @@ export async function convertReservationToConsumption(
   return { converted: true, slotId: row.slot_id };
 }
 
+async function readSlotLedger(
+  db: PoolClient,
+  slotId: string,
+): Promise<{ free: number; reserved: number; used: number }> {
+  const slotRows = await query<{
+    free_units: number;
+    reserved_units: number;
+  }>(
+    db,
+    `SELECT free_units, reserved_units FROM headcount_capacity_slot WHERE id = $1::uuid`,
+    [slotId],
+  );
+  const usedRows = await query<{ c: string }>(
+    db,
+    `SELECT COUNT(*)::text AS c FROM headcount_capacity_consumption
+     WHERE slot_id = $1::uuid AND release_event_id IS NULL`,
+    [slotId],
+  );
+  return {
+    free: Number(slotRows[0]?.free_units ?? 0),
+    reserved: Number(slotRows[0]?.reserved_units ?? 0),
+    used: Number(usedRows[0]?.c ?? 0),
+  };
+}
+
+/**
+ * After convertReservationToConsumption under Override: write catalogue row
+ * when none exists yet for this event (Scheduled reserve may already have one).
+ */
+export async function ensureOverrideRowAfterConvert(
+  db: PoolClient,
+  input: {
+    eventId: string;
+    slotId: string;
+    override: OverrideMutateContext;
+  },
+): Promise<{ overrideId: string | null }> {
+  await ensureHeadcountOverrideSchema(db);
+  const existing = await query<{ id: string }>(
+    db,
+    `SELECT id FROM headcount_override
+     WHERE related_event_id = $1::uuid AND status = 'active'
+     LIMIT 1`,
+    [input.eventId],
+  );
+  if (existing[0]) return { overrideId: existing[0].id };
+
+  const before = await readSlotLedger(db, input.slotId);
+  const override = await createOverride(db, {
+    violatedRule: input.override.violatedRule,
+    reason: input.override.reason,
+    actorAccountId: input.override.actorAccountId,
+    teamId: input.override.teamId,
+    jobTitleId: input.override.jobTitleId,
+    seniorityId: input.override.seniorityId,
+    approvalId: input.override.approvalId,
+    slotId: input.slotId,
+    relatedEventId: input.eventId,
+    relatedAssignmentId: input.override.relatedAssignmentId,
+    capacitySnapshot: {
+      used: before.used,
+      reserved: before.reserved,
+      freeBefore: before.free,
+      freeAfter: before.free,
+    },
+    actorId: input.override.actorAccountId,
+  });
+  return { overrideId: override.id };
+}
+
+/**
+ * Override-aware consume: may drive free negative; writes Override row in same txn.
+ * Never floors with GREATEST(free, 0).
+ * (Same-txn catalogue write via createOverride.)
+ */
+export async function consumeHeadcountCapacityWithOverride(
+  db: PoolClient,
+  input: ConsumeCapacityInput & { override: OverrideMutateContext },
+): Promise<{ consumed: boolean; overrideId: string | null }> {
+  await ensureHeadcountOverrideSchema(db);
+
+  const existing = await query<{ id: string }>(
+    db,
+    `SELECT id FROM headcount_capacity_consumption WHERE event_id = $1::uuid`,
+    [input.eventId],
+  );
+  if (existing.length > 0) {
+    return { consumed: false, overrideId: null };
+  }
+
+  await db.query(
+    `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
+    [input.slotId],
+  );
+
+  if (!input.override.skipApprovalGate) {
+    await assertSlotApprovalConsumable(
+      db,
+      input.slotId,
+      input.evaluationDate ?? todayDateOnlyTehran(),
+    );
+  }
+
+  const before = await readSlotLedger(db, input.slotId);
+
+  const upd = await db.query(
+    `UPDATE headcount_capacity_slot
+     SET free_units = free_units - 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1::uuid
+     RETURNING id, free_units`,
+    [input.slotId],
+  );
+  if (upd.rowCount === 0) {
+    throw new HeadcountOverrideError(
+      "VALIDATION",
+      MSG_HEADCOUNT_OVERRIDE_CONSUME_FAILED_FA,
+    );
+  }
+
+  await db.query(
+    `INSERT INTO headcount_capacity_consumption (id, slot_id, event_id, person_id)
+     VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
+    [randomUUID(), input.slotId, input.eventId, input.personId],
+  );
+
+  const afterFree = before.free - 1;
+  const override = await createOverride(db, {
+    violatedRule: input.override.violatedRule,
+    reason: input.override.reason,
+    actorAccountId: input.override.actorAccountId,
+    teamId: input.override.teamId,
+    jobTitleId: input.override.jobTitleId,
+    seniorityId: input.override.seniorityId,
+    approvalId: input.override.approvalId,
+    slotId: input.slotId,
+    relatedEventId: input.eventId,
+    relatedAssignmentId: input.override.relatedAssignmentId,
+    capacitySnapshot: {
+      used: before.used + 1,
+      reserved: before.reserved,
+      freeBefore: before.free,
+      freeAfter: afterFree,
+    },
+    actorId: input.override.actorAccountId,
+  });
+
+  return { consumed: true, overrideId: override.id };
+}
+
+/**
+ * Override-aware reserve: may drive free negative; writes Override row in same txn.
+ */
+export async function reserveHeadcountCapacityWithOverride(
+  db: PoolClient,
+  input: ReserveCapacityInput & { override: OverrideMutateContext },
+): Promise<{ reserved: boolean; slotId: string; overrideId: string | null }> {
+  await ensureHeadcountOverrideSchema(db);
+
+  const existing = await query<{ id: string; slot_id: string; status: string }>(
+    db,
+    `SELECT id, slot_id, status FROM headcount_capacity_reservation
+     WHERE event_id = $1::uuid`,
+    [input.eventId],
+  );
+  if (existing[0]) {
+    if (
+      existing[0].status === "reserved" ||
+      existing[0].status === "converted"
+    ) {
+      return {
+        reserved: false,
+        slotId: existing[0].slot_id,
+        overrideId: null,
+      };
+    }
+  }
+
+  await db.query(
+    `SELECT id FROM headcount_capacity_slot WHERE id = $1::uuid FOR UPDATE`,
+    [input.slotId],
+  );
+
+  if (!input.override.skipApprovalGate) {
+    await assertSlotApprovalConsumable(
+      db,
+      input.slotId,
+      input.evaluationDate ?? todayDateOnlyTehran(),
+    );
+  }
+
+  const before = await readSlotLedger(db, input.slotId);
+
+  const upd = await db.query(
+    `UPDATE headcount_capacity_slot
+     SET free_units = free_units - 1,
+         reserved_units = reserved_units + 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1::uuid
+     RETURNING id`,
+    [input.slotId],
+  );
+  if (upd.rowCount === 0) {
+    throw new HeadcountOverrideError(
+      "VALIDATION",
+      MSG_HEADCOUNT_OVERRIDE_RESERVE_FAILED_FA,
+    );
+  }
+
+  if (existing[0]?.status === "released") {
+    await db.query(
+      `UPDATE headcount_capacity_reservation
+       SET status = 'reserved',
+           slot_id = $2::uuid,
+           person_id = $3::uuid,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE event_id = $1::uuid`,
+      [input.eventId, input.slotId, input.personId],
+    );
+  } else {
+    await db.query(
+      `INSERT INTO headcount_capacity_reservation
+         (id, slot_id, event_id, person_id, status)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'reserved')`,
+      [randomUUID(), input.slotId, input.eventId, input.personId],
+    );
+  }
+
+  const afterFree = before.free - 1;
+  const override = await createOverride(db, {
+    violatedRule: input.override.violatedRule,
+    reason: input.override.reason,
+    actorAccountId: input.override.actorAccountId,
+    teamId: input.override.teamId,
+    jobTitleId: input.override.jobTitleId,
+    seniorityId: input.override.seniorityId,
+    approvalId: input.override.approvalId,
+    slotId: input.slotId,
+    relatedEventId: input.eventId,
+    relatedAssignmentId: input.override.relatedAssignmentId,
+    capacitySnapshot: {
+      used: before.used,
+      reserved: before.reserved + 1,
+      freeBefore: before.free,
+      freeAfter: afterFree,
+    },
+    actorId: input.override.actorAccountId,
+  });
+
+  return { reserved: true, slotId: input.slotId, overrideId: override.id };
+}
+
 /**
  * Best-effort undo of destination capacity taken by Transfer event_id
  * (fresh consume or converted reservation).
@@ -1142,6 +1471,8 @@ export type CapacityPanelResult = {
   reserved: number;
   free: number;
   exempt: number;
+  /** Active Override rows for the resolved slot (FR-32). */
+  overridden: number;
   slotId: string | null;
   approvalId: string | null;
 };
@@ -1269,6 +1600,7 @@ export async function readHeadcountCapacityPanel(
   }
 
   let used = 0;
+  let overridden = 0;
   if (slotId) {
     const usedRows = await query<{ c: string }>(
       db,
@@ -1277,8 +1609,9 @@ export async function readHeadcountCapacityPanel(
       [slotId],
     );
     used = Number(usedRows[0]?.c ?? 0);
+    overridden = await countActiveOverridesForSlot(db, slotId);
   }
 
-  return { used, reserved, free, exempt, slotId, approvalId };
+  return { used, reserved, free, exempt, overridden, slotId, approvalId };
 }
 
