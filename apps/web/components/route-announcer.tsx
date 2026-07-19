@@ -9,14 +9,12 @@ import {
   surfaceForPath,
 } from "@/lib/section-tab-surfaces";
 
+/** Non-tabbed surfaces only — tabbed labels come from section-tab-surfaces. */
 const SURFACE_LABELS: Record<string, string> = {
   "/dashboard": "داشبورد",
-  "/personnel": "پرسنل",
-  "/organization": "ساختار سازمان",
-  "/headcount": "ظرفیت و جذب",
+  "/personnel-events": "رویدادهای پرسنلی",
   "/reports": "گزارش‌ها",
   "/import": "ورود داده",
-  "/access": "دسترسی‌ها",
   "/audit": "ممیزی",
   "/operations": "عملیات",
   "/correction-cases": "پرونده‌های اصلاح",

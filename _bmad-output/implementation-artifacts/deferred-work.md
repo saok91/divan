@@ -1,3 +1,7 @@
+## Deferred from: code review of 4b-3-sidebar-ia-labels-role-landings.md (2026-07-20)
+
+- `PageAccessDeniedError` thrown by `assertPageAccess` has no App Router `error.tsx` boundary — layout `resolveAppPathAccess` normally shows AccessDenied first; mismatch between `x-divan-pathname` and page path could still surface an unhandled error (pre-existing pattern across gated pages)
+
 ## Deferred from: code review of 4b-2-section-tabs-chrome-routing-leave-guards.md (2026-07-20)
 
 - Logout / authz-changed `router.replace` bypass leave-guard — story documents `requestNavigation` convention; wire session-exit channels in a later shell story

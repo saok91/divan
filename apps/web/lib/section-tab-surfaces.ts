@@ -13,7 +13,7 @@ export type SectionTabDef = {
 export type SectionTabSurface = {
   /** Surface root, e.g. `/personnel`. */
   root: string;
-  /** Visible / announce surface label (until 4b.3 renames). */
+  /** Visible / announce surface label. */
   surfaceLabel: string;
   ariaLabel: string;
   defaultTabId: string;
@@ -23,8 +23,8 @@ export type SectionTabSurface = {
 export const SECTION_TAB_SURFACES: readonly SectionTabSurface[] = [
   {
     root: "/personnel",
-    surfaceLabel: "پرسنل",
-    ariaLabel: "بخش‌های پرسنل",
+    surfaceLabel: "اطلاعات پرسنلی",
+    ariaLabel: "بخش‌های اطلاعات پرسنلی",
     defaultTabId: "list",
     tabs: [
       { id: "list", label: "فهرست پرسنل", href: "/personnel/list" },

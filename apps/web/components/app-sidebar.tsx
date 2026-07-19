@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
+  CalendarClock,
   ChartBar,
   ChevronRight,
   FileBarChart,
@@ -46,10 +47,11 @@ type AppSidebarProps = {
   accountId: string;
 };
 
-/** Epic-1 catalog href → Lucide icon (labels/order unchanged until 4b.3). */
+/** Epic-1 catalog href → Lucide icon. */
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
   "/personnel": Users,
+  "/personnel-events": CalendarClock,
   "/organization": Network,
   "/headcount": ChartBar,
   "/reports": FileBarChart,

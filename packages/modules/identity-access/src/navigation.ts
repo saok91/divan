@@ -10,10 +10,11 @@ export type NavItem = {
   readonly label: string;
 };
 
-/** Frozen IA catalog — Epic-1 paths and Persian labels. */
+/** Frozen IA catalog — Epic-1 paths and Persian labels (Story 4b.3). */
 export const NAV_CATALOG: readonly NavItem[] = Object.freeze([
   { href: "/dashboard", label: "داشبورد" },
-  { href: "/personnel", label: "پرسنل" },
+  { href: "/personnel", label: "اطلاعات پرسنلی" },
+  { href: "/personnel-events", label: "رویدادهای پرسنلی" },
   { href: "/organization", label: "ساختار سازمان" },
   { href: "/headcount", label: "ظرفیت و جذب" },
   { href: "/reports", label: "گزارش‌ها" },
@@ -24,18 +25,20 @@ export const NAV_CATALOG: readonly NavItem[] = Object.freeze([
   { href: "/correction-cases", label: "پرونده‌های اصلاح" },
 ]);
 
-/** Role → permitted catalog hrefs (exact Epic-1 coarse matrix). */
+/** Role → permitted catalog hrefs (exact Epic-1 coarse matrix + events). */
 const ROLE_NAV_HREFS: Readonly<Record<CoarseRole, readonly string[]>> =
   Object.freeze({
     hr_operator: Object.freeze([
       "/dashboard",
       "/personnel",
+      "/personnel-events",
       "/headcount",
       "/reports",
     ]),
     hr_admin: Object.freeze([
       "/dashboard",
       "/personnel",
+      "/personnel-events",
       "/organization",
       "/headcount",
       "/reports",
@@ -46,6 +49,7 @@ const ROLE_NAV_HREFS: Readonly<Record<CoarseRole, readonly string[]>> =
     manager: Object.freeze([
       "/dashboard",
       "/personnel",
+      "/personnel-events",
       "/headcount",
       "/reports",
     ]),
@@ -54,7 +58,7 @@ const ROLE_NAV_HREFS: Readonly<Record<CoarseRole, readonly string[]>> =
   });
 
 const ROLE_LANDING: Readonly<Record<CoarseRole, string>> = Object.freeze({
-  hr_operator: "/personnel",
+  hr_operator: "/personnel/list",
   hr_admin: "/dashboard",
   manager: "/dashboard",
   audit_reviewer: "/audit",
@@ -119,6 +123,7 @@ export function getNavItemsForRole(role: CoarseRole): readonly NavItem[] {
 /**
  * Whether the role may open this path (exact catalog match or nested under it).
  * Unknown / non-catalog paths are denied (fail-closed).
+ * Prefix is `${href}/` so `/personnel-events` is never nested under `/personnel`.
  */
 export function canAccessPath(role: CoarseRole, pathname: string): boolean {
   if (!isKnownRole(role)) return false;

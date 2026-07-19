@@ -214,7 +214,7 @@ export function PersonnelPanel() {
   return (
     <div className="mx-auto max-w-3xl space-y-8 text-foreground">
       <header className="space-y-2">
-        <h1 className="text-heading">پرسنل</h1>
+        <h1 className="text-heading">اطلاعات پرسنلی</h1>
         <p className="text-body text-muted-foreground">
           ایجاد و نگهداری هویت پایدار پرسنل با فیلدهای تأییدشده فرهنگ‌داده.
         </p>
