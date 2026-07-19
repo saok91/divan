@@ -13,8 +13,11 @@ export const operationalCopy = {
   /** LDAP / identity-provider outage — wired by Story 1.8 login UI. */
   ldapUnavailable: "اتصال به سامانه هویت برقرار نیست.",
 
-  /** Empty search (palette / personnel stub). */
+  /** Empty search (palette / personnel stub / governed table). */
   emptySearch: "نتیجه‌ای پیدا نشد. عبارت یا فیلتر را عوض کنید.",
+
+  /** Clear filters CTA — EXPERIENCE exact (Story 4b.4 / UX-DR7). */
+  clearFilters: "پاک کردن فیلترها",
 
   /**
    * Suppressed small-cohort / differencing (Story 2.7 / UX-DR15).
