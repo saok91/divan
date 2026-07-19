@@ -1,5 +1,5 @@
 ﻿# generated: 2026-07-16
-# last_updated: 2026-07-19T06:30:00+03:30
+# last_updated: 2026-07-19T06:45:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-19T06:30:00+03:30
+last_updated: 2026-07-19T06:45:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -81,7 +81,7 @@ development_status:
   3-9-derived-management-relationships: done
   epic-3-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-1-append-only-event-store-attributable-event-record: done
   4-2-draft-finalization-conflict-classification: done
   4-3-scheduled-state-cancel-reverse-correction: done
@@ -96,7 +96,7 @@ development_status:
   4-12-headcount-approval-lifecycle: done
   4-13-universal-coverage-matching-exemptions: done
   4-14-reservation-expiry-exceptions-headcount-override: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   epic-5: backlog
   5-1-permission-safe-personnel-search-lists: backlog
@@ -232,5 +232,38 @@ action_items:
     status: open
   - epic: 3
     action: "Carry forward Epic 2 open items: InferenceBulkPort ops doc; sticky break-glass + fingerprint; artifact reauth for 6.5/7.x"
+    owner: "Winston / Amelia+Sally / Paige+Winston"
+    status: open
+  - epic: 4
+    action: "Mark epic-4 done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-4-retro-2026-07-19.md + sprint-status epic-4/epic-4-retrospective"
+  - epic: 4
+    action: "Encode person-org IDOR scope + PopulationPort cutover honesty into Story 5.1 create-story / Dev Notes"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 4
+    action: "Encode profile/timeline consumer contract (Epic 4 assemblers + lifecycle APIs; no parallel SoT) into Story 5.2 / 5.3 Dev Notes"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 4
+    action: "Plan AD-6 Prisma vs PoolClient single-connection projector hardening (orphan-proof txn model)"
+    owner: "Winston + Amelia"
+    status: open
+  - epic: 4
+    action: "Prefer Vitest/ephemeral DB isolation when next quality opportunity lands (close Epic 3 #7 intent)"
+    owner: "Amelia"
+    status: open
+  - epic: 4
+    action: "Move headcount ensure*Schema off request path to migrations-only runtime"
+    owner: "Winston + Amelia"
+    status: open
+  - epic: 4
+    action: "Keep AR-TEMPORAL / AR-HEADCOUNT / AR-ACCESS / AR-DATA / AR-REPORTING fail-closed; do not invent in Epic 5"
+    owner: "Mary + John"
+    status: open
+  - epic: 4
+    action: "Carry forward Epic 2/3 open items: InferenceBulkPort ops; sticky break-glass; artifact reauth 6.5/7.x; PopulationPort actual cutover"
     owner: "Winston / Amelia+Sally / Paige+Winston"
     status: open
