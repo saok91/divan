@@ -581,9 +581,12 @@ export const personnelEventRouter = createTRPCRouter({
         teamId: z.string().uuid(),
         effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         jobTitleId: z.string().uuid().optional(),
+        seniorityId: z.string().uuid().nullable().optional(),
         ladderId: z.string().uuid().optional(),
         gradeId: z.string().uuid().optional(),
         preferredSlotId: z.string().uuid().optional(),
+        preferredApprovalId: z.string().uuid().optional(),
+        primaryAssignmentId: z.string().min(1).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -592,10 +595,13 @@ export const personnelEventRouter = createTRPCRouter({
       return await readHeadcountCapacityPanel(pool, {
         teamId: input.teamId,
         jobTitleId: input.jobTitleId,
+        seniorityId: input.seniorityId,
         ladderId: input.ladderId,
         gradeId: input.gradeId,
         effectiveDate: input.effectiveDate,
         preferredSlotId: input.preferredSlotId,
+        preferredApprovalId: input.preferredApprovalId,
+        primaryAssignmentId: input.primaryAssignmentId,
       });
     }),
 
@@ -623,6 +629,7 @@ export const personnelEventRouter = createTRPCRouter({
         ladderId: primary.ladderId,
         gradeId: primary.gradeId,
         seniorityId: primary.seniorityId,
+        headcountApprovalId: primary.headcountApprovalId,
         startDate: primary.startDate,
         endDateExclusive: primary.endDateExclusive,
       };

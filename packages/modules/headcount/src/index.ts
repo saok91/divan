@@ -1,7 +1,8 @@
 /**
  * Narrow headcount capacity port (Stories 4.5–4.7 / FR-20 / FR-30 / FR-31 boundary).
  * Story 4.12: Approval lifecycle + consume/reserve status gates.
- * NOT Matching matrix, Reservation expiry, or Override catalogue (→ 4.13 / 4.14).
+ * Story 4.13: Approval-first matching + exemptions (FR-29).
+ * NOT Override catalogue / reservation expiry (→ 4.14).
  * Story 4.11: historical ledger reconstruct via reconstructHeadcountQuantitiesAsOf —
  * readHeadcountCapacityPanel remains live/finalize-only (do not use for asOf < today).
  */
@@ -62,6 +63,61 @@ export type {
   UpdateApprovalInput,
 } from "./headcount-approval";
 
+export {
+  MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
+  MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
+  matchCompatibleApprovals,
+  listCompatibleApprovalCandidates,
+  seniorityCompatible,
+  assertPreferredApprovalCompatible,
+} from "./headcount-matching";
+
+export type {
+  MatchApprovalInput,
+  MatchApprovalResult,
+  CompatibleApprovalCandidate,
+} from "./headcount-matching";
+
+export {
+  HEADCOUNT_EXEMPTION_READ_PERMISSION,
+  HEADCOUNT_EXEMPTION_WRITE_PERMISSION,
+  HEADCOUNT_MATCH_RESELECT_PERMISSION,
+  HEADCOUNT_EXEMPTION_DATA_CATEGORY,
+  HeadcountExemptionError,
+  MSG_HEADCOUNT_EXEMPTION_PERMISSION_REQUIRED_FA,
+  MSG_HEADCOUNT_EXEMPTION_NOT_FOUND_FA,
+  MSG_HEADCOUNT_EXEMPTION_INVALID_VALIDITY_FA,
+  MSG_HEADCOUNT_EXEMPTION_INVALID_REASON_FA,
+  MSG_HEADCOUNT_EXEMPTION_INVALID_STATUS_FA,
+  MSG_HEADCOUNT_EXEMPTION_UNCOVER_FA,
+  MSG_HEADCOUNT_EXEMPTION_INVALID_TREATMENT_FA,
+  MSG_HEADCOUNT_EXEMPTION_INVALID_REFS_FA,
+  REPORTING_TREATMENT_LABEL_FA,
+  EXEMPTION_STATUS_LABEL_FA,
+  ensureHeadcountExemptionSchema,
+  assertActorHasHeadcountExemptionRead,
+  assertActorHasHeadcountExemptionWrite,
+  assertActorHasHeadcountMatchReselect,
+  createExemption,
+  activateExemption,
+  revokeExemption,
+  getExemption,
+  listExemptions,
+  findCoveringExemption,
+  assertExemptionCovers,
+  countActiveExemptionsAsOf,
+  effectiveExemptionStatus,
+  rebindCoveringExemptionToSuccessor,
+} from "./headcount-exemption";
+
+export type {
+  HeadcountExemptionStatus,
+  HeadcountReportingTreatment,
+  HeadcountExemptionRecord,
+  HeadcountExemptionErrorCode,
+  CreateExemptionInput,
+} from "./headcount-exemption";
+
 import { randomUUID } from "node:crypto";
 
 import type { Pool, PoolClient, PrismaClient } from "@divan/db";
@@ -72,6 +128,15 @@ import {
   HeadcountApprovalError,
   slotApprovalAllowsConsume,
 } from "./headcount-approval";
+import {
+  findCoveringExemption,
+  ensureHeadcountExemptionSchema,
+} from "./headcount-exemption";
+import {
+  matchCompatibleApprovals,
+  MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
+  MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
+} from "./headcount-matching";
 
 export const MSG_HEADCOUNT_NO_CAPACITY_FA =
   "ظرفیت نیروی انسانی سازگار برای این انتصاب وجود ندارد؛ بدون Override نهایی‌سازی مجاز نیست.";
@@ -94,20 +159,40 @@ export const MSG_HEADCOUNT_RESERVE_FAILED_FA =
 export const MSG_HEADCOUNT_RESERVATION_RELEASE_FAILED_FA =
   "آزادسازی رزرو ظرفیت نیروی انسانی ناموفق بود.";
 
+export const MSG_HEADCOUNT_EXEMPT_FA =
+  "انتصاب تحت معافیت ظرفیت فعال است؛ مصرف/رزرو انجام نمی‌شود.";
+
 export type CapacityCheckInput = {
   teamId: string;
   jobTitleId?: string;
+  /** Product match dimension (4.13). */
+  seniorityId?: string | null;
+  /**
+   * Legacy fixture bridge only — ignored on Approval-backed product match.
+   * Do NOT pass into Approval match filters.
+   */
   ladderId?: string;
   gradeId?: string;
   effectiveDate: string;
-  /** When set, prefer this slot (Operator/fixture path). */
+  /** Manual Approval reselection (product API). */
+  preferredApprovalId?: string | null;
+  /** Fixture/selfcheck bridge ONLY — prefer Approval path in Operators. */
   preferredSlotId?: string | null;
+  /** When set, active covering exemption → exempt (skip consume). */
+  primaryAssignmentId?: string | null;
 };
 
 export type CapacityCheckResult =
   | {
       outcome: "compatible";
+      approvalId: string | null;
       slotId: string;
+      matchedBy: "default" | "manual" | "legacy_slot";
+      messageFa: string;
+    }
+  | {
+      outcome: "exempt";
+      exemptionId: string;
       messageFa: string;
     }
   | {
@@ -270,7 +355,7 @@ function slotMatchesRefs(
 }
 
 /**
- * Fail-closed capacity evaluation for Start/Return.
+ * Fail-closed capacity evaluation — Approval-first (4.13), legacy slot bridge.
  * Missing DB / query error → unavailable (block; no silent allow).
  */
 export async function evaluateHeadcountCapacity(
@@ -278,6 +363,79 @@ export async function evaluateHeadcountCapacity(
   input: CapacityCheckInput,
 ): Promise<CapacityCheckResult> {
   try {
+    if (input.primaryAssignmentId?.trim()) {
+      await ensureHeadcountExemptionSchema(db);
+      const exemption = await findCoveringExemption(db, {
+        primaryAssignmentId: input.primaryAssignmentId.trim(),
+        evaluationDate: input.effectiveDate,
+      });
+      if (exemption) {
+        return {
+          outcome: "exempt",
+          exemptionId: exemption.id,
+          messageFa: MSG_HEADCOUNT_EXEMPT_FA,
+        };
+      }
+    }
+
+    // Product path: Approval-first when jobTitle present (match dims required).
+    // Explicit legacy preferredSlotId (approval_id IS NULL) skips Approval path.
+    let forceLegacyPreferred = false;
+    if (input.preferredSlotId?.trim()) {
+      const bridgeProbe = await query<{ approval_id: string | null }>(
+        db,
+        `SELECT approval_id FROM headcount_capacity_slot WHERE id = $1::uuid`,
+        [input.preferredSlotId.trim()],
+      );
+      if (bridgeProbe[0] && bridgeProbe[0].approval_id == null) {
+        forceLegacyPreferred = true;
+      }
+    }
+
+    if (input.jobTitleId?.trim() && !forceLegacyPreferred) {
+      let preferredApprovalId = input.preferredApprovalId?.trim() || null;
+      // Bridge: preferredSlotId on an Approval-backed slot → preferredApprovalId
+      if (!preferredApprovalId && input.preferredSlotId?.trim()) {
+        const bridge = await query<{ approval_id: string | null }>(
+          db,
+          `SELECT approval_id FROM headcount_capacity_slot WHERE id = $1::uuid`,
+          [input.preferredSlotId.trim()],
+        );
+        if (bridge[0]?.approval_id) {
+          preferredApprovalId = bridge[0].approval_id;
+        }
+      }
+      const match = await matchCompatibleApprovals(db, {
+        teamId: input.teamId,
+        jobTitleId: input.jobTitleId.trim(),
+        seniorityId: input.seniorityId,
+        evaluationDate: input.effectiveDate,
+        preferredApprovalId,
+      });
+      if (match.outcome === "matched") {
+        return {
+          outcome: "compatible",
+          approvalId: match.approvalId,
+          slotId: match.slotId,
+          matchedBy: match.matchedBy,
+          messageFa: "ظرفیت سازگار یافت شد.",
+        };
+      }
+      if (match.outcome === "manual_incompatible") {
+        return {
+          outcome: "incompatible",
+          messageFa: MSG_HEADCOUNT_MANUAL_APPROVAL_INCOMPATIBLE_FA,
+        };
+      }
+      // Product fail-closed: no compatible Approval → do not scan legacy slots.
+      return {
+        outcome: "incompatible",
+        messageFa: MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA,
+      };
+    }
+
+    // Legacy fixture bridge: slots with approval_id IS NULL (older selfchecks).
+    // Reachable only when jobTitleId absent or preferredSlotId forces legacy.
     if (input.preferredSlotId?.trim()) {
       const preferred = await query<{
         id: string;
@@ -285,12 +443,13 @@ export async function evaluateHeadcountCapacity(
         job_title_id: string | null;
         ladder_id: string | null;
         grade_id: string | null;
+        approval_id: string | null;
         start_date: Date | string;
         end_date_exclusive: Date | string | null;
         free_units: number;
       }>(
         db,
-        `SELECT id, team_id, job_title_id, ladder_id, grade_id,
+        `SELECT id, team_id, job_title_id, ladder_id, grade_id, approval_id,
                 start_date, end_date_exclusive, free_units
          FROM headcount_capacity_slot
          WHERE id = $1::uuid`,
@@ -301,13 +460,16 @@ export async function evaluateHeadcountCapacity(
         slot &&
         slot.team_id === input.teamId &&
         slot.free_units > 0 &&
+        slot.approval_id == null &&
         slotMatchesRefs(slot, input) &&
         dateInSlot(slot, input.effectiveDate) &&
         (await slotApprovalAllowsConsume(db, slot.id, input.effectiveDate))
       ) {
         return {
           outcome: "compatible",
+          approvalId: null,
           slotId: slot.id,
+          matchedBy: "legacy_slot",
           messageFa: "ظرفیت سازگار یافت شد.",
         };
       }
@@ -319,16 +481,18 @@ export async function evaluateHeadcountCapacity(
       job_title_id: string | null;
       ladder_id: string | null;
       grade_id: string | null;
+      approval_id: string | null;
       start_date: Date | string;
       end_date_exclusive: Date | string | null;
       free_units: number;
     }>(
       db,
-      `SELECT id, team_id, job_title_id, ladder_id, grade_id,
+      `SELECT id, team_id, job_title_id, ladder_id, grade_id, approval_id,
               start_date, end_date_exclusive, free_units
        FROM headcount_capacity_slot
        WHERE team_id = $1::uuid
          AND free_units > 0
+         AND approval_id IS NULL
          AND start_date <= $2::date
          AND (end_date_exclusive IS NULL OR end_date_exclusive > $2::date)
        ORDER BY start_date ASC, id ASC`,
@@ -342,7 +506,9 @@ export async function evaluateHeadcountCapacity(
       ) {
         return {
           outcome: "compatible",
+          approvalId: null,
           slotId: row.id,
+          matchedBy: "legacy_slot",
           messageFa: "ظرفیت سازگار یافت شد.",
         };
       }
@@ -350,7 +516,9 @@ export async function evaluateHeadcountCapacity(
 
     return {
       outcome: "incompatible",
-      messageFa: MSG_HEADCOUNT_NO_CAPACITY_FA,
+      messageFa: input.jobTitleId?.trim()
+        ? MSG_HEADCOUNT_NO_COMPATIBLE_APPROVAL_FA
+        : MSG_HEADCOUNT_NO_CAPACITY_FA,
     };
   } catch {
     return {
@@ -959,21 +1127,28 @@ export async function undoTransferDestinationCapacity(
 export type CapacityPanelInput = {
   teamId: string;
   jobTitleId?: string;
+  seniorityId?: string | null;
   ladderId?: string;
   gradeId?: string;
   effectiveDate: string;
   preferredSlotId?: string | null;
+  preferredApprovalId?: string | null;
+  /** Optional — when set, panel can foreshadow exempt count for that Primary. */
+  primaryAssignmentId?: string | null;
 };
 
 export type CapacityPanelResult = {
   used: number;
   reserved: number;
   free: number;
+  exempt: number;
   slotId: string | null;
+  approvalId: string | null;
 };
 
 /**
- * Aggregate used / reserved / free for destination Team(+title) panel (UX-DR13).
+ * Aggregate used / reserved / free / exempt for destination panel (UX-DR13).
+ * Approval-first when possible; legacy slot bridge otherwise.
  */
 export async function readHeadcountCapacityPanel(
   db: Queryable,
@@ -982,23 +1157,64 @@ export async function readHeadcountCapacityPanel(
   await ensureHeadcountCapacitySchema(db);
 
   let slotId: string | null = null;
+  let approvalId: string | null = null;
   let free = 0;
   let reserved = 0;
+  let exempt = 0;
 
-  if (input.preferredSlotId?.trim()) {
+  if (input.primaryAssignmentId?.trim()) {
+    await ensureHeadcountExemptionSchema(db);
+    const covering = await findCoveringExemption(db, {
+      primaryAssignmentId: input.primaryAssignmentId.trim(),
+      evaluationDate: input.effectiveDate,
+    });
+    if (covering) {
+      exempt = 1;
+    }
+  }
+
+  if (input.jobTitleId?.trim()) {
+    const match = await matchCompatibleApprovals(db, {
+      teamId: input.teamId,
+      jobTitleId: input.jobTitleId.trim(),
+      seniorityId: input.seniorityId,
+      evaluationDate: input.effectiveDate,
+      preferredApprovalId: input.preferredApprovalId,
+    });
+    if (match.outcome === "matched") {
+      slotId = match.slotId;
+      approvalId = match.approvalId;
+      const slotRows = await query<{
+        free_units: number;
+        reserved_units: number;
+      }>(
+        db,
+        `SELECT free_units, reserved_units FROM headcount_capacity_slot
+         WHERE id = $1::uuid`,
+        [slotId],
+      );
+      if (slotRows[0]) {
+        free = Number(slotRows[0].free_units);
+        reserved = Number(slotRows[0].reserved_units);
+      }
+    }
+  }
+
+  if (!slotId && input.preferredSlotId?.trim()) {
     const preferred = await query<{
       id: string;
       team_id: string;
       job_title_id: string | null;
       ladder_id: string | null;
       grade_id: string | null;
+      approval_id: string | null;
       start_date: Date | string;
       end_date_exclusive: Date | string | null;
       free_units: number;
       reserved_units: number;
     }>(
       db,
-      `SELECT id, team_id, job_title_id, ladder_id, grade_id,
+      `SELECT id, team_id, job_title_id, ladder_id, grade_id, approval_id,
               start_date, end_date_exclusive, free_units, reserved_units
        FROM headcount_capacity_slot
        WHERE id = $1::uuid`,
@@ -1012,24 +1228,30 @@ export async function readHeadcountCapacityPanel(
       dateInSlot(slot, input.effectiveDate)
     ) {
       slotId = slot.id;
+      approvalId = slot.approval_id;
       free = Number(slot.free_units);
       reserved = Number(slot.reserved_units);
     }
   }
 
-  if (!slotId) {
+  // Legacy fixture foreshadow only — Approval-backed product truth already tried above.
+  if (!slotId && !input.jobTitleId?.trim()) {
     const rows = await query<{
       id: string;
       job_title_id: string | null;
       ladder_id: string | null;
       grade_id: string | null;
+      approval_id: string | null;
       free_units: number;
       reserved_units: number;
     }>(
       db,
-      `SELECT id, job_title_id, ladder_id, grade_id, free_units, reserved_units
+      `SELECT id, job_title_id, ladder_id, grade_id, approval_id,
+              free_units, reserved_units
        FROM headcount_capacity_slot
        WHERE team_id = $1::uuid
+         AND approval_id IS NULL
+         AND free_units > 0
          AND start_date <= $2::date
          AND (end_date_exclusive IS NULL OR end_date_exclusive > $2::date)
        ORDER BY start_date ASC, id ASC`,
@@ -1038,6 +1260,7 @@ export async function readHeadcountCapacityPanel(
     for (const row of rows) {
       if (slotMatchesRefs(row, input)) {
         slotId = row.id;
+        approvalId = row.approval_id;
         free = Number(row.free_units);
         reserved = Number(row.reserved_units);
         break;
@@ -1056,6 +1279,6 @@ export async function readHeadcountCapacityPanel(
     used = Number(usedRows[0]?.c ?? 0);
   }
 
-  return { used, reserved, free, slotId };
+  return { used, reserved, free, exempt, slotId, approvalId };
 }
 

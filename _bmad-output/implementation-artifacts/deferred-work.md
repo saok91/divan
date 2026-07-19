@@ -1,3 +1,18 @@
+## Deferred from: code review of 4-13-universal-coverage-matching-exemptions.md (2026-07-19)
+
+- Unscoped `listExemptions` / `getExemption` (permission-only) — same IDOR-on-list/get class already tracked for drafts/approvals
+- `ensureHeadcountExemptionSchema` runs DDL on every tRPC request — same ensure-* pattern as Approval; revisit when migrations are sole runtime path
+
+## Deferred from: Story 4.13 universal coverage matching & exemptions (2026-07-19)
+
+- **Approval-first matching + exemptions landed** — `matchCompatibleApprovals` (Team+Title+optional Seniority; oldest valid); `preferredApprovalId` + audited stash; `PrimaryAssignment.headcountApprovalId`; `headcount_exemption` CRUD + fail-closed revoke; SeniorityChanged capacity re-eval; panel exempt + muted overridden foreshadow; `/headcount` exemption admin; `headcount-matching.selfcheck`
+- **Addendum §6.2 open edges not productized:** named seats / Position entity; free-form Correction rebind UI; contracting-entity match dims — Correction rebind remains via existing Correction/Reverse capacity replay
+- **Still 4.14:** Override catalogue / negative free / 14-day expiry warnings / Scheduled-exception; durable reserve for Scheduled Start (FR-30 remainder)
+- **Still Epic 5:** Full dashboard / open-headcount product / report catalogue
+- **Exemption rebind on Primary close+open:** ~~covering exemption stays on source Primary id~~ — **closed in code review:** `rebindCoveringExemptionToSuccessor` on JobTitle/Seniority open
+- **Transfer never inherits source exemption** — destination Approval rematch required; panel omits source `primaryAssignmentId` for Transfer
+- **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged
+
 ## Deferred from: code review of 4-12-headcount-approval-lifecycle.md (2026-07-19)
 
 - `ensureHeadcountApprovalSchema` runs DDL on every tRPC request — same ensure-* pattern as other modules; revisit when migrations are sole runtime path
@@ -10,7 +25,7 @@
 - **Headcount Approval lifecycle landed** — `headcount_approval` entity; create/activate/update/cancel/expire; slot bridge (`approval_id`); consume/reserve gates on Draft|Cancelled|Expired|out-of-validity; historical `approved` = Approval `allowed_count` (legacy slots keep live ceiling); Admin UI on `/headcount`; `headcount.approval.*` permissions; `headcount-approval.selfcheck`
 - **MVP live-counter stand-in removed** for Approval-backed slots (4.11 follow-through)
 - **Still fail-closed orphan disposition** — cancel/reduce/expire with active claims rejected until AR-HEADCOUNT disposition (→ 4.14 Override path may unblock)
-- **Still 4.13:** Matching matrix / oldest-valid default / exemptions / `PrimaryAssignment.headcountApprovalId` product link
+- ~~**Still 4.13:** Matching matrix / oldest-valid default / exemptions / `PrimaryAssignment.headcountApprovalId` product link~~ — **closed in 4.13**
 - **Still 4.14:** Reservation-expiry warnings / Scheduled-exception / Override catalogue; durable reserve for Scheduled Start
 - **Still Epic 5:** Full dashboard / open-headcount product
 - **AD-6 / Hash-chain / PopulationPort cutover / Vitest isolation / IDOR on list/get** unchanged

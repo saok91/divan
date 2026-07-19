@@ -56,6 +56,9 @@ export type StartReturnPayloadFacts = {
   gradeId: string;
   seniorityId: string | null;
   capacitySlotId: string | null;
+  headcountApprovalId: string | null;
+  /** When true, skip consume — covered by exemption. */
+  headcountExempt?: boolean;
 };
 
 export type MissingFact = {
@@ -143,6 +146,8 @@ export function parseStartReturnPayload(
       gradeId: gradeId!,
       seniorityId: strField(payload, "seniorityId"),
       capacitySlotId: strField(payload, "capacitySlotId"),
+      headcountApprovalId: strField(payload, "headcountApprovalId"),
+      headcountExempt: payload.headcountExempt === true,
     },
     missing: [],
   };
@@ -277,6 +282,9 @@ export async function applyStartReturnProjections(
         startDate: source.effectiveDate,
         endDateExclusive: null,
         sourceEventId: ctx.eventId,
+        headcountApprovalId: facts.headcountExempt
+          ? null
+          : facts.headcountApprovalId,
       },
       db,
     );
@@ -296,8 +304,9 @@ export async function applyStartReturnProjections(
     }
 
     // Consume capacity when slot was resolved into payload during classify
+    // (skip when exempt — FR-29)
     const slotId = facts.capacitySlotId;
-    if (slotId) {
+    if (slotId && !facts.headcountExempt) {
       await consumeHeadcountCapacity(ctx.client, {
         slotId,
         eventId: ctx.eventId,
@@ -523,7 +532,7 @@ export function capacityResultToConflict(
   requiresAck?: boolean;
   slotId?: string;
 } | null {
-  if (result.outcome === "compatible") {
+  if (result.outcome === "compatible" || result.outcome === "exempt") {
     return null;
   }
   if (result.outcome === "unavailable") {
@@ -533,13 +542,11 @@ export function capacityResultToConflict(
       messageFa: result.messageFa,
     };
   }
-  // incompatible — Operator blocked; Admin Override path
+  // incompatible — universal coverage (FR-29); Override catalogue stays 4.14
   return {
-    code: "HEADCOUNT_CAPACITY_MISSING",
-    severity: "warning",
+    code: "HEADCOUNT_UNAPPROVED",
+    severity: "blocking",
     messageFa: result.messageFa,
-    requiresOverride: true,
-    requiresAck: true,
   };
 }
 

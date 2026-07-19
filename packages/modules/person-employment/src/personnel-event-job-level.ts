@@ -9,6 +9,7 @@ import { getBusinessEventById } from "@divan/event-store";
 import {
   consumeHeadcountCapacity,
   convertReservationToConsumption,
+  rebindCoveringExemptionToSuccessor,
   releaseHeadcountCapacity,
   releaseHeadcountReservation,
   reserveHeadcountCapacity,
@@ -59,12 +60,12 @@ export const JOB_LEVEL_EVENT_TYPES = new Set([
   PRODUCT_PROMOTION_RECORDED,
 ]);
 
-/** Title only — Grade/Role/Ladder/Promotion never mutate capacity.
- * SeniorityChanged updates Primary facts only until AR-HEADCOUNT adds seniority
- * matching (code-review Decision B / Story 4.8).
+/** Title + Seniority — Grade/Role/Ladder/Promotion never mutate capacity.
+ * SeniorityChanged re-matches Approval (Story 4.13 / FR-29).
  */
 export const JOB_LEVEL_CAPACITY_EVENT_TYPES = new Set([
   PRODUCT_JOB_TITLE_CHANGED,
+  PRODUCT_SENIORITY_CHANGED,
 ]);
 
 const PEER_TERMINATION_EVENT_TYPE = "EmploymentTerminated";
@@ -80,6 +81,8 @@ export type JobLevelOverlayFacts = {
   /** Present when client attempted a team change — conflicts → USE_TRANSFER. */
   teamId: string | null;
   capacitySlotId: string | null;
+  headcountApprovalId: string | null;
+  headcountExempt?: boolean;
 };
 
 export type JobLevelSuccessorFacts = {
@@ -90,6 +93,8 @@ export type JobLevelSuccessorFacts = {
   gradeId: string;
   seniorityId: string | null;
   capacitySlotId: string | null;
+  headcountApprovalId: string | null;
+  headcountExempt?: boolean;
   employmentId: string | null;
 };
 
@@ -233,6 +238,8 @@ export function parseJobLevelPayload(
           : strField(payload, "seniorityId"),
       teamId: strField(payload, "teamId"),
       capacitySlotId: strField(payload, "capacitySlotId"),
+      headcountApprovalId: strField(payload, "headcountApprovalId"),
+      headcountExempt: payload.headcountExempt === true,
     },
     missing: [],
   };
@@ -252,6 +259,8 @@ export function resolveSuccessorPrimary(
     gradeId: source.gradeId,
     seniorityId: source.seniorityId,
     capacitySlotId: overlay.capacitySlotId,
+    headcountApprovalId: overlay.headcountApprovalId,
+    headcountExempt: overlay.headcountExempt,
     employmentId: overlay.employmentId,
   };
 
@@ -293,16 +302,15 @@ export function isJobFactsNoop(
   );
 }
 
-/** Capacity match dimensions currently in `@divan/headcount`: Team + Job Title.
- * Seniority is a Primary fact only until AR-HEADCOUNT (Decision B / 4.8 review).
- */
+/** Capacity match dimensions (4.13): Team + Job Title + Seniority. */
 export function matchingBucketChanged(
   source: PrimaryAssignmentRecord,
   successor: JobLevelSuccessorFacts,
 ): boolean {
   return (
     source.teamId !== successor.teamId ||
-    source.jobTitleId !== successor.jobTitleId
+    source.jobTitleId !== successor.jobTitleId ||
+    (source.seniorityId ?? null) !== (successor.seniorityId ?? null)
   );
 }
 
@@ -318,6 +326,8 @@ export function jobLevelFactsAsStartFacts(
     gradeId: facts.gradeId,
     seniorityId: facts.seniorityId,
     capacitySlotId: facts.capacitySlotId,
+    headcountApprovalId: facts.headcountApprovalId,
+    headcountExempt: facts.headcountExempt,
   };
 }
 
@@ -564,20 +574,24 @@ export async function applyJobLevelScheduledReserve(
   }
 
   const slotId = overlay.capacitySlotId ?? successor.capacitySlotId;
-  if (!slotId) {
-    throw new PersonnelEventError(
-      "VALIDATION",
-      "شناسه اسلات ظرفیت برای رزرو الزامی است.",
-      "missing_capacity_slot",
-    );
-  }
+  const exempt =
+    overlay.headcountExempt === true || successor.headcountExempt === true;
+  if (!exempt) {
+    if (!slotId) {
+      throw new PersonnelEventError(
+        "VALIDATION",
+        "شناسه اسلات ظرفیت برای رزرو الزامی است.",
+        "missing_capacity_slot",
+      );
+    }
 
-  await reserveHeadcountCapacity(ctx.client, {
-    slotId,
-    eventId: ctx.eventId,
-    personId: source.personId,
-    evaluationDate: source.effectiveDate,
-  });
+    await reserveHeadcountCapacity(ctx.client, {
+      slotId,
+      eventId: ctx.eventId,
+      personId: source.personId,
+      evaluationDate: source.effectiveDate,
+    });
+  }
 
   return {
     employmentId,
@@ -627,6 +641,10 @@ async function moveJobLevelCapacity(
       requireConsumption: false,
     });
     didReleaseSource = releaseResult.released;
+
+    if (successor.headcountExempt) {
+      return { didReleaseSource, didMoveDest };
+    }
 
     const converted = await convertReservationToConsumption(ctx.client, {
       eventId: ctx.eventId,
@@ -758,6 +776,9 @@ export async function applyJobLevelProjections(
         gradeId: existingDest.gradeId,
         seniorityId: existingDest.seniorityId,
         capacitySlotId: overlay.capacitySlotId,
+        headcountApprovalId:
+          overlay.headcountApprovalId ?? existingDest.headcountApprovalId,
+        headcountExempt: overlay.headcountExempt,
         employmentId,
       };
       if (
@@ -892,6 +913,9 @@ export async function applyJobLevelProjections(
           startDate: source.effectiveDate,
           endDateExclusive: null,
           sourceEventId: ctx.eventId,
+          headcountApprovalId: successor.headcountExempt
+            ? null
+            : successor.headcountApprovalId,
         },
         tx as PrismaClient,
       );
@@ -907,6 +931,19 @@ export async function applyJobLevelProjections(
     didCloseSource = closedInTxn;
     didOpenSuccessor = openedId != null;
     successorPrimaryId = openedId;
+
+    if (successorPrimaryId) {
+      const actorId =
+        ctx.draft?.updatedBy?.trim() ||
+        ctx.draft?.createdBy?.trim() ||
+        "system";
+      await rebindCoveringExemptionToSuccessor(ctx.client, {
+        fromPrimaryAssignmentId: openSource.id,
+        toPrimaryAssignmentId: successorPrimaryId,
+        evaluationDate: source.effectiveDate,
+        actorId,
+      });
+    }
 
     if (
       JOB_LEVEL_CAPACITY_EVENT_TYPES.has(source.eventType) &&

@@ -1,5 +1,5 @@
 /**
- * Headcount Approval governed router (Story 4.12 / FR-28).
+ * Headcount Approval + Exemption + matching governed router (Stories 4.12–4.13).
  * Mirrors job-reference: governedProcedure + Zod + domain errors → TRPCError.
  */
 import { createPgPool, type Pool } from "@divan/db";
@@ -7,17 +7,30 @@ import {
   HEADCOUNT_APPROVAL_DATA_CATEGORY,
   HEADCOUNT_APPROVAL_READ_PERMISSION,
   HEADCOUNT_APPROVAL_WRITE_PERMISSION,
+  HEADCOUNT_EXEMPTION_DATA_CATEGORY,
+  HEADCOUNT_EXEMPTION_READ_PERMISSION,
+  HEADCOUNT_EXEMPTION_WRITE_PERMISSION,
   HeadcountApprovalError,
+  HeadcountExemptionError,
   activateApproval,
+  activateExemption,
   assertActorHasHeadcountApprovalRead,
   assertActorHasHeadcountApprovalWrite,
+  assertActorHasHeadcountExemptionRead,
+  assertActorHasHeadcountExemptionWrite,
   cancelApproval,
   createApproval,
+  createExemption,
   ensureHeadcountApprovalSchema,
   ensureHeadcountCapacitySchema,
+  ensureHeadcountExemptionSchema,
   expireApproval,
   getApproval,
+  getExemption,
   listApprovals,
+  listCompatibleApprovalCandidates,
+  listExemptions,
+  revokeExemption,
   updateApproval,
 } from "@divan/headcount";
 import { getPersonDb } from "@divan/person-employment";
@@ -38,6 +51,22 @@ const approvalReadMeta = {
 const approvalWriteMeta = {
   permission: HEADCOUNT_APPROVAL_WRITE_PERMISSION,
   dataCategory: HEADCOUNT_APPROVAL_DATA_CATEGORY,
+  action: "write" as const,
+  organizationalScope: "org:selfcheck",
+  sensitive: false as const,
+};
+
+const exemptionReadMeta = {
+  permission: HEADCOUNT_EXEMPTION_READ_PERMISSION,
+  dataCategory: HEADCOUNT_EXEMPTION_DATA_CATEGORY,
+  action: "read" as const,
+  organizationalScope: "org:selfcheck",
+  sensitive: false as const,
+};
+
+const exemptionWriteMeta = {
+  permission: HEADCOUNT_EXEMPTION_WRITE_PERMISSION,
+  dataCategory: HEADCOUNT_EXEMPTION_DATA_CATEGORY,
   action: "write" as const,
   organizationalScope: "org:selfcheck",
   sensitive: false as const,
@@ -103,10 +132,43 @@ function mapApprovalError(err: unknown): never {
   throw err;
 }
 
+function mapExemptionError(err: unknown): never {
+  if (err instanceof HeadcountExemptionError) {
+    if (err.code === "NOT_FOUND") {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: err.messageFa,
+        cause: err,
+      });
+    }
+    if (err.code === "PERMISSION_DENIED") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: err.messageFa,
+        cause: err,
+      });
+    }
+    if (err.code === "UNCOVER") {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: err.messageFa,
+        cause: err,
+      });
+    }
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: err.messageFa,
+      cause: err,
+    });
+  }
+  throw err;
+}
+
 async function withSchema<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
   const pool = getHeadcountPool();
   await ensureHeadcountCapacitySchema(pool);
   await ensureHeadcountApprovalSchema(pool);
+  await ensureHeadcountExemptionSchema(pool);
   return fn(pool);
 }
 
@@ -133,6 +195,38 @@ export const headcountRouter = createTRPCRouter({
           listApprovals(pool, {
             status: input?.status,
             teamId: input?.teamId,
+          }),
+        );
+      } catch (err) {
+        mapApprovalError(err);
+      }
+    }),
+
+  listCompatibleApprovals: governedProcedure
+    .meta({
+      ...approvalReadMeta,
+      operation: "headcount.approval.list_compatible",
+    })
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        jobTitleId: z.string().uuid(),
+        seniorityId: z.string().uuid().nullable().optional(),
+        evaluationDate: dateOnlySchema,
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertActorHasHeadcountApprovalRead(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      try {
+        return await withSchema((pool) =>
+          listCompatibleApprovalCandidates(pool, {
+            teamId: input.teamId,
+            jobTitleId: input.jobTitleId,
+            seniorityId: input.seniorityId,
+            evaluationDate: input.evaluationDate,
           }),
         );
       } catch (err) {
@@ -284,6 +378,180 @@ export const headcountRouter = createTRPCRouter({
         );
       } catch (err) {
         mapApprovalError(err);
+      }
+    }),
+
+  listExemptions: governedProcedure
+    .meta({ ...exemptionReadMeta, operation: "headcount.exemption.list" })
+    .input(
+      z
+        .object({
+          status: z
+            .enum(["draft", "active", "revoked", "expired"])
+            .optional(),
+          primaryAssignmentId: z.string().min(1).optional(),
+          personId: z.string().uuid().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertActorHasHeadcountExemptionRead(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      try {
+        return await withSchema((pool) =>
+          listExemptions(pool, {
+            status: input?.status,
+            primaryAssignmentId: input?.primaryAssignmentId,
+            personId: input?.personId,
+          }),
+        );
+      } catch (err) {
+        mapExemptionError(err);
+      }
+    }),
+
+  getExemption: governedProcedure
+    .meta({ ...exemptionReadMeta, operation: "headcount.exemption.get" })
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await assertActorHasHeadcountExemptionRead(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      try {
+        return await withSchema((pool) => getExemption(pool, input.id));
+      } catch (err) {
+        mapExemptionError(err);
+      }
+    }),
+
+  createExemption: governedProcedure
+    .meta({ ...exemptionWriteMeta, operation: "headcount.exemption.create" })
+    .input(
+      z.object({
+        policyCode: z.string().min(1),
+        primaryAssignmentId: z.string().min(1),
+        personId: z.string().uuid(),
+        approverAccountId: z.string().uuid().optional(),
+        reason: z.string().min(1),
+        validityStart: dateOnlySchema,
+        validityEndExclusive: dateOnlySchema,
+        reportingTreatment: z.enum([
+          "exclude_from_used",
+          "count_as_used_exempt",
+          "other",
+        ]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertActorHasHeadcountExemptionWrite(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      try {
+        const db = getPersonDb();
+        const primary = await db.primaryAssignment.findUnique({
+          where: { id: input.primaryAssignmentId },
+          include: { employment: { select: { personId: true } } },
+        });
+        if (!primary || primary.employment.personId !== input.personId) {
+          throw new HeadcountExemptionError(
+            "VALIDATION",
+            "انتصاب اصلی به این فرد تعلق ندارد یا یافت نشد.",
+            "primary_person_mismatch",
+          );
+        }
+        return await withSchema((pool) =>
+          createExemption(pool, {
+            policyCode: input.policyCode,
+            primaryAssignmentId: input.primaryAssignmentId,
+            personId: input.personId,
+            actorAccountId: ctx.session.accountId,
+            approverAccountId:
+              input.approverAccountId ?? ctx.session.accountId,
+            reason: input.reason,
+            validityStart: input.validityStart,
+            validityEndExclusive: input.validityEndExclusive,
+            reportingTreatment: input.reportingTreatment,
+            actorId: ctx.session.accountId,
+          }),
+        );
+      } catch (err) {
+        mapExemptionError(err);
+      }
+    }),
+
+  activateExemption: governedProcedure
+    .meta({ ...exemptionWriteMeta, operation: "headcount.exemption.activate" })
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertActorHasHeadcountExemptionWrite(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      try {
+        return await withSchema((pool) =>
+          activateExemption(pool, {
+            id: input.id,
+            actorId: ctx.session.accountId,
+          }),
+        );
+      } catch (err) {
+        mapExemptionError(err);
+      }
+    }),
+
+  revokeExemption: governedProcedure
+    .meta({ ...exemptionWriteMeta, operation: "headcount.exemption.revoke" })
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        /** Only meaningful for draft cancel; ignored for active. */
+        allowUncover: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertActorHasHeadcountExemptionWrite(
+        ctx.session.accountId,
+        getPersonDb(),
+      );
+      try {
+        return await withSchema(async (pool) => {
+          const existing = await getExemption(pool, input.id);
+          if (!existing) {
+            throw new HeadcountExemptionError(
+              "NOT_FOUND",
+              "معافیت ظرفیت یافت نشد.",
+            );
+          }
+          let hasApprovalRebind = false;
+          let allowUncover = false;
+          if (existing.status === "draft") {
+            allowUncover = true;
+          } else if (existing.status === "active") {
+            const primary = await getPersonDb().primaryAssignment.findUnique({
+              where: { id: existing.primaryAssignmentId },
+              select: { headcountApprovalId: true },
+            });
+            hasApprovalRebind = Boolean(primary?.headcountApprovalId?.trim());
+            if (!hasApprovalRebind) {
+              throw new HeadcountExemptionError(
+                "UNCOVER",
+                "لغو معافیت انتصاب را بدون مجوز ظرفیت پوشش‌نداده رها می‌کند؛ تا تعیین تکلیف مسدود است.",
+              );
+            }
+          }
+          return revokeExemption(pool, {
+            id: input.id,
+            actorId: ctx.session.accountId,
+            allowUncover,
+            hasApprovalRebind,
+          });
+        });
+      } catch (err) {
+        mapExemptionError(err);
       }
     }),
 });

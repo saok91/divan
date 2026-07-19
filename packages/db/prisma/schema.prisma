@@ -142,7 +142,8 @@ model Employment {
 /// Primary Assignment projection (Story 3.7 / FR-11). AD-2: not event-store authority.
 /// Exactly one active Primary per active Employment at an instant; non-overlap + coverage.
 /// Team membership + org/job facts live here — NOT on Employment. Product mutations = Epic 4.
-/// headcountApprovalId deferred (Epic 4) — do not treat null as product field.
+/// Primary Assignment interval projection (Story 3.7 / FR-11).
+/// headcountApprovalId — product link to Approval (Story 4.13 / FR-29); null when exempt.
 model PrimaryAssignment {
   id                   String    @id @default(uuid(7))
   employmentId         String
@@ -168,11 +169,14 @@ model PrimaryAssignment {
   endDateExclusive     DateTime? @db.Date
   /// Null until Epic 4 Personnel Events exist.
   sourceEventId        String?
+  /// Linked Headcount Approval id (raw SQL headcount_approval); null when exempt.
+  headcountApprovalId  String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
   @@index([employmentId])
   @@index([teamId])
+  @@index([headcountApprovalId])
   @@schema("public")
 }
 

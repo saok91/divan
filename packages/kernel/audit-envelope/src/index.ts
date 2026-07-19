@@ -228,6 +228,25 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 4.13 — Exemption + match reselect (FR-29)
+    {
+      permission: "headcount.exemption.read",
+      dataCategory: "organization.headcount_exemption",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "headcount.exemption.write",
+      dataCategory: "organization.headcount_exemption",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "headcount.match.reselect",
+      dataCategory: "organization.headcount_approval",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 

@@ -6,7 +6,10 @@
 import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
 import { createPgPool, type Pool, type PoolClient, type PrismaClient } from "@divan/db";
 import { getBusinessEventById } from "@divan/event-store";
-import { evaluateHeadcountCapacity } from "@divan/headcount";
+import {
+  evaluateHeadcountCapacity,
+  matchCompatibleApprovals,
+} from "@divan/headcount";
 
 import { getPersonDb } from "./db";
 import { getBaselineBoundaryDate } from "./baseline-boundary";
@@ -71,6 +74,15 @@ import {
   peekCompensationSidecarForDraft,
 } from "./personnel-event-compensation";
 import { getActivePrimaryAssignmentAsOf } from "./primary-assignment";
+
+function strPayload(
+  payload: Record<string, unknown>,
+  key: string,
+): string | null {
+  const v = payload[key];
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return null;
+}
 
 /** Lazy read pool for conflict existence checks outside a finalize txn. */
 let conflictReadPool: Pool | null = null;
@@ -1225,12 +1237,29 @@ export async function classifyConflicts(
       jobTitleId: string;
       ladderId: string;
       gradeId: string;
+      seniorityId: string | null;
       capacitySlotId: string | null;
+      preferredApprovalId: string | null;
+      primaryAssignmentId: string | null;
     } | null = null;
 
     if (isTransfer) {
       const parsed = parseTransferPayload(draft.payload);
-      facts = parsed.facts;
+      if (parsed.facts) {
+        facts = {
+          teamId: parsed.facts.teamId,
+          jobTitleId: parsed.facts.jobTitleId,
+          ladderId: parsed.facts.ladderId,
+          gradeId: parsed.facts.gradeId,
+          seniorityId: parsed.facts.seniorityId,
+          capacitySlotId: parsed.facts.capacitySlotId,
+          preferredApprovalId: strPayload(
+            draft.payload,
+            "preferredApprovalId",
+          ),
+          primaryAssignmentId: null,
+        };
+      }
     } else if (isJobCapacity) {
       const { facts: overlay, missing } = parseJobLevelPayload(
         draft.eventType,
@@ -1256,14 +1285,34 @@ export async function classifyConflicts(
               jobTitleId: successor.jobTitleId,
               ladderId: successor.ladderId,
               gradeId: successor.gradeId,
+              seniorityId: successor.seniorityId,
               capacitySlotId: overlay.capacitySlotId,
+              preferredApprovalId: strPayload(
+                draft.payload,
+                "preferredApprovalId",
+              ),
+              primaryAssignmentId: sourcePrimary.id,
             };
           }
         }
       }
     } else {
       const parsed = parseStartReturnPayload(draft.payload);
-      facts = parsed.facts;
+      if (parsed.facts) {
+        facts = {
+          teamId: parsed.facts.teamId,
+          jobTitleId: parsed.facts.jobTitleId,
+          ladderId: parsed.facts.ladderId,
+          gradeId: parsed.facts.gradeId,
+          seniorityId: parsed.facts.seniorityId,
+          capacitySlotId: parsed.facts.capacitySlotId,
+          preferredApprovalId: strPayload(
+            draft.payload,
+            "preferredApprovalId",
+          ),
+          primaryAssignmentId: null,
+        };
+      }
     }
 
     if (facts) {
@@ -1278,10 +1327,11 @@ export async function classifyConflicts(
         const capacity = await evaluateHeadcountCapacity(reader, {
           teamId: facts.teamId,
           jobTitleId: facts.jobTitleId,
-          ladderId: facts.ladderId,
-          gradeId: facts.gradeId,
+          seniorityId: facts.seniorityId,
           effectiveDate: draft.effectiveDate,
+          preferredApprovalId: facts.preferredApprovalId,
           preferredSlotId: facts.capacitySlotId,
+          primaryAssignmentId: facts.primaryAssignmentId,
         });
         const conflict = capacityResultToConflict(capacity);
         if (conflict) {
@@ -1293,9 +1343,34 @@ export async function classifyConflicts(
             requiresAck: conflict.requiresAck,
           });
         } else if (capacity.outcome === "compatible") {
+          let defaultApprovalId = capacity.approvalId;
+          if (capacity.matchedBy === "manual" && capacity.approvalId) {
+            const automatic = await matchCompatibleApprovals(reader, {
+              teamId: facts.teamId,
+              jobTitleId: facts.jobTitleId,
+              seniorityId: facts.seniorityId,
+              evaluationDate: draft.effectiveDate,
+              preferredApprovalId: null,
+            });
+            if (automatic.outcome === "matched") {
+              defaultApprovalId = automatic.approvalId;
+            }
+          }
           draft.payload = {
             ...draft.payload,
             capacitySlotId: capacity.slotId,
+            headcountApprovalId: capacity.approvalId,
+            headcountExempt: false,
+            headcountMatchedBy: capacity.matchedBy,
+            headcountDefaultApprovalId: defaultApprovalId,
+          };
+        } else if (capacity.outcome === "exempt") {
+          draft.payload = {
+            ...draft.payload,
+            capacitySlotId: null,
+            headcountApprovalId: null,
+            headcountExempt: true,
+            headcountExemptionId: capacity.exemptionId,
           };
         }
       }

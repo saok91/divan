@@ -807,6 +807,70 @@ export async function seedHeadcountApprovalPermissionFixtures(
   }
 }
 
+/** Story 4.13 — exemption + match reselect for hr.admin. */
+export const SEED_HEADCOUNT_EXEMPTION = {
+  permissionSetName: "headcount-exemption",
+  roleCode: "headcount_exemption_admin",
+  roleLabelFa: "مدیر معافیت ظرفیت",
+} as const;
+
+export async function seedHeadcountExemptionPermissionFixtures(
+  db: PrismaClient,
+): Promise<void> {
+  const permissionSet = await db.permissionSet.upsert({
+    where: { name: SEED_HEADCOUNT_EXEMPTION.permissionSetName },
+    create: {
+      name: SEED_HEADCOUNT_EXEMPTION.permissionSetName,
+      permissions: [
+        "headcount.exemption.read",
+        "headcount.exemption.write",
+        "headcount.match.reselect",
+      ],
+    },
+    update: {
+      permissions: [
+        "headcount.exemption.read",
+        "headcount.exemption.write",
+        "headcount.match.reselect",
+      ],
+    },
+  });
+
+  const role = await db.accessRole.upsert({
+    where: { code: SEED_HEADCOUNT_EXEMPTION.roleCode },
+    create: {
+      code: SEED_HEADCOUNT_EXEMPTION.roleCode,
+      labelFa: SEED_HEADCOUNT_EXEMPTION.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+    update: {
+      labelFa: SEED_HEADCOUNT_EXEMPTION.roleLabelFa,
+      permissionSetId: permissionSet.id,
+    },
+  });
+
+  for (const username of ["hr.admin"] as const) {
+    const account = await db.internalAccount.findUnique({
+      where: { username },
+    });
+    if (!account) continue;
+
+    await db.accountAccessRole.upsert({
+      where: {
+        accountId_accessRoleId: {
+          accountId: account.id,
+          accessRoleId: role.id,
+        },
+      },
+      create: {
+        accountId: account.id,
+        accessRoleId: role.id,
+      },
+      update: {},
+    });
+  }
+}
+
 async function ensureByCode<T extends { id: string; code: string }>(
   find: () => Promise<T | null>,
   create: () => Promise<T>,
@@ -965,6 +1029,7 @@ export async function seedJobReferenceFixtures(
 ): Promise<void> {
   await seedJobReferencePermissionFixtures(db);
   await seedHeadcountApprovalPermissionFixtures(db);
+  await seedHeadcountExemptionPermissionFixtures(db);
   await seedDemoJobReferences(db);
 }
 

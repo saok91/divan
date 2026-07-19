@@ -75,8 +75,9 @@ function isJobLevelType(eventType: string): boolean {
 }
 
 function isJobCapacityType(eventType: string): boolean {
-  // SeniorityChanged: Primary-only until AR-HEADCOUNT (Decision B)
-  return eventType === "JobTitleChanged";
+  return (
+    eventType === "JobTitleChanged" || eventType === "SeniorityChanged"
+  );
 }
 
 function isCompensationType(eventType: string): boolean {
@@ -138,6 +139,7 @@ export function PersonnelEventForm() {
   const [gradeId, setGradeId] = React.useState("");
   const [seniorityId, setSeniorityId] = React.useState("");
   const [clearSeniority, setClearSeniority] = React.useState(false);
+  const [preferredApprovalId, setPreferredApprovalId] = React.useState("");
   const [terminationReason, setTerminationReason] =
     React.useState("contract_ended");
   const [overrideReason, setOverrideReason] = React.useState("");
@@ -153,6 +155,10 @@ export function PersonnelEventForm() {
   const [ackCodes, setAckCodes] = React.useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
+
+  React.useEffect(() => {
+    setPreferredApprovalId("");
+  }, [eventType]);
 
   const [lifecycleOp, setLifecycleOp] = React.useState<LifecycleOp | null>(
     null,
@@ -208,15 +214,41 @@ export function PersonnelEventForm() {
       teamId: capacityTeamId,
       effectiveDate: effectiveDate.trim(),
       jobTitleId: capacityJobTitleId || undefined,
-      ladderId: ladderId.trim() || undefined,
-      gradeId: gradeId.trim() || undefined,
+      seniorityId: seniorityId.trim() || undefined,
+      preferredApprovalId: preferredApprovalId.trim() || undefined,
+      // Transfer: never foreshadow source exemption (destination must rematch).
+      primaryAssignmentId: isTransferType(eventType)
+        ? undefined
+        : sourcePrimaryQuery.data?.id,
     },
     {
       enabled:
-        (isTransferType(eventType) || isJobCapacityType(eventType)) &&
+        (isTransferType(eventType) ||
+          isJobCapacityType(eventType) ||
+          isStartReturnType(eventType)) &&
         Boolean(capacityTeamId) &&
         Boolean(effectiveDate.trim()) &&
         /^[0-9a-f-]{36}$/i.test(capacityTeamId),
+    },
+  );
+
+  const compatibleApprovalsQuery = api.headcount.listCompatibleApprovals.useQuery(
+    {
+      teamId: capacityTeamId,
+      jobTitleId: capacityJobTitleId,
+      seniorityId: seniorityId.trim() || null,
+      evaluationDate: effectiveDate.trim(),
+    },
+    {
+      enabled:
+        (isTransferType(eventType) ||
+          isJobCapacityType(eventType) ||
+          isStartReturnType(eventType)) &&
+        Boolean(capacityTeamId) &&
+        Boolean(capacityJobTitleId) &&
+        Boolean(effectiveDate.trim()) &&
+        /^[0-9a-f-]{36}$/i.test(capacityTeamId) &&
+        /^[0-9a-f-]{36}$/i.test(capacityJobTitleId),
     },
   );
 
@@ -258,6 +290,9 @@ export function PersonnelEventForm() {
       };
       if (seniorityId.trim()) payload.seniorityId = seniorityId.trim();
       if (employmentId.trim()) payload.employmentId = employmentId.trim();
+      if (preferredApprovalId.trim()) {
+        payload.preferredApprovalId = preferredApprovalId.trim();
+      }
       return payload;
     }
     if (isJobLevelType(eventType)) {
@@ -283,6 +318,12 @@ export function PersonnelEventForm() {
       ) {
         payload.gradeId = gradeId.trim();
         if (ladderId.trim()) payload.ladderId = ladderId.trim();
+      }
+      if (
+        isJobCapacityType(eventType) &&
+        preferredApprovalId.trim()
+      ) {
+        payload.preferredApprovalId = preferredApprovalId.trim();
       }
       return payload;
     }
@@ -310,6 +351,9 @@ export function PersonnelEventForm() {
       gradeId: gradeId.trim(),
     };
     if (seniorityId.trim()) payload.seniorityId = seniorityId.trim();
+    if (preferredApprovalId.trim()) {
+      payload.preferredApprovalId = preferredApprovalId.trim();
+    }
     return payload;
   }, [
     eventType,
@@ -321,6 +365,7 @@ export function PersonnelEventForm() {
     gradeId,
     seniorityId,
     clearSeniority,
+    preferredApprovalId,
     terminationReason,
     employmentId,
     currency,
@@ -798,6 +843,51 @@ export function PersonnelEventForm() {
                 />
               </label>
             ))}
+            <HeadcountCapacityPanel
+              used={capacityQuery.data?.used ?? 0}
+              reserved={capacityQuery.data?.reserved ?? 0}
+              free={capacityQuery.data?.free ?? 0}
+              exempt={capacityQuery.data?.exempt ?? 0}
+              slotFound={
+                capacityQuery.isFetched
+                  ? Boolean(capacityQuery.data?.slotId) ||
+                    (capacityQuery.data?.exempt ?? 0) > 0
+                  : true
+              }
+              loading={capacityQuery.isFetching}
+              errorFa={
+                capacityQuery.isError
+                  ? "خواندن ظرفیت ناموفق بود."
+                  : null
+              }
+            />
+            {compatibleApprovalsQuery.data?.length ? (
+              <label className="block space-y-1">
+                <span
+                  className="text-label-medium"
+                  id={`${formId}-pref-apr-sr`}
+                >
+                  مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)
+                </span>
+                <select
+                  aria-labelledby={`${formId}-pref-apr-sr`}
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  value={preferredApprovalId}
+                  onChange={(e) => {
+                    setPreferredApprovalId(e.target.value);
+                    setDirty(true);
+                  }}
+                >
+                  <option value="">پیش‌فرض خودکار</option>
+                  {compatibleApprovalsQuery.data.map((c, i) => (
+                    <option key={c.approvalId} value={c.approvalId}>
+                      {i === 0 ? "★ " : ""}
+                      {c.approvalId.slice(0, 8)}… (آزاد: {c.freeUnits})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </fieldset>
         ) : null}
 
@@ -943,9 +1033,11 @@ export function PersonnelEventForm() {
               used={capacityQuery.data?.used ?? 0}
               reserved={capacityQuery.data?.reserved ?? 0}
               free={capacityQuery.data?.free ?? 0}
+              exempt={capacityQuery.data?.exempt ?? 0}
               slotFound={
                 capacityQuery.isFetched
-                  ? Boolean(capacityQuery.data?.slotId)
+                  ? Boolean(capacityQuery.data?.slotId) ||
+                    (capacityQuery.data?.exempt ?? 0) > 0
                   : true
               }
               loading={capacityQuery.isFetching}
@@ -955,6 +1047,30 @@ export function PersonnelEventForm() {
                   : null
               }
             />
+            {compatibleApprovalsQuery.data?.length ? (
+              <label className="block space-y-1">
+                <span className="text-label-medium" id={`${formId}-pref-apr`}>
+                  مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)
+                </span>
+                <select
+                  aria-labelledby={`${formId}-pref-apr`}
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  value={preferredApprovalId}
+                  onChange={(e) => {
+                    setPreferredApprovalId(e.target.value);
+                    setDirty(true);
+                  }}
+                >
+                  <option value="">پیش‌فرض خودکار</option>
+                  {compatibleApprovalsQuery.data.map((c, i) => (
+                    <option key={c.approvalId} value={c.approvalId}>
+                      {i === 0 ? "★ " : ""}
+                      {c.approvalId.slice(0, 8)}… (آزاد: {c.freeUnits})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </fieldset>
         ) : null}
 
@@ -1104,22 +1220,53 @@ export function PersonnelEventForm() {
               </>
             ) : null}
             {isJobCapacityType(eventType) ? (
-              <HeadcountCapacityPanel
-                used={capacityQuery.data?.used ?? 0}
-                reserved={capacityQuery.data?.reserved ?? 0}
-                free={capacityQuery.data?.free ?? 0}
-                slotFound={
-                  capacityQuery.isFetched
-                    ? Boolean(capacityQuery.data?.slotId)
-                    : true
-                }
-                loading={capacityQuery.isFetching}
-                errorFa={
-                  capacityQuery.isError
-                    ? "خواندن ظرفیت ناموفق بود."
-                    : null
-                }
-              />
+              <>
+                <HeadcountCapacityPanel
+                  used={capacityQuery.data?.used ?? 0}
+                  reserved={capacityQuery.data?.reserved ?? 0}
+                  free={capacityQuery.data?.free ?? 0}
+                  exempt={capacityQuery.data?.exempt ?? 0}
+                  slotFound={
+                    capacityQuery.isFetched
+                      ? Boolean(capacityQuery.data?.slotId) ||
+                        (capacityQuery.data?.exempt ?? 0) > 0
+                      : true
+                  }
+                  loading={capacityQuery.isFetching}
+                  errorFa={
+                    capacityQuery.isError
+                      ? "خواندن ظرفیت ناموفق بود."
+                      : null
+                  }
+                />
+                {compatibleApprovalsQuery.data?.length ? (
+                  <label className="block space-y-1">
+                    <span
+                      className="text-label-medium"
+                      id={`${formId}-job-pref-apr`}
+                    >
+                      مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)
+                    </span>
+                    <select
+                      aria-labelledby={`${formId}-job-pref-apr`}
+                      className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                      value={preferredApprovalId}
+                      onChange={(e) => {
+                        setPreferredApprovalId(e.target.value);
+                        setDirty(true);
+                      }}
+                    >
+                      <option value="">پیش‌فرض خودکار</option>
+                      {compatibleApprovalsQuery.data.map((c, i) => (
+                        <option key={c.approvalId} value={c.approvalId}>
+                          {i === 0 ? "★ " : ""}
+                          {c.approvalId.slice(0, 8)}… (آزاد: {c.freeUnits})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </>
             ) : null}
           </fieldset>
         ) : null}

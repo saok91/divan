@@ -188,6 +188,8 @@ async function main() {
     assert.equal(primaries.length, 1);
     assert.equal(primaries[0]!.sourceEventId, startFin.outcome === "finalized" ? startFin.eventId : null);
     assert.equal(primaries[0]!.endDateExclusive, null);
+    // Demo seed uses legacy null-approval slots via preferredSlotId; product
+    // Approval-backed path asserts headcountApprovalId in headcount-matching.selfcheck.
 
     const draftAfter = await db.personnelEventDraft.findUniqueOrThrow({
       where: { id: draftStart.id },
@@ -413,9 +415,9 @@ async function main() {
         assert.ok(
           opBlocked.conflicts.some(
             (c) =>
-              c.code === "HEADCOUNT_CAPACITY_MISSING" && c.requiresOverride,
+              c.code === "HEADCOUNT_UNAPPROVED" && c.severity === "blocking",
           ),
-          "Operator must see capacity override-required conflict",
+          "Operator must see blocking HEADCOUNT_UNAPPROVED (FR-29; Override → 4.14)",
         );
       }
 
@@ -436,18 +438,27 @@ async function main() {
           expectedVersion: draftCap2.version,
           actorMayOverride: true,
           acknowledgement: {
-            warningCodes: ["HEADCOUNT_CAPACITY_MISSING"],
+            warningCodes: ["HEADCOUNT_UNAPPROVED"],
           },
           override: {
-            reason: "تأیید دستی ظرفیت برای خودآزمایی ۴٫۵",
+            reason: "تأیید دستی ظرفیت — باید مسدود بماند تا ۴٫۱۴",
             approvedByAccountId: admin,
           },
         },
         pool,
         db,
       );
-      assert.equal(adminFin.outcome, "finalized");
-      assert.equal(await countEmployments(db, noCapPerson.id), 1);
+      assert.equal(
+        adminFin.outcome,
+        "rejected",
+        "Override catalogue not shipped in 4.13 — shortage stays blocked",
+      );
+      if (adminFin.outcome === "rejected") {
+        assert.ok(
+          adminFin.conflicts.some((c) => c.code === "HEADCOUNT_UNAPPROVED"),
+        );
+      }
+      assert.equal(await countEmployments(db, noCapPerson.id), 0);
     } finally {
       for (const row of priorFree.rows) {
         await pool.query(

@@ -61,6 +61,8 @@ export type TransferPayloadFacts = {
   gradeId: string;
   seniorityId: string | null;
   capacitySlotId: string | null;
+  headcountApprovalId: string | null;
+  headcountExempt?: boolean;
   employmentId: string | null;
 };
 
@@ -156,6 +158,8 @@ export function parseTransferPayload(
       gradeId: gradeId!,
       seniorityId: strField(payload, "seniorityId"),
       capacitySlotId: strField(payload, "capacitySlotId"),
+      headcountApprovalId: strField(payload, "headcountApprovalId"),
+      headcountExempt: payload.headcountExempt === true,
       employmentId: strField(payload, "employmentId"),
     },
     missing: [],
@@ -191,6 +195,8 @@ export function transferFactsAsStartFacts(
     gradeId: facts.gradeId,
     seniorityId: facts.seniorityId,
     capacitySlotId: facts.capacitySlotId,
+    headcountApprovalId: facts.headcountApprovalId,
+    headcountExempt: facts.headcountExempt,
   };
 }
 
@@ -383,20 +389,22 @@ export async function applyTransferScheduledReserve(
   }
 
   const slotId = facts.capacitySlotId;
-  if (!slotId) {
-    throw new PersonnelEventError(
-      "VALIDATION",
-      "شناسه اسلات ظرفیت مقصد برای رزرو الزامی است.",
-      "missing_capacity_slot",
-    );
-  }
+  if (!facts.headcountExempt) {
+    if (!slotId) {
+      throw new PersonnelEventError(
+        "VALIDATION",
+        "شناسه اسلات ظرفیت مقصد برای رزرو الزامی است.",
+        "missing_capacity_slot",
+      );
+    }
 
-  await reserveHeadcountCapacity(ctx.client, {
-    slotId,
-    eventId: ctx.eventId,
-    personId: source.personId,
-    evaluationDate: source.effectiveDate,
-  });
+    await reserveHeadcountCapacity(ctx.client, {
+      slotId,
+      eventId: ctx.eventId,
+      personId: source.personId,
+      evaluationDate: source.effectiveDate,
+    });
+  }
 
   return {
     employmentId,
@@ -613,6 +621,9 @@ export async function applyTransferProjections(
           startDate: source.effectiveDate,
           endDateExclusive: null,
           sourceEventId: ctx.eventId,
+          headcountApprovalId: facts.headcountExempt
+            ? null
+            : facts.headcountApprovalId,
         },
         tx as PrismaClient,
       );
@@ -700,6 +711,10 @@ async function moveTransferCapacity(
       requireConsumption: false,
     });
     didReleaseSource = releaseResult.released;
+
+    if (facts.headcountExempt) {
+      return { didReleaseSource, didMoveDest };
+    }
 
     const converted = await convertReservationToConsumption(ctx.client, {
       eventId: ctx.eventId,

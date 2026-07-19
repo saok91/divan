@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { HeadcountApprovalPanel } from "@/components/headcount/approval-panel";
+import { HeadcountExemptionPanel } from "@/components/headcount/exemption-panel";
 import { HistoricalOrgHeadcountForeshadow } from "@/components/organization/historical-org-headcount-foreshadow";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 /**
- * Headcount surface — Approval admin (4.12) + FR-27 foreshadow (4.11).
+ * Headcount surface — Approval (4.12) + Exemption (4.13) + FR-27 foreshadow.
  */
 export default async function HeadcountPage() {
   const session = await auth();
@@ -25,6 +26,7 @@ export default async function HeadcountPage() {
         </p>
       </div>
       <HeadcountApprovalPanel />
+      <HeadcountExemptionPanel />
       <HistoricalOrgHeadcountForeshadow />
     </div>
   );

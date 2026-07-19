@@ -53,6 +53,8 @@ export type PrimaryAssignmentRecord = {
   startDate: string;
   endDateExclusive: string | null;
   sourceEventId: string | null;
+  /** Linked Approval id; null when exempt or legacy. */
+  headcountApprovalId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -70,6 +72,7 @@ export type ApplyPrimaryAssignmentProjectionInput = {
   startDate: string;
   endDateExclusive?: string | null;
   sourceEventId?: string | null;
+  headcountApprovalId?: string | null;
 };
 
 export type TeamMembershipAsOf = {
@@ -110,6 +113,7 @@ function mapPrimary(row: {
   startDate: Date;
   endDateExclusive: Date | null;
   sourceEventId: string | null;
+  headcountApprovalId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): PrimaryAssignmentRecord {
@@ -127,6 +131,7 @@ function mapPrimary(row: {
       ? dateOnlyFromDb(row.endDateExclusive)
       : null,
     sourceEventId: row.sourceEventId,
+    headcountApprovalId: row.headcountApprovalId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -289,6 +294,9 @@ export async function applyPrimaryAssignmentProjection(
   );
   const seniorityId = normalizeOptionalRefId(input.seniorityId ?? null);
   const sourceEventId = normalizeOptionalRefId(input.sourceEventId ?? null);
+  const headcountApprovalId = normalizeOptionalRefId(
+    input.headcountApprovalId ?? null,
+  );
 
   await assertRefsExist(
     {
@@ -335,6 +343,7 @@ export async function applyPrimaryAssignmentProjection(
       ? dateOnlyToDb(interval.endDateExclusive)
       : null,
     sourceEventId,
+    headcountApprovalId,
   };
 
   try {
