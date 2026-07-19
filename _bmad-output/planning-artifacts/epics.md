@@ -4,14 +4,17 @@ inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-divan-2026-07-11/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-divan-2026-07-15/ARCHITECTURE-SPINE.md
   - _bmad-output/planning-artifacts/architecture/architecture-divan-2026-07-15/infra-security-brief.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-19/DESIGN.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-19/EXPERIENCE.md
+  - _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-19.md
+excludedDocuments:
   - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-13/DESIGN.md
   - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-13/EXPERIENCE.md
-excludedDocuments:
   - docs/pre-prd.md
   - _bmad-output/planning-artifacts/prds/prd-divan-2026-07-11/addendum.md
   - _bmad-output/specs/spec-divan/SPEC.md
   - review/reconcile artifacts under prd and ux folders
-exclusionRationale: PRD is authoritative product-scope contract; Architecture Spine + infra companion cover build substrate; UX spine pair is first-class UX contract. Addendum/SPEC/pre-prd remain reference only to avoid duplicate or non-MVP scope bleed into stories.
+exclusionRationale: PRD is authoritative product-scope contract; Architecture Spine + infra companion cover build substrate; UX spine pair (2026-07-19) is first-class UX contract — 2026-07-13 retained as historical reference only (spines win on conflict). Addendum/SPEC/pre-prd remain reference only to avoid duplicate or non-MVP scope bleed into stories. Sprint Change Proposal 2026-07-19 authorized Epic 4b insertion before Epic 5.
 ---
 
 # divan - Epic Breakdown
@@ -116,43 +119,47 @@ NFR14: Security assurance — threat model, vulnerability/patch SLA, secret/key 
 
 ### UX Design Requirements
 
-UX-DR1: Implement design tokens from DESIGN.md — brand color pairs (primary, accent, chrome, muted-brand, sidebar-active) for light and dark; typography scale (heading, heading-sm, body, body-medium, caption, tabular) using Yekan Bakh Fa-En from `imports/fonts/yekan-bakh/` (no FaNum variants); spacing (chrome-height 56px, sidebar-width 240px, compact/comfortable row heights, form-section-gap); rounded.sm/md/lg.
+UX-DR1: Implement design tokens from DESIGN.md (ux-divan-2026-07-19) — brand color pairs (primary, accent, chrome, muted-brand, sidebar-active) for light and dark; typography scale (heading, heading-sm, body, body-medium, caption, tabular) using Yekan Bakh Fa-En from `imports/fonts/yekan-bakh/` (no FaNum variants); spacing (chrome-height 56px, sidebar-width 240px, sidebar-width-collapsed 64px, section-tabs-height 44px, compact/comfortable row heights, form-section-gap, governed-table filter-row); rounded.sm/md/lg.
 UX-DR2: Implement brand-layer button contract — one gold `button-primary` (accent) CTA per surface region with theme-aware dark pairs meeting ≥4.5:1 contrast at 14px; blue `button-secondary` for draft/secondary actions; never place `#FDB913` fill on dark content canvas.
-UX-DR3: Build `app-shell` — fixed navy chrome header + RTL sidebar (chrome stays navy in both themes); logo right / user menu left; role-filtered nav (hide unauthorized items, never show disabled); skip link «پرش به محتوا»; banner stack slot below header.
-UX-DR4: Implement light/dark theme toggle in avatar menu with per-account persistence; in-place token swap without navigation or unsaved-form guards; preserve focus; visible focus ring on chrome (2px offset).
-UX-DR5: Implement banner stack — non-dismissible blocking `stale-banner` (`role="alert"`, `aria-live="assertive"`) above dismissible-on-expiry `break-glass-banner`; stale takes visual and interaction precedence; disable gold CTAs on affected finalize/export/report when stale/recalc pending.
-UX-DR6: Implement `command-palette` (`Ctrl+K` / `/` when not in text input) with permission-safe personnel search, Latin/Persian digit normalization, uniform timing for out-of-scope vs not-found, `aria-busy`/`aria-live` result counts, Enter opens profile, Esc closes.
-UX-DR7: Implement `personnel-data-table` — compact density, `aria-sort`, stable-snapshot pagination, selectable columns, sticky RTL identifier column, horizontal scroll in card (not page), keyboard row focus + Enter, filtered export when permitted.
+UX-DR3: Build `app-shell` — fixed navy chrome header + collapsible RTL sidebar (chrome stays navy in both themes); logo right / user menu left; role-filtered nav (hide unauthorized items, never show disabled); skip link «پرش به محتوا»; banner stack slot below header; sidebar default expanded with footer collapse toggle persisted per account; collapsed = icons + tooltip/`aria-label`; content width reclaims sidebar-width − sidebar-width-collapsed.
+UX-DR4: Implement light/dark theme toggle in avatar menu with per-account persistence; in-place token swap without navigation or unsaved-form guards; preserve focus; visible focus ring on chrome (2px offset). Theme swap and sidebar collapse are exempt from leave-guards.
+UX-DR5: Implement banner stack — non-dismissible blocking `stale-banner` (`role="alert"`, `aria-live="assertive"`) above dismissible-on-expiry `break-glass-banner`; stale takes visual and interaction precedence; disable gold CTAs on affected finalize/export/report when stale/recalc pending. Alias: `stale-recalc-banner` ↔ DESIGN `{stale-banner}`.
+UX-DR6: Implement `command-palette` (`Ctrl+K` / `/` when not in text input) with permission-safe personnel search, Latin/Persian digit normalization, uniform timing for out-of-scope vs not-found, `aria-busy`/`aria-live` result counts, Enter opens profile, Esc closes; subject to leave-guard when target leaves a dirty form/preview.
+UX-DR7: Implement `governed-data-table` (supersedes prior `personnel-data-table` name) — full-width compact density; per-column filters (enum = multi-select Excel-like; text = typeahead substring); header sort + `aria-sort`; stable-snapshot pagination; any filter/sort change → new snapshot and page = 1; result count via polite live region; sticky RTL identifier + sticky row actions (inline-end); sensitive columns omitted from DOM without permission; horizontal scroll in table container (not page); keyboard row focus; filtered export when permitted; empty → «پاک کردن فیلترها» resets to section defaults; **not AG Grid in MVP**.
 UX-DR8: Implement `person-profile-section` cards — identity, current Employment, Assignments, approved sensitive categories, prior Employments; fields outside permission excluded from DOM (not visually hidden); sensitivity icon on governed categories.
 UX-DR9: Implement `personnel-event-timeline` / `event-timeline-row` — Effective Date desc sort with registration-time secondary hint; decorative status dot `aria-hidden`; text `status-badge` sole status source; correction/neutralization chain links.
 UX-DR10: Implement `status-badge-*` for Scheduled / Effective / Cancelled / Reversed / Draft / Override with light and dark token pairs and Persian labels.
-UX-DR11: Implement sectioned `personnel-event-form` (max-w-4xl) with required markers, inline validation, unsaved-change warning, footer Cancel · Save draft (secondary) · Finalize (primary); draft ≠ finalize.
+UX-DR11: Implement sectioned `personnel-event-form` (max-w-4xl) on رویدادهای پرسنلی / ثبت رویداد with required markers, inline validation, unsaved-change warning, footer Cancel · Save draft (secondary) · Finalize (primary); draft ≠ finalize; person pre-fill from list row action; inbound prefill while dirty runs leave-guard first (never silent person swap).
 UX-DR12: Implement `jalali-date-picker` — Popover calendar + typed entry; keyboard day-grid navigation; `aria-label`/`aria-describedby` for purpose and errors; Persian-digit Jalali display; registration timestamps as separate date+time control.
 UX-DR13: Implement `headcount-capacity-panel` showing used / reserved / free / exempt / overridden with tabular numerals; free > 0 uses primary color; blocking conflicts in Persian before finalize.
 UX-DR14: Implement `sensitive-confirmation-dialog` (max-w-2xl) with consequence summary, reason when required, primary confirm vs ghost cancel; blocked when validation fails or stale/recalc gates active.
 UX-DR15: Implement `dashboard-metric-card` grid (2–4 cols ≥1280; 2-col at 1280×720) with shared org/time filters, last calculation time, reconciliation links; suppressed cohort shows «داده قابل نمایش نیست» never 0.
-UX-DR16: Implement `import-preview-table` with destructive/amber error/warning row tints, Persian row/column cites, cancel-before-execute, approver/executor segregation UI, concurrent-batch block message with owner + correlation id, unsaved preview warning citing batch id.
+UX-DR16: Implement `import-preview-table` with destructive/amber error/warning row tints, Persian row/column cites, cancel-before-execute, approver/executor segregation UI, concurrent-batch block message with owner + correlation id, unsaved preview warning citing batch id. Day-to-day bulk uses per-section ورود گروهی; advanced/migration remains sidebar ورود داده.
 UX-DR17: Implement `export-artifact-panel` with classification, expiry, field scope, reauth at generation and retrieval, custody acknowledgement checkbox for sensitive/bulk before download, download notice per FR-52.
-UX-DR18: Role landing routes after login — Operator→پرسنل; Admin/Manager→داشبورد; Audit→ممیزی; System Admin→عملیات; deep-link denial shows «دسترسی ندارید.» + link to role landing and is audited.
-UX-DR19: Deliver IA surfaces in app shell — داشبورد, پرسنل, پروفایل فرد, فرم رویداد, ساختار سازمان, ظرفیت و جذب, گزارش‌ها, خروجی/بازیابی, ورود داده, دسترسی‌ها, ممیزی, عملیات, پرونده‌های اصلاح; one dialog stack level max; import preview uses full-width Sheet.
+UX-DR18: Role landing routes after login — Operator→اطلاعات پرسنلی (فهرست پرسنل); Admin/Manager→داشبورد; Audit→ممیزی; System Admin→عملیات; deep-link denial shows «دسترسی ندارید.» + link to role landing and is audited.
+UX-DR19: Deliver IA surfaces in app shell (ux-divan-2026-07-19 order) — داشبورد, اطلاعات پرسنلی, رویدادهای پرسنلی, ساختار سازمان, ظرفیت و جذب, گزارش‌ها, ورود داده, دسترسی‌ها, ممیزی, عملیات, پرونده‌های اصلاح; contextual پروفایل فرد and خروجی/بازیابی; major surfaces host horizontal section tabs; one dialog stack level max; import preview uses full-width Sheet.
 UX-DR20: Persian number formatting layer — all user-facing numbers as Persian digits (۰–۹); financial amounts with thousand separator (٬); search accepts Latin or Persian digits; display always Persian.
-UX-DR21: Accessibility floor — WCAG 2.2 AA light+dark; keyboard for dialogs/palette/nav/tables/forms/date picker; landmarks and route announcements; 200% zoom keeps primary actions reachable without page-level horizontal scroll; respect `prefers-reduced-motion`.
+UX-DR21: Accessibility floor — WCAG 2.2 AA light+dark; keyboard for dialogs/palette/nav/tables/forms/date picker/trees/section tabs; landmarks and route announcements (surface + tab); collapsed sidebar icons expose accessible names; 200% zoom keeps primary actions reachable without page-level horizontal scroll; respect `prefers-reduced-motion`.
 UX-DR22: Empty/error/state copy patterns in operational Persian — empty search, empty timeline, empty dashboard scope, suppressed metric, LDAP unavailable, scope revoked mid-session (save draft or discard; block finalize), recalc-in-progress skeleton + disabled CTAs, breached correction deadline distinct state.
-UX-DR23: Viewport policy — full experience at ≥1280×720; reference 1920×1080; <1280 shows minimum-viewport message and does not render broken layout; desktop web only (no mobile-primary layout, infinite scroll on personnel lists, bilingual toggle, or employee self-service).
+UX-DR23: Viewport policy — full experience at ≥1280×720; reference 1920×1080; collapse encouraged at 1280×720 for wide tables; section tabs may scroll horizontally; <1280 shows minimum-viewport message and does not render broken layout; desktop web only (no mobile-primary layout, infinite scroll on personnel lists, bilingual toggle, or employee self-service).
 UX-DR24: Direct-operational Persian voice — fact + date + next step; no ceremonial success copy, emoji, or marketing enthusiasm; consequence text required on sensitive confirms.
+UX-DR25: Implement `section-tabs` on each major nav surface — horizontal tabs; URL reflects tab; `tablist`/`tab`/`tabpanel` semantics; leave-guard when leaving dirty form/preview tabs (sidebar, section tabs, command palette, history); theme toggle and sidebar collapse exempt.
+UX-DR26: Implement `tree-navigator` for سلسله‌مراتب and لدر و گرید — expand/collapse per node; keyboard arrows + Enter opens edit modal; `aria-expanded`; toolbar add at allowed level / under selected parent; «افزودن گرید» disabled until ladder selected (or modal requires parent); deactivate-with-active-children / impossible reparent fail-closed in Persian.
+UX-DR27: Access administration person-first IA — tabs افراد و دسترسی · نقش‌ها · محدوده‌ها · دسترسی اضطراری; OrganizationalScope ≠ org units; toxic/self-approval blocked with Persian reason + audit; break-glass tab uses warning posture.
+UX-DR28: Implement `personnel-quick-edit-modal` from فهرست پرسنل — non-event fields only; Save; link «باز کردن پروفایل کامل»; dirty Stay · Discard · Save; block profile link, ثبت رویداد, Esc/overlay dismiss, and nav until resolved.
 
 ### FR Coverage Map
 
 FR1: Epic 1 — LDAP/AD authentication (Story 1.8, infra-gated); seeded auth bootstrap in Story 1.4
 FR2: Epic 2 — Backend-enforced least privilege (default-deny)
 FR3: Epic 2 — Segregated sensitive categories and export permissions
-FR4: Epic 2 — Governed access administration (roles, scopes, links)
+FR4: Epic 2 — Governed access administration (roles, scopes, links); Epic 4b — person-first Access UI retrofit (presentation only)
 FR5: Epic 3 — Stable Person identity and Personnel Code
 FR6: Epic 3 — Employment lifecycle (non-overlapping; one active)
 FR7: Epic 3 — Data-Dictionary-governed profile fields
 FR8: Epic 3 — Compensation and contractual facts (no payroll calc)
-FR9: Epic 3 — Governed organization hierarchy
-FR10: Epic 3 — Independent job concepts (Role, Title, Ladder, Grade, Seniority)
+FR9: Epic 3 — Governed organization hierarchy; Epic 4b — section tabs + tree-navigator UI retrofit (presentation only)
+FR10: Epic 3 — Independent job concepts (Role, Title, Ladder, Grade, Seniority); Epic 4b — لدر و گرید tree + flat ref tabs UI retrofit (presentation only)
 FR11: Epic 3 — Primary Assignment integrity
 FR12: Epic 3 — Secondary Assignment fidelity (AR-SECONDARY inventory)
 FR13: Epic 3 — Management relationships from Assignment/org facts
@@ -185,7 +192,7 @@ FR39: Epic 6 — Baseline and migration provenance
 FR40: Epic 6 — Migration reconciliation and cutover gate
 FR41: Epic 6 — Governed export
 FR42: Epic 7 — Business and security audit evidence
-FR43: Epic 1 — Persian RTL desktop experience
+FR43: Epic 1 — Persian RTL desktop experience (initial shell); Epic 4b — shell/IA alignment to ux-divan-2026-07-19
 FR44: Epic 1 — Jalali date experience
 FR45: Epic 7 — Operational health without HR content exposure
 FR46: Epic 2 — Entitlement lifecycle and privileged/break-glass access
@@ -218,9 +225,14 @@ HR maintains stable Persons and Employments, Data-Dictionary profile and compens
 Operators and admins record attributable effective-dated Personnel Events (start, terminate, return, transfer, job/level, contract/compensation) through Draft→Finalize with Cancel/Reverse/Correction; deterministic current and as-of state; Headcount Approvals, reservations, atomic consumption, exemptions, and Overrides.
 **FRs covered:** FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR27, FR28, FR29, FR30, FR31, FR32
 
+### Epic 4b: Shell & IA Alignment (UX 2026-07-19)
+Operators and admins use the redesigned Persian RTL shell — collapsible sidebar, section tabs, governed tables/trees — with Access and Organization admin surfaces retrofit to the new IA, before Search/Profiles/Dashboard work begins.
+**FRs covered:** FR43 (presentation/IA); FR4, FR9, FR10 (UI reshape only — domain already delivered in Epics 2–3). **UX contract:** ux-divan-2026-07-19. **Sequencing:** After Epic 4 (done); before Epic 5. Authorized by sprint-change-proposal-2026-07-19.
+
 ### Epic 5: Search, Profiles, Dashboard & Reports
 Authorized users search and list permission-safe populations, open profiles with timelines, use the launch dashboard, and run the approved launch report catalogue with synchronized filters and current/as-of semantics.
 **FRs covered:** FR33, FR34, FR35, FR36
+**Depends on:** Epic 4b primitives (`governed-data-table`, section tabs, updated IA).
 
 ### Epic 6: Migration, Baseline & Governed Export
 Migration actors import approved CSV/XLSX through validated preview and atomic Import Batches, establish Baseline provenance, reconcile to signed controls, and produce governed exports with secure artifact lifecycle.
@@ -318,6 +330,7 @@ So that I start work in the right place without seeing forbidden areas.
 **When** the user opens a deep link they are not permitted to access
 **Then** the UI shows «دسترسی ندارید.» with a link to their role landing and the denial is audited
 **And** placeholder destination routes render empty Persian shells without requiring Epic 5 domain features
+**Note (forward contract):** Operator landing label and IA order are superseded by Epic 4b Story 4b.3 (اطلاعات پرسنلی); do not implement Epic 5+ against the «پرسنل» label.
 
 ### Story 1.6: Command Palette, Jalali Date Picker & Persian Digits
 
@@ -860,9 +873,144 @@ So that shortages are visible and governed rather than hidden (FR30, FR32).
 **And** audit retains actor, time, reason, violated rule, related event/Assignment, Team, title, and capacity state
 **And** Cancel or superseding Correction releases/replaces Reservation
 
+## Epic 4b: Shell & IA Alignment (UX 2026-07-19)
+
+Operators and admins use the redesigned Persian RTL shell — collapsible sidebar, section tabs, governed tables/trees — with Access and Organization admin surfaces retrofit to the new IA, before Search/Profiles/Dashboard work begins.
+
+**UX contract:** `ux-divan-2026-07-19` (EXPERIENCE.md + DESIGN.md). Prior Epic 1–3 shell/admin UI AC remain historically true for delivery dates; forward contract is this epic. Authorized by `sprint-change-proposal-2026-07-19`.
+
+### Story 4b.1: DESIGN Delta Tokens & Collapsible App Shell
+
+As an authenticated Divan user,
+I want a collapsible navy RTL sidebar with updated brand tokens,
+So that wide governed tables reclaim horizontal space at desktop viewports (UX-DR1, UX-DR3).
+
+**Acceptance Criteria:**
+
+**Given** the existing `app-shell` from Epic 1
+**When** ux-divan-2026-07-19 DESIGN delta tokens are applied
+**Then** spacing includes `sidebar-width-collapsed` 64px and `section-tabs-height` 44px plus governed-table/tree tokens from DESIGN.md
+**And** the sidebar defaults to expanded; a footer toggle collapses to icon-only with tooltip and `aria-label` on each item
+**And** collapse preference persists per account
+**And** content width reclaims `sidebar-width` − `sidebar-width-collapsed`
+**And** chrome remains navy in light and dark themes; active item keeps sidebar-active + accent RTL leading border
+**And** theme toggle and sidebar collapse do not trigger unsaved-form leave-guards
+
+### Story 4b.2: Section Tabs Chrome, Routing & Leave-Guards
+
+As a user working in a major nav surface,
+I want horizontal section tabs whose URL reflects the active tab, with leave-guards on dirty forms/previews,
+So that I do not lose draft work when navigating (UX-DR25).
+
+**Acceptance Criteria:**
+
+**Given** a major nav surface (اطلاعات پرسنلی, رویدادهای پرسنلی, ساختار سازمان, ظرفیت و جذب, دسترسی‌ها, and other tabbed surfaces as they exist)
+**When** section tabs render
+**Then** they use `tablist` / `tab` / `tabpanel` semantics and the URL reflects the selected tab
+**And** route announcements include surface name + selected tab
+**When** the user attempts to leave a dirty form or loaded import preview via section tab, sidebar, command palette, or history
+**Then** a leave-guard offers Stay · Discard · Save (or equivalent) and blocks navigation until resolved
+**And** theme toggle and sidebar collapse remain exempt from leave-guards
+**And** section tabs may scroll horizontally at 1280×720 without page-level horizontal scroll
+
+### Story 4b.3: Sidebar IA, Labels & Role Landings
+
+As a role-filtered user,
+I want the 2026-07-19 sidebar order and landings,
+So that Personnel Events are top-level and Operator lands on اطلاعات پرسنلی (UX-DR18, UX-DR19).
+
+**Acceptance Criteria:**
+
+**Given** an authenticated session with coarse role context
+**When** the sidebar renders
+**Then** nav order is: داشبورد · اطلاعات پرسنلی · رویدادهای پرسنلی · ساختار سازمان · ظرفیت و جذب · گزارش‌ها · ورود داده · دسترسی‌ها · ممیزی · عملیات · پرونده‌های اصلاح
+**And** unauthorized items are omitted from the DOM (not shown disabled)
+**When** login completes
+**Then** HR Operator lands on اطلاعات پرسنلی / فهرست پرسنل; HR Admin and Manager on داشبورد; Audit reviewer on ممیزی; System Admin on عملیات
+**When** the user opens a deep link they are not permitted to access
+**Then** the UI shows «دسترسی ندارید.» with a link to their role landing and the denial is audited
+**And** this story supersedes Story 1.5 landing label «پرسنل» and Story 1.3 fixed 240px-only sidebar assumption for forward work
+
+### Story 4b.4: Governed Data Table Primitive
+
+As a developer of list surfaces,
+I want a shared `governed-data-table` primitive,
+So that Epic 5+ lists share filter/sort/snapshot/a11y behavior (UX-DR7).
+
+**Acceptance Criteria:**
+
+**Given** the shared UI component library in `apps/web`
+**When** `governed-data-table` is rendered with demo or fixture rows
+**Then** it is full-width and compact; supports per-column enum multi-select and text typeahead filters
+**And** header sort exposes `aria-sort`; pagination uses a stable query snapshot with deterministic ordering
+**And** any filter or sort change creates a new snapshot and resets page to 1; result count is announced via a polite live region
+**And** sticky RTL identifier column and sticky row-actions column (inline-end) remain visible during horizontal scroll inside the table container
+**And** columns the caller lacks permission for are omitted from the DOM
+**And** empty state shows «نتیجه‌ای پیدا نشد. عبارت یا فیلتر را عوض کنید.» with «پاک کردن فیلترها» resetting to section defaults
+**And** AG Grid is not used; infinite scroll is not used
+**And** Epic 5.1 may replace fixture data with permission-safe personnel queries without changing the primitive contract
+
+### Story 4b.5: Access Administration Person-First Retrofit
+
+As an HR Admin,
+I want دسترسی‌ها organized as افراد و دسترسی · نقش‌ها · محدوده‌ها · دسترسی اضطراری,
+So that I answer “who can do what?” from people first (UX-DR27, UJ-Access, FR4 UI).
+
+**Acceptance Criteria:**
+
+**Given** an Admin with access-administration permission on سطح دسترسی‌ها
+**When** the Access surface opens
+**Then** section tabs match EXPERIENCE / `mockups/key-access-admin.html`: افراد و دسترسی · نقش‌ها · محدوده‌ها · دسترسی اضطراری
+**And** افراد و دسترسی is a person-first governed table for accounts → roles/scopes, directory link, active status
+**And** نقش‌ها and محدوده‌ها preserve Story 2.3 attributable create/change behavior and toxic fail-closed rules
+**And** OrganizationalScope CRUD remains label + active (not org units)
+**And** دسترسی اضطراری uses distinct warning posture for break-glass administration entry points already delivered in Epic 2
+**And** empty entitlements still show «تخصیص دسترسی‌ای ثبت نشده.»
+**And** domain APIs and audit evidence from Epic 2 are unchanged — this story is UI reshape only
+
+### Story 4b.6: Organization Section Tabs & Tree Navigators
+
+As an HR Admin,
+I want ساختار سازمان as سلسله‌مراتب · نقش سازمانی · عنوان شغلی · لدر و گرید · ارشدیت,
+So that hierarchy and ladder/grade use trees and flat refs use tables (UX-DR26, FR9–FR10 UI).
+
+**Acceptance Criteria:**
+
+**Given** Admin access to ساختار سازمان
+**When** the surface opens
+**Then** section tabs are: سلسله‌مراتب · نقش سازمانی · عنوان شغلی · لدر و گرید · ارشدیت
+**And** سلسله‌مراتب uses `tree-navigator` for LE → BU → Dept → Team with expand/collapse, keyboard support, and toolbar «افزودن»
+**And** لدر و گرید uses `tree-navigator` with ladder parents and grade children; «افزودن گرید» is disabled until a ladder node is selected (or modal requires parent)
+**And** نقش سازمانی، عنوان شغلی، and ارشدیت use flat `governed-data-table` + «افزودن» modal
+**And** deactivate-with-active-children / impossible reparent fail closed with Persian blockers (Story 3.5/3.6 domain rules unchanged)
+**And** no separate «افزودن» tab; bulk org import remains deferred
+**And** visuals align with `mockups/key-org-ladder-grade.html`; domain APIs from Epic 3 unchanged
+
+### Story 4b.7: Personnel & Events Shell Scaffolds + Event Entry Relocation
+
+As an HR Operator,
+I want اطلاعات پرسنلی and رویدادهای پرسنلی section shells with the Epic 4 event form hosted on ثبت رویداد,
+So that UJ-1 shell entry points exist before full Epic 5 list/profile depth (UJ-1, UX-DR11, UX-DR28).
+
+**Acceptance Criteria:**
+
+**Given** the updated IA from Story 4b.3
+**When** اطلاعات پرسنلی opens
+**Then** tabs exist: فهرست پرسنل · افزودن · ورود گروهی · فرهنگ داده (Admin-only for فرهنگ داده)
+**And** فهرست پرسنل may use `governed-data-table` with EXPERIENCE column headers and default filter همکار فعلی = yes even if full FR33 wiring waits for Story 5.1
+**And** toolbar «افزودن سریع» opens a minimal-create path; row action «اطلاعات کامل/ویرایش» opens `personnel-quick-edit-modal` (non-event fields; dirty Stay · Discard · Save; link «باز کردن پروفایل کامل»)
+**When** رویدادهای پرسنلی opens
+**Then** tabs exist: رویدادها · ثبت رویداد · ورود گروهی
+**And** ثبت رویداد hosts the existing Epic 4 `personnel-event-form` (draft ≠ finalize)
+**And** row/nav «ثبت رویداد» navigates to ثبت رویداد with person pre-filled; inbound prefill while the tab is dirty runs leave-guard first (never silent person swap)
+**And** ظرفیت و جذب may receive thin section-tab shells (هدکانت · ایجاد · ورود گروهی) for IA consistency without expanding headcount domain scope
+**And** full permission-safe search semantics, profile sections, and timeline depth remain Epic 5
+
 ## Epic 5: Search, Profiles, Dashboard & Reports
 
 Authorized users search and list permission-safe populations, open profiles with timelines, use the launch dashboard, and run the approved launch report catalogue with synchronized filters and current/as-of semantics.
+
+**Prerequisite:** Epic 4b shell/IA primitives (`governed-data-table`, section tabs, updated landings) should be complete before Story 5.1 implementation.
 
 ### Story 5.1: Permission-Safe Personnel Search & Lists
 
@@ -872,12 +1020,14 @@ So that I only see populations and fields I am allowed to see (FR33, UX-DR7).
 
 **Acceptance Criteria:**
 
-**Given** an authenticated scoped user on پرسنل
-**When** they search by approved identifiers/categories (name, surname, Personnel Code, national ID, email, phone, Job Title, Team, Department, Business Unit where permitted)
+**Given** an authenticated scoped user on اطلاعات پرسنلی / فهرست پرسنل
+**When** they search/filter by approved identifiers/categories (name, surname, Personnel Code, national ID, email, phone, Job Title, Team, Department, Business Unit, ladder, grade, employment type, and other EXPERIENCE columns where permitted)
 **Then** results, facets, counts, and columns reveal no out-of-scope values
-**And** lists support sorting (`aria-sort`), pagination over a stable query snapshot with deterministic ordering, result count, approved column selection, and filtered export when permitted
+**And** the list uses `governed-data-table` with Excel-like column filters, sorting (`aria-sort`), pagination over a stable query snapshot with deterministic ordering, result count, and filtered export when permitted
+**And** default filter همکار فعلی = yes is active and dismissible; «پاک کردن فیلترها» restores section defaults including that default
+**And** sticky RTL identifier and sticky row actions remain visible; horizontal scroll stays inside the table container
+**And** row actions include «اطلاعات کامل/ویرایش» (`personnel-quick-edit-modal` + link to full profile) and «ثبت رویداد» (navigate to رویدادهای پرسنلی / ثبت رویداد with person pre-filled)
 **And** empty search shows «نتیجه‌ای پیدا نشد. عبارت یا فیلتر را عوض کنید.» with clear-filters action
-**And** compact `personnel-data-table` pins sticky RTL identifier column; horizontal scroll stays inside the card
 **And** command palette Enter opens the selected profile using the same permission-safe search
 
 ### Story 5.2: Personnel Profile Sections
@@ -895,8 +1045,7 @@ So that I can review governed facts without seeing forbidden fields (FR34, UX-DR
 **And** sensitivity icons mark governed categories
 **And** current facts are distinguishable from Scheduled future changes
 **And** cold load uses Skeleton matching density
-
-### Story 5.3: Personnel Event Timeline
+**And** profile is reachable from quick-edit «باز کردن پروفایل کامل», command palette, or deep link (Epic 4b shell delta)
 
 As an HR Admin or Operator,
 I want a chronological Personnel Event timeline with status badges and correction links,
@@ -957,7 +1106,7 @@ So that row-level Persian errors are fixed before execution (FR37, UX-DR16, UJ-4
 
 **Acceptance Criteria:**
 
-**Given** Admin/migration access to ورود داده
+**Given** Admin/migration access to ورود داده (advanced/migration wizard — distinct from per-section ورود گروهی day-to-day bulk tabs)
 **When** an approved template is uploaded
 **Then** validation covers structure, required data, identifiers, uniqueness, dates, enums, hierarchy, references, Ladder–Grade, overlaps, order, and duplicate rows
 **And** each error cites row, column, and actionable Persian reason in `import-preview-table` (destructive/amber tints)

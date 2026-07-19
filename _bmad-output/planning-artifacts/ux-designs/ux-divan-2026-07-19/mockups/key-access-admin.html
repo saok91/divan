@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>دیوان — دسترسی‌ها / افراد و دسترسی</title>
+  <!--
+    Governs:
+    EXPERIENCE.md — Foundation (shell posture); IA Sidebar + Section tabs «دسترسی‌ها»;
+      Component Patterns: app-shell, section-tabs, governed-data-table;
+      Key Flows UJ-2 (person-first access admin); Inspiration person-first access.
+    DESIGN.md — Brand & Style; Layout & Spacing (full-width content, section-tabs);
+      Components: sidebar-nav, section-tabs, governed-data-table, button-primary / secondary posture.
+  -->
+  <style>
+    @font-face {
+      font-family: 'Yekan Bakh Fa-En';
+      src: url('../../ux-divan-2026-07-13/imports/fonts/yekan-bakh/Yekan Bakh Fa-En 04 Regular.woff') format('woff');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Yekan Bakh Fa-En';
+      src: url('../../ux-divan-2026-07-13/imports/fonts/yekan-bakh/Yekan Bakh Fa-En 06 Bold.woff') format('woff');
+      font-weight: 700;
+      font-style: normal;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Yekan Bakh Fa-En', Tahoma, sans-serif;
+      background: #1a1b1e;
+      padding: 28px 16px;
+      display: flex;
+      justify-content: center;
+      color: #212529;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .frame {
+      width: 1100px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    }
+    .header {
+      background: #051061;
+      color: #fff;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 14px;
+    }
+    .brand { font-weight: 700; font-size: 16px; }
+    .search-pill {
+      background: rgba(255,255,255,.12);
+      padding: 7px 16px;
+      border-radius: 999px;
+      color: rgba(255,255,255,.65);
+      font-size: 13px;
+      min-width: 220px;
+      text-align: center;
+    }
+    .user { font-size: 13px; color: rgba(255,255,255,.9); }
+    .layout { display: flex; min-height: 580px; }
+    .sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      background: #051061;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-nav { flex: 1; padding: 8px 0; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      color: rgba(255,255,255,.72);
+      border-right: 2px solid transparent;
+      font-size: 13px;
+    }
+    .nav-item .ico { width: 18px; text-align: center; opacity: .85; font-size: 14px; }
+    .nav-item.active {
+      background: rgba(255,255,255,.12);
+      border-right-color: #FDB913;
+      color: #fff;
+      font-weight: 700;
+    }
+    .sidebar-footer {
+      border-top: 1px solid rgba(255,255,255,.12);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: rgba(255,255,255,.65);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .content {
+      flex: 1;
+      min-width: 0;
+      padding: 20px 24px 24px;
+    }
+    h1 { font-size: 20px; font-weight: 700; line-height: 1.3; margin-bottom: 12px; }
+    .section-tabs {
+      display: flex;
+      gap: 4px;
+      height: 44px;
+      border-bottom: 1px solid #dee2e6;
+      margin-bottom: 16px;
+    }
+    .tab {
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #808184;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    .tab.active {
+      color: #051061;
+      font-weight: 700;
+      border-bottom-color: #006FFF;
+    }
+    .toolbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .caption {
+      font-size: 12px;
+      color: #808184;
+      line-height: 1.5;
+      max-width: 520px;
+    }
+    .caption strong {
+      color: #495057;
+      font-weight: 700;
+    }
+    .callout {
+      font-size: 12px;
+      color: #1864AB;
+      background: #E7F5FF;
+      border: 1px solid #006FFF;
+      border-radius: 6px;
+      padding: 8px 12px;
+    }
+    .table-wrap {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+      overflow: auto;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      background: #f1f3f5;
+      text-align: right;
+      padding: 10px 12px;
+      font-weight: 400;
+      font-size: 12px;
+      color: #808184;
+      white-space: nowrap;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .filter-row th {
+      background: #fff;
+      padding: 6px 10px;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .filter-row input,
+    .filter-row select {
+      width: 100%;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 6px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: #f8f9fa;
+    }
+    td {
+      padding: 10px 12px;
+      border-top: 1px solid #f1f3f5;
+      height: 40px;
+      vertical-align: middle;
+    }
+    tbody tr:hover td { background: #f8f9fa; }
+    tbody tr.inactive td { color: #808184; background: #f8f9fa; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .badge-on {
+      background: #D3F9D8;
+      color: #2B8A3E;
+    }
+    .badge-off {
+      background: #F1F3F5;
+      color: #495057;
+    }
+    .roles { font-size: 12px; }
+    .link-action {
+      color: #006FFF;
+      font-size: 12px;
+      text-decoration: none;
+      margin-left: 10px;
+    }
+    .link-action:first-child { margin-left: 0; }
+    .count {
+      font-size: 12px;
+      color: #808184;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="header">
+      <span class="brand">دیوان</span>
+      <span class="search-pill">جستجو… Ctrl+K</span>
+      <span class="user">رضا · مدیر HR</span>
+    </header>
+    <div class="layout">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="nav-item"><span class="ico">▣</span> داشبورد</div>
+          <div class="nav-item"><span class="ico">◎</span> اطلاعات پرسنلی</div>
+          <div class="nav-item"><span class="ico">↻</span> رویدادهای پرسنلی</div>
+          <div class="nav-item"><span class="ico">⌂</span> ساختار سازمان</div>
+          <div class="nav-item"><span class="ico">◇</span> ظرفیت و جذب</div>
+          <div class="nav-item"><span class="ico">▤</span> گزارش‌ها</div>
+          <div class="nav-item"><span class="ico">↑</span> ورود داده</div>
+          <div class="nav-item active"><span class="ico">⚿</span> دسترسی‌ها</div>
+          <div class="nav-item"><span class="ico">⌕</span> ممیزی</div>
+          <div class="nav-item"><span class="ico">⚙</span> عملیات</div>
+          <div class="nav-item"><span class="ico">✎</span> پرونده‌های اصلاح</div>
+        </nav>
+        <div class="sidebar-footer"><span>‹</span> جمع کردن</div>
+      </aside>
+      <main class="content">
+        <h1>دسترسی‌ها</h1>
+        <div class="section-tabs">
+          <span class="tab active">افراد و دسترسی</span>
+          <span class="tab">نقش‌ها</span>
+          <span class="tab">محدوده‌ها</span>
+          <span class="tab">دسترسی اضطراری</span>
+        </div>
+        <div class="toolbar">
+          <p class="caption">
+            <strong>مدل ذهنی شخص‌محور:</strong>
+            ابتدا حساب فرد را پیدا کنید، سپس نقش‌ها، محدوده و وضعیت را از همین جدول مدیریت کنید.
+          </p>
+          <p class="callout">تعریف نقش و محدوده در تب‌های دیگر</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>نام نمایشی</th>
+                <th>حساب</th>
+                <th>نقش‌ها</th>
+                <th>محدوده</th>
+                <th>وضعیت</th>
+                <th>پیوند دایرکتوری</th>
+                <th>اقدامات</th>
+              </tr>
+              <tr class="filter-row">
+                <th><input type="text" placeholder="جستجوی نام…" /></th>
+                <th><input type="text" placeholder="—" /></th>
+                <th>
+                  <select>
+                    <option>همه</option>
+                    <option>اپراتور HR</option>
+                    <option>مدیر HR</option>
+                  </select>
+                </th>
+                <th><input type="text" placeholder="—" /></th>
+                <th>
+                  <select>
+                    <option>همه</option>
+                    <option>فعال</option>
+                    <option>غیرفعال</option>
+                  </select>
+                </th>
+                <th>
+                  <select>
+                    <option>همه</option>
+                    <option>پیوند شده</option>
+                    <option>بدون پیوند</option>
+                  </select>
+                </th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>مینا احمدی</td>
+                <td>mina.ahmadi</td>
+                <td class="roles">اپراتور HR</td>
+                <td>کل سازمان</td>
+                <td><span class="badge badge-on">فعال</span></td>
+                <td>پیوند شده</td>
+                <td>
+                  <a class="link-action" href="#">تخصیص نقش</a>
+                  <a class="link-action" href="#">محدوده</a>
+                </td>
+              </tr>
+              <tr>
+                <td>رضا کریمی</td>
+                <td>reza.karimi</td>
+                <td class="roles">مدیر HR · ممیزی</td>
+                <td>کل سازمان</td>
+                <td><span class="badge badge-on">فعال</span></td>
+                <td>پیوند شده</td>
+                <td>
+                  <a class="link-action" href="#">تخصیص نقش</a>
+                  <a class="link-action" href="#">محدوده</a>
+                </td>
+              </tr>
+              <tr class="inactive">
+                <td>نرگس مرادی</td>
+                <td>narges.moradi</td>
+                <td class="roles">اپراتور HR</td>
+                <td>واحد فناوری</td>
+                <td><span class="badge badge-off">غیرفعال</span></td>
+                <td>بدون پیوند</td>
+                <td>
+                  <a class="link-action" href="#">تخصیص نقش</a>
+                  <a class="link-action" href="#">فعال‌سازی</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="count">۳ حساب · صفحه ۱ از ۱</div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

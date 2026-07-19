@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>دیوان — اطلاعات پرسنلی / فهرست پرسنل</title>
+  <!--
+    Governs:
+    EXPERIENCE.md — Foundation (shell posture); IA Sidebar + Section tabs «اطلاعات پرسنلی»;
+      Component Patterns: app-shell, section-tabs, governed-data-table, personnel-quick-edit-modal;
+      State Patterns «Default personnel filter on»; Interaction Primitives row actions; Key Flows UJ-1.
+    DESIGN.md — Brand & Style; Layout & Spacing (chrome/sidebar/section-tabs/full-width);
+      Components: sidebar-nav, section-tabs, governed-data-table, quick-edit-modal, button-primary.
+  -->
+  <style>
+    @font-face {
+      font-family: 'Yekan Bakh Fa-En';
+      src: url('../../ux-divan-2026-07-13/imports/fonts/yekan-bakh/Yekan Bakh Fa-En 04 Regular.woff') format('woff');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Yekan Bakh Fa-En';
+      src: url('../../ux-divan-2026-07-13/imports/fonts/yekan-bakh/Yekan Bakh Fa-En 06 Bold.woff') format('woff');
+      font-weight: 700;
+      font-style: normal;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Yekan Bakh Fa-En', Tahoma, sans-serif;
+      background: #1a1b1e;
+      padding: 28px 16px;
+      display: flex;
+      justify-content: center;
+      color: #212529;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .frame {
+      width: 1100px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    }
+    .header {
+      background: #051061;
+      color: #fff;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 14px;
+    }
+    .brand { font-weight: 700; font-size: 16px; letter-spacing: 0.02em; }
+    .search-pill {
+      background: rgba(255,255,255,.12);
+      padding: 7px 16px;
+      border-radius: 999px;
+      color: rgba(255,255,255,.65);
+      font-size: 13px;
+      min-width: 220px;
+      text-align: center;
+    }
+    .user { font-size: 13px; color: rgba(255,255,255,.9); }
+    .layout { display: flex; min-height: 640px; }
+    .sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      background: #051061;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-nav { flex: 1; padding: 8px 0; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      color: rgba(255,255,255,.72);
+      border-right: 2px solid transparent;
+      font-size: 13px;
+    }
+    .nav-item .ico { width: 18px; text-align: center; opacity: .85; font-size: 14px; }
+    .nav-item.active {
+      background: rgba(255,255,255,.12);
+      border-right-color: #FDB913;
+      color: #fff;
+      font-weight: 700;
+    }
+    .sidebar-footer {
+      border-top: 1px solid rgba(255,255,255,.12);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: rgba(255,255,255,.65);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .content {
+      flex: 1;
+      min-width: 0;
+      padding: 20px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    h1 { font-size: 20px; font-weight: 700; line-height: 1.3; margin-bottom: 12px; }
+    .section-tabs {
+      display: flex;
+      gap: 4px;
+      height: 44px;
+      border-bottom: 1px solid #dee2e6;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #808184;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    .tab.active {
+      color: #051061;
+      font-weight: 700;
+      border-bottom-color: #006FFF;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #495057;
+    }
+    .chip.on {
+      background: #E7F5FF;
+      border-color: #006FFF;
+      color: #1864AB;
+      font-weight: 700;
+    }
+    .chip .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #006FFF;
+    }
+    .count { font-size: 12px; color: #808184; flex: 1; }
+    .btn-gold {
+      background: #FDB913;
+      color: #1A1208;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .workspace {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      min-width: 0;
+    }
+    .table-wrap {
+      flex: 1;
+      min-width: 0;
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 980px;
+    }
+    th {
+      background: #f1f3f5;
+      text-align: right;
+      padding: 8px 10px;
+      font-weight: 400;
+      font-size: 12px;
+      color: #808184;
+      white-space: nowrap;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .filter-row th {
+      background: #fff;
+      padding: 6px 8px;
+      border-bottom: 1px solid #dee2e6;
+      font-weight: 400;
+    }
+    .filter-row input,
+    .filter-row select {
+      width: 100%;
+      min-width: 64px;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 6px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: #f8f9fa;
+      color: #212529;
+    }
+    .filter-row input:focus,
+    .filter-row select:focus {
+      outline: 1px solid #006FFF;
+      border-color: #006FFF;
+      background: #fff;
+    }
+    td {
+      padding: 8px 10px;
+      border-top: 1px solid #f1f3f5;
+      height: 40px;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    tbody tr:hover td { background: #f8f9fa; }
+    tbody tr.match td { background: #FFF9DB; }
+    .yes { color: #2B8A3E; font-weight: 700; font-size: 12px; }
+    .no { color: #808184; font-size: 12px; }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: flex-start;
+    }
+    .link-action {
+      color: #006FFF;
+      font-size: 12px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .modal-panel {
+      width: 280px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .modal-label {
+      font-size: 11px;
+      color: #808184;
+      margin-bottom: 6px;
+    }
+    .modal-stage {
+      position: relative;
+      background: #e9ecef;
+      border-radius: 8px;
+      min-height: 320px;
+      overflow: hidden;
+    }
+    .modal-dim {
+      position: absolute;
+      inset: 0;
+      background: rgba(5,16,97,.35);
+    }
+    .modal-card {
+      position: absolute;
+      top: 24px;
+      right: 16px;
+      left: 16px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.2);
+      padding: 16px;
+      z-index: 1;
+    }
+    .modal-card h2 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      line-height: 1.35;
+    }
+    .modal-field {
+      margin-bottom: 10px;
+    }
+    .modal-field label {
+      display: block;
+      font-size: 12px;
+      color: #808184;
+      margin-bottom: 4px;
+    }
+    .modal-field .val {
+      font-size: 13px;
+      padding: 6px 8px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      background: #f8f9fa;
+    }
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .btn-ghost {
+      background: transparent;
+      border: none;
+      color: #808184;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 6px 8px;
+    }
+    .profile-link {
+      color: #006FFF;
+      font-size: 12px;
+      margin-right: auto;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header class="header">
+      <span class="brand">دیوان</span>
+      <span class="search-pill">جستجو… Ctrl+K</span>
+      <span class="user">مینا · اپراتور HR</span>
+    </header>
+    <div class="layout">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="nav-item"><span class="ico">▣</span> داشبورد</div>
+          <div class="nav-item active"><span class="ico">◎</span> اطلاعات پرسنلی</div>
+          <div class="nav-item"><span class="ico">↻</span> رویدادهای پرسنلی</div>
+          <div class="nav-item"><span class="ico">⌂</span> ساختار سازمان</div>
+          <div class="nav-item"><span class="ico">◇</span> ظرفیت و جذب</div>
+          <div class="nav-item"><span class="ico">▤</span> گزارش‌ها</div>
+          <div class="nav-item"><span class="ico">↑</span> ورود داده</div>
+          <div class="nav-item"><span class="ico">⚿</span> دسترسی‌ها</div>
+          <div class="nav-item"><span class="ico">⌕</span> ممیزی</div>
+          <div class="nav-item"><span class="ico">⚙</span> عملیات</div>
+          <div class="nav-item"><span class="ico">✎</span> پرونده‌های اصلاح</div>
+        </nav>
+        <div class="sidebar-footer"><span>‹</span> جمع کردن</div>
+      </aside>
+      <main class="content">
+        <h1>اطلاعات پرسنلی</h1>
+        <div class="section-tabs">
+          <span class="tab active">فهرست پرسنل</span>
+          <span class="tab">افزودن</span>
+          <span class="tab">ورود گروهی</span>
+          <span class="tab">فرهنگ داده</span>
+        </div>
+        <div class="toolbar">
+          <span class="chip on"><span class="dot"></span> همکار فعلی</span>
+          <span class="count">۱۲۴ نفر · صفحه ۱ از ۷</span>
+          <button type="button" class="btn-gold">افزودن سریع</button>
+        </div>
+        <div class="workspace">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>کد پرسنلی</th>
+                  <th>نام</th>
+                  <th>نام خانوادگی</th>
+                  <th>تیم</th>
+                  <th>نقش</th>
+                  <th>نردبان</th>
+                  <th>گرید</th>
+                  <th>نوع همکاری</th>
+                  <th>جبران خدمت</th>
+                  <th>پایان قرارداد</th>
+                  <th>طرف قرارداد</th>
+                  <th>همکار فعلی</th>
+                  <th>اقدامات</th>
+                </tr>
+                <tr class="filter-row">
+                  <th><input type="text" placeholder="—" /></th>
+                  <th><input type="text" placeholder="—" /></th>
+                  <th><input type="text" value="قا" /></th>
+                  <th><input type="text" placeholder="—" /></th>
+                  <th><input type="text" placeholder="—" /></th>
+                  <th><input type="text" placeholder="—" /></th>
+                  <th><input type="text" placeholder="—" /></th>
+                  <th>
+                    <select>
+                      <option>همه</option>
+                      <option selected>قراردادی</option>
+                      <option>رسمی</option>
+                      <option>پیمانکاری</option>
+                    </select>
+                  </th>
+                  <th><input type="text" placeholder="—" /></th>
+                  <th><input type="text" placeholder="—" /></th>
+                  <th><input type="text" placeholder="—" /></th>
+                  <th>
+                    <select>
+                      <option selected>بله</option>
+                      <option>خیر</option>
+                      <option>همه</option>
+                    </select>
+                  </th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="match">
+                  <td>۱۰۴۲</td>
+                  <td>علی</td>
+                  <td>قاسمی</td>
+                  <td>فناوری</td>
+                  <td>تحلیلگر</td>
+                  <td>تخصصی</td>
+                  <td>۲</td>
+                  <td>قراردادی</td>
+                  <td>۴۸٬۰۰۰٬۰۰۰</td>
+                  <td>۱۴۰۵/۰۶/۳۱</td>
+                  <td>دیوان</td>
+                  <td><span class="yes">بله</span></td>
+                  <td>
+                    <div class="actions">
+                      <a class="link-action" href="#">اطلاعات کامل/ویرایش</a>
+                      <a class="link-action" href="#">ثبت رویداد</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>۱۰۸۷</td>
+                  <td>سارا</td>
+                  <td>قاسم‌پور</td>
+                  <td>منابع انسانی</td>
+                  <td>کارشناس</td>
+                  <td>تخصصی</td>
+                  <td>۱٫۵</td>
+                  <td>قراردادی</td>
+                  <td>۳۶٬۰۰۰٬۰۰۰</td>
+                  <td>۱۴۰۴/۱۲/۲۹</td>
+                  <td>دیوان</td>
+                  <td><span class="yes">بله</span></td>
+                  <td>
+                    <div class="actions">
+                      <a class="link-action" href="#">اطلاعات کامل/ویرایش</a>
+                      <a class="link-action" href="#">ثبت رویداد</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>۰۹۵۱</td>
+                  <td>رضا</td>
+                  <td>قاسم‌زاده</td>
+                  <td>عملیات</td>
+                  <td>کارشناس ارشد</td>
+                  <td>عملیاتی</td>
+                  <td>B</td>
+                  <td>قراردادی</td>
+                  <td>۴۲٬۰۰۰٬۰۰۰</td>
+                  <td>۱۴۰۵/۰۳/۳۱</td>
+                  <td>دیوان</td>
+                  <td><span class="yes">بله</span></td>
+                  <td>
+                    <div class="actions">
+                      <a class="link-action" href="#">اطلاعات کامل/ویرایش</a>
+                      <a class="link-action" href="#">ثبت رویداد</a>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <aside class="modal-panel">
+            <div class="modal-label">حالت مودال</div>
+            <div class="modal-stage">
+              <div class="modal-dim"></div>
+              <div class="modal-card">
+                <h2>اطلاعات کامل / ویرایش</h2>
+                <div class="modal-field">
+                  <label>نام خانوادگی</label>
+                  <div class="val">قاسمی</div>
+                </div>
+                <div class="modal-field">
+                  <label>تیم</label>
+                  <div class="val">فناوری</div>
+                </div>
+                <div class="modal-field">
+                  <label>نقش</label>
+                  <div class="val">تحلیلگر</div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn-gold">ذخیره</button>
+                  <button type="button" class="btn-ghost">انصراف</button>
+                  <a class="profile-link" href="#">باز کردن پروفایل کامل</a>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
