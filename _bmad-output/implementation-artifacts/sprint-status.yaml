@@ -1,5 +1,5 @@
 ﻿# generated: 2026-07-16
-# last_updated: 2026-07-24T19:55:00+03:30
+# last_updated: 2026-07-24T22:40:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-24T19:55:00+03:30
+last_updated: 2026-07-24T22:40:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -110,7 +110,7 @@ development_status:
 
   epic-5: in-progress
   5-1-permission-safe-personnel-search-lists: done
-  5-2-personnel-profile-sections: backlog
+  5-2-personnel-profile-sections: done
   5-3-personnel-event-timeline: backlog
   5-4-core-launch-dashboard: backlog
   5-5-launch-report-catalogue: backlog
@@ -257,7 +257,8 @@ action_items:
   - epic: 4
     action: "Encode profile/timeline consumer contract (Epic 4 assemblers + lifecycle APIs; no parallel SoT) into Story 5.2 / 5.3 Dev Notes"
     owner: "Amelia + Sally"
-    status: open
+    status: done
+    resolved_in: "5-2-personnel-profile-sections.md (Gate + Profile/timeline consumer contract; 5.3 inherits same APIs)"
   - epic: 4
     action: "Plan AD-6 Prisma vs PoolClient single-connection projector hardening (orphan-proof txn model)"
     owner: "Winston + Amelia"
@@ -296,7 +297,8 @@ action_items:
   - epic: 4b
     action: "Encode profile/timeline consumer contract (Epic 4 assemblers + lifecycle APIs; no parallel SoT) into Story 5.2 / 5.3 Dev Notes"
     owner: "Amelia + Sally"
-    status: open
+    status: done
+    resolved_in: "5-2-personnel-profile-sections.md (Gate + Profile/timeline consumer contract; 5.3 inherits same APIs)"
   - epic: 4b
     action: "Deduplicate person-create form shared by Add panel and QuickCreate when next touching those paths"
     owner: "Amelia"

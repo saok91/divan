@@ -109,10 +109,15 @@ export async function resolvePersonnelPopulationRegistry(): Promise<{
   };
 }
 
-async function resolveLabelsForStates(
+/**
+ * Resolve org/job display labels for assembler states (list + profile).
+ * Includes secondary-assignment org/role/job/ladder/grade ids (Story 5.2).
+ */
+export async function resolveLabelsForStates(
   states: Awaited<ReturnType<typeof getCurrentPersonState>>[],
-): Promise<PersonnelListLabelBundle> {
+): Promise<PersonnelListLabelBundle & { orgUnitNameById: Map<string, string> }> {
   const teamIds = new Set<string>();
+  const orgUnitIds = new Set<string>();
   const roleIds = new Set<string>();
   const jobTitleIds = new Set<string>();
   const ladderIds = new Set<string>();
@@ -123,14 +128,23 @@ async function resolveLabelsForStates(
     const teamId = s.teamMembership?.teamId ?? s.primaryAssignment?.teamId;
     if (teamId) teamIds.add(teamId);
     const primary = s.primaryAssignment;
-    if (!primary) continue;
-    roleIds.add(primary.organizationalRoleId);
-    jobTitleIds.add(primary.jobTitleId);
-    ladderIds.add(primary.ladderId);
-    gradeIds.add(primary.gradeId);
+    if (primary) {
+      roleIds.add(primary.organizationalRoleId);
+      jobTitleIds.add(primary.jobTitleId);
+      ladderIds.add(primary.ladderId);
+      gradeIds.add(primary.gradeId);
+    }
+    for (const sec of s.secondaryAssignments) {
+      orgUnitIds.add(sec.orgUnitId);
+      if (sec.organizationalRoleId) roleIds.add(sec.organizationalRoleId);
+      if (sec.jobTitleId) jobTitleIds.add(sec.jobTitleId);
+      if (sec.ladderId) ladderIds.add(sec.ladderId);
+      if (sec.gradeId) gradeIds.add(sec.gradeId);
+    }
   }
 
   const teamNameById = new Map<string, string>();
+  const orgUnitNameById = new Map<string, string>();
   const roleNameById = new Map<string, string>();
   const jobTitleNameById = new Map<string, string>();
   const ladderNameById = new Map<string, string>();
@@ -140,6 +154,10 @@ async function resolveLabelsForStates(
     ...[...teamIds].map(async (id) => {
       const u = await getOrgUnitById(id);
       if (u) teamNameById.set(id, u.nameFa);
+    }),
+    ...[...orgUnitIds].map(async (id) => {
+      const u = await getOrgUnitById(id);
+      if (u) orgUnitNameById.set(id, u.nameFa);
     }),
     ...[...roleIds].map(async (id) => {
       const r = await getOrganizationalRoleById(id);
@@ -161,6 +179,7 @@ async function resolveLabelsForStates(
 
   return {
     teamNameById,
+    orgUnitNameById,
     roleNameById,
     jobTitleNameById,
     ladderNameById,

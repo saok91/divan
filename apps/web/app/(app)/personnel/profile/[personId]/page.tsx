@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 
+import { PersonProfileView } from "@/components/personnel/person-profile-view";
 import { auth } from "@/auth";
 import { assertPageAccess } from "@/lib/assert-page-access";
 import { getSessionContext } from "@divan/identity-access";
@@ -13,11 +14,10 @@ type PersonnelProfilePageProps = {
 };
 
 /**
- * Thin profile placeholder (Story 5.1 deep-link).
- * Full profile sections = Story 5.2.
- * Population scope gate mirrors getById IDOR (AC #8).
+ * Permission-filtered Person profile (Story 5.2 / FR-34).
+ * Server gate mirrors getById IDOR; facts via getCurrentPersonState.
  */
-export default async function PersonnelProfilePlaceholderPage({
+export default async function PersonnelProfilePage({
   params,
 }: PersonnelProfilePageProps) {
   const session = await auth();
@@ -55,27 +55,8 @@ export default async function PersonnelProfilePlaceholderPage({
   }
 
   return (
-    <div className="space-y-4 p-6">
-      <header className="space-y-1">
-        <h1 className="text-title">پروفایل پرسنل</h1>
-        <p className="text-body text-muted-foreground">
-          بخش‌های کامل پروفایل در داستان ۵.۲ پیاده‌سازی می‌شود.
-        </p>
-      </header>
-      <p className="text-body">
-        شناسه:{" "}
-        <span className="text-tabular" dir="ltr">
-          {personId}
-        </span>
-      </p>
-      <p>
-        <a
-          href="/personnel/list"
-          className="text-body text-accent underline-offset-4 hover:underline"
-        >
-          بازگشت به فهرست پرسنل
-        </a>
-      </p>
+    <div className="p-6">
+      <PersonProfileView personId={personId} />
     </div>
   );
 }

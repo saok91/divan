@@ -28,6 +28,7 @@ import {
   getPersonById,
   getPersonByPersonnelCode,
   listDataElements,
+  listEmploymentsForPerson,
   listEnabledProfileFields,
   matchReturn,
   mergePersons,
@@ -37,13 +38,18 @@ import {
   updatePersonIdentity,
   type PersonProfileFieldKey,
 } from "@divan/person-employment";
-import { parseDateOnly } from "@divan/temporal-engine";
+import { parseDateOnly, todayDateOnlyTehran } from "@divan/temporal-engine";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, governedProcedure } from "./trpc";
 import {
+  filterPriorEmployments,
+  mapsToProfileOrgJobLabels,
+} from "@/lib/person-profile-mapper";
+import {
   assertPersonInScopedPopulation,
+  resolveLabelsForStates,
   runPersonnelScopedSearch,
 } from "./personnel-scoped-search";
 
@@ -390,6 +396,80 @@ export const personRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * Prior (closed) employments for profile (Story 5.2 / FR-34).
+   * Scoped + person.read — no parallel profile projection table.
+   */
+  listPriorEmployments: governedProcedure
+    .meta({ ...personReadMeta, operation: "person.prior_employments" })
+    .input(z.object({ personId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await requirePersonRead(ctx.session.accountId);
+      try {
+        await assertPersonInScopedPopulation({
+          personId: input.personId,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
+        const rows = await listEmploymentsForPerson(input.personId);
+        return filterPriorEmployments(rows, todayDateOnlyTehran());
+      } catch (err) {
+        mapPersonError(err);
+      }
+    }),
+
+  /**
+   * Org/job display labels for profile sections (Story 5.2).
+   * Reuses list projector lookup path — not a new SoT.
+   */
+  getProfileLabels: governedProcedure
+    .meta({ ...personReadMeta, operation: "person.profile_labels" })
+    .input(z.object({ personId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await requirePersonRead(ctx.session.accountId);
+      try {
+        await assertPersonInScopedPopulation({
+          personId: input.personId,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
+        const hasCompensationRead = await actorHasCompensationRead(
+          ctx.session.accountId,
+        );
+        const allowedCategories = new Set<string>([PERSON_DATA_CATEGORY]);
+        if (hasCompensationRead) {
+          allowedCategories.add(COMPENSATION_DATA_CATEGORY);
+        }
+        const state = await getCurrentPersonState(
+          input.personId,
+          {
+            actorAuthz: {
+              allowedCategories,
+              categories: DEV_DEMO_CATEGORIES,
+              hasCompensationRead,
+            },
+          },
+          { eventDb: getCurrentStatePool() },
+        );
+        if (!state.ok) {
+          return mapsToProfileOrgJobLabels({
+            teamNameById: new Map(),
+            roleNameById: new Map(),
+            jobTitleNameById: new Map(),
+            ladderNameById: new Map(),
+            gradeNameById: new Map(),
+            orgUnitNameById: new Map(),
+          });
+        }
+        const labels = await resolveLabelsForStates([state]);
+        return mapsToProfileOrgJobLabels(labels);
+      } catch (err) {
+        mapPersonError(err);
+      }
+    }),
+
   /** Thin admin registry read — disposition + enabled (not full governance UI). */
   listDictionary: governedProcedure
     .meta({ ...personReadMeta, operation: "person.dictionary.list" })
@@ -403,6 +483,7 @@ export const personRouter = createTRPCRouter({
           enabled: r.enabled,
           labelFa: r.labelFa,
           categoryId: r.categoryId,
+          sensitivity: r.sensitivity,
           registryVersion: r.registryVersion,
         }));
       } catch (err) {

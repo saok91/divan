@@ -1,3 +1,10 @@
+## Deferred from: code review of 5-2-personnel-profile-sections.md (2026-07-24)
+
+- Selfcheck omits scope-denial on profile get — gates exist on page + procedures; helper selfcheck cannot cover IDOR without DB
+- `scheduledChangesAreSeparateFromCurrent` only checks employment id + `resolvedStatus` — does not assert assignment non-fold
+- Cold load waits on all four queries — slow/failed labels|prior holds ready state behind Skeleton
+- `getProfileLabels` re-runs `getCurrentPersonState` while client already loaded state — duplicate assembler cost
+
 ## Deferred from: code review of 5-1-permission-safe-personnel-search-lists.md (2026-07-24)
 
 - Up to 500 parallel `getCurrentPersonState` per list/search request — MVP envelope documented; revisit batching/cursor when population grows

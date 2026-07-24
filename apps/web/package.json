@@ -12,7 +12,8 @@
     "selfcheck:governed-table": "tsx components/governed-data-table/governed-data-table.selfcheck.ts",
     "selfcheck:tree-navigator": "tsx components/tree-navigator/tree-navigator.selfcheck.ts",
     "selfcheck:access-people": "tsx components/access/access-people.selfcheck.ts",
-    "selfcheck:personnel-search": "tsx src/server/personnel-search.selfcheck.ts"
+    "selfcheck:personnel-search": "tsx src/server/personnel-search.selfcheck.ts",
+    "selfcheck:personnel-profile": "tsx lib/person-profile.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",
