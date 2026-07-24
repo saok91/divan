@@ -1,5 +1,5 @@
-# generated: 2026-07-16
-# last_updated: 2026-07-25T01:10:00+03:30
+﻿# generated: 2026-07-16
+# last_updated: 2026-07-25T01:25:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-25T01:20:00+03:30
+last_updated: 2026-07-25T01:25:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -108,13 +108,13 @@ development_status:
   4b-7-personnel-events-shell-scaffolds-event-entry: done
   epic-4b-retrospective: done
 
-  epic-5: in-progress
+  epic-5: done
   5-1-permission-safe-personnel-search-lists: done
   5-2-personnel-profile-sections: done
   5-3-personnel-event-timeline: done
   5-4-core-launch-dashboard: done
   5-5-launch-report-catalogue: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 
   epic-6: backlog
   6-1-controlled-import-wizard-with-preview: backlog
@@ -274,7 +274,8 @@ action_items:
   - epic: 4
     action: "Keep AR-TEMPORAL / AR-HEADCOUNT / AR-ACCESS / AR-DATA / AR-REPORTING fail-closed; do not invent in Epic 5"
     owner: "Mary + John"
-    status: open
+    status: done
+    resolved_in: "Epic 5 Gates 5.1–5.5 held fail-closed; succeeded by Epic 5 AR fail-closed for Epic 6"
   - epic: 4
     action: "Carry forward Epic 2/3 open items: InferenceBulkPort ops; sticky break-glass; artifact reauth 6.5/7.x; PopulationPort actual cutover"
     owner: "Winston / Amelia+Sally / Paige+Winston"
@@ -314,8 +315,50 @@ action_items:
   - epic: 4b
     action: "Keep AR-TEMPORAL / AR-HEADCOUNT / AR-ACCESS / AR-DATA / AR-REPORTING fail-closed; do not invent in Epic 5"
     owner: "Mary + John"
-    status: open
+    status: done
+    resolved_in: "Epic 5 Gates 5.1–5.5 held fail-closed; succeeded by Epic 5 action AR fail-closed for Epic 6"
   - epic: 4b
     action: "Carry forward still-open Epic 2/3/4 items: InferenceBulkPort ops; sticky break-glass; artifact reauth 6.5/7.x; PopulationPort actual cutover; AD-6 hardening; ensure*Schema migrations-only"
+    owner: "Winston / Amelia+Sally / Paige+Winston"
+    status: open
+  - epic: 5
+    action: "Mark epic-5 done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-5-retro-2026-07-25.md + sprint-status epic-5/epic-5-retrospective"
+  - epic: 5
+    action: "Encode PopulationPort cutover honesty + fixture≠production authz into Story 6.1+ Dev Notes"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 5
+    action: "Encode governed export / artifact reauth / custody / classification into Story 6.5 create-story (close 5.5 stub + Epic 2 reauth carry)"
+    owner: "Amelia + Paige + Winston"
+    status: open
+  - epic: 5
+    action: "Encode Import Batch report key: unavailable until real batch evidence; never fabricate outcomes"
+    owner: "Amelia + Mary"
+    status: open
+  - epic: 5
+    action: "Add person-org scope gate on Cancel/Reverse/Correct mutations (close 5.3 defer) on next lifecycle-write touch"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 5
+    action: "Deduplicate person-create form shared by Add panel and QuickCreate (carry Epic 4b #5)"
+    owner: "Amelia"
+    status: open
+  - epic: 5
+    action: "Wire logout / authz-changed navigation through leave-guard requestNavigation, or document explicit product exemption (carry Epic 4b #6)"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 5
+    action: "Prefer Vitest/ephemeral isolation + deeper UI selfchecks when next quality opportunity lands"
+    owner: "Amelia"
+    status: open
+  - epic: 5
+    action: "Keep AR-MIGRATION / AR-ACCESS / AR-DATA / AR-REPORTING / AR-TEMPORAL fail-closed; do not invent in Epic 6"
+    owner: "Mary + John"
+    status: open
+  - epic: 5
+    action: "Carry forward still-open Epic 2/3/4/4b items: InferenceBulkPort ops; sticky break-glass; PopulationPort actual cutover; AD-6 hardening; ensure*Schema migrations-only; BOM tooling"
     owner: "Winston / Amelia+Sally / Paige+Winston"
     status: open
