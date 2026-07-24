@@ -21,6 +21,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePlatformStatus } from "@/components/platform-status-provider";
+import {
+  EVENT_TYPE_OPTIONS,
+  formatChainLinksFa,
+} from "@/lib/personnel-event-timeline";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
@@ -31,28 +35,6 @@ type Conflict = {
   requiresAck?: boolean;
   requiresOverride?: boolean;
 };
-
-const EVENT_TYPE_OPTIONS = [
-  { value: "ScaffoldChangeRecorded", labelFa: "اسکفولد (آزمایش بستر)" },
-  { value: "EmploymentStarted", labelFa: "شروع همکاری (EmploymentStarted)" },
-  { value: "EmploymentReturned", labelFa: "بازگشت همکاری (EmploymentReturned)" },
-  {
-    value: "EmploymentTerminated",
-    labelFa: "خاتمه همکاری (EmploymentTerminated)",
-  },
-  { value: "TransferRecorded", labelFa: "انتقال (TransferRecorded)" },
-  {
-    value: "OrganizationalRoleChanged",
-    labelFa: "تغییر نقش سازمانی",
-  },
-  { value: "JobTitleChanged", labelFa: "تغییر عنوان شغلی" },
-  { value: "SeniorityChanged", labelFa: "تغییر ارشدیت" },
-  { value: "LadderChanged", labelFa: "تغییر لدر" },
-  { value: "GradeChanged", labelFa: "تغییر گرید" },
-  { value: "PromotionRecorded", labelFa: "ثبت ارتقا (نتیجه نهایی)" },
-  { value: "CompensationChanged", labelFa: "تغییر جبران‌خدمت" },
-  { value: "ContractChanged", labelFa: "تغییر قرارداد" },
-] as const;
 
 function isStartReturnType(eventType: string): boolean {
   return (
@@ -92,30 +74,6 @@ function isCompensationType(eventType: string): boolean {
 }
 
 type LifecycleOp = "cancel" | "reverse" | "correct";
-
-function formatChainLinksFa(links: {
-  cancellations: string[];
-  reversals: string[];
-  corrections: string[];
-}): string | null {
-  const parts: string[] = [];
-  if (links.cancellations.length > 0) {
-    parts.push(
-      `لغو: ${links.cancellations.map((id) => id.slice(0, 8)).join("، ")}`,
-    );
-  }
-  if (links.reversals.length > 0) {
-    parts.push(
-      `بازگشت: ${links.reversals.map((id) => id.slice(0, 8)).join("، ")}`,
-    );
-  }
-  if (links.corrections.length > 0) {
-    parts.push(
-      `اصلاح: ${links.corrections.map((id) => id.slice(0, 8)).join("، ")}`,
-    );
-  }
-  return parts.length > 0 ? parts.join(" · ") : null;
-}
 
 type PersonnelEventFormProps = {
   /** Prefill from `/personnel-events/register?person=` (Story 4b.7). */

@@ -13,7 +13,8 @@
     "selfcheck:tree-navigator": "tsx components/tree-navigator/tree-navigator.selfcheck.ts",
     "selfcheck:access-people": "tsx components/access/access-people.selfcheck.ts",
     "selfcheck:personnel-search": "tsx src/server/personnel-search.selfcheck.ts",
-    "selfcheck:personnel-profile": "tsx lib/person-profile.selfcheck.ts"
+    "selfcheck:personnel-profile": "tsx lib/person-profile.selfcheck.ts",
+    "selfcheck:personnel-timeline": "tsx lib/personnel-event-timeline.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",

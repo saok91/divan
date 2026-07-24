@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 
 import { PersonProfileSensitivityIcon } from "@/components/personnel/person-profile-sensitivity-icon";
+import { PersonnelEventTimeline } from "@/components/personnel/personnel-event-timeline";
 import { StatusBadge } from "@/components/personnel/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toPersianDigits } from "@/lib/persian-digits";
@@ -533,10 +534,7 @@ export function PersonProfileView({ personId }: PersonProfileViewProps) {
 
       <ProfileSection title="گاه‌شمار رویدادهای پرسنلی" className="border-t border-border pt-6">
         <div id="personnel-timeline-entry" className="space-y-2">
-          <p className="text-body text-muted-foreground">
-            نقطهٔ ورود گاه‌شمار برای این فرد. جزئیات کامل (UX-DR9) در داستان ۵.۳
-            پیاده‌سازی می‌شود.
-          </p>
+          <PersonnelEventTimeline personId={personId} />
         </div>
       </ProfileSection>
 

@@ -358,7 +358,7 @@ export async function appendBusinessEvent(
   return { id };
 }
 
-/** Business event row shape for thin reads (Story 4.3). */
+/** Business event row shape for thin reads (Story 4.3; provenance FR-34 / 5.3). */
 export type BusinessEventRecord = {
   id: string;
   eventType: string;
@@ -371,6 +371,9 @@ export type BusinessEventRecord = {
   finalizedBy: string | null;
   finalizedAt: Date | null;
   reason: string | null;
+  referenceCode: string | null;
+  /** Structural refs / codes only — never sensitive field values. */
+  provenance: Record<string, unknown>;
   correctsEventId: string | null;
   cancelsEventId: string | null;
   reversesEventId: string | null;
@@ -391,6 +394,8 @@ type KernelBusinessRow = {
   finalized_by: string | null;
   finalized_at: Date | null;
   reason: string | null;
+  reference_code: string | null;
+  provenance: unknown;
   corrects_event_id: string | null;
   cancels_event_id: string | null;
   reverses_event_id: string | null;
@@ -431,6 +436,8 @@ function mapBusinessRow(row: KernelBusinessRow): BusinessEventRecord {
     finalizedBy: row.finalized_by,
     finalizedAt: row.finalized_at,
     reason: row.reason,
+    referenceCode: row.reference_code,
+    provenance: asRecord(row.provenance),
     correctsEventId: row.corrects_event_id,
     cancelsEventId: row.cancels_event_id,
     reversesEventId: row.reverses_event_id,
@@ -443,6 +450,7 @@ function mapBusinessRow(row: KernelBusinessRow): BusinessEventRecord {
 const BUSINESS_SELECT = `
   id, event_type, person_id, employment_id, effective_date, status,
   registered_by, registered_at, finalized_by, finalized_at, reason,
+  reference_code, provenance,
   corrects_event_id, cancels_event_id, reverses_event_id, supersedes_event_id,
   payload, correlation_id
 `;
@@ -601,7 +609,11 @@ export async function listChainLinksForEvents(
   return map;
 }
 
-/** Authoritative business events for a person (excludes pure Draft storage rows). */
+/**
+ * Authoritative business events for a person (UI / timeline DESC list).
+ * Sort: Effective Date desc → registration time desc → event type asc (AC #2 / FR-34).
+ * Never reuse for temporal apply — see `listBusinessEventsForPersonForApply`.
+ */
 export async function listBusinessEventsForPerson(
   db: PgQueryable,
   personId: string,
@@ -612,7 +624,7 @@ export async function listBusinessEventsForPerson(
   const result = await db.query<KernelBusinessRow>(
     `SELECT ${BUSINESS_SELECT} FROM kernel_events
      WHERE event_class = 'business' AND person_id = $1::uuid
-     ORDER BY effective_date DESC, registered_at DESC, id DESC
+     ORDER BY effective_date DESC, registered_at DESC, event_type ASC, id DESC
      LIMIT $2`,
     [personId.trim(), limit],
   );

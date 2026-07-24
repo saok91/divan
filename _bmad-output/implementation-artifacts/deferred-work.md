@@ -575,3 +575,8 @@
 - `dateOnlyFromDb` via `toISOString().slice(0,10)` ï¿½ same Person 3.1 DATE mapping; harden if non-UTC driver behavior appears
 - No DB `CHECK (endDateExclusive > startDate)` ï¿½ domain `assertValidEmploymentInterval` remains mandatory; add CHECK if raw SQL writers become a threat
 - temporal-engine open-end sentinel `9999-12-31` vs PG unbounded `daterange` ï¿½ engine pre-existing; revisit only if far-horizon intervals matter
+
+## Deferred from: code review of 5-3-personnel-event-timeline.md (2026-07-24)
+
+- Cancel/Reverse/Correct mutations lack person-org scope on target event (permission-only); direct mutation by eventId can act on out-of-scope persons — pre-existing Epic 4 surface, not introduced by 5.3 list hardening.
+- `assertPersonInScopedPopulation` collapses registry/retrieval/infra errors into uniform `PERSON_NOT_FOUND` — intentional anti-enumeration posture from 5.1/5.2; 5.3 only added `channel` param.

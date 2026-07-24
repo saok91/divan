@@ -12,6 +12,7 @@ import {
   PERSONNEL_EVENT_FINALIZE_PERMISSION,
   PERSONNEL_EVENT_REVERSE_PERMISSION,
   PersonnelEventError,
+  PersonIdentityError,
   assertActorHasPersonnelEventCancel,
   assertActorHasPersonnelEventCorrect,
   assertActorHasPersonnelEventDraft,
@@ -50,6 +51,7 @@ import { todayDateOnlyTehran } from "@divan/temporal-engine";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { assertPersonInScopedPopulation } from "./personnel-scoped-search";
 import { ensureRecalcEnqueueRegistered } from "./recalc-enqueue";
 import { createTRPCRouter, governedProcedure } from "./trpc";
 
@@ -131,6 +133,20 @@ async function readyFinalizePool(): Promise<Pool> {
 }
 
 function mapPersonnelEventError(err: unknown): never {
+  if (err instanceof PersonIdentityError) {
+    if (err.code === "PERSON_NOT_FOUND") {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: err.messageFa,
+        cause: err,
+      });
+    }
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: err.messageFa,
+      cause: err,
+    });
+  }
   if (err instanceof PersonnelEventError) {
     if (
       err.code === "DRAFT_NOT_FOUND" ||
@@ -441,12 +457,20 @@ export const personnelEventRouter = createTRPCRouter({
     .input(
       z.object({
         personId: z.string().min(1),
-        limit: z.number().int().positive().max(100).optional(),
+        /** Align with event-store list clamp / timeline load-more (Story 5.3). */
+        limit: z.number().int().positive().max(200).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
       try {
         await assertActorHasPersonnelEventDraft(ctx.session.accountId);
+        await assertPersonInScopedPopulation({
+          personId: input.personId,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+          channel: "timeline",
+        });
         const asOf = todayDateOnlyTehran();
         const pool = getFinalizePool();
         const events = await listBusinessEventsForPerson(

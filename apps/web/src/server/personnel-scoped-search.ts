@@ -415,7 +415,7 @@ export async function runPersonnelScopedSearch(
 
 /**
  * Same population intersection used by list/search — for get/update IDOR gate.
- * Uses identity channel `profile` so minimum-cohort does not block single-person reads.
+ * Default identity channel `profile`; timeline list uses `timeline` (Story 5.3).
  * Missing vs out-of-scope: uniform NOT_FOUND (do not invent AR-ACCESS enumeration timing).
  */
 export async function assertPersonInScopedPopulation(input: {
@@ -424,8 +424,11 @@ export async function assertPersonInScopedPopulation(input: {
   actorScopeCodes: string[];
   correlationId: string;
   skipAccessEvent?: boolean;
+  /** Defaults to `profile` so 5.1/5.2 callers stay stable. */
+  channel?: "profile" | "timeline";
 }): Promise<void> {
   const { PersonIdentityError } = await import("@divan/person-employment");
+  const channel = input.channel ?? "profile";
 
   if (!isPersonUuid(input.personId)) {
     throw new PersonIdentityError("PERSON_NOT_FOUND", "پرسنل یافت نشد.");
@@ -441,12 +444,15 @@ export async function assertPersonInScopedPopulation(input: {
     const retrieval = await runGovernedRetrieval({
       actorAccountId: input.actorAccountId,
       actorScopeCodes: input.actorScopeCodes,
-      channel: "profile",
+      channel,
       asOfDate: currentAsOfDate(),
       objectIds: [input.personId],
       dataCategory: PERSON_DATA_CATEGORY,
       correlationId: input.correlationId,
-      purpose: "personnel.get_scope",
+      purpose:
+        channel === "timeline"
+          ? "personnel.timeline_scope"
+          : "personnel.get_scope",
       organizationalScope: input.actorScopeCodes[0],
       populationRegistry: registry,
       skipAccessEvent: input.skipAccessEvent ?? true,
