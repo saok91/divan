@@ -8,7 +8,7 @@ import {
   DEV_DEMO_CATEGORIES,
 } from "@divan/audit-envelope";
 import { COMPENSATION_DATA_CATEGORY } from "@divan/compensation-facts";
-import { createPgPool, type Pool } from "@divan/db";
+import { getSharedPgPool, type Pool } from "@divan/db";
 import {
   PERSON_DATA_CATEGORY,
   PERSON_FIELD_MAX,
@@ -76,7 +76,7 @@ function getCurrentStatePool(): Pool {
   if (!url) {
     throw new Error("DATABASE_URL is required for current person state");
   }
-  currentStatePool = createPgPool(url);
+  currentStatePool = getSharedPgPool(url);
   return currentStatePool;
 }
 

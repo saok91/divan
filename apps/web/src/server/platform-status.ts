@@ -3,13 +3,13 @@
  * Separate from `me` session identity so ops signals do not dilute authz fields.
  */
 
-import { createPgPool } from "@divan/db";
+import { getSharedPgPool, type Pool } from "@divan/db";
 import { getPlatformRecalcSignal } from "@divan/person-employment";
 
 import { ensureRecalcEnqueueRegistered } from "./recalc-enqueue";
 import { createTRPCRouter, protectedProcedure } from "./trpc";
 
-let statusPool: ReturnType<typeof createPgPool> | null = null;
+let statusPool: Pool | null = null;
 
 function getStatusPool() {
   if (statusPool) return statusPool;
@@ -17,7 +17,7 @@ function getStatusPool() {
   if (!url) {
     throw new Error("DATABASE_URL is required for platform status");
   }
-  statusPool = createPgPool(url);
+  statusPool = getSharedPgPool(url);
   return statusPool;
 }
 

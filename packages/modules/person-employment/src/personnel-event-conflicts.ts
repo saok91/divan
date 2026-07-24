@@ -4,7 +4,7 @@
  */
 
 import { todayDateOnlyTehran, parseDateOnly } from "@divan/temporal-engine";
-import { createPgPool, type Pool, type PoolClient, type PrismaClient } from "@divan/db";
+import { getSharedPgPool, type Pool, type PoolClient, type PrismaClient } from "@divan/db";
 import { getBusinessEventById } from "@divan/event-store";
 import {
   checkReservationApprovalExpiryWarning,
@@ -99,7 +99,7 @@ function getConflictReadPool(): Pool | null {
   if (conflictReadPool) return conflictReadPool;
   const url = process.env.DATABASE_URL?.trim();
   if (!url) return null;
-  conflictReadPool = createPgPool(url);
+  conflictReadPool = getSharedPgPool(url);
   return conflictReadPool;
 }
 

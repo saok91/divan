@@ -39,7 +39,7 @@ import {
   waiveGrant,
   type MutateResult,
 } from "@divan/identity-access";
-import { createPgPool } from "@divan/db";
+import { getSharedPgPool, type Pool } from "@divan/db";
 import { appendAccessEvent } from "@divan/event-store";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -116,7 +116,7 @@ function mapAdminError(err: unknown): never {
   throw err;
 }
 
-let evidencePool: ReturnType<typeof createPgPool> | null = null;
+let evidencePool: Pool | null = null;
 
 function getEvidencePool() {
   if (evidencePool) return evidencePool;
@@ -127,7 +127,7 @@ function getEvidencePool() {
       message: "دسترسی ندارید.",
     });
   }
-  evidencePool = createPgPool(url);
+  evidencePool = getSharedPgPool(url);
   return evidencePool;
 }
 

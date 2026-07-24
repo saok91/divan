@@ -6,22 +6,86 @@ export type { Pool, PoolClient } from "pg";
 /** Runtime Prisma namespace (JsonNull, etc.) — modules import from `@divan/db`, not `@prisma/client`. */
 export { Prisma };
 
+type DivanDbGlobal = {
+  __divanPgPool?: pg.Pool;
+  __divanPgPoolUrl?: string;
+  __divanPrisma?: PrismaClient;
+};
+
+const globalForDb = globalThis as typeof globalThis & DivanDbGlobal;
+
+function defaultPoolMax(): number {
+  const fromEnv = Number(process.env.DIVAN_PG_POOL_MAX);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  // Dev/Turbopack HMR used to spawn many module-local pools; keep the shared
+  // process budget small so Postgres `max_connections` is not exhausted.
+  return process.env.NODE_ENV === "production" ? 10 : 5;
+}
+
 /**
  * Shared `pg.Pool` for kernel raw-SQL paths (event-store) and Prisma adapter.
- * Callers own lifecycle — call `pool.end()` when shutting down.
+ * Survives Turbopack/HMR via `globalThis` so hot reloads do not leak clients.
  */
-export function createPgPool(connectionString: string): pg.Pool {
+export function getSharedPgPool(
+  connectionString = process.env.DATABASE_URL,
+): pg.Pool {
+  const trimmed = connectionString?.trim();
+  if (!trimmed) {
+    throw new Error("DATABASE_URL / connectionString is required");
+  }
+  if (
+    globalForDb.__divanPgPool &&
+    globalForDb.__divanPgPoolUrl === trimmed
+  ) {
+    return globalForDb.__divanPgPool;
+  }
+  if (globalForDb.__divanPgPool) {
+    void globalForDb.__divanPgPool.end().catch(() => undefined);
+    globalForDb.__divanPrisma = undefined;
+  }
+  globalForDb.__divanPgPool = new pg.Pool({
+    connectionString: trimmed,
+    max: defaultPoolMax(),
+  });
+  globalForDb.__divanPgPoolUrl = trimmed;
+  return globalForDb.__divanPgPool;
+}
+
+/**
+ * Process-wide Prisma client (same DATABASE_URL / schema for all modules).
+ * Prefer this over `createPrismaClient` in long-lived web/worker processes.
+ */
+export function getSharedPrismaClient(
+  connectionString = process.env.DATABASE_URL,
+): PrismaClient {
+  if (globalForDb.__divanPrisma) return globalForDb.__divanPrisma;
+  const pool = getSharedPgPool(connectionString);
+  const adapter = new PrismaPg(pool);
+  globalForDb.__divanPrisma = new PrismaClient({ adapter });
+  return globalForDb.__divanPrisma;
+}
+
+/**
+ * One-off `pg.Pool` (selfchecks / workers that own lifecycle).
+ * Prefer `getSharedPgPool` in apps/web request paths.
+ */
+export function createPgPool(
+  connectionString: string,
+  options?: { max?: number },
+): pg.Pool {
   const trimmed = connectionString.trim();
   if (!trimmed) {
     throw new Error("DATABASE_URL / connectionString is required");
   }
-  return new pg.Pool({ connectionString: trimmed });
+  return new pg.Pool({
+    connectionString: trimmed,
+    max: options?.max ?? defaultPoolMax(),
+  });
 }
 
 /**
- * Create a Prisma client with the Prisma 7 driver adapter.
- * Callers must supply DATABASE_URL (local Postgres 17.10+).
- * Pool lifecycle is owned by the returned client — call `$disconnect()` when done.
+ * Create a disposable Prisma client with its own pool (selfchecks).
+ * Long-lived code should use `getSharedPrismaClient`.
  */
 export function createPrismaClient(connectionString: string): PrismaClient {
   const pool = createPgPool(connectionString);
@@ -41,7 +105,7 @@ export async function checkDatabaseConnectivity(
     return false;
   }
 
-  const pool = createPgPool(trimmed);
+  const pool = createPgPool(trimmed, { max: 1 });
   const adapter = new PrismaPg(pool);
   const client = new PrismaClient({ adapter });
 

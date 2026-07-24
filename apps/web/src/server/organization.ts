@@ -3,7 +3,7 @@
  * Coarse hr_admin unlocks nav only — mutations require organization.write.
  * Story 4.11: historical org/headcount counts (`getHistoricalCounts`).
  */
-import { createPgPool, type Pool } from "@divan/db";
+import { getSharedPgPool, type Pool } from "@divan/db";
 import {
   ORGANIZATION_DATA_CATEGORY,
   ORGANIZATION_READ_PERMISSION,
@@ -63,7 +63,7 @@ function getHistoricalCountsPool(): Pool {
       message: "پیکربندی پایگاه داده برای شمارش تاریخی سازمان موجود نیست.",
     });
   }
-  historicalCountsPool = createPgPool(url);
+  historicalCountsPool = getSharedPgPool(url);
   return historicalCountsPool;
 }
 

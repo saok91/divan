@@ -15,7 +15,7 @@ import {
   type InferenceBulkChannel,
   type InferenceBulkEvaluateResult,
 } from "@divan/audit-envelope";
-import { createPgPool } from "@divan/db";
+import { getSharedPgPool, type Pool } from "@divan/db";
 import {
   currentAsOfDate,
   drillDownPopulation,
@@ -39,7 +39,7 @@ const INFERENCE_CHANNELS = new Set<string>([
   "audit",
 ]);
 
-let evidencePool: ReturnType<typeof createPgPool> | null = null;
+let evidencePool: Pool | null = null;
 
 function getEvidencePool() {
   if (evidencePool) return evidencePool;
@@ -50,7 +50,7 @@ function getEvidencePool() {
       message: "Evidence store is not configured.",
     });
   }
-  evidencePool = createPgPool(url);
+  evidencePool = getSharedPgPool(url);
   return evidencePool;
 }
 

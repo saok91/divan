@@ -2,7 +2,7 @@
  * Personnel Event Draft / finalize / lifecycle router (Stories 4.2–4.3).
  * Coarse role unlocks nav only — mutations require PermissionSet bindings.
  */
-import { createPgPool, type Pool } from "@divan/db";
+import { getSharedPgPool, type Pool } from "@divan/db";
 import { readHeadcountCapacityPanel } from "@divan/headcount";
 import {
   PERSONNEL_EVENT_CANCEL_PERMISSION,
@@ -113,7 +113,7 @@ function getFinalizePool(): Pool {
       message: "پیکربندی پایگاه‌داده در دسترس نیست.",
     });
   }
-  finalizePool = createPgPool(url);
+  finalizePool = getSharedPgPool(url);
   return finalizePool;
 }
 

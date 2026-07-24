@@ -1,6 +1,7 @@
-import { createPrismaClient, type PrismaClient } from "@divan/db";
+import { getSharedPrismaClient, type PrismaClient } from "@divan/db";
 
-let singleton: PrismaClient | null = null;
+/** Test / seed override — does not replace the process-wide shared client. */
+let override: PrismaClient | null = null;
 
 /**
  * Shared Prisma client for person-employment (via @divan/db adapter).
@@ -8,15 +9,11 @@ let singleton: PrismaClient | null = null;
 export function getPersonDb(
   connectionString = process.env.DATABASE_URL,
 ): PrismaClient {
-  if (singleton) return singleton;
-  if (!connectionString?.trim()) {
-    throw new Error("DATABASE_URL is required for person-employment");
-  }
-  singleton = createPrismaClient(connectionString);
-  return singleton;
+  if (override) return override;
+  return getSharedPrismaClient(connectionString);
 }
 
-/** Test / seed helper — replace or clear the singleton. */
+/** Test / seed helper — replace or clear the module override. */
 export function setPersonDb(client: PrismaClient | null): void {
-  singleton = client;
+  override = client;
 }

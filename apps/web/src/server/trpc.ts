@@ -9,7 +9,7 @@ import {
   type AuditEnvelope,
   type EvaluationMode,
 } from "@divan/audit-envelope";
-import { createPgPool, type Pool } from "@divan/db";
+import { getSharedPgPool, type Pool } from "@divan/db";
 import {
   AccessAdminError,
   AuthzChangedError,
@@ -123,7 +123,7 @@ function getEnvelope(): AuditEnvelope {
       message: operationalCopy.accessDeniedTitle,
     });
   }
-  envelopePool = createPgPool(url);
+  envelopePool = getSharedPgPool(url);
   envelope = createAuditEnvelope({
     pool: envelopePool,
     getPolicy: () => loadPolicyRegistry(),

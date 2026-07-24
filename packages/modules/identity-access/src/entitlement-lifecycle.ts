@@ -25,13 +25,14 @@ import type {
   EntitlementGrant,
   EntitlementGrantKind,
   EntitlementGrantStatus,
+  Pool,
   Prisma,
   PrismaClient,
 } from "@divan/db";
+import { getSharedPgPool } from "@divan/db";
 
 import { randomUUID } from "node:crypto";
 
-import { createPgPool } from "@divan/db";
 import { appendAccessEvent } from "@divan/event-store";
 
 import {
@@ -300,13 +301,13 @@ async function requireAccount(
   }
 }
 
-let failSafeEvidencePool: ReturnType<typeof createPgPool> | null = null;
+let failSafeEvidencePool: Pool | null = null;
 
 function getFailSafeEvidencePool() {
   if (failSafeEvidencePool) return failSafeEvidencePool;
   const url = process.env.DATABASE_URL?.trim();
   if (!url) return null;
-  failSafeEvidencePool = createPgPool(url);
+  failSafeEvidencePool = getSharedPgPool(url);
   return failSafeEvidencePool;
 }
 

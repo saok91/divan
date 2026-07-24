@@ -2,7 +2,7 @@
  * Headcount Approval + Exemption + Override + matching governed router (Stories 4.12–4.14).
  * Mirrors job-reference: governedProcedure + Zod + domain errors → TRPCError.
  */
-import { createPgPool, type Pool } from "@divan/db";
+import { getSharedPgPool, type Pool } from "@divan/db";
 import {
   HEADCOUNT_APPROVAL_DATA_CATEGORY,
   HEADCOUNT_APPROVAL_READ_PERMISSION,
@@ -112,7 +112,7 @@ function getHeadcountPool(): Pool {
       message: "پیکربندی پایگاه داده برای مجوز ظرفیت موجود نیست.",
     });
   }
-  headcountPool = createPgPool(url);
+  headcountPool = getSharedPgPool(url);
   return headcountPool;
 }
 
