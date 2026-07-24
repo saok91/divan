@@ -5,6 +5,7 @@ export type PersonnelListRow = {
   familyName: string;
   team: string;
   role: string;
+  jobTitle: string;
   ladder: string;
   grade: string;
   collaborationType: string;

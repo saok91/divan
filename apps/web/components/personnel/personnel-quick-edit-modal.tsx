@@ -38,12 +38,16 @@ type PersonnelQuickEditModalProps = {
   onSaved: (person: SavedPerson) => void;
 };
 
-const PROFILE_HREF_PLACEHOLDER = "/personnel/list";
+const PROFILE_HREF_PREFIX = "/personnel/profile/";
 
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     id,
   );
+}
+
+function profileHref(personId: string): string {
+  return `${PROFILE_HREF_PREFIX}${encodeURIComponent(personId)}`;
 }
 
 /**
@@ -200,7 +204,7 @@ export function PersonnelQuickEditModal({
     if (!dirty) return;
     e.preventDefault();
     if (leaveGuard) {
-      void leaveGuard.requestNavigation(PROFILE_HREF_PLACEHOLDER);
+      void leaveGuard.requestNavigation(profileHref(row.id));
       return;
     }
     onOpenChange(false);
@@ -343,7 +347,7 @@ export function PersonnelQuickEditModal({
 
           <DialogFooter className="flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
-              href={PROFILE_HREF_PLACEHOLDER}
+              href={profileHref(row.id)}
               className="text-body text-accent underline-offset-4 hover:underline"
               onClick={onProfileLinkClick}
             >

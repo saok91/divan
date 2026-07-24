@@ -27,6 +27,7 @@
     "selfcheck:personnel-event-job-level": "tsx src/personnel-event-job-level.selfcheck.ts",
     "selfcheck:personnel-event-compensation": "tsx src/personnel-event-compensation.selfcheck.ts",
     "selfcheck:current-person-state": "tsx src/current-person-state.selfcheck.ts",
+    "selfcheck:personnel-list-projector": "tsx src/personnel-list-projector.selfcheck.ts",
     "selfcheck:historical-org-headcount": "tsx src/historical-org-headcount.selfcheck.ts"
   },
   "devDependencies": {

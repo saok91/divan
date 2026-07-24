@@ -1,3 +1,11 @@
+## Deferred from: code review of 5-1-permission-safe-personnel-search-lists.md (2026-07-24)
+
+- Up to 500 parallel `getCurrentPersonState` per list/search request — MVP envelope documented; revisit batching/cursor when population grows
+- `organizationalScope` / access-event purpose uses only `actorScopeCodes[0]` for multi-scope actors — pre-existing retrieval reduction
+- `person.search` invalidate failures after create/save lack operator-facing refresh feedback — same status-pattern gap as other panels
+- Dept / Business Unit / national ID / email as list-search identifiers (AC #1 remainder) — EXPERIENCE + phone + Job Title shipped in 5.1; extend when org-ancestor labels + category gates are ready
+- PopulationPort default-registry cutover still open — 5.1 fail-closed while fixture-backed; needs AR-IDENTITY + `population-cutover.ts` criteria
+
 ## Deferred from: code review of 4b-7-personnel-events-shell-scaffolds-event-entry.md (2026-07-24)
 
 - Duplicated person-create form between `PersonnelAddPanel` and `PersonnelQuickCreateDialog` (validation / enabled fields / error codes) — extract shared form later

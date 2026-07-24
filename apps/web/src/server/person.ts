@@ -29,7 +29,6 @@ import {
   getPersonByPersonnelCode,
   listDataElements,
   listEnabledProfileFields,
-  listPersons,
   matchReturn,
   mergePersons,
   projectPersonRecord,
@@ -43,6 +42,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, governedProcedure } from "./trpc";
+import {
+  assertPersonInScopedPopulation,
+  runPersonnelScopedSearch,
+} from "./personnel-scoped-search";
 
 const personReadMeta = {
   permission: PERSON_READ_PERMISSION,
@@ -203,14 +206,62 @@ const identityFieldsSchema = z.object({
 });
 
 export const personRouter = createTRPCRouter({
+  /**
+   * Permission-safe personnel search/list (Story 5.1 / FR-33).
+   * Do not use unscoped `list` as the FR33 source.
+   */
+  search: governedProcedure
+    .meta({ ...personReadMeta, operation: "person.search" })
+    .input(
+      z
+        .object({
+          channel: z.enum(["search", "list"]).default("list"),
+          normalizedQuery: z.string().max(200).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      await requirePersonRead(ctx.session.accountId);
+      const result = await runPersonnelScopedSearch({
+        actorAccountId: ctx.session.accountId,
+        actorScopeCodes: ctx.session.organizationalScopeCodes,
+        correlationId: ctx.correlationId,
+        channel: input?.channel ?? "list",
+        normalizedQuery: input?.normalizedQuery,
+      });
+      return {
+        ...result,
+        profileHrefPrefix: "/personnel/profile/",
+      };
+    }),
+
+  /**
+   * Legacy list — same PopulationPort scope as `person.search` (Story 5.1 review).
+   * Prefer `person.search` for FR-33 list UI; this path must not dump unscoped Person rows.
+   */
   list: governedProcedure
     .meta({ ...personReadMeta, operation: "person.list" })
     .query(async ({ ctx }) => {
       await requirePersonRead(ctx.session.accountId);
       try {
-        const rows = await listPersons();
+        const scoped = await runPersonnelScopedSearch({
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+          channel: "list",
+        });
+        if (scoped.outcome !== "allowed" || scoped.rows.length === 0) {
+          return [];
+        }
         const enabledFields = await getEnabledPersonFieldKeys();
-        return Promise.all(rows.map((p) => toPublicPerson(p, enabledFields)));
+        const persons = await Promise.all(
+          scoped.rows.map((r) => getPersonById(r.id)),
+        );
+        return Promise.all(
+          persons
+            .filter((p): p is NonNullable<typeof p> => p != null)
+            .map((p) => toPublicPerson(p, enabledFields)),
+        );
       } catch (err) {
         mapPersonError(err);
       }
@@ -222,6 +273,12 @@ export const personRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await requirePersonRead(ctx.session.accountId);
       try {
+        await assertPersonInScopedPopulation({
+          personId: input.id,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
         const person = await getPersonById(input.id);
         if (!person) {
           throw new PersonIdentityError(
@@ -264,6 +321,12 @@ export const personRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await requirePersonRead(ctx.session.accountId);
       try {
+        await assertPersonInScopedPopulation({
+          personId: input.personId,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
         const hasCompensationRead = await actorHasCompensationRead(
           ctx.session.accountId,
         );
@@ -301,6 +364,12 @@ export const personRouter = createTRPCRouter({
             "پرسنل یافت نشد.",
           );
         }
+        await assertPersonInScopedPopulation({
+          personId: person.id,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
         return toPublicPerson(person);
       } catch (err) {
         mapPersonError(err);
@@ -405,6 +474,12 @@ export const personRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await requirePersonWrite(ctx.session.accountId);
       try {
+        await assertPersonInScopedPopulation({
+          personId: input.id,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
         const { id, ...fields } = input;
         const person = await updatePersonIdentity(id, fields, {
           accountId: ctx.session.accountId,
@@ -435,6 +510,12 @@ export const personRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await requirePersonWrite(ctx.session.accountId);
       try {
+        await assertPersonInScopedPopulation({
+          personId: input.id,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
         const person = await updatePersonIdentity(
           input.id,
           { nationalId: input.nationalId },

@@ -185,6 +185,7 @@ export {
   getPersonById,
   getPersonByPersonnelCode,
   listPersons,
+  listPersonsForScopedSearch,
   correctPersonnelCode,
   mergePersons,
   splitPerson,
@@ -555,6 +556,20 @@ export type {
 } from "./historical-org-headcount";
 
 export { POPULATION_SUBJECT_ID_TARGET } from "./population-cutover";
+
+export {
+  isPersonUuid,
+  currentColleagueFromState,
+  projectPersonnelListRow,
+  comparePersonnelListRows,
+  rowMatchesPersonnelQuery,
+  PERSONNEL_LIST_MAX_ROWS,
+} from "./personnel-list-projector";
+
+export type {
+  PersonnelListRowDto,
+  PersonnelListLabelBundle,
+} from "./personnel-list-projector";
 
 export {
   createDraft,

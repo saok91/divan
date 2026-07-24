@@ -21,6 +21,7 @@ import {
   drillDownPopulation,
   intersectPopulation,
   listGrants,
+  type PopulationFixtureRegistry,
   type RetrievalChannel,
 } from "@divan/identity-access";
 import { TRPCError } from "@trpc/server";
@@ -102,6 +103,11 @@ export type RunGovernedRetrievalInput = {
   demoBulkApproval?: boolean;
   /** When true, skip DB access-event append (pure unit probes). Prefer false. */
   skipAccessEvent?: boolean;
+  /**
+   * Optional PopulationPort registry override (Story 5.1 provisional demo map).
+   * Default active fixture registry when omitted.
+   */
+  populationRegistry?: PopulationFixtureRegistry;
 };
 
 export type RunGovernedRetrievalResult = {
@@ -165,15 +171,18 @@ export async function runGovernedRetrieval(
 ): Promise<RunGovernedRetrievalResult> {
   const asOf = input.asOfDate ?? currentAsOfDate();
   const channel = input.channel;
-  const pop = intersectPopulation({
-    actorAccountId: input.actorAccountId,
-    actorScopeCodes: input.actorScopeCodes,
-    asOfDate: asOf,
-    channel,
-    objectIds: input.objectIds,
-    dataCategory: input.dataCategory,
-    unreconciled: input.unreconciled === true ? true : undefined,
-  });
+  const pop = intersectPopulation(
+    {
+      actorAccountId: input.actorAccountId,
+      actorScopeCodes: input.actorScopeCodes,
+      asOfDate: asOf,
+      channel,
+      objectIds: input.objectIds,
+      dataCategory: input.dataCategory,
+      unreconciled: input.unreconciled === true ? true : undefined,
+    },
+    input.populationRegistry,
+  );
 
   if (!pop.ok) {
     throw new TRPCError({

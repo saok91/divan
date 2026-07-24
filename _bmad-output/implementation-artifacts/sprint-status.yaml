@@ -1,5 +1,5 @@
-# generated: 2026-07-16
-# last_updated: 2026-07-24T17:00:00+03:30
+﻿# generated: 2026-07-16
+# last_updated: 2026-07-24T19:55:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-24T17:00:00+03:30
+last_updated: 2026-07-24T19:55:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -108,8 +108,8 @@ development_status:
   4b-7-personnel-events-shell-scaffolds-event-entry: done
   epic-4b-retrospective: done
 
-  epic-5: backlog
-  5-1-permission-safe-personnel-search-lists: backlog
+  epic-5: in-progress
+  5-1-permission-safe-personnel-search-lists: done
   5-2-personnel-profile-sections: backlog
   5-3-personnel-event-timeline: backlog
   5-4-core-launch-dashboard: backlog
@@ -252,7 +252,8 @@ action_items:
   - epic: 4
     action: "Encode person-org IDOR scope + PopulationPort cutover honesty into Story 5.1 create-story / Dev Notes"
     owner: "Amelia + Winston"
-    status: open
+    status: done
+    resolved_in: "5-1-permission-safe-personnel-search-lists.md (Gate, AC #8–#9, Tasks 1–2, Epic 4/4b carry-ins)"
   - epic: 4
     action: "Encode profile/timeline consumer contract (Epic 4 assemblers + lifecycle APIs; no parallel SoT) into Story 5.2 / 5.3 Dev Notes"
     owner: "Amelia + Sally"
@@ -285,11 +286,13 @@ action_items:
   - epic: 4b
     action: "Encode leave-guard data-state rules (dirty ≠ dialog visibility; Discard snapshot; Save resolves Promise; single dialog depth) into Story 5.1+ form/filter Dev Notes"
     owner: "Amelia + Sally"
-    status: open
+    status: done
+    resolved_in: "5-1-permission-safe-personnel-search-lists.md (Gate, Task 4 leave-guard rules, Epic 4b carry-ins)"
   - epic: 4b
     action: "Encode Epic 4 carry-ins into Story 5.1 create-story: person-org IDOR scope + PopulationPort honesty + consume assemblers / GovernedDataTable without contract churn"
     owner: "Amelia + Winston"
-    status: open
+    status: done
+    resolved_in: "5-1-permission-safe-personnel-search-lists.md (Gate, AC #8–#10, Tasks 1–3)"
   - epic: 4b
     action: "Encode profile/timeline consumer contract (Epic 4 assemblers + lifecycle APIs; no parallel SoT) into Story 5.2 / 5.3 Dev Notes"
     owner: "Amelia + Sally"

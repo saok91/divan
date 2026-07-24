@@ -1,16 +1,17 @@
 /**
- * Permission-safe personnel search seam for command palette.
- * Story 1.6: stub returns empty (Epic 5 / Story 5.1 plugs real search).
+ * Permission-safe personnel search seam for command palette (Story 5.1 / FR-33).
  *
- * TODO(Epic 5 / OQ-2): Uniform timing/copy for out-of-scope vs not-found
+ * TODO(OQ-2): Uniform timing/copy for out-of-scope vs not-found
  * must land with AR-ACCESS — do not invent enumeration-safe delays here.
  */
+
+import { vanillaApi } from "@/lib/trpc/vanilla";
 
 export type PersonnelSearchHit = {
   id: string;
   /** Display label (name + code when real data exists). */
   label: string;
-  /** Profile route when Story 5.1 wires navigation. */
+  /** Profile deep-link (Story 5.1). */
   href: string;
 };
 
@@ -20,16 +21,40 @@ export type PersonnelSearchParams = {
   normalizedQuery: string;
 };
 
+function profileHref(personId: string): string {
+  return `/personnel/profile/${encodeURIComponent(personId)}`;
+}
+
 /**
- * Async empty stub — shape preserved so Story 5.1 can replace the body
- * without rewriting the command palette.
+ * Same permission-safe server search as فهرست پرسنل (`person.search`).
+ * Client-only — returns [] on empty query, network/auth errors, or denied.
  */
 export async function searchPersonnel(
   params: PersonnelSearchParams,
 ): Promise<PersonnelSearchHit[]> {
-  void params;
-  // Short delay so aria-busy is observable in smoke tests.
-  // TODO(Epic 5 / OQ-2): replace with real permission-safe search + AR-ACCESS timing.
-  await new Promise((resolve) => setTimeout(resolve, 120));
-  return [];
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const q = (params.normalizedQuery || params.query).trim();
+  if (!q) return [];
+
+  try {
+    const result = await vanillaApi.person.search.query({
+      channel: "search",
+      normalizedQuery: q,
+    });
+
+    if (result.outcome !== "allowed") {
+      return [];
+    }
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      label: `${row.givenName} ${row.familyName} (${row.personnelCode})`.trim(),
+      href: profileHref(row.id),
+    }));
+  } catch {
+    return [];
+  }
 }

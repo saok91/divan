@@ -1,3 +1,7 @@
+/**
+ * Personnel list panel — permission-safe search via person.search (Story 5.1).
+ */
+
 "use client";
 
 import * as React from "react";
@@ -9,44 +13,11 @@ import type { PersonnelListRow } from "@/components/personnel/personnel-list-typ
 import { PersonnelQuickCreateDialog } from "@/components/personnel/personnel-quick-create-dialog";
 import { PersonnelQuickEditModal } from "@/components/personnel/personnel-quick-edit-modal";
 import { Button } from "@/components/ui/button";
+import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
+import { api } from "@/lib/trpc/client";
 
 export type { PersonnelListRow } from "@/components/personnel/personnel-list-types";
-
-/** Scaffold fixture rows — FR33 / PopulationPort = Story 5.1. */
-export const PERSONNEL_LIST_FIXTURES: PersonnelListRow[] = Array.from(
-  { length: 28 },
-  (_, i) => {
-    const n = i + 1;
-    const pad = String(n).padStart(3, "0");
-    const names = [
-      ["علی", "محمدی"],
-      ["سارا", "احمدی"],
-      ["مینا", "رضایی"],
-      ["رضا", "کریمی"],
-      ["نگار", "حسینی"],
-      ["حسین", "نوری"],
-    ] as const;
-    const [givenName, familyName] = names[i % 6]!;
-    const teams = ["فنی", "عملیات", "منابع انسانی"] as const;
-    return {
-      id: `fixture-${pad}`,
-      personnelCode: `P-${pad}`,
-      givenName,
-      familyName,
-      team: teams[i % 3]!,
-      role: i % 2 === 0 ? "کارشناس" : "سرپرست",
-      ladder: i % 3 === 0 ? "فنی" : "عمومی",
-      grade: `G${(i % 5) + 1}`,
-      collaborationType: i % 4 === 0 ? "پیمانکار" : "کارمند",
-      compensation: `${(n * 10_000_000).toLocaleString("en-US")}`,
-      contractEndDate: i % 5 === 0 ? "۱۴۰۵/۱۲/۲۹" : "—",
-      contractParty: i % 5 === 0 ? "شرکت نمونه" : "—",
-      currentColleague: i % 3 === 0 ? "no" : "yes",
-      mobilePhone: `0912${String(1000000 + n).slice(0, 7)}`,
-    };
-  },
-);
 
 export const PERSONNEL_SECTION_DEFAULT_FILTERS: Record<
   string,
@@ -55,110 +26,173 @@ export const PERSONNEL_SECTION_DEFAULT_FILTERS: Record<
   currentColleague: ["yes"],
 };
 
-const COLUMNS: GovernedColumn<PersonnelListRow>[] = [
-  {
-    id: "personnelCode",
-    header: "کد پرسنلی",
-    accessor: (r) => r.personnelCode,
-    sticky: "identifier",
-    sortable: true,
-    filter: "text",
-    cell: (r) => (
-      <span className="text-tabular" dir="ltr">
-        {toPersianDigits(r.personnelCode)}
-      </span>
-    ),
-  },
-  {
-    id: "givenName",
-    header: "نام",
-    accessor: (r) => r.givenName,
-    filter: "text",
-    sortable: true,
-  },
-  {
-    id: "familyName",
-    header: "نام خانوادگی",
-    accessor: (r) => r.familyName,
-    filter: "text",
-    sortable: true,
-  },
-  {
-    id: "team",
-    header: "تیم",
-    accessor: (r) => r.team,
-    filter: "text",
-    sortable: true,
-  },
-  {
-    id: "role",
-    header: "نقش",
-    accessor: (r) => r.role,
-    filter: "text",
-  },
-  {
-    id: "ladder",
-    header: "نردبان",
-    accessor: (r) => r.ladder,
-    filter: "text",
-  },
-  {
-    id: "grade",
-    header: "گرید",
-    accessor: (r) => r.grade,
-    filter: "text",
-  },
-  {
-    id: "collaborationType",
-    header: "نوع همکاری",
-    accessor: (r) => r.collaborationType,
-    filter: "enum",
-    enumOptions: [
-      { value: "کارمند", label: "کارمند" },
-      { value: "پیمانکار", label: "پیمانکار" },
-    ],
-  },
-  {
-    id: "compensation",
-    header: "جبران خدمت",
-    accessor: (r) => r.compensation,
-    permitted: false,
-  },
-  {
-    id: "contractEndDate",
-    header: "تاریخ پایان قرارداد",
-    accessor: (r) => r.contractEndDate,
-    filter: "text",
-  },
-  {
-    id: "contractParty",
-    header: "طرف قرارداد",
-    accessor: (r) => r.contractParty,
-    filter: "text",
-  },
-  {
-    id: "currentColleague",
-    header: "همکار فعلی",
-    accessor: (r) => r.currentColleague,
-    filter: "enum",
-    enumOptions: [
-      { value: "yes", label: "بله" },
-      { value: "no", label: "خیر" },
-    ],
-    sortable: true,
-    cell: (r) => (r.currentColleague === "yes" ? "بله" : "خیر"),
-  },
-];
+function buildColumns(
+  hasCompensationRead: boolean,
+): GovernedColumn<PersonnelListRow>[] {
+  return [
+    {
+      id: "personnelCode",
+      header: "کد پرسنلی",
+      accessor: (r) => r.personnelCode,
+      sticky: "identifier",
+      sortable: true,
+      filter: "text",
+      cell: (r) => (
+        <span className="text-tabular" dir="ltr">
+          {toPersianDigits(r.personnelCode)}
+        </span>
+      ),
+    },
+    {
+      id: "givenName",
+      header: "نام",
+      accessor: (r) => r.givenName,
+      filter: "text",
+      sortable: true,
+    },
+    {
+      id: "familyName",
+      header: "نام خانوادگی",
+      accessor: (r) => r.familyName,
+      filter: "text",
+      sortable: true,
+    },
+    {
+      id: "team",
+      header: "تیم",
+      accessor: (r) => r.team,
+      filter: "text",
+      sortable: true,
+    },
+    {
+      id: "role",
+      header: "نقش",
+      accessor: (r) => r.role,
+      filter: "text",
+    },
+    {
+      id: "jobTitle",
+      header: "عنوان شغلی",
+      accessor: (r) => r.jobTitle,
+      filter: "text",
+      sortable: true,
+    },
+    {
+      id: "ladder",
+      header: "نردبان",
+      accessor: (r) => r.ladder,
+      filter: "text",
+    },
+    {
+      id: "grade",
+      header: "گرید",
+      accessor: (r) => r.grade,
+      filter: "text",
+    },
+    {
+      id: "collaborationType",
+      header: "نوع همکاری",
+      accessor: (r) => r.collaborationType,
+      filter: "enum",
+      enumOptions: [
+        { value: "کارمند", label: "کارمند" },
+        { value: "پیمانکار", label: "پیمانکار" },
+      ],
+    },
+    {
+      id: "mobilePhone",
+      header: "تلفن همراه",
+      accessor: (r) => r.mobilePhone ?? "",
+      filter: "text",
+      cell: (r) =>
+        r.mobilePhone ? (
+          <span className="text-tabular" dir="ltr">
+            {toPersianDigits(r.mobilePhone)}
+          </span>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      id: "compensation",
+      header: "جبران خدمت",
+      accessor: (r) => r.compensation,
+      permitted: hasCompensationRead,
+    },
+    {
+      id: "contractEndDate",
+      header: "تاریخ پایان قرارداد",
+      accessor: (r) => r.contractEndDate,
+      filter: "text",
+      permitted: hasCompensationRead,
+    },
+    {
+      id: "contractParty",
+      header: "طرف قرارداد",
+      accessor: (r) => r.contractParty,
+      filter: "text",
+      permitted: hasCompensationRead,
+    },
+    {
+      id: "currentColleague",
+      header: "همکار فعلی",
+      accessor: (r) => r.currentColleague,
+      filter: "enum",
+      enumOptions: [
+        { value: "yes", label: "بله" },
+        { value: "no", label: "خیر" },
+      ],
+      sortable: true,
+      cell: (r) => (r.currentColleague === "yes" ? "بله" : "خیر"),
+    },
+  ];
+}
 
 /**
- * فهرست پرسنل scaffold — GovernedDataTable + quick-create / quick-edit (Story 4b.7).
- * Fixture data until FR33 wiring in 5.1.
+ * فهرست پرسنل — GovernedDataTable bound to person.search (FR-33).
  */
 export function PersonnelListPanel() {
   const leaveGuard = useLeaveGuardOptional();
+  const utils = api.useUtils();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editRow, setEditRow] = React.useState<PersonnelListRow | null>(null);
-  const [rows, setRows] = React.useState(PERSONNEL_LIST_FIXTURES);
+
+  const searchQuery = api.person.search.useQuery({ channel: "list" });
+
+  const rows = React.useMemo((): PersonnelListRow[] => {
+    return (searchQuery.data?.rows ?? []).map((r) => ({
+      id: r.id,
+      personnelCode: r.personnelCode,
+      givenName: r.givenName,
+      familyName: r.familyName,
+      team: r.team,
+      role: r.role,
+      jobTitle: r.jobTitle,
+      ladder: r.ladder,
+      grade: r.grade,
+      collaborationType: r.collaborationType,
+      compensation: r.compensation,
+      contractEndDate: r.contractEndDate,
+      contractParty: r.contractParty,
+      currentColleague: r.currentColleague,
+      mobilePhone: r.mobilePhone,
+    }));
+  }, [searchQuery.data?.rows]);
+
+  const hasCompensationRead = searchQuery.data?.hasCompensationRead === true;
+  const columns = React.useMemo(
+    () => buildColumns(hasCompensationRead),
+    [hasCompensationRead],
+  );
+
+  const disclosure = searchQuery.data?.populationDisclosureFa;
+  const truncated = searchQuery.data?.truncated === true;
+  const suppressed =
+    searchQuery.data?.outcome === "suppressed" ||
+    searchQuery.data?.outcome === "denied";
+  const statusMessage = suppressed
+    ? searchQuery.data?.messageFa || operationalCopy.suppressedCohort
+    : null;
 
   function openCreate() {
     setEditRow(null);
@@ -179,17 +213,36 @@ export function PersonnelListPanel() {
     window.location.assign(href);
   }
 
+  async function invalidateList() {
+    await utils.person.search.invalidate();
+  }
+
+  const tableRows =
+    searchQuery.isLoading || searchQuery.isError || suppressed ? [] : rows;
+
   return (
     <section className="space-y-3" aria-labelledby="personnel-list-heading">
       <header className="sr-only">
         <h2 id="personnel-list-heading">فهرست پرسنل</h2>
       </header>
 
+      {searchQuery.isError ? (
+        <p className="text-body text-destructive" role="alert">
+          {searchQuery.error.message || operationalCopy.accessDeniedTitle}
+        </p>
+      ) : null}
+
+      {statusMessage ? (
+        <p className="text-body text-muted-foreground" role="status">
+          {statusMessage}
+        </p>
+      ) : null}
+
       <div className="[&_[data-slot=table]]:min-w-[72rem]">
         <GovernedDataTable
           aria-label="فهرست پرسنل"
-          columns={COLUMNS}
-          rows={rows}
+          columns={columns}
+          rows={tableRows}
           getRowId={(row) => row.id}
           sectionDefaultFilters={PERSONNEL_SECTION_DEFAULT_FILTERS}
           pageSize={25}
@@ -199,9 +252,20 @@ export function PersonnelListPanel() {
                 افزودن سریع
               </Button>
               <p className="text-caption text-muted-foreground">
-                فیلتر پیش‌فرض: همکار فعلی = بله (اسکفولد تا داستان ۵.۱)
+                فیلتر پیش‌فرض: همکار فعلی = بله
+                {disclosure ? ` — ${disclosure}` : null}
+                {truncated
+                  ? " — فهرست به سقف ۵۰۰ نفر محدود شده است."
+                  : null}
               </p>
             </div>
+          }
+          exportSlot={
+            searchQuery.data?.hasExportPermission ? (
+              <Button type="button" variant="ghost" size="sm" disabled>
+                خروجی (به‌زودی)
+              </Button>
+            ) : undefined
           }
           rowActions={(row) => (
             <div className="flex flex-wrap items-center gap-1">
@@ -233,26 +297,8 @@ export function PersonnelListPanel() {
         onOpenChange={(open) => {
           if (!open) setCreateOpen(false);
         }}
-        onCreated={(person) => {
-          setRows((prev) => [
-            {
-              id: person.id,
-              personnelCode: person.personnelCode,
-              givenName: person.givenName,
-              familyName: person.familyName,
-              team: "—",
-              role: "—",
-              ladder: "—",
-              grade: "—",
-              collaborationType: "کارمند",
-              compensation: "",
-              contractEndDate: "—",
-              contractParty: "—",
-              currentColleague: "yes",
-              mobilePhone: person.mobilePhone,
-            },
-            ...prev,
-          ]);
+        onCreated={() => {
+          void invalidateList();
           setCreateOpen(false);
         }}
       />
@@ -265,19 +311,8 @@ export function PersonnelListPanel() {
           onOpenChange={(open) => {
             if (!open) setEditRow(null);
           }}
-          onSaved={(person) => {
-            setRows((prev) =>
-              prev.map((r) =>
-                r.id === person.id
-                  ? {
-                      ...r,
-                      givenName: person.givenName,
-                      familyName: person.familyName,
-                      mobilePhone: person.mobilePhone,
-                    }
-                  : r,
-              ),
-            );
+          onSaved={() => {
+            void invalidateList();
             setEditRow(null);
           }}
         />

@@ -511,6 +511,23 @@ export async function listPersons(
   return rows.map(mapPerson);
 }
 
+/**
+ * Deterministic candidate set for scoped search (Story 5.1).
+ * Order: personnelCode ASC, id ASC — stable pagination tie-break.
+ * Cap aligns with GovernedDataTable ~500 NFR envelope.
+ */
+export async function listPersonsForScopedSearch(
+  db: PrismaClient = getPersonDb(),
+  limit = 500,
+): Promise<PersonRecord[]> {
+  const take = Math.min(Math.max(limit, 1), 500);
+  const rows = await db.person.findMany({
+    orderBy: [{ personnelCode: "asc" }, { id: "asc" }],
+    take,
+  });
+  return rows.map(mapPerson);
+}
+
 function blockedOp(_name: string): never {
   throw new PersonIdentityError(
     "BLOCKED_IDENTITY_OPERATION",

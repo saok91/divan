@@ -15,12 +15,19 @@
  * Story 4.9 lands `getCurrentPersonState` (projection as-of assembler) — does **not**
  * switch default `intersectPopulation` registry or claim real-workforce PopulationPort.
  *
+ * Story 5.1 wires FR-33 personnel search through authorize → PopulationPort →
+ * InferenceBulk → projector, with **honesty**: while the default registry stays
+ * fixture-backed, list/search **fail closed** (empty population + Operator
+ * disclosure caption). That is **not** default-registry cutover and must not be
+ * labeled production workforce authz. Full cutover still requires the criteria below.
+ *
  * **Cutover criteria (all required before switching default registry):**
  * 1. Subject ids are Person UUIDs (`Person.id`) end-to-end for populations being authorized.
  * 2. Team membership edges come from Primary Assignment as-of helpers (3.7+), not `person:a1` fixtures.
  * 3. Management edges (if used) come from 3.9 derive/adapter with explicit Person→Account resolver.
  * 4. Account↔Person linking policy is AR-IDENTITY-approved **or** an explicitly documented
- *    provisional seed map scoped to demo — not a silent production FK.
+ *    demo seed — not a silent production FK. (Provisional “stamp all Person UUIDs with
+ *    actor scopes” is rejected; prefer fail-closed until real registry.)
  * 5. This file + `deferred-work.md` updated in the same change; selfcheck proves at least one
  *    non-fixture population path.
  * 6. Until then: keep fixtures; do **not** claim authz population is “real workforce.”
@@ -39,4 +46,4 @@
  */
 
 export const POPULATION_SUBJECT_ID_TARGET =
-  "Person.id (UUID) — OrgUnit live (3.5); Primary Team membership helper live (3.7); Secondary read helpers live (3.8); management derive APIs + adapter live (3.9); business event store attributable (4.1); current-state assembler live (4.9); default PopulationPort registry still fixture-backed pending AR-IDENTITY + cutover criteria";
+  "Person.id (UUID) — OrgUnit live (3.5); Primary Team membership helper live (3.7); Secondary read helpers live (3.8); management derive APIs + adapter live (3.9); business event store attributable (4.1); current-state assembler live (4.9); Story 5.1 FR-33 list/search fail-closed while fixture registry remains (disclosure; not provisional UUID stamp map); default PopulationPort registry still fixture-backed pending AR-IDENTITY + cutover criteria";
