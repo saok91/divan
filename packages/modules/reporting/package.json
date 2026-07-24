@@ -10,7 +10,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "selfcheck:dashboard": "tsx src/dashboard.selfcheck.ts"
+    "selfcheck:dashboard": "tsx src/dashboard.selfcheck.ts",
+    "selfcheck:report": "tsx src/report.selfcheck.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.3",

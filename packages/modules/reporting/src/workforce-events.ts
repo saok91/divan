@@ -101,3 +101,71 @@ export function buildWorkforceTrendBuckets(
     a.bucketKey < b.bucketKey ? -1 : a.bucketKey > b.bucketKey ? 1 : 0,
   );
 }
+
+/**
+ * Status-aware filter for Story 5.5 catalogue keys (scheduled /
+ * corrected_cancelled_reversed). Do **not** stretch isCountableEffective —
+ * Effective-only helpers stay unchanged for dashboard.
+ */
+export function filterEventsByStatus(
+  events: readonly WorkforceEventRow[],
+  statuses: readonly string[],
+  rangeStart?: string,
+  rangeEnd?: string,
+): WorkforceEventRow[] {
+  const allow = new Set(statuses);
+  return events.filter((ev) => {
+    if (!allow.has(ev.status)) return false;
+    if (rangeStart != null && rangeEnd != null) {
+      return inInclusiveRange(ev.effectiveDate, rangeStart, rangeEnd);
+    }
+    return true;
+  });
+}
+
+export type EventTypeStatusAggregate = {
+  eventType: string;
+  status: string;
+  count: number;
+};
+
+/**
+ * Count events by (eventType, status) in optional Effective-Date range.
+ * Used for Scheduled and Corrected/Cancelled/Reversed report keys.
+ */
+export function aggregateEventsByTypeAndStatus(
+  events: readonly WorkforceEventRow[],
+  statuses: readonly string[],
+  rangeStart?: string,
+  rangeEnd?: string,
+  eventTypes?: readonly string[],
+): EventTypeStatusAggregate[] {
+  const statusAllow = new Set(statuses);
+  const typeAllow = eventTypes ? new Set(eventTypes) : null;
+  const map = new Map<string, EventTypeStatusAggregate>();
+  for (const ev of events) {
+    if (!statusAllow.has(ev.status)) continue;
+    if (typeAllow && !typeAllow.has(ev.eventType)) continue;
+    if (
+      rangeStart != null &&
+      rangeEnd != null &&
+      !inInclusiveRange(ev.effectiveDate, rangeStart, rangeEnd)
+    ) {
+      continue;
+    }
+    const key = `${ev.eventType}\0${ev.status}`;
+    const row = map.get(key) ?? {
+      eventType: ev.eventType,
+      status: ev.status,
+      count: 0,
+    };
+    row.count += 1;
+    map.set(key, row);
+  }
+  return [...map.values()].sort((a, b) => {
+    if (a.eventType !== b.eventType) {
+      return a.eventType < b.eventType ? -1 : 1;
+    }
+    return a.status < b.status ? -1 : a.status > b.status ? 1 : 0;
+  });
+}

@@ -31,6 +31,7 @@ import { organizationRouter } from "./organization";
 import { personRouter } from "./person";
 import { personnelEventRouter } from "./personnel-event";
 import { platformStatusRouter } from "./platform-status";
+import { reportRouter } from "./report";
 import {
   actorHasActiveBulkGrant,
   runGovernedDrillDown,
@@ -93,6 +94,8 @@ export const appRouter = createTRPCRouter({
   platformStatus: platformStatusRouter,
 
   dashboard: dashboardRouter,
+
+  report: reportRouter,
 
   /**
    * Demo governed read — controlled allow via DEV_DEMO_POLICY fixture.

@@ -32,6 +32,13 @@ export const operationalCopy = {
   emptyDashboardScope:
     "در محدوده دسترسی شما داده‌ای برای این فیلتر نیست.",
 
+  /**
+   * Empty scoped report (Story 5.5 / FR-36) — same Persian as dashboard empty
+   * scope is acceptable; never reuse emptySearch or suppressedCohort.
+   */
+  emptyReportScope:
+    "در محدوده دسترسی شما داده‌ای برای این فیلتر نیست.",
+
   /** Dashboard load / filter failures — never reuse accessDenied for infra. */
   dashboardLoadError: "بارگذاری داشبورد ممکن نشد.",
   dashboardFilterInvalid: "تاریخ یا بازهٔ فیلتر نامعتبر است.",
@@ -43,6 +50,16 @@ export const operationalCopy = {
   dashboardTeamFilterHint:
     "شناسه تیم فقط روی کارت‌های سازمان و ظرفیت اعمال می‌شود؛ افراد فعال و روند روی محدودهٔ دسترسی جمعیت است.",
 
+  /** Report load / filter failures (Story 5.5) — never reuse accessDenied for infra. */
+  reportLoadError: "بارگذاری گزارش ممکن نشد.",
+  reportFilterInvalid: "تاریخ یا بازهٔ فیلتر گزارش نامعتبر است.",
+  reportPending: "در حال به‌روزرسانی داده‌های مشتق…",
+  reportImportBatchUnavailable:
+    "گزارش نتیجه دسته‌های واردسازی پس از Epic ۶ (مهاجرت) فعال می‌شود؛ دادهٔ واردسازی هنوز در دسترس نیست.",
+  reportExportStubHint:
+    "خروجی حاکمیتی در داستان ۶٫۵ فعال می‌شود؛ فعلاً فقط مشاهده مجاز است.",
+  reportTeamFilterHint:
+    "شناسه تیم جمعیت گزارش‌های فرد/رویداد را قطع می‌کند؛ برای سازمان، اعضای تیم و ظرفیت هم اعمال می‌شود.",
   /** Viewport gate (genuine small window). */
   viewportGateBody:
     "برای استفاده از دیوان، حداقل وضوح صفحهٔ نمایش {size} لازم است. لطفاً پنجره را بزرگ‌تر کنید یا از نمایشگر دسکتاپ استفاده کنید.",

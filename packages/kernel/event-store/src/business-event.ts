@@ -637,15 +637,36 @@ export async function listBusinessEventsForPerson(
  * never reuse the DESC UI list sort for reconstruction.
  *
  * Optional `fromEffectiveDate`: include events with effective_date >= from.
+ * Optional `toEffectiveDate`: include events with effective_date <= to.
+ * When both are set, the inclusive Effective-Date window is applied in SQL
+ * so out-of-range rows do not consume the apply load limit (Story 5.5).
  */
 export async function listBusinessEventsForPersonForApply(
   db: PgQueryable,
   personId: string,
-  opts: { fromEffectiveDate?: string; limit?: number } = {},
+  opts: {
+    fromEffectiveDate?: string;
+    toEffectiveDate?: string;
+    limit?: number;
+  } = {},
 ): Promise<BusinessEventRecord[]> {
   assertUuid("personId", "invalid_person_id", personId.trim());
   const limit = Math.min(Math.max(opts.limit ?? 500, 1), 2000);
   const from = opts.fromEffectiveDate?.trim();
+  const to = opts.toEffectiveDate?.trim();
+  const pid = personId.trim();
+  if (from && to) {
+    const result = await db.query<KernelBusinessRow>(
+      `SELECT ${BUSINESS_SELECT} FROM kernel_events
+       WHERE event_class = 'business' AND person_id = $1::uuid
+         AND effective_date >= $2::date
+         AND effective_date <= $3::date
+       ORDER BY ${APPLY_ORDER_SQL_ORDER_BY}
+       LIMIT $4`,
+      [pid, from, to, limit],
+    );
+    return result.rows.map(mapBusinessRow);
+  }
   if (from) {
     const result = await db.query<KernelBusinessRow>(
       `SELECT ${BUSINESS_SELECT} FROM kernel_events
@@ -653,7 +674,18 @@ export async function listBusinessEventsForPersonForApply(
          AND effective_date >= $2::date
        ORDER BY ${APPLY_ORDER_SQL_ORDER_BY}
        LIMIT $3`,
-      [personId.trim(), from, limit],
+      [pid, from, limit],
+    );
+    return result.rows.map(mapBusinessRow);
+  }
+  if (to) {
+    const result = await db.query<KernelBusinessRow>(
+      `SELECT ${BUSINESS_SELECT} FROM kernel_events
+       WHERE event_class = 'business' AND person_id = $1::uuid
+         AND effective_date <= $2::date
+       ORDER BY ${APPLY_ORDER_SQL_ORDER_BY}
+       LIMIT $3`,
+      [pid, to, limit],
     );
     return result.rows.map(mapBusinessRow);
   }
@@ -662,7 +694,7 @@ export async function listBusinessEventsForPersonForApply(
      WHERE event_class = 'business' AND person_id = $1::uuid
      ORDER BY ${APPLY_ORDER_SQL_ORDER_BY}
      LIMIT $2`,
-    [personId.trim(), limit],
+    [pid, limit],
   );
   return result.rows.map(mapBusinessRow);
 }

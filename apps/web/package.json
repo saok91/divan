@@ -15,7 +15,8 @@
     "selfcheck:personnel-search": "tsx src/server/personnel-search.selfcheck.ts",
     "selfcheck:personnel-profile": "tsx lib/person-profile.selfcheck.ts",
     "selfcheck:personnel-timeline": "tsx lib/personnel-event-timeline.selfcheck.ts",
-    "selfcheck:dashboard": "tsx src/server/dashboard.selfcheck.ts"
+    "selfcheck:dashboard": "tsx src/server/dashboard.selfcheck.ts",
+    "selfcheck:report": "tsx src/server/report.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",
