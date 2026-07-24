@@ -22,6 +22,7 @@
     "@divan/db": "workspace:*",
     "@divan/event-store": "workspace:*",
     "@divan/headcount": "workspace:*",
+    "@divan/migration": "workspace:*",
     "@divan/person-employment": "workspace:*",
     "@divan/temporal-engine": "workspace:*"
   }

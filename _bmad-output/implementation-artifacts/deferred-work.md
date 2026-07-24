@@ -1,3 +1,8 @@
+## Deferred from: code review of 6-2-atomic-import-batch-execution-staging-cutover.md (2026-07-25)
+
+- 32-bit FNV advisory lock hash collisions across distinct overlap keys (`concurrent-mutex.ts` `advisoryLockKeyPair`) ? rare false concurrent blocks / misleading owner lookup; revisit stronger hash or keyed lock table if production contention appears
+- Import-batch selfcheck uses always-true `permissionHolder`, seeds overlap via manual SQL, and does not prove Prisma-vs-event-store orphan rollback or two live concurrent executors ? strengthen when ephemeral DB harness / PE TX participation exists
+
 ## Deferred from: code review of 5-2-personnel-profile-sections.md (2026-07-24)
 
 - Selfcheck omits scope-denial on profile get — gates exist on page + procedures; helper selfcheck cannot cover IDOR without DB

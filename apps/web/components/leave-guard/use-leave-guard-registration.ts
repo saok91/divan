@@ -14,6 +14,7 @@ type UseLeaveGuardRegistrationArgs = {
   onDiscard?: () => void;
   kind?: LeaveGuardRegistration["kind"];
   previewBatchId?: string;
+  stagingBatchId?: string;
 };
 
 /**
@@ -28,6 +29,7 @@ export function useLeaveGuardRegistration({
   onDiscard,
   kind = "form",
   previewBatchId,
+  stagingBatchId,
 }: UseLeaveGuardRegistrationArgs): void {
   const { upsert, unregister } = useLeaveGuard();
   const onSaveRef = React.useRef(onSave);
@@ -46,6 +48,7 @@ export function useLeaveGuardRegistration({
       isDirty,
       kind,
       previewBatchId,
+      stagingBatchId,
       onSave: hasSave
         ? async () => {
             const fn = onSaveRef.current;
@@ -59,7 +62,16 @@ export function useLeaveGuardRegistration({
           }
         : undefined,
     });
-  }, [upsert, id, isDirty, kind, previewBatchId, hasSave, hasDiscard]);
+  }, [
+    upsert,
+    id,
+    isDirty,
+    kind,
+    previewBatchId,
+    stagingBatchId,
+    hasSave,
+    hasDiscard,
+  ]);
 
   React.useEffect(() => {
     return () => unregister(id);

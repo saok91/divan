@@ -7,9 +7,10 @@ export type LeaveGuardRegistration = {
   isDirty: boolean;
   onSave?: () => Promise<boolean>;
   onDiscard?: () => void;
-  /** When true, dialog uses import-preview copy with batch id. */
-  kind?: "form" | "import-preview";
+  /** When true, dialog uses import-preview / import-staging copy with batch id. */
+  kind?: "form" | "import-preview" | "import-staging";
   previewBatchId?: string;
+  stagingBatchId?: string;
 };
 
 export type PendingNavigation = {

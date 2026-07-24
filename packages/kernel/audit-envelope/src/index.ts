@@ -260,6 +260,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 6.2 — provisional migration SoD (AR-MIGRATION pending freeze)
+    {
+      permission: "migration.approve",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "migration.execute",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 

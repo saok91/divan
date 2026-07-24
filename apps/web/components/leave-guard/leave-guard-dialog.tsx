@@ -14,6 +14,7 @@ import {
 import { useLeaveGuard } from "@/components/leave-guard/leave-guard-context";
 import {
   leaveGuardImportPreviewMessage,
+  leaveGuardImportStagingMessage,
   operationalCopy,
 } from "@/lib/operational-copy";
 
@@ -25,11 +26,14 @@ export function LeaveGuardDialog() {
   const { pending, dirtyEntries, resolvePending, busy } = useLeaveGuard();
   const open = pending !== null;
 
+  const stagingEntry = dirtyEntries.find((e) => e.kind === "import-staging");
   const previewEntry = dirtyEntries.find((e) => e.kind === "import-preview");
   const body =
-    previewEntry?.previewBatchId != null
-      ? leaveGuardImportPreviewMessage(previewEntry.previewBatchId)
-      : operationalCopy.unsavedForm;
+    stagingEntry?.stagingBatchId != null
+      ? leaveGuardImportStagingMessage(stagingEntry.stagingBatchId)
+      : previewEntry?.previewBatchId != null
+        ? leaveGuardImportPreviewMessage(previewEntry.previewBatchId)
+        : operationalCopy.unsavedForm;
 
   // Save only when every dirty registration can persist (avoid markClean of unsaved entries).
   const canSave =

@@ -1,0 +1,611 @@
+/**
+ * Atomic import batch cutover (Story 6.2 / AD-4 / FR-38).
+ *
+ * Pipeline: revalidate → mutex → withTransaction(append BaselineRecorded) → evidence.
+ * Production event-store ingress only here — never from preview/confirm.
+ *
+ * AD-6 honesty (accepted review Decision): `createPerson` uses Prisma (published
+ * PE API) outside the event-store PoolClient TX. Mid-cutover abort can leave
+ * orphan Person rows while Baseline events roll back. `assertZeroProductionTrace`
+ * only counts `kernel_events` by correlation_id — not Person rows. Full Prisma↔Pool
+ * orphan hardening remains an open Epic 4 / AD-6 action (story Absolute non-goal).
+ *
+ * FR-40 reconciliation gate UI = Story 6.4. Optional fail-closed stub for
+ * production-tier when reconciliation token absent.
+ */
+
+import type { Pool, PoolClient } from "@divan/db";
+import {
+  appendBusinessEvent,
+  withTransaction,
+} from "@divan/event-store";
+import {
+  PersonIdentityError,
+  createPerson,
+  getGradeById,
+  getJobTitleById,
+  getLadderById,
+  getOrgUnitById,
+  getOrganizationalRoleById,
+  getPersonByPersonnelCode,
+  type CreatePersonInput,
+} from "@divan/person-employment";
+
+import {
+  getLatestBatchEvidence,
+  persistBatchEvidence,
+  type ImportBatchEvidence,
+} from "./batch-evidence";
+import {
+  acquireOverlapLocks,
+  buildOverlapKeys,
+  formatConcurrentBatchMessage,
+  releaseOverlapLocksForBatch,
+} from "./concurrent-mutex";
+import { MigrationError } from "./errors";
+import {
+  assertApproveExecuteSegregation,
+  assertMigrationExecutePermission,
+  type SodPermissionHolder,
+} from "./sod";
+import {
+  getStagingBatch,
+  markStagingStatus,
+  rollbackStagingBatch,
+  type StagingBatchRecord,
+  type StagingBatchRow,
+} from "./staging-repo";
+import {
+  formatImportIssueCite,
+  validateImportMatrix,
+  type ImportIssue,
+} from "./validate-import";
+import {
+  getLaunchImportTemplate,
+  isLaunchImportTemplateKey,
+} from "./templates";
+import type { ParsedImportMatrix } from "./parse-workbook";
+
+/** PascalCase past-tense Baseline event introduced for migration cutover. */
+export const BASELINE_RECORDED_EVENT_TYPE = "BaselineRecorded";
+
+export type ExecuteBatchResult = {
+  batch: StagingBatchRecord;
+  evidence: ImportBatchEvidence;
+  /** True when a prior successful cutover was returned (idempotent). */
+  idempotentReplay: boolean;
+};
+
+export type ExecuteBatchOptions = {
+  batchId: string;
+  executorAccountId: string;
+  executorDisplayName?: string;
+  permissionHolder: SodPermissionHolder;
+  /** Default true — same actor cannot approve+execute. */
+  segregationOn?: boolean;
+  /**
+   * Provisional FR-40 hook (Story 6.4 owns real gate).
+   * When tier is `production` and token absent → fail closed.
+   */
+  cutoverTier?: "trial" | "staging" | "production";
+  reconciliationEvidenceToken?: string | null;
+};
+
+function rowToCreatePersonInput(values: Record<string, string>): CreatePersonInput {
+  const input: CreatePersonInput = {
+    personnelCode: values.personnelCode ?? "",
+    givenName: values.givenName ?? "",
+    familyName: values.familyName ?? "",
+    mobilePhone: values.mobilePhone ?? "",
+  };
+  if (values.fatherName?.trim()) input.fatherName = values.fatherName.trim();
+  if (values.birthDate?.trim()) input.birthDate = values.birthDate.trim();
+  if (values.gender?.trim()) input.gender = values.gender.trim();
+  if (values.nationality?.trim()) input.nationality = values.nationality.trim();
+  return input;
+}
+
+function stagingRowsToParsedMatrix(
+  batch: StagingBatchRecord,
+): ParsedImportMatrix {
+  if (!isLaunchImportTemplateKey(batch.templateKey)) {
+    throw new MigrationError(
+      "TEMPLATE_UNKNOWN",
+      "قالب دسته برای اعتبارسنجی مجدد شناخته نشد.",
+    );
+  }
+  const template = getLaunchImportTemplate(batch.templateKey);
+  if (!template) {
+    throw new MigrationError(
+      "TEMPLATE_UNKNOWN",
+      "قالب دسته برای اعتبارسنجی مجدد شناخته نشد.",
+    );
+  }
+  return {
+    template,
+    headers: template.columns.map((c) => c.headerFa),
+    columnKeys: template.columns.map((c) => c.key),
+    rows: batch.rows.map((r) => ({ ...r.values })),
+    sourceRowNumbers: batch.rows.map((r) => r.sourceRow),
+  };
+}
+
+/**
+ * Re-run FR-37 validators against frozen staging rows before cutover.
+ */
+export function revalidateStagingBatch(batch: StagingBatchRecord): ImportIssue[] {
+  const parsed = stagingRowsToParsedMatrix(batch);
+  return validateImportMatrix(parsed);
+}
+
+/**
+ * Authoritative live FK checks via published PE APIs (AC #3).
+ */
+export async function revalidateAuthoritativeReferences(
+  batch: StagingBatchRecord,
+): Promise<void> {
+  for (const row of batch.rows) {
+    const teamId = (row.values.teamId ?? "").trim();
+    if (teamId) {
+      const unit = await getOrgUnitById(teamId);
+      if (!unit || unit.unitType !== "TEAM") {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: شناسه تیم در وضعیت جاری معتبر نیست.`,
+        );
+      }
+    }
+    const roleId = (row.values.organizationalRoleId ?? "").trim();
+    if (roleId) {
+      const role = await getOrganizationalRoleById(roleId);
+      if (!role) {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: شناسه نقش سازمانی یافت نشد.`,
+        );
+      }
+    }
+    const jobTitleId = (row.values.jobTitleId ?? "").trim();
+    if (jobTitleId) {
+      const job = await getJobTitleById(jobTitleId);
+      if (!job) {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: شناسه عنوان شغلی یافت نشد.`,
+        );
+      }
+    }
+    const ladderId = (row.values.ladderId ?? "").trim();
+    if (ladderId) {
+      const ladder = await getLadderById(ladderId);
+      if (!ladder) {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: شناسه نردبان یافت نشد.`,
+        );
+      }
+    }
+    const gradeId = (row.values.gradeId ?? "").trim();
+    if (gradeId) {
+      const grade = await getGradeById(gradeId);
+      if (!grade) {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: شناسه گرید یافت نشد.`,
+        );
+      }
+    }
+  }
+}
+
+function assertNoDuplicatePersonnelCodes(issues: ImportIssue[]): void {
+  const dups = issues.filter(
+    (i) =>
+      i.severity === "warning" &&
+      i.column === "personnelCode" &&
+      i.messageFa.includes("در چند ردیف"),
+  );
+  if (dups.length > 0) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `اعتبارسنجی مجدد ناموفق: ${formatImportIssueCite(dups[0]!)}`,
+    );
+  }
+}
+
+/**
+ * Assert no production business events exist for this batch correlation.
+ * Used after pre-cutover rollback / failed cutover (AC #4).
+ *
+ * Honesty: does not detect Prisma Person orphans (see file header AD-6 note).
+ */
+export async function assertZeroProductionTrace(
+  client: PoolClient,
+  correlationId: string,
+): Promise<void> {
+  const res = await client.query(
+    `SELECT COUNT(*)::int AS c
+     FROM kernel_events
+     WHERE correlation_id = $1::uuid
+       AND event_class = 'business'`,
+    [correlationId],
+  );
+  const count = Number(res.rows[0]?.c ?? 0);
+  if (count > 0) {
+    throw new MigrationError(
+      "CUTOVER_FAILED",
+      `ردی از رویدادهای تولید برای این دسته باقی مانده است (${count}).`,
+    );
+  }
+}
+
+function mapPersonIdentityToMigration(err: PersonIdentityError): never {
+  throw new MigrationError(
+    err.code === "PERMISSION_DENIED" ? "SOD_VIOLATION" : "REVALIDATION_FAILED",
+    err.messageFa,
+  );
+}
+
+async function cutoverRowsInTx(
+  client: PoolClient,
+  batch: StagingBatchRecord,
+  executorAccountId: string,
+): Promise<{
+  createdPersonIds: string[];
+  matchedPersonIds: string[];
+  eventIds: string[];
+}> {
+  const createdPersonIds: string[] = [];
+  const matchedPersonIds: string[] = [];
+  const eventIds: string[] = [];
+
+  for (const row of batch.rows) {
+    const code = (row.values.personnelCode ?? "").trim();
+    if (!code) {
+      throw new MigrationError(
+        "REVALIDATION_FAILED",
+        `ردیف ${row.sourceRow}: کد پرسنلی خالی است.`,
+      );
+    }
+
+    let person;
+    try {
+      person = await getPersonByPersonnelCode(code);
+      if (!person) {
+        person = await createPerson(rowToCreatePersonInput(row.values), {
+          accountId: executorAccountId,
+          correlationId: batch.correlationId,
+        });
+        createdPersonIds.push(person.id);
+      } else {
+        matchedPersonIds.push(person.id);
+      }
+    } catch (err) {
+      if (err instanceof PersonIdentityError) mapPersonIdentityToMigration(err);
+      throw err;
+    }
+
+    const effectiveDate =
+      (row.values.startDate ?? "").trim() ||
+      new Date().toISOString().slice(0, 10);
+
+    const { id: eventId } = await appendBusinessEvent(client, {
+      correlationId: batch.correlationId,
+      eventType: BASELINE_RECORDED_EVENT_TYPE,
+      personId: person.id,
+      effectiveDate,
+      registeredBy: executorAccountId,
+      status: "Effective",
+      finalizedBy: executorAccountId,
+      finalizedAt: new Date(),
+      provenance: {
+        source: "migration",
+        batchId: batch.id,
+        previewBatchId: batch.previewBatchId,
+        templateKey: batch.templateKey,
+        sourceRow: row.sourceRow,
+      },
+      payload: {
+        source: "migration",
+        rowId: row.rowId,
+        teamId: row.values.teamId ?? null,
+        organizationalRoleId: row.values.organizationalRoleId ?? null,
+        jobTitleId: row.values.jobTitleId ?? null,
+        ladderId: row.values.ladderId ?? null,
+        gradeId: row.values.gradeId ?? null,
+        seniorityId: row.values.seniorityId ?? null,
+        collaborationType: row.values.collaborationType ?? null,
+      },
+      afterEvidence: {
+        personnelCode: code,
+        personId: person.id,
+      },
+    });
+    eventIds.push(eventId);
+  }
+
+  return { createdPersonIds, matchedPersonIds, eventIds };
+}
+
+/**
+ * Execute approved staging batch: revalidate, mutex, atomic cutover, evidence.
+ * Repeat of successful batch returns prior evidence (idempotent — no duplicate events).
+ * Failed batches require a new upload/approve cycle after staging drop
+ * (review Decision #3 + AC #4).
+ */
+export async function executeImportBatch(
+  pool: Pool,
+  opts: ExecuteBatchOptions,
+): Promise<ExecuteBatchResult> {
+  await assertMigrationExecutePermission(opts.permissionHolder);
+
+  const batch = await getStagingBatch(pool, opts.batchId);
+
+  // Idempotent replay of successful cutover
+  if (batch.status === "cutover-complete") {
+    const prior = await getLatestBatchEvidence(pool, batch.id);
+    if (prior && prior.status === "cutover-complete") {
+      return { batch, evidence: prior, idempotentReplay: true };
+    }
+    throw new MigrationError(
+      "IDEMPOTENCY_CONFLICT",
+      "دسته قطعی‌سازی‌شده است اما مدرک اجرا یافت نشد.",
+    );
+  }
+
+  if (batch.status === "executing") {
+    throw new MigrationError(
+      "CONCURRENT_BATCH",
+      formatConcurrentBatchMessage({
+        ownerDisplayName: batch.ownerDisplayName || batch.executedBy || "",
+        correlationId: batch.correlationId,
+      }),
+      {
+        ownerDisplayName: batch.ownerDisplayName || batch.executedBy || "",
+        correlationId: batch.correlationId,
+      },
+    );
+  }
+
+  if (batch.status === "failed") {
+    throw new MigrationError(
+      "BATCH_NOT_APPROVED",
+      "دسته ناموفق است و ردیف‌های موقت پاک شده‌اند؛ بارگذاری و تأیید جدید لازم است.",
+    );
+  }
+
+  if (batch.status !== "approved") {
+    if (batch.status === "confirmed-draft") {
+      throw new MigrationError(
+        "BATCH_NOT_APPROVED",
+        "دسته هنوز تأیید نشده است.",
+      );
+    }
+    throw new MigrationError(
+      "BATCH_NOT_APPROVED",
+      "وضعیت دسته برای اجرا معتبر نیست.",
+    );
+  }
+
+  if (!batch.approvedBy) {
+    throw new MigrationError(
+      "BATCH_NOT_APPROVED",
+      "دسته هنوز تأیید نشده است.",
+    );
+  }
+
+  assertApproveExecuteSegregation({
+    approvedByAccountId: batch.approvedBy,
+    executorAccountId: opts.executorAccountId,
+    segregationOn: opts.segregationOn,
+  });
+
+  const tier = opts.cutoverTier ?? "trial";
+  if (
+    tier === "production" &&
+    !(opts.reconciliationEvidenceToken ?? "").trim()
+  ) {
+    // Provisional FR-40 fail-closed stub — real workspace = Story 6.4
+    throw new MigrationError(
+      "CUTOVER_FAILED",
+      "قطعه‌سازی سطح تولید بدون مدرک تطبیق مجاز نیست (در انتظار داستان ۶٫۴).",
+    );
+  }
+
+  const issues = revalidateStagingBatch(batch);
+  const errors = issues.filter((i) => i.severity === "error");
+  if (errors.length > 0) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `اعتبارسنجی مجدد ناموفق: ${formatImportIssueCite(errors[0]!)}`,
+    );
+  }
+  assertNoDuplicatePersonnelCodes(issues);
+  await revalidateAuthoritativeReferences(batch);
+
+  const overlapKeys = buildOverlapKeys(batch.rows);
+  const executorDisplay =
+    opts.executorDisplayName?.trim() || opts.executorAccountId;
+
+  try {
+    const result = await withTransaction(pool, async (client) => {
+      const claimed = await client.query(
+        `SELECT id FROM migration_staging.import_batch
+         WHERE id = $1::uuid AND status = 'approved'
+         FOR UPDATE`,
+        [batch.id],
+      );
+      if ((claimed.rowCount ?? 0) === 0) {
+        throw new MigrationError(
+          "CONCURRENT_BATCH",
+          formatConcurrentBatchMessage({
+            ownerDisplayName: batch.ownerDisplayName || "",
+            correlationId: batch.correlationId,
+          }),
+          {
+            ownerDisplayName: batch.ownerDisplayName || "",
+            correlationId: batch.correlationId,
+          },
+        );
+      }
+
+      await markStagingStatus(client, batch.id, "executing", {
+        executedBy: opts.executorAccountId,
+        executedAt: new Date(),
+      });
+
+      await acquireOverlapLocks(client, {
+        overlapKeys,
+        holder: {
+          batchId: batch.id,
+          ownerAccountId: opts.executorAccountId,
+          ownerDisplayName: executorDisplay,
+          correlationId: batch.correlationId,
+        },
+      });
+
+      const { createdPersonIds, matchedPersonIds, eventIds } =
+        await cutoverRowsInTx(client, batch, opts.executorAccountId);
+
+      await markStagingStatus(client, batch.id, "cutover-complete", {
+        executedBy: opts.executorAccountId,
+        executedAt: new Date(),
+      });
+
+      await releaseOverlapLocksForBatch(client, batch.id);
+
+      const allRecordIds = [...createdPersonIds, ...matchedPersonIds];
+      const evidence = await persistBatchEvidence(client, {
+        batchId: batch.id,
+        correlationId: batch.correlationId,
+        status: "cutover-complete",
+        actors: {
+          uploadedBy: batch.uploadedBy,
+          uploadedAt: batch.uploadedAt,
+          approvedBy: batch.approvedBy,
+          approvedAt: batch.approvedAt,
+          executedBy: opts.executorAccountId,
+          executedAt: new Date().toISOString(),
+        },
+        counts: {
+          rowCount: batch.rows.length,
+          createdPersonCount: createdPersonIds.length,
+          createdEventCount: eventIds.length,
+          errorCount: 0,
+        },
+        createdRecordIds: allRecordIds,
+        createdEventIds: eventIds,
+      });
+
+      return { createdPersonIds, matchedPersonIds, eventIds, evidence };
+    });
+
+    const updated = await getStagingBatch(pool, batch.id);
+    return {
+      batch: updated,
+      evidence: result.evidence,
+      idempotentReplay: false,
+    };
+  } catch (err) {
+    // Pre-cutover / mid-cutover abort before COMMIT → TX rolled back by withTransaction.
+    // Drop staging rows + failed evidence; assert zero production event trace.
+    try {
+      await withTransaction(pool, async (client) => {
+        await assertZeroProductionTrace(client, batch.correlationId);
+        await releaseOverlapLocksForBatch(client, batch.id);
+        await rollbackStagingBatch(client, batch.id);
+        await markStagingStatus(client, batch.id, "failed", {
+          executedBy: opts.executorAccountId,
+          executedAt: new Date(),
+          errorSummary: {
+            messageFa:
+              err instanceof MigrationError
+                ? err.messageFa
+                : "اجرای دسته ناموفق بود.",
+            code: err instanceof MigrationError ? err.code : "CUTOVER_FAILED",
+          },
+        });
+        await persistBatchEvidence(client, {
+          batchId: batch.id,
+          correlationId: batch.correlationId,
+          status: "failed",
+          actors: {
+            uploadedBy: batch.uploadedBy,
+            uploadedAt: batch.uploadedAt,
+            approvedBy: batch.approvedBy,
+            approvedAt: batch.approvedAt,
+            executedBy: opts.executorAccountId,
+            executedAt: new Date().toISOString(),
+          },
+          counts: {
+            rowCount: batch.rows.length,
+            createdPersonCount: 0,
+            createdEventCount: 0,
+            errorCount: 1,
+          },
+          errors: [
+            err instanceof MigrationError
+              ? err.messageFa
+              : "اجرای دسته ناموفق بود.",
+          ],
+        });
+      });
+    } catch {
+      // Best-effort cleanup; rethrow original
+    }
+
+    if (err instanceof MigrationError) throw err;
+    if (err instanceof PersonIdentityError) mapPersonIdentityToMigration(err);
+    throw new MigrationError(
+      "CUTOVER_FAILED",
+      "اجرای دسته ناموفق بود؛ وضعیت تولید تغییر نکرد.",
+    );
+  }
+}
+
+/**
+ * Pre-cutover staging drop with zero production trace assertion (AC #4).
+ */
+export async function rollbackImportStaging(
+  pool: Pool,
+  opts: { batchId: string },
+): Promise<{ batch: StagingBatchRecord; evidence: ImportBatchEvidence }> {
+  const batch = await getStagingBatch(pool, opts.batchId);
+
+  return withTransaction(pool, async (client) => {
+    await assertZeroProductionTrace(client, batch.correlationId);
+    await releaseOverlapLocksForBatch(client, batch.id);
+    const rolled = await rollbackStagingBatch(client, batch.id);
+    const evidence = await persistBatchEvidence(client, {
+      batchId: rolled.id,
+      correlationId: rolled.correlationId,
+      status: "rolled-back",
+      actors: {
+        uploadedBy: rolled.uploadedBy,
+        uploadedAt: rolled.uploadedAt,
+        approvedBy: rolled.approvedBy,
+        approvedAt: rolled.approvedAt,
+        executedBy: rolled.executedBy,
+        executedAt: rolled.executedAt,
+      },
+      counts: {
+        rowCount: 0,
+        createdPersonCount: 0,
+        createdEventCount: 0,
+        errorCount: 0,
+      },
+    });
+    return { batch: rolled, evidence };
+  });
+}
+
+/** Read-only projection of frozen staging rows for executor UI. */
+export function stagingRowsReadOnly(
+  batch: StagingBatchRecord,
+): StagingBatchRow[] {
+  return batch.rows.map((r) => ({
+    rowId: r.rowId,
+    sourceRow: r.sourceRow,
+    values: { ...r.values },
+  }));
+}

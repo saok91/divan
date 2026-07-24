@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { ImportPreviewTable } from "@/components/import/import-preview-table";
 import { useLeaveGuardRegistration } from "@/components/leave-guard";
+import { SensitiveConfirmationDialog } from "@/components/personnel/sensitive-confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,7 +27,14 @@ import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
-type WizardStep = "identify" | "validate" | "preview" | "confirm";
+type WizardStep =
+  | "identify"
+  | "validate"
+  | "preview"
+  | "confirm"
+  | "approve"
+  | "execute"
+  | "result";
 
 /** Prefer ArrayBuffer over FileReader — avoids NotReadableError on some OS/file locks. */
 async function fileToBase64(file: File): Promise<string> {
@@ -52,9 +60,7 @@ function uploadErrorMessage(
     typeof (err as { message: unknown }).message === "string"
   ) {
     const msg = (err as { message: string }).message;
-    // tRPC / MigrationError Persian messages are usable as-is
     if (/[\u0600-\u06FF]/.test(msg)) return msg;
-    // File read NotReadableError (English DOMException)
     if (/could not be read|NotReadableError|read_failed/i.test(msg)) {
       return operationalCopy.importFileReadError;
     }
@@ -67,7 +73,16 @@ const STEPS: { id: WizardStep; label: string }[] = [
   { id: "validate", label: operationalCopy.importStepValidate },
   { id: "preview", label: operationalCopy.importStepPreview },
   { id: "confirm", label: operationalCopy.importStepConfirm },
+  { id: "approve", label: operationalCopy.importStepApprove },
+  { id: "execute", label: operationalCopy.importStepExecute },
+  { id: "result", label: operationalCopy.importStepResult },
 ];
+
+const TERMINAL_STATUSES = new Set([
+  "cutover-complete",
+  "failed",
+  "rolled-back",
+]);
 
 export function ImportWizard() {
   const [step, setStep] = React.useState<WizardStep>("identify");
@@ -75,13 +90,19 @@ export function ImportWizard() {
   const [file, setFile] = React.useState<File | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [executeOpen, setExecuteOpen] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [localMessage, setLocalMessage] = React.useState<string | null>(null);
+  const [stagingBatchId, setStagingBatchId] = React.useState<string | null>(
+    null,
+  );
 
   const templatesQuery = api.migration.templates.useQuery();
   const uploadMutation = api.migration.uploadAndValidate.useMutation();
   const cancelMutation = api.migration.cancelPreview.useMutation();
   const confirmMutation = api.migration.confirmDraft.useMutation();
+  const approveMutation = api.migration.approveBatch.useMutation();
+  const executeMutation = api.migration.executeBatch.useMutation();
 
   const resolvedTemplateKey =
     templateKey || templatesQuery.data?.templates[0]?.key || "";
@@ -90,14 +111,27 @@ export function ImportWizard() {
   const previewBatchId = preview?.previewBatchId;
   const previewLoaded = Boolean(preview && preview.status !== "cancelled");
 
+  const stagingBatch =
+    executeMutation.data?.batch ??
+    approveMutation.data?.batch ??
+    null;
+  const evidence = executeMutation.data?.evidence ?? null;
+  const contentsReadOnly =
+    approveMutation.data?.contentsReadOnly === true ||
+    Boolean(stagingBatch && stagingBatch.payloadFrozen);
+
   const clearPreview = React.useCallback(async () => {
     const id = previewBatchId;
     setSheetOpen(false);
     setConfirmOpen(false);
+    setExecuteOpen(false);
     setStep("identify");
     setLocalMessage(null);
+    setStagingBatchId(null);
     uploadMutation.reset();
     confirmMutation.reset();
+    approveMutation.reset();
+    executeMutation.reset();
     if (id) {
       try {
         await cancelMutation.mutateAsync({ previewBatchId: id });
@@ -105,14 +139,28 @@ export function ImportWizard() {
         // Draft may already be gone — local clear still applies.
       }
     }
-  }, [previewBatchId, uploadMutation, confirmMutation, cancelMutation]);
+  }, [
+    previewBatchId,
+    uploadMutation,
+    confirmMutation,
+    approveMutation,
+    executeMutation,
+    cancelMutation,
+  ]);
+
+  const stagingOpenNonTerminal = Boolean(
+    stagingBatchId &&
+      (!stagingBatch || !TERMINAL_STATUSES.has(stagingBatch.status)),
+  );
 
   useLeaveGuardRegistration({
     id: "import-wizard-preview",
-    // Data-state dirty: preview draft open — never Sheet open alone.
-    isDirty: Boolean(preview && preview.status === "preview"),
-    kind: "import-preview",
+    // Data-state dirty: open preview draft OR non-terminal staging — never Dialog open alone.
+    isDirty:
+      Boolean(preview && preview.status === "preview") || stagingOpenNonTerminal,
+    kind: stagingOpenNonTerminal ? "import-staging" : "import-preview",
     previewBatchId: previewBatchId,
+    stagingBatchId: stagingBatchId ?? undefined,
     onDiscard: () => {
       void clearPreview();
     },
@@ -122,6 +170,9 @@ export function ImportWizard() {
     setUploadError(null);
     setLocalMessage(null);
     confirmMutation.reset();
+    approveMutation.reset();
+    executeMutation.reset();
+    setStagingBatchId(null);
     if (!resolvedTemplateKey || !file) {
       setUploadError(operationalCopy.importUploadReject);
       return;
@@ -145,20 +196,72 @@ export function ImportWizard() {
   async function onConfirmDraft() {
     if (!previewBatchId) return;
     try {
-      await confirmMutation.mutateAsync({ previewBatchId });
+      const res = await confirmMutation.mutateAsync({ previewBatchId });
       setConfirmOpen(false);
       setStep("confirm");
       setLocalMessage(operationalCopy.importDraftConfirmed);
+      if (res.stagingBatchId) {
+        setStagingBatchId(res.stagingBatchId);
+        setStep("approve");
+      }
     } catch (err) {
       setUploadError(uploadErrorMessage(err));
       setConfirmOpen(false);
     }
   }
 
+  async function onApprove() {
+    if (!stagingBatchId) return;
+    setUploadError(null);
+    try {
+      await approveMutation.mutateAsync({ batchId: stagingBatchId });
+      setStep("execute");
+      setLocalMessage(operationalCopy.importContentsReadOnly);
+    } catch (err) {
+      setUploadError(uploadErrorMessage(err, operationalCopy.importSodBlocked));
+    }
+  }
+
+  async function onExecute() {
+    if (!stagingBatchId) return;
+    setUploadError(null);
+    try {
+      await executeMutation.mutateAsync({
+        batchId: stagingBatchId,
+        cutoverTier: "trial",
+      });
+      setExecuteOpen(false);
+      setStep("result");
+      setLocalMessage(operationalCopy.importExecuteSuccess);
+    } catch (err) {
+      setExecuteOpen(false);
+      setStep("result");
+      const detail = uploadErrorMessage(err);
+      // Include staging batch id so operators can correlate failures (UX-DR16).
+      setUploadError(
+        `${operationalCopy.importExecuteFailed}: ${detail} — ${stagingBatchId}`,
+      );
+    }
+  }
+
   const busy =
     uploadMutation.isPending ||
     cancelMutation.isPending ||
-    confirmMutation.isPending;
+    confirmMutation.isPending ||
+    approveMutation.isPending ||
+    executeMutation.isPending;
+
+  const tableColumns =
+    stagingBatch?.visibleColumns ?? preview?.visibleColumns ?? [];
+  const tableRows =
+    stagingBatch?.rows.map((r) => ({
+      rowId: r.rowId,
+      sourceRow: r.sourceRow,
+      severity: "ok" as const,
+      values: r.values,
+    })) ??
+    preview?.rows ??
+    [];
 
   return (
     <div className="space-y-6">
@@ -214,7 +317,7 @@ export function ImportWizard() {
               ))}
             </select>
             <p className="text-caption text-muted-foreground">
-              قالب موقتی — انجماد AR-MIGRATION هنوز نهایی شده.
+              قالب موقتی — انجماد AR-MIGRATION هنوز انجام نشده.
             </p>
           </div>
         )}
@@ -270,6 +373,30 @@ export function ImportWizard() {
               </Button>
             </>
           ) : null}
+          {stagingBatchId && step === "approve" ? (
+            <Button
+              type="button"
+              variant="primary"
+              disabled={busy}
+              onClick={() => void onApprove()}
+            >
+              {operationalCopy.importApproveAction}
+            </Button>
+          ) : null}
+          {stagingBatchId && step === "execute" ? (
+            <Button
+              type="button"
+              variant="primary"
+              disabled={busy || executeOpen}
+              onClick={() => {
+                // Single dialog depth: SensitiveConfirmationDialog only (no confirm Dialog).
+                setConfirmOpen(false);
+                setExecuteOpen(true);
+              }}
+            >
+              {operationalCopy.importExecuteAction}
+            </Button>
+          ) : null}
         </div>
 
         {uploadError ? (
@@ -282,20 +409,54 @@ export function ImportWizard() {
             {localMessage}
           </p>
         ) : null}
-        {preview?.populationDisclosureFa ? (
+        {contentsReadOnly ? (
+          <p className="text-caption text-muted-foreground">
+            {operationalCopy.importContentsReadOnly}
+          </p>
+        ) : null}
+        {preview?.populationDisclosureFa ||
+        approveMutation.data?.populationDisclosureFa ||
+        executeMutation.data?.populationDisclosureFa ? (
           <p className="text-caption text-muted-foreground">
             {operationalCopy.importPopulationHint}:{" "}
-            {preview.populationDisclosureFa}
+            {executeMutation.data?.populationDisclosureFa ??
+              approveMutation.data?.populationDisclosureFa ??
+              preview?.populationDisclosureFa}
           </p>
+        ) : null}
+
+        {evidence ? (
+          <section
+            className="space-y-2 rounded-md border border-border p-3"
+            aria-labelledby="import-evidence-heading"
+          >
+            <h3 id="import-evidence-heading" className="text-body-medium">
+              {operationalCopy.importEvidenceLabel}
+            </h3>
+            <p className="text-caption">
+              {operationalCopy.importCorrelationLabel}:{" "}
+              {toPersianDigits(evidence.correlationId)}
+            </p>
+            <p className="text-caption">
+              {operationalCopy.importRowsLabel}:{" "}
+              {toPersianDigits(evidence.counts.rowCount)} · رویداد:{" "}
+              {toPersianDigits(evidence.counts.createdEventCount)} · فرد:{" "}
+              {toPersianDigits(evidence.counts.createdPersonCount)}
+            </p>
+            {evidence.createdEventIds.length > 0 ? (
+              <p className="text-caption text-muted-foreground break-all">
+                {evidence.createdEventIds.map((id) => toPersianDigits(id)).join("، ")}
+              </p>
+            ) : null}
+          </section>
         ) : null}
       </section>
 
-      {/* Preview Sheet — full width; confirm Dialog is the only dialog above it */}
+      {/* Preview Sheet — confirm Dialog XOR execute SensitiveConfirmationDialog */}
       <Sheet
         open={sheetOpen && previewLoaded}
         onOpenChange={(open) => {
           if (!open) {
-            // Closing sheet does not cancel draft — dirty leave-guard remains.
             setSheetOpen(false);
           }
         }}
@@ -304,7 +465,6 @@ export function ImportWizard() {
           side="bottom"
           fullWidth
           className="gap-0 p-0"
-          // Esc closes sheet only; leave-guard handles navigation away.
           onEscapeKeyDown={() => setSheetOpen(false)}
         >
           <SheetHeader className="border-b">
@@ -317,16 +477,21 @@ export function ImportWizard() {
           </SheetHeader>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {preview ? (
+            {tableColumns.length > 0 ? (
               <ImportPreviewTable
-                columns={preview.visibleColumns}
-                rows={preview.rows}
-                issueCitesFa={preview.issueCitesFa}
+                columns={tableColumns}
+                rows={tableRows}
+                issueCitesFa={preview?.issueCitesFa ?? []}
               />
             ) : null}
             {preview?.statusHintFa ? (
               <p className="mt-3 text-caption text-muted-foreground">
                 {preview.statusHintFa}
+              </p>
+            ) : null}
+            {step === "approve" ? (
+              <p className="mt-3 text-caption text-muted-foreground">
+                {operationalCopy.importApproveHint}
               </p>
             ) : null}
           </div>
@@ -348,30 +513,56 @@ export function ImportWizard() {
             >
               {operationalCopy.importClosePreview}
             </Button>
-            <Button
-              type="button"
-              variant="primary"
-              disabled={
-                busy ||
-                !preview ||
-                preview.errorCount > 0 ||
-                preview.status === "confirmed-draft"
-              }
-              onClick={() => {
-                // Single dialog depth: close is not needed — Dialog stacks above Sheet.
-                setConfirmOpen(true);
-              }}
-            >
-              {operationalCopy.importConfirmDraft}
-            </Button>
+            {preview?.status !== "confirmed-draft" ? (
+              <Button
+                type="button"
+                variant="primary"
+                disabled={
+                  busy ||
+                  !preview ||
+                  preview.errorCount > 0 ||
+                  confirmOpen ||
+                  executeOpen
+                }
+                onClick={() => {
+                  setExecuteOpen(false);
+                  setConfirmOpen(true);
+                }}
+              >
+                {operationalCopy.importConfirmDraft}
+              </Button>
+            ) : null}
+            {stagingBatchId && step === "approve" ? (
+              <Button
+                type="button"
+                variant="primary"
+                disabled={busy}
+                onClick={() => void onApprove()}
+              >
+                {operationalCopy.importApproveAction}
+              </Button>
+            ) : null}
+            {stagingBatchId && step === "execute" ? (
+              <Button
+                type="button"
+                variant="primary"
+                disabled={busy || executeOpen}
+                onClick={() => {
+                  setConfirmOpen(false);
+                  setExecuteOpen(true);
+                }}
+              >
+                {operationalCopy.importExecuteAction}
+              </Button>
+            ) : null}
           </SheetFooter>
         </SheetContent>
       </Sheet>
 
+      {/* Confirm draft Dialog — XOR with execute SensitiveConfirmationDialog */}
       <Dialog
-        open={confirmOpen}
+        open={confirmOpen && !executeOpen}
         onOpenChange={(open) => {
-          // Only one confirmation Dialog above the Sheet.
           setConfirmOpen(open);
         }}
       >
@@ -401,6 +592,17 @@ export function ImportWizard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SensitiveConfirmationDialog
+        open={executeOpen && !confirmOpen}
+        onOpenChange={setExecuteOpen}
+        title={operationalCopy.importExecuteConfirmTitle}
+        consequence={operationalCopy.importExecuteConsequence}
+        confirmLabel={operationalCopy.importExecuteAction}
+        cancelLabel={operationalCopy.importConfirmDismiss}
+        busy={executeMutation.isPending}
+        onConfirm={() => void onExecute()}
+      />
     </div>
   );
 }

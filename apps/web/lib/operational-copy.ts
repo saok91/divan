@@ -92,8 +92,26 @@ export const operationalCopy = {
   importErrorsLabel: "خطا",
   importWarningsLabel: "هشدار",
   importRowsLabel: "ردیف",
-  importDraftConfirmed: "پیش‌نویس منجمد شد؛ اجرا هنوز فعال نیست.",
+  importDraftConfirmed: "پیش‌نویس منجمد شد؛ مرحله بعد تأیید جداگانه است.",
   importPopulationHint: "شفافیت محدوده جمعیت",
+  importStepApprove: "تأیید دسته",
+  importStepExecute: "اجرا",
+  importStepResult: "نتیجه",
+  importApproveAction: "تأیید برای اجرا",
+  importApproveHint:
+    "تأیید محتوا را منجمد می‌کند؛ اجرا باید توسط نقش جداگانه انجام شود.",
+  importExecuteAction: "اجرای دسته",
+  importExecuteConfirmTitle: "تأیید اجرای دسته واردسازی",
+  importExecuteConsequence:
+    "اجرا دسته را از انبار موقت به تولید قطعی می‌کند. در صورت ناموفق بودن، وضعیت تولید تغییر نمی‌کند.",
+  importExecuteSuccess: "اجرا موفق بود. شناسه‌های ایجادشده در شواهد دسته ثبت شد.",
+  importExecuteFailed: "ناموفق",
+  importConcurrentBatch: "دسته دیگری در حال اجراست",
+  importSodBlocked: "تفکیک وظایف رعایت نشده است.",
+  importContentsReadOnly: "محتوای تأییدشده فقط خواندنی است و قابل ویرایش نیست.",
+  importEvidenceLabel: "شواهد دسته",
+  importCorrelationLabel: "شناسه همبستگی",
+  importRollbackStaging: "بازگشت انبار موقت",
 
   /** Viewport gate (genuine small window). */
   viewportGateBody:
@@ -245,4 +263,16 @@ export function routeAnnounce(
 /** Import-preview leave-guard body (batch id already Persian digits if needed). */
 export function leaveGuardImportPreviewMessage(batchId: string): string {
   return `پیش‌نمایش دسته ${batchId} ذخیره نشده.`;
+}
+
+export function leaveGuardImportStagingMessage(batchId: string): string {
+  return `دسته موقت ${batchId} هنوز به پایان نرسیده است.`;
+}
+
+export function importConcurrentBatchMessage(opts: {
+  ownerDisplayName: string;
+  correlationId: string;
+}): string {
+  const owner = opts.ownerDisplayName.trim() || "—";
+  return `${operationalCopy.importConcurrentBatch} — مالک: ${owner} — شناسه همبستگی: ${opts.correlationId}`;
 }

@@ -1,12 +1,9 @@
 /**
- * Preview batch DTO + ephemeral draft store (Story 6.1).
+ * Preview batch DTO + ephemeral draft store (Story 6.1 / handoff to 6.2).
  *
- * AD-4 boundary: staging/cutover execution = Story 6.2.
- * This module never appends to the production event-store or writes Baseline.
- *
- * Ops constraint (6.1): drafts live in-process memory for previewBatchId
- * stability within a **single Node process** lifetime. Multi-instance /
- * serverless deploys need sticky routing or a shared store (deferred to 6.2+).
+ * AD-4: this module never appends to the production event-store or writes Baseline.
+ * Preview-only drafts may remain in-process (single Node). Before approve/execute,
+ * confirmed drafts MUST be promoted to durable `migration_staging` (Story 6.2).
  * Cancel removes the draft; TTL / caps bound memory.
  */
 
@@ -369,6 +366,25 @@ export function confirmImportPreviewDraft(
     eventStoreAppended: false,
   };
   return stored.batch;
+}
+
+/**
+ * Internal handoff for promote-to-staging (Story 6.2).
+ * Returns null when draft missing/cancelled.
+ */
+export function getStoredDraftForStaging(previewBatchId: string): {
+  batch: ImportPreviewBatch;
+  fullRows: ImportPreviewRow[];
+  createdByAccountId: string;
+} | null {
+  purgeExpiredDrafts();
+  const stored = draftStore.get(previewBatchId);
+  if (!stored || stored.batch.status === "cancelled") return null;
+  return {
+    batch: stored.batch,
+    fullRows: stored.fullRows,
+    createdByAccountId: stored.createdByAccountId,
+  };
 }
 
 /** Test/selfcheck helper — wipe in-memory drafts. */

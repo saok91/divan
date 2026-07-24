@@ -16,6 +16,10 @@ import {
   type HeadcountOverrideRecord,
 } from "@divan/headcount";
 import {
+  countSuccessfulCutoverEvidence,
+  listSuccessfulCutoverEvidence,
+} from "@divan/migration";
+import {
   MSG_HIST_ORG_TEAM_NOT_ACTIVE_FA,
   PRODUCT_COMPENSATION_EVENT_TYPE,
   PRODUCT_CONTRACT_EVENT_TYPE,
@@ -428,6 +432,68 @@ function eventRowsInRange(
 }
 
 /**
+ * Import batch outcomes — evidence-backed only (Story 6.2 / AC #8).
+ * Never fabricate from preview drafts. Until first successful cutover evidence,
+ * keep exact unavailable message.
+ */
+async function assembleImportBatchOutcomesReport(
+  eventDb: Pool | PoolClient,
+  asOf: string,
+  lastCalculatedAt: string,
+  populationVolume: number | null,
+): Promise<ReportRunResult> {
+  const evidenceCount = await countSuccessfulCutoverEvidence(eventDb);
+  if (evidenceCount === 0) {
+    return emptyResult(
+      "import_batch_outcomes",
+      "unavailable",
+      MSG_REPORT_IMPORT_BATCH_UNAVAILABLE_FA,
+      asOf,
+      lastCalculatedAt,
+      populationVolume,
+    );
+  }
+
+  const evidence = await listSuccessfulCutoverEvidence(eventDb, 200);
+  const columns: ReportColumnDef[] = [
+    { id: "batchId", headerFa: "شناسه دسته" },
+    { id: "correlationId", headerFa: "شناسه همبستگی" },
+    { id: "status", headerFa: "وضعیت" },
+    { id: "createdAt", headerFa: "زمان" },
+    { id: "rowCount", headerFa: "ردیف" },
+    { id: "eventCount", headerFa: "رویداد" },
+  ];
+  const rows: ReportRowDto[] = evidence.map((e) => {
+    const counts =
+      typeof e.counts === "object" && e.counts != null
+        ? (e.counts as { rowCount?: number; createdEventCount?: number })
+        : {};
+    return {
+      id: e.batchId,
+      cells: {
+        batchId: e.batchId,
+        correlationId: e.correlationId,
+        status: e.status,
+        createdAt: e.createdAt,
+        rowCount: counts.rowCount ?? null,
+        eventCount: counts.createdEventCount ?? null,
+      },
+    };
+  });
+
+  return {
+    reportKey: "import_batch_outcomes",
+    titleFa: TITLE.import_batch_outcomes,
+    outcome: "allowed",
+    columns,
+    rows,
+    lastCalculatedAt,
+    asOf,
+    populationVolume,
+  };
+}
+
+/**
  * Assemble one permission-safe report run from authorized subjects + published APIs.
  */
 export async function assembleReportRun(
@@ -451,12 +517,10 @@ export async function assembleReportRun(
   }
 
   if (input.retrievalOutcome === "empty" || subjectIds.length === 0) {
-    // Import batch stub is independent of population emptiness.
+    // Import batch: evidence-backed or unavailable — never fabricate from drafts.
     if (reportKey === "import_batch_outcomes") {
-      return emptyResult(
-        reportKey,
-        "unavailable",
-        MSG_REPORT_IMPORT_BATCH_UNAVAILABLE_FA,
+      return assembleImportBatchOutcomesReport(
+        input.eventDb,
         filter.asOf,
         lastCalculatedAt,
         0,
@@ -509,10 +573,8 @@ export async function assembleReportRun(
   }
 
   if (reportKey === "import_batch_outcomes") {
-    return emptyResult(
-      reportKey,
-      "unavailable",
-      MSG_REPORT_IMPORT_BATCH_UNAVAILABLE_FA,
+    return assembleImportBatchOutcomesReport(
+      input.eventDb,
       filter.asOf,
       lastCalculatedAt,
       subjectIds.length,
