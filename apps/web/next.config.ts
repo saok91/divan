@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
     "@divan/person-employment",
     "@divan/compensation-facts",
     "@divan/headcount",
+    "@divan/reporting",
   ],
 };
 

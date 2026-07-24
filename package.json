@@ -32,7 +32,8 @@
     "selfcheck:primary-assignment": "pnpm --filter @divan/person-employment selfcheck:primary-assignment",
     "selfcheck:secondary-assignment": "pnpm --filter @divan/person-employment selfcheck:secondary-assignment",
     "selfcheck:management-relationships": "pnpm --filter @divan/person-employment selfcheck:management-relationships",
-    "selfcheck:compensation-facts": "pnpm --filter @divan/compensation-facts selfcheck:compensation-facts"
+    "selfcheck:compensation-facts": "pnpm --filter @divan/compensation-facts selfcheck:compensation-facts",
+    "selfcheck:dashboard": "pnpm --filter @divan/reporting selfcheck:dashboard && pnpm --filter @divan/web selfcheck:dashboard"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

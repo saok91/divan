@@ -9,15 +9,19 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "selfcheck:dashboard": "tsx src/dashboard.selfcheck.ts"
   },
   "devDependencies": {
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",
     "@divan/db": "workspace:*",
     "@divan/event-store": "workspace:*",
+    "@divan/headcount": "workspace:*",
+    "@divan/person-employment": "workspace:*",
     "@divan/temporal-engine": "workspace:*"
   }
 }

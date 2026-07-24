@@ -24,6 +24,7 @@ import {
   protectedProcedure,
 } from "./trpc";
 import { accessAdminRouter } from "./access-admin";
+import { dashboardRouter } from "./dashboard";
 import { headcountRouter } from "./headcount";
 import { jobReferenceRouter } from "./job-reference";
 import { organizationRouter } from "./organization";
@@ -90,6 +91,8 @@ export const appRouter = createTRPCRouter({
   personnelEvent: personnelEventRouter,
 
   platformStatus: platformStatusRouter,
+
+  dashboard: dashboardRouter,
 
   /**
    * Demo governed read — controlled allow via DEV_DEMO_POLICY fixture.

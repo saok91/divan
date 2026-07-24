@@ -14,7 +14,8 @@
     "selfcheck:access-people": "tsx components/access/access-people.selfcheck.ts",
     "selfcheck:personnel-search": "tsx src/server/personnel-search.selfcheck.ts",
     "selfcheck:personnel-profile": "tsx lib/person-profile.selfcheck.ts",
-    "selfcheck:personnel-timeline": "tsx lib/personnel-event-timeline.selfcheck.ts"
+    "selfcheck:personnel-timeline": "tsx lib/personnel-event-timeline.selfcheck.ts",
+    "selfcheck:dashboard": "tsx src/server/dashboard.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",
@@ -24,6 +25,7 @@
     "@divan/identity-access": "workspace:*",
     "@divan/compensation-facts": "workspace:*",
     "@divan/person-employment": "workspace:*",
+    "@divan/reporting": "workspace:*",
     "@divan/temporal-engine": "workspace:*",
     "@radix-ui/react-slot": "^1.3.0",
     "@tailwindcss/postcss": "^4.3.3",

@@ -580,3 +580,9 @@
 
 - Cancel/Reverse/Correct mutations lack person-org scope on target event (permission-only); direct mutation by eventId can act on out-of-scope persons — pre-existing Epic 4 surface, not introduced by 5.3 list hardening.
 - `assertPersonInScopedPopulation` collapses registry/retrieval/infra errors into uniform `PERSON_NOT_FOUND` — intentional anti-enumeration posture from 5.1/5.2; 5.3 only added `channel` param.
+
+## Deferred from: code review of 5-4-core-launch-dashboard.md (2026-07-25)
+
+- N+1 `listEmploymentsForPerson` per authorized subject for active-person count ? NFR-2 provisional ?5s envelope; optimize with batch/projector read when AR-NFR / scale demands
+- Full reconcile deep-link query presets (`asOf` / trend range / team) on `/personnel/list` and `/personnel-events/events` ? capacity already passes `teamId`; extend when those surfaces accept shared filter params
+- Interactive team-capacity sort control (by membership vs capacity) ? launch card sorts server-side by membership for `topTeamId` only

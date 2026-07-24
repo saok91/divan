@@ -25,6 +25,24 @@ export const operationalCopy = {
    */
   suppressedCohort: "داده قابل نمایش نیست",
 
+  /**
+   * Empty scoped dashboard (Story 5.4 / UX-DR15) — not emptySearch.
+   * True empty scope under actor filters; never reuse suppress copy.
+   */
+  emptyDashboardScope:
+    "در محدوده دسترسی شما داده‌ای برای این فیلتر نیست.",
+
+  /** Dashboard load / filter failures — never reuse accessDenied for infra. */
+  dashboardLoadError: "بارگذاری داشبورد ممکن نشد.",
+  dashboardFilterInvalid: "تاریخ یا بازهٔ فیلتر نامعتبر است.",
+  dashboardPending: "در حال به‌روزرسانی داده‌های مشتق…",
+  /**
+   * Team filter applies to org/HC cards only — population cards stay on
+   * PopulationPort ∩ InferenceBulk cohort (Story 5.4 review decision).
+   */
+  dashboardTeamFilterHint:
+    "شناسه تیم فقط روی کارت‌های سازمان و ظرفیت اعمال می‌شود؛ افراد فعال و روند روی محدودهٔ دسترسی جمعیت است.",
+
   /** Viewport gate (genuine small window). */
   viewportGateBody:
     "برای استفاده از دیوان، حداقل وضوح صفحهٔ نمایش {size} لازم است. لطفاً پنجره را بزرگ‌تر کنید یا از نمایشگر دسکتاپ استفاده کنید.",
