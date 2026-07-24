@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-24T16:50:00+03:30
+# last_updated: 2026-07-24T17:00:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-24T16:50:00+03:30
+last_updated: 2026-07-24T17:00:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -98,7 +98,7 @@ development_status:
   4-14-reservation-expiry-exceptions-headcount-override: done
   epic-4-retrospective: done
 
-  epic-4b: in-progress
+  epic-4b: done
   4b-1-design-delta-tokens-collapsible-app-shell: done
   4b-2-section-tabs-chrome-routing-leave-guards: done
   4b-3-sidebar-ia-labels-role-landings: done
@@ -106,7 +106,7 @@ development_status:
   4b-5-access-administration-person-first-retrofit: done
   4b-6-organization-section-tabs-tree-navigators: done
   4b-7-personnel-events-shell-scaffolds-event-entry: done
-  epic-4b-retrospective: optional
+  epic-4b-retrospective: done
 
   epic-5: backlog
   5-1-permission-safe-personnel-search-lists: backlog
@@ -275,5 +275,42 @@ action_items:
     status: open
   - epic: 4
     action: "Carry forward Epic 2/3 open items: InferenceBulkPort ops; sticky break-glass; artifact reauth 6.5/7.x; PopulationPort actual cutover"
+    owner: "Winston / Amelia+Sally / Paige+Winston"
+    status: open
+  - epic: 4b
+    action: "Mark epic-4b done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-4b-retro-2026-07-24.md + sprint-status epic-4b/epic-4b-retrospective"
+  - epic: 4b
+    action: "Encode leave-guard data-state rules (dirty ≠ dialog visibility; Discard snapshot; Save resolves Promise; single dialog depth) into Story 5.1+ form/filter Dev Notes"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 4b
+    action: "Encode Epic 4 carry-ins into Story 5.1 create-story: person-org IDOR scope + PopulationPort honesty + consume assemblers / GovernedDataTable without contract churn"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 4b
+    action: "Encode profile/timeline consumer contract (Epic 4 assemblers + lifecycle APIs; no parallel SoT) into Story 5.2 / 5.3 Dev Notes"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 4b
+    action: "Deduplicate person-create form shared by Add panel and QuickCreate when next touching those paths"
+    owner: "Amelia"
+    status: open
+  - epic: 4b
+    action: "Wire logout / authz-changed navigation through leave-guard requestNavigation, or document explicit product exemption"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 4b
+    action: "Prefer Vitest/ephemeral isolation + deeper UI selfchecks when next quality opportunity lands (close Epic 3/4 intent)"
+    owner: "Amelia"
+    status: open
+  - epic: 4b
+    action: "Keep AR-TEMPORAL / AR-HEADCOUNT / AR-ACCESS / AR-DATA / AR-REPORTING fail-closed; do not invent in Epic 5"
+    owner: "Mary + John"
+    status: open
+  - epic: 4b
+    action: "Carry forward still-open Epic 2/3/4 items: InferenceBulkPort ops; sticky break-glass; artifact reauth 6.5/7.x; PopulationPort actual cutover; AD-6 hardening; ensure*Schema migrations-only"
     owner: "Winston / Amelia+Sally / Paige+Winston"
     status: open
