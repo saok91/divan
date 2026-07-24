@@ -105,6 +105,29 @@ export const SECTION_TAB_SURFACES: readonly SectionTabSurface[] = [
       },
     ],
   },
+  {
+    root: "/personnel-events",
+    surfaceLabel: "رویدادهای پرسنلی",
+    ariaLabel: "بخش‌های رویدادهای پرسنلی",
+    defaultTabId: "events",
+    tabs: [
+      {
+        id: "events",
+        label: "رویدادها",
+        href: "/personnel-events/events",
+      },
+      {
+        id: "register",
+        label: "ثبت رویداد",
+        href: "/personnel-events/register",
+      },
+      {
+        id: "bulk-import",
+        label: "ورود گروهی",
+        href: "/personnel-events/bulk-import",
+      },
+    ],
+  },
 ] as const;
 
 /** Placeholder copy for tab shells until 4b.5–4b.7 fill content. */

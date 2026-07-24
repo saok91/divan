@@ -1,3 +1,8 @@
+## Deferred from: code review of 4b-7-personnel-events-shell-scaffolds-event-entry.md (2026-07-24)
+
+- Duplicated person-create form between `PersonnelAddPanel` and `PersonnelQuickCreateDialog` (validation / enabled fields / error codes) — extract shared form later
+- Incomplete `aria-describedby` / `aria-invalid` coverage on new add/quick-create fields vs retired `PersonnelPanel` — a11y polish pass
+
 ## Deferred from: code review of 4b-6-organization-section-tabs-tree-navigators.md (2026-07-20)
 
 - tree-navigator selfcheck covers pure helpers only — DOM roles / keyboard / lazy-children integration unasserted (story Task 1 scope)

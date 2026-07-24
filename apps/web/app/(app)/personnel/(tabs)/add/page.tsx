@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { SectionTabPlaceholder } from "@/components/section-tab-placeholder";
+import { PersonnelAddPanel } from "@/components/personnel/personnel-add-panel";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 export default async function PersonnelAddPage() {
@@ -10,5 +10,10 @@ export default async function PersonnelAddPage() {
     redirect("/login");
   }
   assertPageAccess(session.user.coarseRole, "/personnel");
-  return <SectionTabPlaceholder />;
+
+  return (
+    <div className="p-6">
+      <PersonnelAddPanel />
+    </div>
+  );
 }

@@ -1,9 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
-import { useLeaveGuardRegistration } from "@/components/leave-guard";
+import {
+  useLeaveGuardOptional,
+  useLeaveGuardRegistration,
+} from "@/components/leave-guard";
 import { HeadcountCapacityPanel } from "@/components/personnel/headcount-capacity-panel";
 import {
   ConflictList,
@@ -113,12 +117,21 @@ function formatChainLinksFa(links: {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
+type PersonnelEventFormProps = {
+  /** Prefill from `/personnel-events/register?person=` (Story 4b.7). */
+  initialPersonId?: string;
+};
+
 /**
- * Minimal فرم رویداد (UX-DR11) — Stories 4.2–4.3.
+ * Minimal فرم رویداد (UX-DR11) — Stories 4.2–4.3; relocated in 4b.7.
  * Save draft ≠ Finalize. Lifecycle Cancel/Reverse/Correct append-only.
  */
-export function PersonnelEventForm() {
+export function PersonnelEventForm({
+  initialPersonId,
+}: PersonnelEventFormProps) {
   const formId = React.useId();
+  const router = useRouter();
+  const leaveGuard = useLeaveGuardOptional();
   const {
     isGoldCtaBlocked,
     isFinalizeBlockedByAuthzChange,
@@ -128,7 +141,9 @@ export function PersonnelEventForm() {
     registerPersonnelDraftSaveHandler,
   } = usePlatformStatus();
 
-  const [personId, setPersonId] = React.useState("");
+  const [personId, setPersonId] = React.useState(() =>
+    initialPersonId?.trim() ? initialPersonId.trim() : "",
+  );
   const [employmentId, setEmploymentId] = React.useState("");
   const [eventType, setEventType] = React.useState("ScaffoldChangeRecorded");
   const [effectiveDate, setEffectiveDate] = React.useState("");
@@ -206,7 +221,11 @@ export function PersonnelEventForm() {
     version: 1,
   }), []);
 
-  const lastSavedRef = React.useRef<FormSnapshot>(emptySnapshot());
+  const lastSavedRef = React.useRef<FormSnapshot>(
+    initialPersonId?.trim()
+      ? { ...emptySnapshot(), personId: initialPersonId.trim() }
+      : emptySnapshot(),
+  );
 
   const applySnapshot = React.useCallback((snap: FormSnapshot) => {
     setPersonId(snap.personId);
@@ -232,9 +251,8 @@ export function PersonnelEventForm() {
     setVersion(snap.version);
   }, []);
 
-  React.useEffect(() => {
-    setPreferredApprovalId("");
-  }, [eventType]);
+  // Prefill: host passes `initialPersonId` from ?person=; dirty inbound uses leave-guard first.
+  // Clear preferred approval when event type changes (inline in select onChange).
 
   const [lifecycleOp, setLifecycleOp] = React.useState<LifecycleOp | null>(
     null,
@@ -642,19 +660,74 @@ export function PersonnelEventForm() {
     onDiscard: onLeaveDiscard,
   });
 
+  const dirtyRef = React.useRef(dirty);
+  const personIdRef = React.useRef(personId);
+  const inboundReconcileRef = React.useRef(false);
+  React.useLayoutEffect(() => {
+    dirtyRef.current = dirty;
+    personIdRef.current = personId;
+  });
+
+  /** Inbound `?person=` while mounted — leave-guard before swap; never silent wipe (AC #6). */
+  React.useEffect(() => {
+    const inbound = initialPersonId?.trim() ?? "";
+    if (inbound === personIdRef.current) return;
+    if (inboundReconcileRef.current) return;
+
+    if (!dirtyRef.current) {
+      queueMicrotask(() => {
+        if (inbound === personIdRef.current || dirtyRef.current) return;
+        setPersonId(inbound);
+        lastSavedRef.current = { ...lastSavedRef.current, personId: inbound };
+      });
+      return;
+    }
+
+    const targetHref = inbound
+      ? `/personnel-events/register?person=${encodeURIComponent(inbound)}`
+      : "/personnel-events/register";
+    const stayHref = personIdRef.current
+      ? `/personnel-events/register?person=${encodeURIComponent(personIdRef.current)}`
+      : "/personnel-events/register";
+
+    if (!leaveGuard) {
+      router.replace(stayHref);
+      return;
+    }
+
+    inboundReconcileRef.current = true;
+    void leaveGuard.requestNavigation(targetHref).then((ok) => {
+      inboundReconcileRef.current = false;
+      if (ok) {
+        setPersonId(inbound);
+        lastSavedRef.current = { ...lastSavedRef.current, personId: inbound };
+        return;
+      }
+      router.replace(stayHref);
+    });
+  }, [initialPersonId, leaveGuard, router]);
+
+  // Sync evaluate → local conflicts for form-level ack UI (same as pre-4b.7).
+  /* eslint-disable react-hooks/set-state-in-effect -- intentional evaluate→conflicts bridge */
   React.useEffect(() => {
     if (evaluateQuery.data?.conflicts) {
       setConflicts(evaluateQuery.data.conflicts as Conflict[]);
     }
   }, [evaluateQuery.data]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  const blocking = conflicts.some((c) => c.severity === "blocking");
-  const warningsNeedingAck = conflicts.filter(
+  const evaluatedConflicts = (evaluateQuery.data?.conflicts ??
+    []) as Conflict[];
+  /** While confirm is open, always trust evaluate payload (including empty). */
+  const activeConflicts = confirmOpen ? evaluatedConflicts : conflicts;
+
+  const blocking = activeConflicts.some((c) => c.severity === "blocking");
+  const warningsNeedingAck = activeConflicts.filter(
     (c) => c.severity === "warning" && c.requiresAck,
   );
-  const overrideCodes = conflicts.filter((c) => c.requiresOverride);
+  const overrideCodes = activeConflicts.filter((c) => c.requiresOverride);
   const needsOverride = overrideCodes.length > 0;
-  const hasScheduledException = conflicts.some(
+  const hasScheduledException = activeConflicts.some(
     (c) =>
       c.code === "HEADCOUNT_SCHEDULED_EXCEPTION" ||
       c.code?.includes("SCHEDULED_EXCEPTION"),
@@ -873,6 +946,7 @@ export function PersonnelEventForm() {
               value={eventType}
               onChange={(e) => {
                 setEventType(e.target.value);
+                setPreferredApprovalId("");
                 setDirty(true);
               }}
               required
@@ -1505,10 +1579,10 @@ export function PersonnelEventForm() {
           </fieldset>
         ) : null}
 
-        {conflicts.length > 0 ? (
+        {activeConflicts.length > 0 ? (
           <div className="space-y-2">
             <h3 className="text-label-medium">تعارض‌ها</h3>
-            <ConflictList conflicts={conflicts} />
+            <ConflictList conflicts={activeConflicts} />
             {warningsNeedingAck.map((w) => (
               <label
                 key={w.code}
@@ -1761,11 +1835,16 @@ export function PersonnelEventForm() {
             {evaluateQuery.isLoading ? (
               <p role="status">در حال بررسی تعارض‌ها…</p>
             ) : (
-              <ConflictList conflicts={conflicts} />
+              <ConflictList conflicts={activeConflicts} />
             )}
           </div>
         }
-        confirmDisabled={finalizeBlocked || finalizeMut.isPending}
+        confirmDisabled={
+          finalizeBlocked ||
+          finalizeMut.isPending ||
+          evaluateQuery.isLoading ||
+          evaluateQuery.isError
+        }
         blockedReason={
           isFinalizeBlockedByAuthzChange
             ? "نهایی‌سازی تا تأیید تغییر دسترسی ممکن نیست."

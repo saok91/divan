@@ -126,6 +126,9 @@ export const operationalCopy = {
     "فقط عناصر approve با فراداده کامل فعال می‌شوند؛ حضور در اکسل کافی نیست.",
   personDictionaryLoading: "در حال بارگذاری رجیستری…",
   personDictionaryError: "بارگذاری رجیستری فرهنگ‌داده ممکن نشد.",
+  personDictionaryEmpty: "عنصری در رجیستری فرهنگ‌داده نیست.",
+  personDictionaryEnabled: "فعال",
+  personDictionaryDisabled: "غیرفعال",
 
   /** Organization hierarchy (Story 3.5). */
   orgListLoading: "در حال بارگذاری ساختار سازمان…",

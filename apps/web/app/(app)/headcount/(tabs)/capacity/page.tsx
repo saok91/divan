@@ -20,12 +20,6 @@ export default async function HeadcountCapacityPage() {
 
   return (
     <div className="space-y-10 p-6">
-      <div className="space-y-2">
-        <h1 className="text-heading">ظرفیت و جذب</h1>
-        <p className="text-body text-muted-foreground">
-          ظرفیت سازمانی و فرایند جذب در این بخش پیگیری می‌شود.
-        </p>
-      </div>
       <HeadcountApprovalPanel />
       <HeadcountExemptionPanel />
       <HeadcountOverridePanel />

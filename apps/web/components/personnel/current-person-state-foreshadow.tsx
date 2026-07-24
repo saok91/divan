@@ -20,7 +20,7 @@ const VIEW_SEMANTICS_LABEL_FA: Record<
 };
 
 /**
- * Optional foreshadow of Person state on /personnel (Stories 4.9–4.10).
+ * Optional foreshadow of Person state — hosted under افزودن (Stories 4.9–4.10 / 4b.7).
  * Jalali as-of + semantics / Baseline banners — not full profile (→ 5.2).
  */
 export function CurrentPersonStateForeshadow() {
