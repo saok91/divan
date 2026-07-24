@@ -27,6 +27,7 @@ import { accessAdminRouter } from "./access-admin";
 import { dashboardRouter } from "./dashboard";
 import { headcountRouter } from "./headcount";
 import { jobReferenceRouter } from "./job-reference";
+import { migrationRouter } from "./migration";
 import { organizationRouter } from "./organization";
 import { personRouter } from "./person";
 import { personnelEventRouter } from "./personnel-event";
@@ -96,6 +97,8 @@ export const appRouter = createTRPCRouter({
   dashboard: dashboardRouter,
 
   report: reportRouter,
+
+  migration: migrationRouter,
 
   /**
    * Demo governed read — controlled allow via DEV_DEMO_POLICY fixture.

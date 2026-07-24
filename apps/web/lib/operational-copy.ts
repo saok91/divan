@@ -60,6 +60,41 @@ export const operationalCopy = {
     "خروجی حاکمیتی در داستان ۶٫۵ فعال می‌شود؛ فعلاً فقط مشاهده مجاز است.",
   reportTeamFilterHint:
     "شناسه تیم جمعیت گزارش‌های فرد/رویداد را قطع می‌کند؛ برای سازمان، اعضای تیم و ظرفیت هم اعمال می‌شود.",
+
+  /** Controlled import wizard (Story 6.1) — never reuse accessDenied for infra. */
+  importLoadError: "بارگذاری واردسازی ممکن نشد.",
+  importUploadReject: "فایل پذیرفته نشد. قالب و نوع فایل را بررسی کنید.",
+  importFileReadError:
+    "خواندن فایل ممکن نشد. فایل را دوباره انتخاب کنید یا اگر باز است ببندید.",
+  importTemplateMismatch:
+    "ستون‌های فایل با قالب ثبت‌شده مطابقت ندارد. از قالب راه‌اندازی استفاده کنید.",
+  importFormulaReject:
+    "فایل دارای فرمول، ماکرو یا پیوند خارجی است و رد شد. فقط مقادیر ثابت بفرستید.",
+  importValidationSummary: "خلاصه اعتبارسنجی",
+  importStepIdentify: "شناسایی",
+  importStepValidate: "اعتبارسنجی",
+  importStepPreview: "پیش‌نمایش",
+  importStepConfirm: "تأیید پیش‌نویس",
+  importSelectTemplate: "قالب واردسازی",
+  importSelectFile: "فایل CSV یا XLSX",
+  importUploadAction: "بارگذاری و اعتبارسنجی",
+  importCancelPreview: "لغو پیش‌نمایش",
+  importClosePreview: "بستن",
+  importConfirmDismiss: "انصراف",
+  importReopenPreview: "باز کردن پیش‌نمایش",
+  importConfirmDraft: "تأیید پیش‌نویس (بدون اجرا)",
+  importConfirmHint:
+    "تأیید فقط پیش‌نویس را برای اجرای بعدی نگه می‌دارد؛ قطعی‌سازی تولید در داستان ۶٫۲ است.",
+  importBulkDayHint:
+    "ورود گروهی روزمره در تب‌های بخش‌هاست؛ این صفحه ویزارد پیشرفتهٔ مهاجرت است.",
+  importPreviewTitle: "پیش‌نمایش واردسازی",
+  importNoTemplates: "قالب واردسازی ثبت نشده.",
+  importErrorsLabel: "خطا",
+  importWarningsLabel: "هشدار",
+  importRowsLabel: "ردیف",
+  importDraftConfirmed: "پیش‌نویس منجمد شد؛ اجرا هنوز فعال نیست.",
+  importPopulationHint: "شفافیت محدوده جمعیت",
+
   /** Viewport gate (genuine small window). */
   viewportGateBody:
     "برای استفاده از دیوان، حداقل وضوح صفحهٔ نمایش {size} لازم است. لطفاً پنجره را بزرگ‌تر کنید یا از نمایشگر دسکتاپ استفاده کنید.",
