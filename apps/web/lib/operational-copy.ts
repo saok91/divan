@@ -113,6 +113,38 @@ export const operationalCopy = {
   importCorrelationLabel: "شناسه همبستگی",
   importRollbackStaging: "بازگشت انبار موقت",
 
+  /**
+   * FR-39 Baseline / reconstructable-history boundary (Story 6.3).
+   * provenance.source=migration is audit metadata — not cutover control.
+   */
+  eventOriginBaselineFa: "خط مبنا",
+  eventOriginImportedFa: "رویداد وارداتی",
+  eventOriginNativeFa: "رویداد بومی",
+  eventTypeBaselineRecordedFa: "خط مبنا (Baseline)",
+  /**
+   * Timeline header when Person has BaselineRecorded and it is chronologically
+   * first (where applicable).
+   */
+  timelineBoundaryStartsAtBaselineFa:
+    "شروع تاریخچهٔ قابل‌بازسازی قابل‌اتکا برای این فرد از رویداد خط مبنا در تاریخ مؤثر زیر است.",
+  /**
+   * Honest qualifier when any non-Baseline events exist before Baseline Effective Date
+   * (native or imported — do not claim “بومی” alone).
+   */
+  timelineBoundaryWithEarlierNativeFa:
+    "خط مبنا ثبت شده است و مرز تاریخچهٔ قابل‌بازسازی قابل‌اتکا را مشخص می‌کند؛ رویدادهای پیش از تاریخ مؤثر خط مبنا ممکن است خارج از این مرز باشند.",
+  /**
+   * Timeline page may omit older events — never claim Baseline is chronologically first.
+   */
+  timelineBoundaryHistoryIncompleteFa:
+    "خط مبنا در این فهرست دیده می‌شود؛ به‌دلیل بارگذاری ناقص گاه‌شمار، قطعی نیست که رویداد قدیمی‌تری پیش از خط مبنا وجود نداشته باشد.",
+  importFr39BaselineEstablishedFa:
+    "خط مبنا (Baseline) برای ردیف‌های موفق برقرار شد.",
+  importFr39BoundaryHonestyFa:
+    "شروع تاریخچهٔ قابل‌بازسازی قابل‌اتکا از رویداد خط مبنای تأییدشده است (در صورت وجود فرد از قبل، رویدادهای پیشین ممکن است قبل از این مرز باشند).",
+  importFr39ProvenanceMetadataOnlyFa:
+    "منبع migration فقط فرادادهٔ ممیزی است و جایگزین کنترل‌های تأیید/اجرا/انبار موقت/تفکیک وظایف نیست.",
+
   /** Viewport gate (genuine small window). */
   viewportGateBody:
     "برای استفاده از دیوان، حداقل وضوح صفحهٔ نمایش {size} لازم است. لطفاً پنجره را بزرگ‌تر کنید یا از نمایشگر دسکتاپ استفاده کنید.",

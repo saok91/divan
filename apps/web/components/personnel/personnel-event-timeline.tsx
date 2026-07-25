@@ -11,8 +11,11 @@ import {
   TIMELINE_MAX_LIMIT,
   TIMELINE_PAGE_SIZE,
   TIMELINE_TRUNCATED_COPY_FA,
+  resolveTimelineBoundaryStatement,
   shouldShowSameDayRegistrationHint,
 } from "@/lib/personnel-event-timeline";
+import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
+import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
 
 const TIMELINE_LOAD_ERROR_FA =
@@ -90,12 +93,37 @@ export function PersonnelEventTimeline({ personId }: PersonnelEventTimelineProps
   const hitPageCeiling = rows.length >= limit;
   const canLoadMore = hitPageCeiling && limit < TIMELINE_MAX_LIMIT;
   const atMaxAndFull = hitPageCeiling && limit >= TIMELINE_MAX_LIMIT;
+  // Newest-first page may omit older rows — never claim Baseline is chronologically first.
+  const historyMayBeIncomplete = hitPageCeiling;
+  const boundary = resolveTimelineBoundaryStatement(
+    rows.map((r) => ({
+      eventType: r.event.eventType,
+      effectiveDate: r.event.effectiveDate,
+      provenance: r.event.provenance,
+    })),
+    { historyMayBeIncomplete },
+  );
+  const boundaryJalali = boundary
+    ? formatJalaliDisplayFromGregorian(boundary.baselineEffectiveDate)
+    : null;
 
   return (
     <div className="space-y-4">
       {lifecycleCapsQuery.isError ? (
         <p role="alert" className="text-body text-destructive">
           {LIFECYCLE_CAPS_LOAD_ERROR_FA}
+        </p>
+      ) : null}
+
+      {boundary ? (
+        <p className="text-sm text-muted-foreground" role="note">
+          {boundary.messageFa}
+          {boundary.showBaselineDate && boundaryJalali ? (
+            <>
+              {" "}
+              <span dir="ltr">{toPersianDigits(boundaryJalali)}</span>
+            </>
+          ) : null}
         </p>
       ) : null}
 

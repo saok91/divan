@@ -433,6 +433,15 @@ export function ImportWizard() {
             <h3 id="import-evidence-heading" className="text-body-medium">
               {operationalCopy.importEvidenceLabel}
             </h3>
+            <p className="text-caption text-muted-foreground">
+              {operationalCopy.importFr39BaselineEstablishedFa}
+            </p>
+            <p className="text-caption text-muted-foreground">
+              {operationalCopy.importFr39BoundaryHonestyFa}
+            </p>
+            <p className="text-caption text-muted-foreground">
+              {operationalCopy.importFr39ProvenanceMetadataOnlyFa}
+            </p>
             <p className="text-caption">
               {operationalCopy.importCorrelationLabel}:{" "}
               {toPersianDigits(evidence.correlationId)}

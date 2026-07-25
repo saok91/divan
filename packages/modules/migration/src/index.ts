@@ -1,10 +1,11 @@
 /**
  * @divan/migration — controlled import parse / validate / preview / staging cutover
- * (Stories 6.1–6.2).
+ * (Stories 6.1–6.3).
  *
  * Domain owns template registry, workbook parse (FR-52), FR-37 validators,
  * ephemeral preview drafts, durable staging, provisional SoD, atomic cutover,
- * and batch evidence. Web stays thin (governed tRPC + wizard UI).
+ * batch evidence, and FR-39 event-origin classification helpers.
+ * Web stays thin (governed tRPC + wizard UI).
  */
 
 export {
@@ -121,6 +122,13 @@ export {
 
 export {
   BASELINE_RECORDED_EVENT_TYPE,
+  classifyEventOrigin,
+  isMigrationProvenance,
+  type EventOrigin,
+  type MigrationProvenance,
+} from "./event-origin";
+
+export {
   revalidateStagingBatch,
   revalidateAuthoritativeReferences,
   assertZeroProductionTrace,

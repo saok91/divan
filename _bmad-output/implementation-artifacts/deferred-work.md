@@ -1,3 +1,8 @@
+## Deferred from: code review of 6-3-baseline-provenance-reconstructable-history-boundary.md (2026-07-26)
+
+- FR-26 `MSG_BASELINE_DISCLOSURE_WITHIN_FA` voice updated, but profile/as-of UI still only surfaces limited/unconfigured disclosures ? pre-existing gating; not introduced by 6.3
+- `resolveTimelineBoundaryStatement` string-compares Effective Date without empty/non-ISO validation ? pre-existing store date contract; revisit if malformed dates appear in production rows
+
 ## Deferred from: code review of 6-2-atomic-import-batch-execution-staging-cutover.md (2026-07-25)
 
 - 32-bit FNV advisory lock hash collisions across distinct overlap keys (`concurrent-mutex.ts` `advisoryLockKeyPair`) ? rare false concurrent blocks / misleading owner lookup; revisit stronger hash or keyed lock table if production contention appears

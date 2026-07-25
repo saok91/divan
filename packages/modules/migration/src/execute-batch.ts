@@ -65,9 +65,9 @@ import {
   isLaunchImportTemplateKey,
 } from "./templates";
 import type { ParsedImportMatrix } from "./parse-workbook";
+import { BASELINE_RECORDED_EVENT_TYPE } from "./event-origin";
 
-/** PascalCase past-tense Baseline event introduced for migration cutover. */
-export const BASELINE_RECORDED_EVENT_TYPE = "BaselineRecorded";
+export { BASELINE_RECORDED_EVENT_TYPE };
 
 export type ExecuteBatchResult = {
   batch: StagingBatchRecord;
@@ -298,6 +298,8 @@ async function cutoverRowsInTx(
       status: "Effective",
       finalizedBy: executorAccountId,
       finalizedAt: new Date(),
+      // provenance.source=migration is audit metadata only (FR-39 / AD-4) —
+      // never a cutover/authz control; SoD/approve/execute gate elsewhere.
       provenance: {
         source: "migration",
         batchId: batch.id,

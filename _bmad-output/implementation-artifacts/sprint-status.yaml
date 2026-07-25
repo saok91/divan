@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-25T02:45:00+03:30
+last_updated: 2026-07-26T01:25:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -119,7 +119,7 @@ development_status:
   epic-6: in-progress
   6-1-controlled-import-wizard-with-preview: done
   6-2-atomic-import-batch-execution-staging-cutover: done
-  6-3-baseline-provenance-reconstructable-history-boundary: backlog
+  6-3-baseline-provenance-reconstructable-history-boundary: done
   6-4-migration-reconciliation-workspace: backlog
   6-5-governed-export-artifact-panel: backlog
   epic-6-retrospective: optional

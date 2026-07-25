@@ -7,6 +7,7 @@ import {
 } from "@/components/personnel/status-badge";
 import { PersonnelEventLifecycleControls } from "@/components/personnel/personnel-event-lifecycle-controls";
 import {
+  classifyEventOrigin,
   eventTypeLabelFa,
   formatChainLinksFa,
   formatProvenanceCaption,
@@ -55,7 +56,7 @@ function toIso(value: string | Date | null | undefined): string | null {
 
 /**
  * One timeline row — type, Jalali Effective Date, actor+time, StatusBadge,
- * provenance, chain links, lifecycle actions (Story 5.3 / UX-DR9).
+ * provenance, chain links, lifecycle actions (Story 5.3 / UX-DR9; Story 6.3 FR-39).
  */
 export function EventTimelineRow({
   row,
@@ -78,13 +79,21 @@ export function EventTimelineRow({
     toIso(row.event.finalizedAt),
   );
   const chainHint = formatChainLinksFa(row.links);
+  const origin = classifyEventOrigin({
+    eventType: row.event.eventType,
+    provenance: row.event.provenance,
+  });
   const provenanceCaption = formatProvenanceCaption({
+    eventType: row.event.eventType,
     provenance: row.event.provenance,
     referenceCode: row.event.referenceCode,
   });
 
   return (
-    <li className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4 last:border-b-0">
+    <li
+      className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4 last:border-b-0"
+      data-origin={origin}
+    >
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={badge} />
@@ -128,7 +137,11 @@ export function EventTimelineRow({
         ) : null}
 
         {provenanceCaption ? (
-          <p className="text-xs text-muted-foreground" dir="auto">
+          <p
+            className="text-xs text-muted-foreground"
+            dir="auto"
+            data-origin={origin}
+          >
             {provenanceCaption}
           </p>
         ) : null}
@@ -149,3 +162,4 @@ export function EventTimelineRow({
     </li>
   );
 }
+
