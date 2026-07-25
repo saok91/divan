@@ -145,6 +145,62 @@ export const operationalCopy = {
   importFr39ProvenanceMetadataOnlyFa:
     "منبع migration فقط فرادادهٔ ممیزی است و جایگزین کنترل‌های تأیید/اجرا/انبار موقت/تفکیک وظایف نیست.",
 
+  /**
+   * FR-40 / LG-1 reconciliation workspace (Story 6.4).
+   * Unsigned/incomplete must never read as production-ready.
+   */
+  reconWorkspaceTitle: "فضای کار تطبیق مهاجرت",
+  reconWorkspaceHint:
+    "تطبیق با کنترل‌های تأییدشدهٔ مالک؛ قطعه‌سازی تولید بدون امضا و رفع مغایرت بحرانی مسدود است.",
+  reconCreateRun: "ایجاد اجرای تطبیق",
+  reconCompare: "محاسبه مشاهدات و مقایسه",
+  reconAttestControls: "ثبت کنترل‌های تأییدشده",
+  reconDomainColumn: "دامنه",
+  reconControlColumn: "کنترل تأییدشده",
+  reconObservedColumn: "مشاهده",
+  reconStatusColumn: "وضعیت",
+  reconDiscrepanciesTitle: "مغایرت‌ها",
+  reconDispositionAction: "ثبت معافیت FR-۵۵",
+  reconOwnerRequired: "مالک مغایرت الزامی است.",
+  reconOwnerPlaceholder: "شناسه حساب مالک",
+  reconRationalePlaceholder: "توجیه معافیت",
+  reconIndependentApproverPlaceholder: "شناسه تأییدکننده مستقل",
+  reconWaiverScopePlaceholder: "دامنه معافیت",
+  reconWaiverRiskPlaceholder: "ریسک باقیمانده",
+  reconWaiverControlPlaceholder: "کنترل جبرانی",
+  reconWaiverExpiryPlaceholder: "تاریخ انقضا",
+  reconWaiverFieldsRequired:
+    "معافیت FR-۵۵ نیازمند مالک، توجیه، تأییدکننده مستقل، دامنه، ریسک، کنترل جبرانی و تاریخ انقضا است.",
+  reconControlsJsonRequired:
+    "برای ثبت کنترل‌ها باید JSON صریح همهٔ دامنه‌ها را وارد کنید؛ مقدار مشاهده جایگزین نمی‌شود.",
+  reconControlJsonHint:
+    "JSON کنترل‌های تأییدشدهٔ مالک برای همهٔ دامنه‌ها (بدون کپی خودکار از مشاهده)",
+  reconSignMigrationLead: "امضای Migration Lead",
+  reconSignHrDataOwner: "امضای HR Data Owner",
+  reconSignaturesTitle: "امضاها",
+  reconProductionBlocked: "قطعه‌سازی تولید مسدود است.",
+  reconProductionReady: "گیت تولید برای این اجرا برقرار است.",
+  reconNotProductionReady:
+    "تطبیق امضا نشده یا ناقص است — آمادهٔ تولید نیست.",
+  reconStatusDraft: "پیش‌نویس",
+  reconStatusInProgress: "در حال انجام",
+  reconStatusSigned: "امضاشده",
+  reconStatusMatch: "مطابق",
+  reconStatusMismatch: "مغایرت",
+  reconStatusMissingControl: "کنترل موجود نیست",
+  reconStatusUnavailable: "مشاهده در دسترس نیست",
+  reconStatusOpen: "باز",
+  reconStatusClosed: "بسته",
+  reconTrialExecuteOnly: "اجرای آزمایشی (بدون ادعای آمادگی تولید)",
+  reconTrialExecuteStatus:
+    "اجرای آزمایشی انجام شد؛ آمادگی تولید ادعا نشده است.",
+  reconProductionExecute: "اجرای تولید (پس از گیت تطبیق)",
+  reconProductionExecuteConfirmTitle: "تأیید اجرای تولید پس از تطبیق امضاشده",
+  reconProductionExecuteConsequence:
+    "اجرای تولید فقط با اجرای تطبیق امضاشده و بدون مغایرت بحرانی باز مجاز است. توکن دلخواه پذیرفته نمی‌شود.",
+  reconNoRunYet: "هنوز اجرای تطبیقی برای این دسته ایجاد نشده است.",
+  reconLoadError: "بارگذاری فضای تطبیق ناموفق بود. دوباره تلاش کنید.",
+
   /** Viewport gate (genuine small window). */
   viewportGateBody:
     "برای استفاده از دیوان، حداقل وضوح صفحهٔ نمایش {size} لازم است. لطفاً پنجره را بزرگ‌تر کنید یا از نمایشگر دسکتاپ استفاده کنید.",

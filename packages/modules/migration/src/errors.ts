@@ -28,7 +28,16 @@ export type MigrationErrorCode =
   | "IDEMPOTENCY_CONFLICT"
   | "REVALIDATION_FAILED"
   | "BATCH_IMMUTABLE"
-  | "STAGING_ROLLBACK_FAILED";
+  | "STAGING_ROLLBACK_FAILED"
+  /** Story 6.4 — FR-40 / LG-1 reconciliation + production gate. */
+  | "RECONCILIATION_REQUIRED"
+  | "RECONCILIATION_INCOMPLETE"
+  | "RECONCILIATION_UNSIGNED"
+  | "CRITICAL_DEFECT_OPEN"
+  | "RECONCILIATION_STALE"
+  | "DISPOSITION_REQUIRED"
+  | "SIGNATURE_INVALID"
+  | "CONTROL_MISSING";
 
 export class MigrationError extends Error {
   readonly code: MigrationErrorCode;

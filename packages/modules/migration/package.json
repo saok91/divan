@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "selfcheck:import-preview": "tsx src/import-preview.selfcheck.ts",
     "selfcheck:import-batch": "tsx src/import-batch.selfcheck.ts",
-    "selfcheck:event-origin": "tsx src/event-origin.selfcheck.ts"
+    "selfcheck:event-origin": "tsx src/event-origin.selfcheck.ts",
+    "selfcheck:reconciliation": "tsx src/reconciliation.selfcheck.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

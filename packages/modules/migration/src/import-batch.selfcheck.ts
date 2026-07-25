@@ -25,6 +25,7 @@ import {
   assertZeroProductionTrace,
   buildImportPreviewBatch,
   buildOverlapKeys,
+  buildSyntheticSignedRun,
   clearImportPreviewDraftStore,
   confirmImportPreviewDraft,
   executeImportBatch,
@@ -35,6 +36,7 @@ import {
   approveStagingBatch,
   rollbackImportStaging,
   seedMigrationSodPermissionFixtures,
+  verifyProductionGateOnRun,
 } from "./index";
 
 import { withTransaction as esWithTransaction } from "@divan/event-store";
@@ -76,6 +78,22 @@ assertApproveExecuteSegregation({
   executorAccountId: "actor-2",
   segregationOn: true,
 });
+
+/** Story 6.4 — production gate: empty/unsigned run fails; signed happy path passes */
+{
+  const bid = randomUUID();
+  const unsigned = buildSyntheticSignedRun({
+    batchId: bid,
+    missingSignature: true,
+  });
+  unsigned.status = "draft";
+  const deny = verifyProductionGateOnRun(unsigned, bid);
+  assert.equal(deny.ok, false);
+
+  const signed = buildSyntheticSignedRun({ batchId: bid });
+  const allow = verifyProductionGateOnRun(signed, bid);
+  assert.equal(allow.ok, true);
+}
 
 /** Upload ≠ approve SoD */
 let uploadApproveThrown = false;

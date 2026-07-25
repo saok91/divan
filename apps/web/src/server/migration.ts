@@ -16,26 +16,38 @@ import {
   IMPORT_MAX_FILE_BYTES,
   MIGRATION_APPROVE_PERMISSION,
   MIGRATION_EXECUTE_PERMISSION,
+  MIGRATION_RECONCILE_PERMISSION,
+  MIGRATION_SIGN_PERMISSION,
   MigrationError,
   approveStagingBatch,
   assertMigrationApprovePermission,
+  buildDomainComparisonRows,
   buildImportPreviewBatch,
   cancelImportPreviewBatch,
   confirmImportPreviewDraft,
+  createReconciliationRun,
   executeImportBatch,
   getImportPreviewBatch,
   getLatestBatchEvidence,
+  getReconciliation,
   getStagingBatch,
   getStagingBatchByPreviewId,
   getStoredDraftForStaging,
   isLaunchImportTemplateKey,
+  listReconciliationRuns,
   parseImportFile,
   projectStagingBatchForViewer,
   promoteConfirmedDraftToStaging,
   requireLaunchImportTemplateCatalogue,
   rollbackImportStaging,
+  runReconciliationCompare,
+  setDiscrepancyDisposition,
+  signReconciliation,
+  upsertReconciliationControls,
+  verifyProductionGateOnRun,
   type ImportBatchEvidence,
   type ImportPreviewBatch,
+  type ReconciliationRun,
   type StagingBatchRecord,
 } from "@divan/migration";
 import {
@@ -513,6 +525,7 @@ export const migrationRouter = createTRPCRouter({
       z.object({
         batchId: z.string().uuid(),
         cutoverTier: z.enum(["trial", "staging", "production"]).optional(),
+        reconciliationRunId: z.string().uuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }): Promise<MigrationExecuteResponse> => {
@@ -526,6 +539,7 @@ export const migrationRouter = createTRPCRouter({
           executorDisplayName: ctx.session.displayName || ctx.session.username,
           permissionHolder: permissionHolder(ctx.session.accountId),
           cutoverTier: input.cutoverTier ?? "trial",
+          reconciliationRunId: input.reconciliationRunId ?? null,
         });
         const evidence = filterEvidenceRecordIds(result.evidence, {
           accountId: ctx.session.accountId,
@@ -627,4 +641,232 @@ export const migrationRouter = createTRPCRouter({
         }
       },
     ),
+
+  listReconciliationRuns: governedProcedure
+    .meta({
+      permission: MIGRATION_RECONCILE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "read",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.list_reconciliation_runs",
+      sensitive: true,
+    })
+    .input(z.object({ batchId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        void MIGRATION_RECONCILE_PERMISSION;
+        void ctx;
+        return await listReconciliationRuns(
+          getMigrationPool(),
+          input.batchId,
+        );
+      } catch (err) {
+        mapMigrationError(err);
+      }
+    }),
+
+  getReconciliation: governedProcedure
+    .meta({
+      permission: MIGRATION_RECONCILE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "read",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.get_reconciliation",
+      sensitive: true,
+    })
+    .input(z.object({ runId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        void MIGRATION_RECONCILE_PERMISSION;
+        void ctx;
+        const run = await getReconciliation(getMigrationPool(), input.runId);
+        if (!run) {
+          throw new MigrationError(
+            "RECONCILIATION_REQUIRED",
+            "اجرای تطبیق یافت نشد.",
+          );
+        }
+        return {
+          run,
+          comparison: buildDomainComparisonRows(run),
+          productionGate: verifyProductionGateOnRun(run, run.batchId),
+        };
+      } catch (err) {
+        mapMigrationError(err);
+      }
+    }),
+
+  createReconciliationRun: governedProcedure
+    .meta({
+      permission: MIGRATION_RECONCILE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "write",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.create_reconciliation_run",
+      sensitive: true,
+    })
+    .input(
+      z.object({
+        batchId: z.string().uuid(),
+        tier: z
+          .enum(["trial", "final", "production-candidate"])
+          .optional(),
+        sourceExtractVersion: z.string().max(200).optional(),
+        notes: z.string().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }): Promise<ReconciliationRun> => {
+      try {
+        return await createReconciliationRun(getMigrationPool(), {
+          batchId: input.batchId,
+          createdBy: ctx.session.accountId,
+          permissionHolder: permissionHolder(ctx.session.accountId),
+          tier: input.tier,
+          sourceExtractVersion: input.sourceExtractVersion,
+          notes: input.notes,
+        });
+      } catch (err) {
+        mapMigrationError(err);
+      }
+    }),
+
+  upsertReconciliationControls: governedProcedure
+    .meta({
+      permission: MIGRATION_RECONCILE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "write",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.upsert_reconciliation_controls",
+      sensitive: true,
+    })
+    .input(
+      z.object({
+        runId: z.string().uuid(),
+        controls: z
+          .array(
+            z.object({
+              domainKey: z.string().min(1).max(64),
+              controlValue: z.unknown(),
+              labelFa: z.string().max(200).optional(),
+            }),
+          )
+          .min(1)
+          .max(32),
+      }),
+    )
+    .mutation(async ({ ctx, input }): Promise<ReconciliationRun> => {
+      try {
+        return await upsertReconciliationControls(getMigrationPool(), {
+          runId: input.runId,
+          attestedBy: ctx.session.accountId,
+          permissionHolder: permissionHolder(ctx.session.accountId),
+          controls: input.controls.map((c) => ({
+            domainKey: c.domainKey,
+            controlValue: c.controlValue as import("@divan/migration").JsonValue,
+            labelFa: c.labelFa,
+          })),
+        });
+      } catch (err) {
+        mapMigrationError(err);
+      }
+    }),
+
+  runReconciliationCompare: governedProcedure
+    .meta({
+      permission: MIGRATION_RECONCILE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "write",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.run_reconciliation_compare",
+      sensitive: true,
+    })
+    .input(z.object({ runId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }): Promise<ReconciliationRun> => {
+      try {
+        return await runReconciliationCompare(getMigrationPool(), {
+          runId: input.runId,
+          permissionHolder: permissionHolder(ctx.session.accountId),
+        });
+      } catch (err) {
+        mapMigrationError(err);
+      }
+    }),
+
+  setDiscrepancyDisposition: governedProcedure
+    .meta({
+      permission: MIGRATION_RECONCILE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "write",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.set_discrepancy_disposition",
+      sensitive: true,
+    })
+    .input(
+      z.object({
+        runId: z.string().uuid(),
+        discrepancyId: z.string().uuid(),
+        status: z.enum(["accepted", "waived", "resolved"]),
+        dispositionCode: z.string().min(1).max(64),
+        dispositionRationaleFa: z.string().min(1).max(2000),
+        ownerAccountId: z.string().min(1).max(128),
+        ownerDisplay: z.string().max(200).optional(),
+        waiver: z
+          .object({
+            independentApprover: z.string().min(1).max(128),
+            scope: z.string().min(1).max(500),
+            risk: z.string().min(1).max(500),
+            compensatingControl: z.string().min(1).max(500),
+            expiry: z.string().min(1).max(64),
+          })
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await setDiscrepancyDisposition(getMigrationPool(), {
+          discrepancyId: input.discrepancyId,
+          runId: input.runId,
+          permissionHolder: permissionHolder(ctx.session.accountId),
+          actorAccountId: ctx.session.accountId,
+          actorDisplay: ctx.session.displayName || ctx.session.username,
+          status: input.status,
+          dispositionCode: input.dispositionCode,
+          dispositionRationaleFa: input.dispositionRationaleFa,
+          ownerAccountId: input.ownerAccountId,
+          ownerDisplay: input.ownerDisplay,
+          waiver: input.waiver ?? null,
+        });
+      } catch (err) {
+        mapMigrationError(err);
+      }
+    }),
+
+  signReconciliation: governedProcedure
+    .meta({
+      permission: MIGRATION_SIGN_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "write",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.sign_reconciliation",
+      sensitive: true,
+    })
+    .input(
+      z.object({
+        runId: z.string().uuid(),
+        roleCode: z.enum(["migration_lead", "hr_data_owner"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }): Promise<ReconciliationRun> => {
+      try {
+        void MIGRATION_SIGN_PERMISSION;
+        return await signReconciliation(getMigrationPool(), {
+          runId: input.runId,
+          roleCode: input.roleCode,
+          signerAccountId: ctx.session.accountId,
+          permissionHolder: permissionHolder(ctx.session.accountId),
+        });
+      } catch (err) {
+        mapMigrationError(err);
+      }
+    }),
 });

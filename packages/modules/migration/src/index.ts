@@ -1,10 +1,10 @@
 /**
  * @divan/migration — controlled import parse / validate / preview / staging cutover
- * (Stories 6.1–6.3).
+ * / reconciliation production gate (Stories 6.1–6.4).
  *
  * Domain owns template registry, workbook parse (FR-52), FR-37 validators,
  * ephemeral preview drafts, durable staging, provisional SoD, atomic cutover,
- * batch evidence, and FR-39 event-origin classification helpers.
+ * batch evidence, FR-39 event-origin helpers, and FR-40 reconciliation workspace.
  * Web stays thin (governed tRPC + wizard UI).
  */
 
@@ -71,14 +71,22 @@ export {
 export {
   MIGRATION_APPROVE_PERMISSION,
   MIGRATION_EXECUTE_PERMISSION,
+  MIGRATION_RECONCILE_PERMISSION,
+  MIGRATION_SIGN_PERMISSION,
   MSG_SOD_APPROVE_REQUIRED_FA,
   MSG_SOD_EXECUTE_REQUIRED_FA,
+  MSG_SOD_RECONCILE_REQUIRED_FA,
+  MSG_SOD_SIGN_REQUIRED_FA,
   MSG_SOD_SAME_ACTOR_FA,
   MSG_SOD_UPLOAD_APPROVE_FA,
+  MSG_SOD_SAME_SIGNER_FA,
   assertApproveExecuteSegregation,
   assertUploadApproveSegregation,
+  assertReconcileSignSegregation,
   assertMigrationApprovePermission,
   assertMigrationExecutePermission,
+  assertMigrationReconcilePermission,
+  assertMigrationSignPermission,
   type SodPermissionHolder,
 } from "./sod";
 
@@ -143,3 +151,47 @@ export {
   SEED_MIGRATION_SOD,
   seedMigrationSodPermissionFixtures,
 } from "./seed-sod";
+
+export {
+  RECONCILIATION_DOMAIN_KEYS,
+  RECONCILIATION_DOMAIN_LABELS_FA,
+  REQUIRED_PRODUCTION_DOMAINS,
+  PROJECTOR_GAP_DOMAINS,
+  LG1_INTEGRITY_CLASSES,
+  isReconciliationDomainKey,
+  domainIntegrityClass,
+  type ReconciliationDomainKey,
+  type Lg1IntegrityClass,
+} from "./reconciliation-domains";
+
+export {
+  computeReconciliationEvidenceHash,
+  computeObservationsForBatch,
+  createReconciliationRun,
+  upsertReconciliationControls,
+  runReconciliationCompare,
+  setDiscrepancyDisposition,
+  signReconciliation,
+  verifyProductionGateOnRun,
+  assertProductionReconciliationGate,
+  getReconciliation,
+  listReconciliationRuns,
+  buildDomainComparisonRows,
+  buildSyntheticSignedRun,
+  type ProductionGateResult,
+  type DomainComparisonRow,
+} from "./reconciliation";
+
+export type {
+  ReconciliationRun,
+  ReconciliationControl,
+  ReconciliationObservation,
+  ReconciliationDiscrepancy,
+  ReconciliationSignature,
+  ReconciliationTier,
+  ReconciliationRunStatus,
+  DiscrepancySeverity,
+  DiscrepancyStatus,
+  SignatureRoleCode,
+  JsonValue,
+} from "./reconciliation-repo";

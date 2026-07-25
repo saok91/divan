@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { ImportPreviewTable } from "@/components/import/import-preview-table";
+import { MigrationReconciliationWorkspace } from "@/components/import/migration-reconciliation-workspace";
 import { useLeaveGuardRegistration } from "@/components/leave-guard";
 import { SensitiveConfirmationDialog } from "@/components/personnel/sensitive-confirmation-dialog";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,12 @@ export function ImportWizard() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [executeOpen, setExecuteOpen] = React.useState(false);
+  const [executeTier, setExecuteTier] = React.useState<"trial" | "production">(
+    "trial",
+  );
+  const [reconRunId, setReconRunId] = React.useState<string | null>(null);
+  const [reconProductionReady, setReconProductionReady] = React.useState(false);
+  const [reconDirty, setReconDirty] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [localMessage, setLocalMessage] = React.useState<string | null>(null);
   const [stagingBatchId, setStagingBatchId] = React.useState<string | null>(
@@ -155,9 +162,12 @@ export function ImportWizard() {
 
   useLeaveGuardRegistration({
     id: "import-wizard-preview",
-    // Data-state dirty: open preview draft OR non-terminal staging — never Dialog open alone.
+    // Data-state dirty: open preview draft OR non-terminal staging OR recon edits —
+    // never Dialog open alone.
     isDirty:
-      Boolean(preview && preview.status === "preview") || stagingOpenNonTerminal,
+      Boolean(preview && preview.status === "preview") ||
+      stagingOpenNonTerminal ||
+      reconDirty,
     kind: stagingOpenNonTerminal ? "import-staging" : "import-preview",
     previewBatchId: previewBatchId,
     stagingBatchId: stagingBatchId ?? undefined,
@@ -228,11 +238,17 @@ export function ImportWizard() {
     try {
       await executeMutation.mutateAsync({
         batchId: stagingBatchId,
-        cutoverTier: "trial",
+        cutoverTier: executeTier,
+        reconciliationRunId:
+          executeTier === "production" ? (reconRunId ?? undefined) : undefined,
       });
       setExecuteOpen(false);
       setStep("result");
-      setLocalMessage(operationalCopy.importExecuteSuccess);
+      setLocalMessage(
+        executeTier === "production"
+          ? operationalCopy.importExecuteSuccess
+          : `${operationalCopy.importExecuteSuccess} — ${operationalCopy.reconTrialExecuteStatus}`,
+      );
     } catch (err) {
       setExecuteOpen(false);
       setStep("result");
@@ -384,18 +400,35 @@ export function ImportWizard() {
             </Button>
           ) : null}
           {stagingBatchId && step === "execute" ? (
-            <Button
-              type="button"
-              variant="primary"
-              disabled={busy || executeOpen}
-              onClick={() => {
-                // Single dialog depth: SensitiveConfirmationDialog only (no confirm Dialog).
-                setConfirmOpen(false);
-                setExecuteOpen(true);
-              }}
-            >
-              {operationalCopy.importExecuteAction}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={busy || executeOpen}
+                onClick={() => {
+                  // Single dialog depth: SensitiveConfirmationDialog only (no confirm Dialog).
+                  setConfirmOpen(false);
+                  setExecuteTier("trial");
+                  setExecuteOpen(true);
+                }}
+              >
+                {operationalCopy.reconTrialExecuteOnly}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={
+                  busy || executeOpen || !reconProductionReady || !reconRunId
+                }
+                onClick={() => {
+                  setConfirmOpen(false);
+                  setExecuteTier("production");
+                  setExecuteOpen(true);
+                }}
+              >
+                {operationalCopy.reconProductionExecute}
+              </Button>
+            </>
           ) : null}
         </div>
 
@@ -458,6 +491,18 @@ export function ImportWizard() {
               </p>
             ) : null}
           </section>
+        ) : null}
+
+        {stagingBatchId &&
+        (step === "execute" || step === "result" || step === "approve") ? (
+          <MigrationReconciliationWorkspace
+            batchId={stagingBatchId}
+            onProductionGateChange={({ ready, runId }) => {
+              setReconProductionReady(ready);
+              setReconRunId(runId);
+            }}
+            onDirtyChange={setReconDirty}
+          />
         ) : null}
       </section>
 
@@ -552,17 +597,34 @@ export function ImportWizard() {
               </Button>
             ) : null}
             {stagingBatchId && step === "execute" ? (
-              <Button
-                type="button"
-                variant="primary"
-                disabled={busy || executeOpen}
-                onClick={() => {
-                  setConfirmOpen(false);
-                  setExecuteOpen(true);
-                }}
-              >
-                {operationalCopy.importExecuteAction}
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={busy || executeOpen}
+                  onClick={() => {
+                    setConfirmOpen(false);
+                    setExecuteTier("trial");
+                    setExecuteOpen(true);
+                  }}
+                >
+                  {operationalCopy.reconTrialExecuteOnly}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={
+                    busy || executeOpen || !reconProductionReady || !reconRunId
+                  }
+                  onClick={() => {
+                    setConfirmOpen(false);
+                    setExecuteTier("production");
+                    setExecuteOpen(true);
+                  }}
+                >
+                  {operationalCopy.reconProductionExecute}
+                </Button>
+              </>
             ) : null}
           </SheetFooter>
         </SheetContent>
@@ -605,11 +667,32 @@ export function ImportWizard() {
       <SensitiveConfirmationDialog
         open={executeOpen && !confirmOpen}
         onOpenChange={setExecuteOpen}
-        title={operationalCopy.importExecuteConfirmTitle}
-        consequence={operationalCopy.importExecuteConsequence}
-        confirmLabel={operationalCopy.importExecuteAction}
+        title={
+          executeTier === "production"
+            ? operationalCopy.reconProductionExecuteConfirmTitle
+            : operationalCopy.importExecuteConfirmTitle
+        }
+        consequence={
+          executeTier === "production"
+            ? operationalCopy.reconProductionExecuteConsequence
+            : operationalCopy.importExecuteConsequence
+        }
+        confirmLabel={
+          executeTier === "production"
+            ? operationalCopy.reconProductionExecute
+            : operationalCopy.reconTrialExecuteOnly
+        }
         cancelLabel={operationalCopy.importConfirmDismiss}
         busy={executeMutation.isPending}
+        confirmDisabled={
+          executeTier === "production" &&
+          (!reconProductionReady || !reconRunId)
+        }
+        blockedReason={
+          executeTier === "production" && !reconProductionReady
+            ? operationalCopy.reconNotProductionReady
+            : undefined
+        }
         onConfirm={() => void onExecute()}
       />
     </div>

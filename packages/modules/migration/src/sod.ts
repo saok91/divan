@@ -20,17 +20,32 @@ export const MIGRATION_APPROVE_PERMISSION = "migration.approve";
 /** @provisional-pending-AR-MIGRATION-freeze */
 export const MIGRATION_EXECUTE_PERMISSION = "migration.execute";
 
+/** @provisional-pending-AR-MIGRATION-freeze — Story 6.4 reconcile/compare/disposition */
+export const MIGRATION_RECONCILE_PERMISSION = "migration.reconcile";
+
+/** @provisional-pending-AR-MIGRATION-freeze — Story 6.4 dual signatures */
+export const MIGRATION_SIGN_PERMISSION = "migration.sign";
+
 export const MSG_SOD_APPROVE_REQUIRED_FA =
   "مجوز تأیید دسته واردسازی را ندارید.";
 
 export const MSG_SOD_EXECUTE_REQUIRED_FA =
   "مجوز اجرای دسته واردسازی را ندارید.";
 
+export const MSG_SOD_RECONCILE_REQUIRED_FA =
+  "مجوز اجرای تطبیق واردسازی را ندارید.";
+
+export const MSG_SOD_SIGN_REQUIRED_FA =
+  "مجوز امضای تطبیق واردسازی را ندارید.";
+
 export const MSG_SOD_SAME_ACTOR_FA =
   "همان کاربر نمی‌تواند هم تأیید و هم اجرای یک دسته حساس را انجام دهد.";
 
 export const MSG_SOD_UPLOAD_APPROVE_FA =
   "همان کاربر نمی‌تواند هم بارگذاری و هم تأیید یک دسته حساس را انجام دهد.";
+
+export const MSG_SOD_SAME_SIGNER_FA =
+  "همان کاربر نمی‌تواند هر دو نقش امضای تطبیق را برای یک اجرا انجام دهد.";
 
 export type SodPermissionHolder = {
   /** True when actor's PermissionSet includes the permission. */
@@ -85,5 +100,38 @@ export function assertUploadApproveSegregation(opts: {
   if (!on) return;
   if (opts.uploadedByAccountId === opts.approverAccountId) {
     throw new MigrationError("SOD_VIOLATION", MSG_SOD_UPLOAD_APPROVE_FA);
+  }
+}
+
+export async function assertMigrationReconcilePermission(
+  holder: SodPermissionHolder,
+): Promise<void> {
+  const ok = await holder.holds(MIGRATION_RECONCILE_PERMISSION);
+  if (!ok) {
+    throw new MigrationError("SOD_VIOLATION", MSG_SOD_RECONCILE_REQUIRED_FA);
+  }
+}
+
+export async function assertMigrationSignPermission(
+  holder: SodPermissionHolder,
+): Promise<void> {
+  const ok = await holder.holds(MIGRATION_SIGN_PERMISSION);
+  if (!ok) {
+    throw new MigrationError("SOD_VIOLATION", MSG_SOD_SIGN_REQUIRED_FA);
+  }
+}
+
+/**
+ * Dual-signature segregation: migration_lead ≠ hr_data_owner when mode on.
+ */
+export function assertReconcileSignSegregation(opts: {
+  firstSignerAccountId: string;
+  secondSignerAccountId: string;
+  segregationOn?: boolean;
+}): void {
+  const on = opts.segregationOn !== false;
+  if (!on) return;
+  if (opts.firstSignerAccountId === opts.secondSignerAccountId) {
+    throw new MigrationError("SOD_VIOLATION", MSG_SOD_SAME_SIGNER_FA);
   }
 }

@@ -35,6 +35,17 @@ assert.ok(operationalCopy.importExecuteConsequence);
 assert.ok(operationalCopy.importConcurrentBatch.includes("دسته دیگری"));
 assert.ok(operationalCopy.importContentsReadOnly);
 
+assert.ok(operationalCopy.reconWorkspaceTitle);
+assert.ok(operationalCopy.reconProductionBlocked);
+assert.ok(operationalCopy.reconNotProductionReady);
+assert.ok(operationalCopy.reconProductionExecute);
+assert.ok(operationalCopy.reconSignMigrationLead);
+assert.ok(operationalCopy.reconTrialExecuteOnly);
+assert.ok(operationalCopy.reconTrialExecuteStatus);
+assert.ok(operationalCopy.reconControlsJsonRequired);
+assert.ok(operationalCopy.reconWaiverFieldsRequired);
+assert.ok(operationalCopy.reconIndependentApproverPlaceholder);
+
 const concurrent = importConcurrentBatchMessage({
   ownerDisplayName: "مالک",
   correlationId: "cid-1",

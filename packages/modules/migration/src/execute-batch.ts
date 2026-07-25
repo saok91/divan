@@ -10,8 +10,9 @@
  * only counts `kernel_events` by correlation_id — not Person rows. Full Prisma↔Pool
  * orphan hardening remains an open Epic 4 / AD-6 action (story Absolute non-goal).
  *
- * FR-40 reconciliation gate UI = Story 6.4. Optional fail-closed stub for
- * production-tier when reconciliation token absent.
+ * FR-40 / LG-1: production tier requires verified signed reconciliation run
+ * (Story 6.4). Trial/staging may execute without signed final reconciliation.
+ * source=migration is audit metadata only — never an authz or cutover unlock.
  */
 
 import type { Pool, PoolClient } from "@divan/db";
@@ -43,6 +44,7 @@ import {
   releaseOverlapLocksForBatch,
 } from "./concurrent-mutex";
 import { MigrationError } from "./errors";
+import { assertProductionReconciliationGate } from "./reconciliation";
 import {
   assertApproveExecuteSegregation,
   assertMigrationExecutePermission,
@@ -84,11 +86,13 @@ export type ExecuteBatchOptions = {
   /** Default true — same actor cannot approve+execute. */
   segregationOn?: boolean;
   /**
-   * Provisional FR-40 hook (Story 6.4 owns real gate).
-   * When tier is `production` and token absent → fail closed.
+   * Production requires a verified signed reconciliation run id (DB-backed).
+   * Arbitrary client strings are rejected by assertProductionReconciliationGate.
+   * Trial/staging may omit.
    */
   cutoverTier?: "trial" | "staging" | "production";
-  reconciliationEvidenceToken?: string | null;
+  /** UUID of signed reconciliation_run linked to this batch. */
+  reconciliationRunId?: string | null;
 };
 
 function rowToCreatePersonInput(values: Record<string, string>): CreatePersonInput {
@@ -403,15 +407,13 @@ export async function executeImportBatch(
   });
 
   const tier = opts.cutoverTier ?? "trial";
-  if (
-    tier === "production" &&
-    !(opts.reconciliationEvidenceToken ?? "").trim()
-  ) {
-    // Provisional FR-40 fail-closed stub — real workspace = Story 6.4
-    throw new MigrationError(
-      "CUTOVER_FAILED",
-      "قطعه‌سازی سطح تولید بدون مدرک تطبیق مجاز نیست (در انتظار داستان ۶٫۴).",
-    );
+  if (tier === "production") {
+    // Verify persisted signed reconciliation — never unlock on free-string token.
+    // source=migration remains audit metadata only (not an authz unlock).
+    await assertProductionReconciliationGate(pool, {
+      batchId: opts.batchId,
+      reconciliationRunId: opts.reconciliationRunId,
+    });
   }
 
   const issues = revalidateStagingBatch(batch);

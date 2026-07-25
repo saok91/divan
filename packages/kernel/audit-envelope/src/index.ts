@@ -273,6 +273,31 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 6.4 — provisional reconciliation SoD (AR-MIGRATION pending freeze)
+    {
+      permission: "migration.reconcile",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "migration.reconcile",
+      dataCategory: "identity.person",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "migration.sign",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "migration.sign",
+      dataCategory: "identity.person",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 
