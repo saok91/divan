@@ -7,7 +7,7 @@ import {
   BASELINE_RECORDED_EVENT_TYPE,
   classifyEventOrigin,
   type EventOrigin,
-} from "@divan/migration";
+} from "@divan/migration/event-origin";
 
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";

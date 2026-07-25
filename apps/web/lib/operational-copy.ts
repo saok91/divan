@@ -24,6 +24,8 @@ export const operationalCopy = {
    * Never render as 0 — cards and cells use this exact string.
    */
   suppressedCohort: "داده قابل نمایش نیست",
+  personnelPopulationFixtureEmpty:
+    "محدودهٔ جمعیت فعلاً fixture است — فهرست خالی (fail-closed). برای توسعهٔ محلی ALLOW_DEV_POPULATION_UUID_REGISTRY=true را در .env بگذارید (همراه ALLOW_DEV_SEED).",
 
   /**
    * Empty scoped dashboard (Story 5.4 / UX-DR15) — not emptySearch.

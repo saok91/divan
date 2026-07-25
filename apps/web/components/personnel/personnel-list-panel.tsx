@@ -24,7 +24,8 @@ export const PERSONNEL_SECTION_DEFAULT_FILTERS: Record<
   string,
   string | string[]
 > = {
-  currentColleague: ["yes"],
+  // No default currentColleague filter — imported/migrated people often have no
+  // active Employment yet (`currentColleague: no`) and would render an empty table.
 };
 
 function buildColumns(
@@ -188,12 +189,18 @@ export function PersonnelListPanel() {
 
   const disclosure = searchQuery.data?.populationDisclosureFa;
   const truncated = searchQuery.data?.truncated === true;
+  const populationFailClosed =
+    searchQuery.data?.populationAuthzMode === "fixture-fail-closed";
   const suppressed =
     searchQuery.data?.outcome === "suppressed" ||
     searchQuery.data?.outcome === "denied";
   const statusMessage = suppressed
     ? searchQuery.data?.messageFa || operationalCopy.suppressedCohort
-    : null;
+    : populationFailClosed
+      ? disclosure || operationalCopy.personnelPopulationFixtureEmpty
+      : searchQuery.data?.outcome === "empty" && disclosure
+        ? disclosure
+        : null;
 
   function openCreate() {
     setEditRow(null);
@@ -253,10 +260,10 @@ export function PersonnelListPanel() {
                 افزودن سریع
               </Button>
               <p className="text-caption text-muted-foreground">
-                فیلتر پیش‌فرض: همکار فعلی = بله
+                می‌توانید با فیلتر «همکار فعلی» فقط شاغلان جاری را ببینید.
                 {disclosure ? ` — ${disclosure}` : null}
                 {truncated
-                  ? " — فهرست به سقف ۵۰۰ نفر محدود شده است."
+                  ? " — فهرست به سقف حجم بازیابی محدود شده است."
                   : null}
               </p>
             </div>

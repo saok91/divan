@@ -7,10 +7,18 @@
  * PopulationPort honesty: default registry remains fixture-backed (`person:a1`).
  * Until cutover criteria in population-cutover.ts are met, FR-33 fails closed
  * (empty population + Operator disclosure) — never stamps real Person UUIDs
- * with the actor's scopes as fake org authz.
+ * with the actor's scopes as fake org authz *in production*.
+ *
+ * Local/dev only: `ALLOW_DEV_POPULATION_UUID_REGISTRY=true` (+ `ALLOW_DEV_SEED=true`,
+ * non-production) may build a provisional Person UUID ∩ `org:selfcheck` registry
+ * with an honest disclosure — still not default-registry cutover.
  */
 
-import { DEV_DEMO_CATEGORIES } from "@divan/audit-envelope";
+import {
+  DEV_DEMO_CATEGORIES,
+  clearInferenceBulkWindowsForTests,
+  getInferenceBulkHooks,
+} from "@divan/audit-envelope";
 import { COMPENSATION_DATA_CATEGORY } from "@divan/compensation-facts";
 import { getSharedPgPool, type Pool } from "@divan/db";
 import {
@@ -29,6 +37,7 @@ import {
   getLadderById,
   getOrgUnitById,
   getOrganizationalRoleById,
+  getPersonDb,
   isPersonUuid,
   projectPersonnelListRow,
   rowMatchesPersonnelQuery,
@@ -44,6 +53,7 @@ import {
   PERSONNEL_EXPORT_FIELDS,
 } from "./export-capability";
 import {
+  POPULATION_DEV_UUID_DISCLOSURE_FA,
   POPULATION_FIXTURE_DISCLOSURE_FA,
   emptyFailClosedPopulationRegistry,
   registryUsesFixtureSubjects,
@@ -55,6 +65,7 @@ import {
 } from "./retrieval-control";
 
 export {
+  POPULATION_DEV_UUID_DISCLOSURE_FA,
   POPULATION_FIXTURE_DISCLOSURE_FA,
   registryUsesFixtureSubjects,
   emptyFailClosedPopulationRegistry,
@@ -96,6 +107,52 @@ function getEventPool(): Pool | null {
   return eventPool;
 }
 
+/** Soft cap for provisional DEV population subjects (projector still uses PERSONNEL_LIST_MAX_ROWS). */
+const DEV_POPULATION_UUID_SUBJECT_CAP = 2000;
+
+function isDevUuidPopulationRegistryEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (env.NODE_ENV === "production") return false;
+  if (env.ALLOW_DEV_SEED !== "true") return false;
+  return env.ALLOW_DEV_POPULATION_UUID_REGISTRY === "true";
+}
+
+/**
+ * Provisional local registry: Person.id ∩ org:selfcheck.
+ * Opt-in only — does not satisfy population-cutover.ts production criteria.
+ */
+async function tryBuildDevUuidPopulationRegistry(): Promise<{
+  registry: PopulationFixtureRegistry;
+  mode: PopulationAuthzMode;
+  disclosureFa: string;
+} | null> {
+  if (!isDevUuidPopulationRegistryEnabled()) return null;
+
+  const people = await getPersonDb().person.findMany({
+    select: { id: true },
+    take: DEV_POPULATION_UUID_SUBJECT_CAP,
+  });
+  const subjects = people
+    .map((p) => p.id)
+    .filter(isPersonUuid)
+    .map((id) => ({
+      id,
+      scopeCodes: ["org:selfcheck"] as string[],
+    }));
+
+  return {
+    registry: {
+      subjects,
+      relationships: [],
+      crossTimeGrants: [],
+      facts: [],
+    },
+    mode: "uuid-registry",
+    disclosureFa: POPULATION_DEV_UUID_DISCLOSURE_FA,
+  };
+}
+
 export async function resolvePersonnelPopulationRegistry(): Promise<{
   registry: PopulationFixtureRegistry;
   mode: PopulationAuthzMode;
@@ -109,6 +166,12 @@ export async function resolvePersonnelPopulationRegistry(): Promise<{
       disclosureFa: null,
     };
   }
+
+  const provisional = await tryBuildDevUuidPopulationRegistry();
+  if (provisional) {
+    return provisional;
+  }
+
   return {
     registry: emptyFailClosedPopulationRegistry(),
     mode: "fixture-fail-closed",
@@ -279,10 +342,22 @@ function mapRetrievalOutcome(
         volume: null,
         decisionId: payload.decisionId,
       };
+    case "require_bulk_approval":
+      return {
+        outcome: "denied",
+        messageFa:
+          payload.messageFa ||
+          "برای فهرست با حجم بالاتر، تأیید بازیابی انبوه لازم است.",
+        volume: null,
+        decisionId: payload.decisionId,
+      };
     default:
       return {
         outcome: "denied",
-        messageFa: payload.messageFa || operationalCopy.accessDeniedTitle,
+        messageFa:
+          payload.reason != null
+            ? `${payload.messageFa || operationalCopy.accessDeniedTitle} (${payload.reason})`
+            : payload.messageFa || operationalCopy.accessDeniedTitle,
         volume: null,
         decisionId: payload.decisionId,
       };
@@ -360,6 +435,31 @@ export async function runPersonnelScopedSearch(
     disclosureFa = resolved.disclosureFa;
   }
 
+  /**
+   * DEMO InferenceBulk: maxVolumePerRequest=10 and bulkApprovalVolumeThreshold=5.
+   * A full Person UUID registry otherwise hard-denies (≥5 without bulk grant, >10 always).
+   * Provisional DEV path: cap to the DEMO per-request ceiling + treat list/search as
+   * bulk-approved for local UI only (honest disclosure already on the registry).
+   */
+  const hooks = getInferenceBulkHooks();
+  const devUuidList =
+    isDevUuidPopulationRegistryEnabled() && mode === "uuid-registry";
+  let inferenceCapped = false;
+  if (devUuidList) {
+    // Prior oversized denies charge DEMO windows and brick the actor for 60s —
+    // clear for provisional local list only.
+    clearInferenceBulkWindowsForTests();
+    const cap =
+      hooks.maxVolumePerRequest > 0 ? hooks.maxVolumePerRequest : 10;
+    if (registry.subjects.length > cap) {
+      inferenceCapped = true;
+      registry = {
+        ...registry,
+        subjects: registry.subjects.slice(0, cap),
+      };
+    }
+  }
+
   const retrieval = await runGovernedRetrieval({
     actorAccountId: input.actorAccountId,
     actorScopeCodes: input.actorScopeCodes,
@@ -372,6 +472,7 @@ export async function runPersonnelScopedSearch(
     organizationalScope: input.actorScopeCodes[0],
     populationRegistry: registry,
     skipAccessEvent: input.skipAccessEvent,
+    demoBulkApproval: devUuidList,
   });
 
   const mapped = mapRetrievalOutcome(retrieval);
@@ -384,7 +485,7 @@ export async function runPersonnelScopedSearch(
       hasCompensationRead,
       hasExportPermission: false,
       exportSnapshotHash: null,
-      truncated: false,
+      truncated: inferenceCapped,
     };
   }
 
@@ -430,7 +531,7 @@ export async function runPersonnelScopedSearch(
     hasCompensationRead,
     hasExportPermission,
     exportSnapshotHash,
-    truncated: projected.truncated,
+    truncated: projected.truncated || inferenceCapped,
     decisionId: mapped.decisionId,
   };
 }

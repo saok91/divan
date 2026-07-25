@@ -11,6 +11,7 @@ import { intersectPopulation } from "@divan/identity-access";
 import { isPersonUuid } from "@divan/person-employment";
 
 import {
+  POPULATION_DEV_UUID_DISCLOSURE_FA,
   POPULATION_FIXTURE_DISCLOSURE_FA,
   emptyFailClosedPopulationRegistry,
   registryUsesFixtureSubjects,
@@ -87,5 +88,7 @@ assert.ok(
     "production workforce authz",
   ),
 );
+assert.ok(POPULATION_DEV_UUID_DISCLOSURE_FA.includes("ALLOW_DEV_POPULATION_UUID_REGISTRY"));
+assert.ok(POPULATION_DEV_UUID_DISCLOSURE_FA.includes("cutover"));
 
 console.log("personnel-search selfcheck: ok");

@@ -37,6 +37,10 @@
  * PopulationPort registry replacement remains open until Account↔Person link
  * policy (AR-IDENTITY) + event-backed wiring. Do **not** claim cutover complete.
  *
+ * Local/dev opt-in (not cutover): `ALLOW_DEV_POPULATION_UUID_REGISTRY=true` with
+ * `ALLOW_DEV_SEED=true` may provisionally map Person UUIDs ∩ `org:selfcheck` for
+ * UI/testing — disclosed as provisional; refuses in production.
+ *
  * Subject id target for the real port remains Person UUID (`Person.id`).
  *
  * Pipeline order (unchanged): authorize → PopulationPort → InferenceBulkPort

@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 
-import { BASELINE_RECORDED_EVENT_TYPE } from "@divan/migration";
+import { BASELINE_RECORDED_EVENT_TYPE } from "@divan/migration/event-origin";
 
 import { operationalCopy } from "./operational-copy";
 import {
