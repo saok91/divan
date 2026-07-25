@@ -1,10 +1,11 @@
 /**
- * Reporting BC — dashboard (5.4) + report catalogue (5.5 / FR-36).
+ * Reporting BC — dashboard (5.4) + report catalogue (5.5 / FR-36)
+ * + governed export artifacts (6.5 / FR-41 / FR-52).
  *
  * Consumers must call InferenceBulkPort (`@divan/audit-envelope`
- * evaluateInferenceBulk / web `runGovernedRetrieval` channel `dashboard`|`report`)
- * after PopulationPort intersection — same control plane as count/export.
- * Do not invent a parallel threshold stack here.
+ * evaluateInferenceBulk / web `runGovernedRetrieval` channel
+ * `dashboard`|`report`|`export`) after PopulationPort intersection —
+ * same control plane as count/export. Do not invent a parallel threshold stack.
  */
 
 export {
@@ -73,3 +74,76 @@ export {
   type AssembleReportRunInput,
   type ReportRunResult,
 } from "./report-run";
+
+export {
+  ExportError,
+  MSG_EXPORT_DENIED_FA,
+  MSG_REAUTH_FAILED_FA,
+  MSG_ARTIFACT_EXPIRED_FA,
+  MSG_ARTIFACT_REVOKED_FA,
+  MSG_ARTIFACT_DISPOSED_FA,
+  MSG_ARTIFACT_NOT_FOUND_FA,
+  MSG_CUSTODY_ACK_REQUIRED_FA,
+  MSG_SENSITIVE_EXPORT_DENIED_FA,
+  MSG_SNAPSHOT_MISMATCH_FA,
+  MSG_FORMAT_UNSUPPORTED_FA,
+  MSG_CONTENT_MISSING_FA,
+  type ExportErrorCode,
+} from "./export-errors";
+
+export {
+  REPORT_EXPORT_PERMISSION,
+  PERSON_EXPORT_PERMISSION,
+  EXPORT_RETRIEVE_PERMISSION,
+  EXPORT_ARTIFACT_TTL_MS,
+  EXPORT_CUSTODY_BULK_ROW_THRESHOLD,
+  CLASSIFICATION_INTERNAL_FA,
+  CLASSIFICATION_SENSITIVE_FA,
+  HANDLING_DEFAULT_FA,
+  CUSTODY_BOUNDARY_FA,
+} from "./export-permissions";
+
+export {
+  computeExportSnapshotHash,
+  filterExportFields,
+  assertNoSensitiveWithoutExport,
+  resolveClassification,
+  requiresCustodyAcknowledgement,
+  createExportArtifact,
+  downloadExportArtifact,
+  revokeExportArtifact,
+  disposeExportArtifact,
+  panelDtoFromArtifact,
+  newExportCorrelationId,
+  type ExportReauthFn,
+  type ExportFieldDef,
+  type StableSnapshotInput,
+  type CreateExportArtifactInput,
+  type CreateExportArtifactResult,
+  type DownloadExportArtifactInput,
+  type DownloadExportArtifactResult,
+} from "./export-artifact";
+
+export {
+  getExportArtifactById,
+  getExportArtifactWithBytes,
+  listRetrievalsForArtifact,
+  type ExportArtifactRecord,
+  type ExportArtifactWithBytes,
+  type ExportRetrievalRecord,
+  type ExportSourceSurface,
+  type ExportFormat,
+  type ExportArtifactState,
+  type PgQueryable as ExportPgQueryable,
+} from "./export-artifact-repo";
+
+export {
+  neutralizeExportCellValue,
+  writeFormulaSafeCsv,
+  writeFormulaSafeXlsx,
+  csvContainsUnquotedFormulaRisk,
+  FORMULA_SAFE_TAB_PREFIX,
+  type ExportColumn,
+  type ExportCellValue,
+  type ExportRow,
+} from "./formula-safe-export";

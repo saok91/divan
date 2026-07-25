@@ -1,5 +1,5 @@
-# generated: 2026-07-16
-# last_updated: 2026-07-26T03:15:00+03:30
+﻿# generated: 2026-07-16
+# last_updated: 2026-07-26T03:20:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-26T03:15:00+03:30
+last_updated: 2026-07-26T03:20:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -121,7 +121,7 @@ development_status:
   6-2-atomic-import-batch-execution-staging-cutover: done
   6-3-baseline-provenance-reconstructable-history-boundary: done
   6-4-migration-reconciliation-workspace: done
-  6-5-governed-export-artifact-panel: backlog
+  6-5-governed-export-artifact-panel: done
   epic-6-retrospective: optional
 
   epic-7: backlog
@@ -211,7 +211,8 @@ action_items:
   - epic: 2
     action: "Keep artifact/export reauth consumer contract mandatory for Stories 6.5 / 7.x"
     owner: "Paige + Winston"
-    status: open
+    status: done
+    resolved_in: "6-5-governed-export-artifact-panel.md — production consumer calls reauthorizeForQueuedOrArtifactWork on create+download; 7.x still inherits same hook"
   - epic: 3
     action: "Mark epic-3 done in sprint-status (stories + retro complete)"
     owner: "Amelia"
@@ -334,7 +335,8 @@ action_items:
   - epic: 5
     action: "Encode governed export / artifact reauth / custody / classification into Story 6.5 create-story (close 5.5 stub + Epic 2 reauth carry)"
     owner: "Amelia + Paige + Winston"
-    status: open
+    status: done
+    resolved_in: "6-5-governed-export-artifact-panel.md (Gate, AC #3-#7, reauth algorithm, custody, classification)"
   - epic: 5
     action: "Encode Import Batch report key: unavailable until real batch evidence; never fabricate outcomes"
     owner: "Amelia + Mary"

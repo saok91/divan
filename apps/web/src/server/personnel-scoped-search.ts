@@ -39,6 +39,11 @@ import {
 import { operationalCopy } from "@/lib/operational-copy";
 
 import {
+  computePersonnelExportSnapshotHash,
+  softHasPersonExport,
+  PERSONNEL_EXPORT_FIELDS,
+} from "./export-capability";
+import {
   POPULATION_FIXTURE_DISCLOSURE_FA,
   emptyFailClosedPopulationRegistry,
   registryUsesFixtureSubjects,
@@ -72,8 +77,10 @@ export type PersonnelScopedSearchResult = {
   populationAuthzMode: PopulationAuthzMode;
   populationDisclosureFa: string | null;
   hasCompensationRead: boolean;
-  /** Story 6.5 owns governed export — stub affordance only when true. */
+  /** Governed export affordance (Story 6.5) — false when unauthorized. */
   hasExportPermission: boolean;
+  /** Snapshot hash for export.createFromPersonnel when hasExportPermission. */
+  exportSnapshotHash: string | null;
   /** True when authorized subject set exceeded PERSONNEL_LIST_MAX_ROWS. */
   truncated: boolean;
   decisionId?: string;
@@ -295,6 +302,7 @@ function emptyDeniedResult(
     rows: [],
     volume: null,
     hasExportPermission: false,
+    exportSnapshotHash: null,
     truncated: false,
     ...partial,
   };
@@ -375,6 +383,7 @@ export async function runPersonnelScopedSearch(
       populationDisclosureFa: disclosureFa,
       hasCompensationRead,
       hasExportPermission: false,
+      exportSnapshotHash: null,
       truncated: false,
     };
   }
@@ -400,6 +409,18 @@ export async function runPersonnelScopedSearch(
     rows = rows.filter((r) => rowMatchesPersonnelQuery(r, q));
   }
 
+  const hasExportPermission = await softHasPersonExport(input.actorAccountId);
+  const fieldIds = PERSONNEL_EXPORT_FIELDS.filter(
+    (f) => hasCompensationRead || f.id !== "compensation",
+  ).map((f) => f.id);
+  const exportSnapshotHash = hasExportPermission
+    ? computePersonnelExportSnapshotHash({
+        normalizedQuery: q ?? null,
+        asOf: currentAsOfDate(),
+        fieldIds,
+      })
+    : null;
+
   return {
     outcome: "allowed",
     rows,
@@ -407,7 +428,8 @@ export async function runPersonnelScopedSearch(
     populationAuthzMode: mode,
     populationDisclosureFa: disclosureFa,
     hasCompensationRead,
-    hasExportPermission: false,
+    hasExportPermission,
+    exportSnapshotHash,
     truncated: projected.truncated,
     decisionId: mapped.decisionId,
   };

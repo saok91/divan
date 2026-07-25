@@ -33,6 +33,7 @@ import { personRouter } from "./person";
 import { personnelEventRouter } from "./personnel-event";
 import { platformStatusRouter } from "./platform-status";
 import { reportRouter } from "./report";
+import { exportArtifactRouter } from "./export-artifact";
 import {
   actorHasActiveBulkGrant,
   runGovernedDrillDown,
@@ -97,6 +98,8 @@ export const appRouter = createTRPCRouter({
   dashboard: dashboardRouter,
 
   report: reportRouter,
+
+  export: exportArtifactRouter,
 
   migration: migrationRouter,
 

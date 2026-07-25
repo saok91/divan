@@ -56,10 +56,47 @@ export const operationalCopy = {
   reportPending: "در حال به‌روزرسانی داده‌های مشتق…",
   reportImportBatchUnavailable:
     "گزارش نتیجه دسته‌های واردسازی پس از Epic ۶ (مهاجرت) فعال می‌شود؛ دادهٔ واردسازی هنوز در دسترس نیست.",
+  /** @deprecated Story 6.5 — kept for reference; live export uses export* keys. */
   reportExportStubHint:
-    "خروجی حاکمیتی در داستان ۶٫۵ فعال می‌شود؛ فعلاً فقط مشاهده مجاز است.",
+    "خروجی حاکمیتی فعال است؛ از پنل خروجی برای دریافت فایل استفاده کنید.",
   reportTeamFilterHint:
     "شناسه تیم جمعیت گزارش‌های فرد/رویداد را قطع می‌کند؛ برای سازمان، اعضای تیم و ظرفیت هم اعمال می‌شود.",
+
+  /** Governed export artifact panel (Story 6.5 / UX-DR17 / FR-41 / FR-52). */
+  exportLoadError: "آماده‌سازی خروجی ممکن نشد.",
+  exportDenied: "مجوز خروجی برای این محدوده را ندارید.",
+  exportArtifactNotFound: "خروجی یافت نشد.",
+  exportSnapshotMismatch:
+    "فیلتر یا محدودهٔ خروجی با نتیجهٔ بازبینی‌شده هم‌خوان نیست.",
+  exportOpenPanel: "خروجی",
+  exportPanelTitle: "خروجی حاکمیتی",
+  exportClassificationLabel: "طبقه‌بندی",
+  exportHandlingLabel: "نحوهٔ نگهداری",
+  exportExpiryLabel: "انقضا",
+  exportFieldScopeLabel: "محدودهٔ فیلدها",
+  exportFormatLabel: "قالب",
+  exportFormatCsv: "CSV",
+  exportFormatXlsx: "XLSX",
+  exportGenerate: "آماده‌سازی خروجی",
+  exportDownload: "دریافت فایل",
+  exportDownloadDisabledReason: "ابتدا پذیرش نگهداری را تأیید کنید.",
+  exportCustodyAckLabel:
+    "می‌پذیرم که دریافت‌کننده و مقصد را درست اعلام کرده‌ام و نسخه‌های خارج از سامانه تحت کنترل دیوان نیستند.",
+  exportCustodyBoundary:
+    "دیوان پیوند/خروجی مدیریت‌شده را لغو می‌کند؛ نسخه‌های محلی، ایمیل یا اشتراک خارج از سامانه تحت کنترل دیوان نیستند و باید طبق فرایند سازمانی امحا شوند.",
+  exportRecipientLabel: "گیرنده",
+  exportRecipientRequired: "گیرنده را وارد کنید.",
+  exportDestinationLabel: "کلاس مقصد",
+  exportDestinationLocal: "دانلود محلی",
+  exportDestinationShared: "درایو اشتراکی",
+  exportDestinationEmail: "ایمیل",
+  exportDestinationOther: "سایر",
+  exportRevoke: "لغو خروجی مدیریت‌شده",
+  exportBusy: "در حال آماده‌سازی…",
+  exportRowCountLabel: "تعداد ردیف",
+  exportOmittedSensitiveHint:
+    "برخی فیلدهای حساس به‌دلیل نبود مجوز جداگانهٔ خروجی حذف شدند.",
+  exportClose: "بستن",
 
   /** Controlled import wizard (Story 6.1) — never reuse accessDenied for infra. */
   importLoadError: "بارگذاری واردسازی ممکن نشد.",

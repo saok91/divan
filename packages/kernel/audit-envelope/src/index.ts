@@ -298,6 +298,26 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "read",
       organizationalScope: "org:selfcheck",
     },
+    // Story 6.5 — provisional governed export (AR-ACCESS / AR-DATA pending freeze)
+    // IMPORTANT: action must be "export" (not read) — 6.4 meta mismatch lesson.
+    {
+      permission: "report.export",
+      dataCategory: "identity.person",
+      action: "export",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "person.export",
+      dataCategory: "identity.person",
+      action: "export",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "export.retrieve",
+      dataCategory: "identity.person",
+      action: "export",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 

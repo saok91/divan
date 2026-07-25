@@ -3,6 +3,7 @@
 import * as React from "react";
 import { todayDateOnlyTehran } from "@divan/temporal-engine";
 
+import { ExportArtifactPanel } from "@/components/export/export-artifact-panel";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import { useLeaveGuardOptional } from "@/components/leave-guard";
@@ -299,15 +300,23 @@ export function ReportCataloguePanel() {
               </div>
             }
             exportSlot={
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled
-                title={operationalCopy.reportExportStubHint}
-              >
-                خروجی (به‌زودی)
-              </Button>
+              runQuery.data?.exportAvailable &&
+              runQuery.data.exportSnapshotHash ? (
+                <ExportArtifactPanel
+                  source={{
+                    kind: "report",
+                    reviewedSnapshotHash: runQuery.data.exportSnapshotHash,
+                    filter: {
+                      reportKey: runQuery.data.filter.reportKey,
+                      teamId: runQuery.data.filter.teamId,
+                      evaluationMode: runQuery.data.evaluationMode,
+                      asOfDate: runQuery.data.filter.asOf,
+                      rangeStart: runQuery.data.filter.rangeStart || undefined,
+                      rangeEnd: runQuery.data.filter.rangeEnd || undefined,
+                    },
+                  }}
+                />
+              ) : undefined
             }
             rowActions={
               tableRows.some((r) => r.href)

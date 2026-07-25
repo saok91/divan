@@ -79,6 +79,11 @@ export type ReportColumnDef = {
   headerFa: string;
   /** When false, column is omitted from the table (soft-omit). */
   permitted?: boolean;
+  /**
+   * Category registry id when the column carries category-gated Data Elements.
+   * Export omits requiresSeparateExport categories without matching *.export.
+   */
+  dataCategory?: string | null;
 };
 
 export type ReportCellValue = string | number | null;

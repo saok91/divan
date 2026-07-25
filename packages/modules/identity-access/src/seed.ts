@@ -10,10 +10,10 @@ import {
   seedPrimaryAssignmentFixtures,
   seedSecondaryAssignmentFixtures,
 } from "@divan/person-employment";
-
 import { seedAccessAdministrationFixtures } from "./access-admin";
 import { seedBreakGlassFixtures } from "./break-glass";
 import { getIdentityProvider } from "./config";
+import { seedExportPermissionFixtures } from "./seed-export";
 import type { CoarseRole } from "./types";
 
 /** Shared local/dev/CI password — documented in README; never for production. */
@@ -155,6 +155,7 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
     await seedSecondaryAssignmentFixtures(tx as unknown as PrismaClient);
     await seedManagementRelationshipFixtures(tx as unknown as PrismaClient);
     await seedCompensationFactsFixtures(tx as unknown as PrismaClient);
+    await seedExportPermissionFixtures(tx as unknown as PrismaClient);
 
     return { createdOrUpdated };
   });

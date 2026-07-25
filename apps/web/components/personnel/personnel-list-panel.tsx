@@ -6,6 +6,7 @@
 
 import * as React from "react";
 
+import { ExportArtifactPanel } from "@/components/export/export-artifact-panel";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import { useLeaveGuardOptional } from "@/components/leave-guard";
@@ -261,10 +262,17 @@ export function PersonnelListPanel() {
             </div>
           }
           exportSlot={
-            searchQuery.data?.hasExportPermission ? (
-              <Button type="button" variant="ghost" size="sm" disabled>
-                خروجی (به‌زودی)
-              </Button>
+            searchQuery.data?.hasExportPermission &&
+            searchQuery.data.exportSnapshotHash &&
+            !truncated ? (
+              <ExportArtifactPanel
+                source={{
+                  kind: "personnel_list",
+                  reviewedSnapshotHash: searchQuery.data.exportSnapshotHash,
+                  // Server-side search query when wired; client table filters are not SoT.
+                  normalizedQuery: undefined,
+                }}
+              />
             ) : undefined
           }
           rowActions={(row) => (

@@ -1,3 +1,7 @@
+## Deferred from: code review of 6-5-governed-export-artifact-panel.md (2026-07-26)
+
+- Base64-in-tRPC download with no size cap/streaming (`apps/web/src/server/export-artifact.ts`) ? scale/managed-retrieval model; revisit streaming or size limits when export volumes grow
+
 ## Deferred from: code review of 6-3-baseline-provenance-reconstructable-history-boundary.md (2026-07-26)
 
 - FR-26 `MSG_BASELINE_DISCLOSURE_WITHIN_FA` voice updated, but profile/as-of UI still only surfaces limited/unconfigured disclosures ? pre-existing gating; not introduced by 6.3

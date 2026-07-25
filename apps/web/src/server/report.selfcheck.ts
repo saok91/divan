@@ -45,9 +45,19 @@ assert.equal(
   "Web Import Batch copy must match @divan/reporting constant",
 );
 assert.ok(
-  operationalCopy.reportExportStubHint.includes("۶٫۵") ||
-    operationalCopy.reportExportStubHint.includes("6.5"),
-  "Export stub must point to Story 6.5",
+  operationalCopy.exportOpenPanel.length > 0 &&
+    operationalCopy.exportCustodyBoundary.includes("محلی"),
+  "Export panel copy must be live (Story 6.5) — not stub-only",
+);
+assert.ok(
+  operationalCopy.exportCustodyAckLabel.length > 0,
+  "Custody acknowledgement copy required",
+);
+/** Stub hint retired as primary affordance — may remain as deprecated pointer. */
+assert.ok(
+  !operationalCopy.reportExportStubHint.includes("۶٫۵") &&
+    !operationalCopy.reportExportStubHint.includes("6.5"),
+  "Stub hint must no longer defer to Story 6.5 as unfinished",
 );
 
 /** Snapshot report — range optional. */

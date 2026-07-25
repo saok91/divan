@@ -3,7 +3,7 @@
  * Pipeline: authorize → PopulationPort ∩ InferenceBulk (channel report)
  * → reporting assembleReportRun → payload.
  *
- * No Prisma in web; no parallel report SoT; export stub only (6.5).
+ * Export capability (Story 6.5): exportAvailable + exportSnapshotHash when entitled.
  */
 import { getSharedPgPool, type Pool } from "@divan/db";
 import {
@@ -36,6 +36,10 @@ import { z } from "zod";
 
 import { operationalCopy } from "@/lib/operational-copy";
 
+import {
+  computeReportExportSnapshotHash,
+  softHasReportExport,
+} from "./export-capability";
 import { resolvePersonnelPopulationRegistry } from "./personnel-scoped-search";
 import { runGovernedRetrieval } from "./retrieval-control";
 import { createTRPCRouter, governedProcedure } from "./trpc";
@@ -246,8 +250,10 @@ export type ReportRunResponse = ReportRunResult & {
     rangeStart: string;
     rangeEnd: string;
   };
-  /** Export affordance is stub until Story 6.5 — never claim FR-41 done. */
-  exportAvailable: false;
+  /** Governed export affordance (Story 6.5) — false when unauthorized (no theater). */
+  exportAvailable: boolean;
+  /** Stable snapshot hash for export.create binding; null when export unavailable. */
+  exportSnapshotHash: string | null;
 };
 
 function catalogueForCaps(caps: {
@@ -421,6 +427,24 @@ export const reportRouter = createTRPCRouter({
           eventDb: getReportPool(),
         });
 
+        const exportAvailable = await softHasReportExport(
+          ctx.session.accountId,
+        );
+        const permittedFieldIds = run.columns
+          .filter((c) => c.permitted !== false)
+          .map((c) => c.id);
+        const exportSnapshotHash = exportAvailable
+          ? computeReportExportSnapshotHash({
+              reportKey,
+              teamId: input.teamId,
+              asOf,
+              rangeStart: input.rangeStart?.trim() || null,
+              rangeEnd: input.rangeEnd?.trim() || null,
+              evaluationMode: ctx.evaluationMode,
+              fieldIds: permittedFieldIds,
+            })
+          : null;
+
         return {
           ...run,
           populationAuthzMode: mode,
@@ -434,7 +458,8 @@ export const reportRouter = createTRPCRouter({
             rangeStart: input.rangeStart?.trim() || "",
             rangeEnd: input.rangeEnd?.trim() || "",
           },
-          exportAvailable: false,
+          exportAvailable,
+          exportSnapshotHash,
         };
       } catch (err) {
         mapReportError(err);
