@@ -16,6 +16,43 @@ export const operationalCopy = {
   /** Empty search (palette / personnel stub / governed table). */
   emptySearch: "نتیجه‌ای پیدا نشد. عبارت یا فیلتر را عوض کنید.",
 
+  /**
+   * Audit investigation empty filter (Story 7.1 / UX-DR22) — exact string.
+   * Never reuse emptySearch.
+   */
+  auditEmptyFilter: "رویدادی با این فیلتر نیست.",
+  auditQueryFailed: "بازیابی شواهد ممیزی ممکن نشد.",
+  auditLoadError: "بارگذاری سطح ممیزی ممکن نشد.",
+  auditLoadingResults: "در حال بارگذاری…",
+  auditSelfReviewBlocked:
+    "بازبینی فعالیت حساس خودتان مجاز نیست. بازبین مستقل الزامی است.",
+  auditSelfReviewGateOk:
+    "استقلال بازبین تأیید شد. ادامهٔ بازبینی از مسیر حاکمیتی موجود.",
+  auditMigrationHonestyTitle: "صداقت شواهد مهاجرت",
+  auditAuthAttemptHonesty:
+    "جداول قدیمی AuthAttempt/AccessDenial منبع اولیهٔ تحقیق نیستند؛ منبع = رویدادهای هسته. پر کردن تاریخی معوق است.",
+  auditInferenceBulkEvidenceOnly:
+    "کنترل InferenceBulk روی کانال ممیزی فقط برای ثبت شواهد بازیابی است؛ نتایج تحقیق از انبار رویداد فیلتر جمعیت نمی‌شوند.",
+  auditTruncatedResults:
+    "نتایج بیش از سقف صفحه است — فیلتر را محدودتر کنید.",
+  auditInvalidDateRange: "بازهٔ تاریخ نامعتبر است.",
+  auditInvalidReviewHref: "مسیر بازبینی نامعتبر است.",
+  auditEvidenceNotFound: "شواهد ممیزی یافت نشد.",
+  auditOpenExportArtifact: "باز کردن خروجی مدیریت‌شده",
+  auditOpenReview: "باز کردن بازبینی مستقل",
+  auditFilterActor: "شناسه بازیگر",
+  auditFilterOperation: "عملیات",
+  auditFilterEntityType: "نوع موجودیت",
+  auditFilterEntityId: "شناسه موجودیت",
+  auditFilterResult: "نتیجه",
+  auditFilterCorrelation: "همبستگی",
+  auditFilterEventClass: "کلاس رویداد",
+  auditFilterFrom: "از تاریخ",
+  auditFilterTo: "تا تاریخ",
+  auditApplyFilters: "اعمال فیلتر",
+  auditDetailTitle: "جزئیات رویداد",
+  auditSearchHeading: "تحقیق شواهد ممیزی",
+
   /** Clear filters CTA — EXPERIENCE exact (Story 4b.4 / UX-DR7). */
   clearFilters: "پاک کردن فیلترها",
 

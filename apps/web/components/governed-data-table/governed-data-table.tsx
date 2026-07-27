@@ -135,6 +135,7 @@ export function GovernedDataTable<T>({
   toolbar,
   rowActions,
   exportSlot,
+  emptyMessage,
   "aria-label": ariaLabel,
 }: GovernedDataTableProps<T>) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -365,7 +366,9 @@ export function GovernedDataTable<T>({
                 className="h-32 text-center"
               >
                 <div className="flex flex-col items-center gap-3 py-4">
-                  <p className="text-body-medium">{operationalCopy.emptySearch}</p>
+                  <p className="text-body-medium">
+                    {emptyMessage ?? operationalCopy.emptySearch}
+                  </p>
                   <Button
                     type="button"
                     variant="secondary"

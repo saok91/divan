@@ -18,6 +18,14 @@ import {
   assertNoSensitiveEvidence,
   assertValidBusinessEventType,
 } from "./business-event";
+import {
+  escapeLikePattern,
+  getAuditEvidenceById,
+  listAccessEvents,
+  queryAuditEvidence,
+  type AuditEvidenceRecord,
+  type QueryAuditEvidenceFilters,
+} from "./access-event-query";
 
 export {
   appendBusinessEvent,
@@ -30,12 +38,18 @@ export {
   BusinessEventValidationError,
   assertNoSensitiveEvidence,
   assertValidBusinessEventType,
+  escapeLikePattern,
+  getAuditEvidenceById,
+  listAccessEvents,
+  queryAuditEvidence,
 };
 export type {
   AppendBusinessEventInput,
   AppendBusinessEventResult,
   BusinessEventRecord,
   BusinessEventStatus,
+  AuditEvidenceRecord,
+  QueryAuditEvidenceFilters,
 };
 
 /** Queryable surface shared by Pool and PoolClient. */

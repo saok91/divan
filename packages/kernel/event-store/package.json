@@ -10,7 +10,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "selfcheck": "tsx src/event-store.selfcheck.ts"
+    "selfcheck": "tsx src/event-store.selfcheck.ts",
+    "selfcheck:audit-query": "tsx src/access-event-query.selfcheck.ts"
   },
   "dependencies": {
     "@divan/temporal-engine": "workspace:*",

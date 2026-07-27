@@ -1,5 +1,5 @@
-﻿# generated: 2026-07-16
-# last_updated: 2026-07-26T02:55:00+03:30
+# generated: 2026-07-16
+# last_updated: 2026-07-27T02:45:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-26T02:55:00+03:30
+last_updated: 2026-07-27T02:45:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -124,8 +124,8 @@ development_status:
   6-5-governed-export-artifact-panel: done
   epic-6-retrospective: done
 
-  epic-7: backlog
-  7-1-audit-investigation-surface: backlog
+  epic-7: in-progress
+  7-1-audit-investigation-surface: done
   7-2-operations-health-without-hr-content: backlog
   7-3-retention-disposal-legal-hold: backlog
   7-4-audit-trust-fail-safe: backlog
@@ -375,11 +375,13 @@ action_items:
   - epic: 6
     action: "Encode migration-evidence honesty (AD-6 orphans, events-only zero-trace, Baseline projector gap) into Story 7.1+ Dev Notes"
     owner: "Amelia + Winston"
-    status: open
+    status: done
+    resolved_in: "7-1-audit-investigation-surface.md (Gate, AC #7, Task 4, Migration-evidence honesty)"
   - epic: 6
     action: "Encode consume-6.5 artifact reauth / custody / revoke into Story 7.3 (and 7.1 retrieval) create-story — no parallel download SoT"
     owner: "Amelia + Paige + Winston"
-    status: open
+    status: done
+    resolved_in: "7-1-audit-investigation-surface.md (Gate, AC #6, Task 3–4, Consumer/artifact retrieve contract); 7.3 still inherits retention productization"
   - epic: 6
     action: "Plan AD-6 Prisma↔PoolClient single-connection cutover hardening on next cutover/projection TX touch"
     owner: "Winston + Amelia"

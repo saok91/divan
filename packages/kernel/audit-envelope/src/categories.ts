@@ -162,6 +162,13 @@ export const DEV_DEMO_CATEGORIES: CategoryRegistry = freezeRegistry([
     sensitivity: "ordinary",
     requiresSeparateExport: false,
   },
+  // Story 7.1 — provisional audit investigation category (AR-DATA pending freeze)
+  {
+    id: "audit.evidence",
+    enabled: true,
+    sensitivity: "sensitive",
+    requiresSeparateExport: true,
+  },
 ]);
 
 /**

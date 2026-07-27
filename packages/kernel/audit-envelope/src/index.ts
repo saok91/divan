@@ -63,6 +63,26 @@ export {
   type RecordInferenceBulkAccessInput,
 } from "./inference-bulk";
 
+export {
+  AUDIT_CONSUME_65_ARTIFACT_CONTRACT,
+  AUDIT_EVIDENCE_DATA_CATEGORY,
+  AUDIT_EVIDENCE_REVIEW_PERMISSION,
+  AUDIT_INFERENCE_BULK_EVIDENCE_ONLY_FA,
+  AUDIT_INVESTIGATE_PERMISSION,
+  AUDIT_MIGRATION_HONESTY_FA,
+  AuditInvestigationError,
+  MSG_AUDIT_EMPTY_FILTER_FA,
+  MSG_AUDIT_INVESTIGATE_DENIED_FA,
+  MSG_AUDIT_QUERY_FAILED_FA,
+  MSG_AUDIT_SELF_REVIEW_BLOCKED_FA,
+  assertAuditEvidenceSelfReviewAllowed,
+  buildAuditInvestigationHonesty,
+  isExportArtifactEvidence,
+  isMigrationRelatedEvidence,
+  type AuditInvestigationErrorCode,
+  type AuditInvestigationHonesty,
+} from "./investigation";
+
 export type EvaluationMode = "current" | "as_of";
 
 export type CoarseAuthzContext = {
@@ -316,6 +336,20 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       permission: "export.retrieve",
       dataCategory: "identity.person",
       action: "export",
+      organizationalScope: "org:selfcheck",
+    },
+    // Story 7.1 — provisional audit investigation (AR-ACCESS / AR-AUDIT pending freeze)
+    // IMPORTANT: action must be "read" for search (6.4 meta mismatch lesson).
+    {
+      permission: "audit.investigate",
+      dataCategory: "audit.evidence",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "audit.evidence.review",
+      dataCategory: "audit.evidence",
+      action: "write",
       organizationalScope: "org:selfcheck",
     },
   ],

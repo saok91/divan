@@ -1,3 +1,9 @@
+## Deferred from: code review of 7-1-audit-investigation-surface.md (2026-07-27)
+
+- Full tRPC/web smoke for unauthorized?deny + no row leak / artifact reauth path (`audit.selfcheck.ts`) ? harness gap; domain selfchecks cover helpers only
+- Unknown `event_class` coerced to `access` in `mapRow` (`access-event-query.ts`) ? store invariant assumed; reject/unknown branch if non-{access,business} rows appear
+- `capabilities` gated by same `audit.investigate` permission (`audit.ts`) ? soft probe unusable without grant; UI unused; revisit if coarse-role messaging needed
+
 ## Deferred from: code review of 6-5-governed-export-artifact-panel.md (2026-07-26)
 
 - Base64-in-tRPC download with no size cap/streaming (`apps/web/src/server/export-artifact.ts`) ? scale/managed-retrieval model; revisit streaming or size limits when export volumes grow

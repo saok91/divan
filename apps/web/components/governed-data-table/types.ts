@@ -23,6 +23,8 @@ export type GovernedDataTableProps<T> = {
   toolbar?: React.ReactNode;
   rowActions?: (row: T) => React.ReactNode;
   exportSlot?: React.ReactNode;
+  /** Override empty-state copy (default: operationalCopy.emptySearch). */
+  emptyMessage?: string;
   "aria-label": string;
 };
 
