@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "selfcheck": "tsx src/audit-envelope.selfcheck.ts",
     "selfcheck:inference-bulk": "tsx src/inference-bulk.selfcheck.ts",
-    "selfcheck:investigation": "tsx src/investigation.selfcheck.ts"
+    "selfcheck:investigation": "tsx src/investigation.selfcheck.ts",
+    "selfcheck:ops-health": "tsx src/ops-health.selfcheck.ts"
   },
   "dependencies": {
     "@divan/event-store": "workspace:*",

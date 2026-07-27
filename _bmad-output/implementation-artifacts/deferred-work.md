@@ -628,3 +628,7 @@
 - IDOR-shaped get/list reconciliation by run UUID with void ctx beyond governedProcedure ? pre-existing migration permission+UUID pattern; tighten batch/org binding when AR-ACCESS scopes migration evidence
 - Selfcheck lacks full create?sign?executeImportBatch production cutover against live staging ? PG-optional honesty already documented; expand when CI has durable PG + staging fixtures
 - Bind `migration_lead` / `hr_data_owner` signature roles to distinct accounts or role-specific permissions ? deferred to AR-ACCESS / real SoD; provisional any-`migration.sign`-holder + same-actor segregation kept for 6.4
+
+## Deferred from: code review of 7-2-operations-health-without-hr-content.md (2026-07-27)
+
+- Ops/package selfchecks are mostly source greps — do not execute unauthorized deny, live LDAP→red, or snapshot round-trip — deferred, verification debt from Story 7.2 DoD/selfcheck scope

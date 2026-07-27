@@ -787,6 +787,7 @@ export {
   markRecalculationStale,
   getRecalculationStatus,
   getPlatformRecalcSignal,
+  getOpsRecalcAggregate,
   enqueueRecalculationAfterCommit,
   scheduleHeavyRecalculation,
   runHistoricalRecalculation,
@@ -804,5 +805,6 @@ export type {
   RecalculationStatusRow,
   RecalcJobPayload,
   PlatformRecalcSignal,
+  OpsRecalcAggregate,
   RecalcEnqueueFn,
 } from "./personnel-event-recalc";

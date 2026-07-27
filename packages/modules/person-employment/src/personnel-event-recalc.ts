@@ -305,6 +305,66 @@ export async function getPlatformRecalcSignal(
   return { recalculationPending, blockingStale, stalePendingUntil };
 }
 
+/** Count-only recalc aggregate for ops dashboard — never returns personId. */
+export type OpsRecalcAggregate = {
+  pendingCount: number;
+  failedCount: number;
+  staleCount: number;
+  /** Opaque job keys only (personId stripped) — for correlation, optional. */
+  sampleJobKeys: string[];
+  signal: PlatformRecalcSignal;
+};
+
+/**
+ * Ops-safe recalc aggregate. Prefer this over listPendingRecalculationJobs
+ * (which includes personId) for any SysAdmin / ops surface.
+ */
+export async function getOpsRecalcAggregate(
+  db: RecalcQueryable,
+): Promise<OpsRecalcAggregate> {
+  const counts = await db.query<{
+    pending_count: string | number;
+    failed_count: string | number;
+    stale_count: string | number;
+  }>(
+    `SELECT
+       COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_count,
+       COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_count,
+       COUNT(*) FILTER (WHERE status = 'stale')::int AS stale_count
+     FROM recalculation_status`,
+  );
+  const row = counts.rows[0];
+  const pendingCount = Number(row?.pending_count ?? 0);
+  const failedCount = Number(row?.failed_count ?? 0);
+  const staleCount = Number(row?.stale_count ?? 0);
+
+  const keys = await db.query<{ generation: string | number | bigint }>(
+    `SELECT generation
+     FROM recalculation_status
+     WHERE status IN ('pending', 'failed', 'stale')
+     ORDER BY updated_at DESC NULLS LAST
+     LIMIT 5`,
+  );
+  // Opaque generation-only keys — never embed personId (job_key is recalc:<personId>:gN).
+  const sampleJobKeys = keys.rows
+    .map((r) => {
+      const generation = Number(r.generation);
+      return Number.isFinite(generation)
+        ? `recalc:g${generation}`
+        : null;
+    })
+    .filter((k): k is string => typeof k === "string" && k.length > 0);
+
+  const signal = await getPlatformRecalcSignal(db);
+  return {
+    pendingCount,
+    failedCount,
+    staleCount,
+    sampleJobKeys,
+    signal,
+  };
+}
+
 /** All non-clear rows that still need a job (worker reclaim / idempotent replay). */
 export async function listPendingRecalculationJobs(
   db: RecalcQueryable,

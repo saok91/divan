@@ -169,6 +169,13 @@ export const DEV_DEMO_CATEGORIES: CategoryRegistry = freezeRegistry([
     sensitivity: "sensitive",
     requiresSeparateExport: true,
   },
+  // Story 7.2 — ops platform health (ordinary; NOT person `health`)
+  {
+    id: "ops.platform",
+    enabled: true,
+    sensitivity: "ordinary",
+    requiresSeparateExport: false,
+  },
 ]);
 
 /**

@@ -83,6 +83,24 @@ export {
   type AuditInvestigationHonesty,
 } from "./investigation";
 
+export {
+  MSG_OPS_HEALTH_DENIED_FA,
+  MSG_OPS_HEALTH_PROBE_FAILED_FA,
+  OPS_HEALTH_FORBIDDEN_DTO_KEYS,
+  OPS_HEALTH_READ_PERMISSION,
+  OPS_MIGRATION_HONESTY_FA,
+  OPS_PLATFORM_DATA_CATEGORY,
+  OpsHealthError,
+  getBackupEvidenceHook,
+  opsHealthDtoContainsForbiddenKeys,
+  type BackupEvidenceHook,
+  type BackupEvidenceHookStatus,
+  type OpsHealthErrorCode,
+  type OpsHealthSection,
+  type OpsHealthSectionStatus,
+  type OpsHealthSnapshot,
+} from "./ops-health";
+
 export type EvaluationMode = "current" | "as_of";
 
 export type CoarseAuthzContext = {
@@ -350,6 +368,13 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       permission: "audit.evidence.review",
       dataCategory: "audit.evidence",
       action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    // Story 7.2 — provisional ops health (AR-ACCESS / AR-NFR pending freeze)
+    {
+      permission: "ops.health.read",
+      dataCategory: "ops.platform",
+      action: "read",
       organizationalScope: "org:selfcheck",
     },
   ],

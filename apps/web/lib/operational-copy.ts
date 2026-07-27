@@ -402,6 +402,47 @@ export const operationalCopy = {
   jobRefLaddersEmpty: "نردبانی ثبت نشده. می‌توانید یک نردبان ایجاد کنید.",
   jobRefGradesEmpty: "گریدی برای این نردبان ثبت نشده.",
   jobRefActionFailed: "عملیات مرجع شغلی انجام نشد.",
+
+  /** Operations health (Story 7.2 / FR-45 / UJ-5) — no HR content. */
+  opsHealthHeading: "سلامت عملیات",
+  opsHealthIntro:
+    "وضعیت سرویس، هویت، ورود، بازمحاسبه و قلاب پشتیبان — بدون ردیف پرسنلی.",
+  opsHealthLoading: "در حال بارگذاری وضعیت عملیات…",
+  opsHealthLoadError: "بارگذاری سطح عملیات ممکن نشد.",
+  opsHealthProbeFailed: "بررسی سلامت عملیاتی ممکن نشد. دوباره تلاش کنید.",
+  opsHealthDenied: "دسترسی ندارید.",
+  opsSectionIdentity: "هویت (LDAP)",
+  opsSectionService: "سرویس و پایگاه‌داده",
+  opsSectionRecalc: "بازمحاسبه",
+  opsSectionImport: "ورود / مهاجرت",
+  opsSectionBackup: "پشتیبان / بازیابی",
+  opsSectionDependencies: "وابستگی‌ها",
+  opsHonestyTitle: "صداقت عملیاتی",
+  opsStatusOk: "سالم",
+  opsStatusDegraded: "تضعیف‌شده",
+  opsStatusRed: "قرمز",
+  opsStatusUnavailable: "در دسترس نیست",
+  opsStatusNotConfigured: "پیکربندی نشده",
+  opsStatusEvidenceRecorded: "شواهد ثبت شده",
+  opsServiceOk: "فرآیند برنامه و پایگاه‌داده پاسخ می‌دهند.",
+  opsServiceDbDown: "پایگاه‌داده در دسترس نیست.",
+  opsRecalcOk: "بازمحاسبه مسدودکننده‌ای در صف نیست.",
+  opsRecalcPending: "بازمحاسبه در صف است — بنر سراسری نیز فعال است.",
+  opsRecalcBlocking:
+    "بازمحاسبه ناموفق یا کهنه — مسیرهای حساس fail-closed می‌مانند.",
+  opsRecalcUnavailable: "سیگنال بازمحاسبه در دسترس نیست.",
+  opsDepPostgresOk: "PostgreSQL: سالم",
+  opsDepPostgresDown: "PostgreSQL: قطع",
+  opsDepLdapOk: "LDAP: سالم",
+  opsDepLdapNotConfigured: "LDAP: پیکربندی نشده (seeded-dev)",
+  opsDepRecalcWorkerKnown: "صف بازمحاسبه: از وضعیت مشتق قابل مشاهده است",
+  opsDepRecalcWorkerUnavailable: "صف بازمحاسبه: سیگنال در دسترس نیست",
+  opsCountPending: "در انتظار",
+  opsCountFailed: "ناموفق",
+  opsCountStale: "کهنه",
+  opsCorrelationLabel: "همبستگی",
+  opsGateNote:
+    "مسیر SysAdmin فقط هویت/پیکربندی/سلامت است؛ محتوای HR نیازمند break-glass است.",
 } as const;
 
 /**

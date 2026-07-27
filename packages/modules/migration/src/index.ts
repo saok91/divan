@@ -108,6 +108,11 @@ export {
 } from "./staging-repo";
 
 export {
+  getOpsImportBatchSummary,
+  type OpsImportBatchSummary,
+} from "./ops-import-summary";
+
+export {
   MIGRATION_ADVISORY_NAMESPACE,
   MSG_CONCURRENT_BATCH_FA,
   buildOverlapKeys,

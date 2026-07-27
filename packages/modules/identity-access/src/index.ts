@@ -40,6 +40,11 @@ export {
 export { MSG_LDAP_UNAVAILABLE } from "./ldap-client";
 
 export {
+  probeDirectoryConnectivity,
+  type DirectoryConnectivityProbe,
+} from "./directory-probe";
+
+export {
   authenticate,
   getSessionContext,
   getActiveCoarseRoleByUsername,
