@@ -13,7 +13,8 @@
     "selfcheck": "tsx src/audit-envelope.selfcheck.ts",
     "selfcheck:inference-bulk": "tsx src/inference-bulk.selfcheck.ts",
     "selfcheck:investigation": "tsx src/investigation.selfcheck.ts",
-    "selfcheck:ops-health": "tsx src/ops-health.selfcheck.ts"
+    "selfcheck:ops-health": "tsx src/ops-health.selfcheck.ts",
+    "selfcheck:data-lifecycle": "tsx src/data-lifecycle.selfcheck.ts"
   },
   "dependencies": {
     "@divan/event-store": "workspace:*",

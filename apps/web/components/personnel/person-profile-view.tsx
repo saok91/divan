@@ -257,6 +257,15 @@ export function PersonProfileView({ personId }: PersonProfileViewProps) {
             {state.baselineDisclosure.messageFa}
           </p>
         ) : null}
+        {state.disposalDisclosure.limited &&
+        state.disposalDisclosure.messageFa ? (
+          <p
+            role="alert"
+            className="text-body text-amber-800 dark:text-amber-200"
+          >
+            {state.disposalDisclosure.messageFa}
+          </p>
+        ) : null}
       </header>
 
       <ProfileSection title="هویت">

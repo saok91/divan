@@ -12,6 +12,7 @@
  */
 
 import type { PrismaClient } from "@divan/db";
+import { parseLifecycleClass } from "@divan/audit-envelope";
 
 import { getPersonDb } from "./db";
 import {
@@ -103,7 +104,19 @@ export function isMetadataComplete(
     const v = el[key];
     if (typeof v !== "string" || v.trim().length === 0) return false;
   }
+  // Story 7.3: retention must parse to a known provisional lifecycle class.
+  if (!parseLifecycleClass(el.retention)) return false;
   return true;
+}
+
+/**
+ * True when retention metadata is a known provisional class (or mapped seed blurb).
+ * Free-text blurbs alone are insufficient for disposal enforcement.
+ */
+export function isRetentionLifecycleClassComplete(
+  retention: string | null | undefined,
+): boolean {
+  return parseLifecycleClass(retention) !== null;
 }
 
 /**

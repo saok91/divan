@@ -172,7 +172,7 @@ function approveMeta(partial: {
     format: partial.format,
     sensitivity: partial.sensitivity ?? "ordinary",
     access: partial.access ?? "identity.person + person.read/write",
-    retention: "workforce-master-data retention (AR-DATA)",
+    retention: "retain",
     export: "governed export only (FR-50+)",
     audit: "access-event + identity change audit",
   };

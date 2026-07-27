@@ -16,6 +16,7 @@ import { getIdentityProvider } from "./config";
 import { seedExportPermissionFixtures } from "./seed-export";
 import { seedAuditPermissionFixtures } from "./seed-audit";
 import { seedOpsPermissionFixtures } from "./seed-ops";
+import { seedRetentionPermissionFixtures } from "./seed-retention";
 import type { CoarseRole } from "./types";
 
 /** Shared local/dev/CI password — documented in README; never for production. */
@@ -160,6 +161,7 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
     await seedExportPermissionFixtures(tx as unknown as PrismaClient);
     await seedAuditPermissionFixtures(tx as unknown as PrismaClient);
     await seedOpsPermissionFixtures(tx as unknown as PrismaClient);
+    await seedRetentionPermissionFixtures(tx as unknown as PrismaClient);
 
     return { createdOrUpdated };
   });

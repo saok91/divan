@@ -4,6 +4,7 @@
  */
 import {
   DEV_DEMO_CATEGORIES,
+  DataLifecycleError,
   loadCategoryRegistry,
 } from "@divan/audit-envelope";
 import { getSharedPgPool, type Pool } from "@divan/db";
@@ -24,6 +25,7 @@ import {
   REPORT_EXPORT_PERMISSION,
   assembleReportRun,
   createExportArtifact,
+  disposeExportArtifact,
   downloadExportArtifact,
   getExportArtifactById,
   panelDtoFromArtifact,
@@ -79,6 +81,19 @@ function getExportPool(): Pool {
 }
 
 function mapExportError(err: unknown): never {
+  if (err instanceof DataLifecycleError) {
+    throw new TRPCError({
+      code:
+        err.code === "DISPOSAL_BLOCKED_BY_HOLD" ||
+        err.code === "LEGAL_HOLD_ACTIVE"
+          ? "BAD_REQUEST"
+          : err.code === "LIFECYCLE_DENIED"
+            ? "FORBIDDEN"
+            : "BAD_REQUEST",
+      message: err.messageFa,
+      cause: err,
+    });
+  }
   if (err instanceof ExportError) {
     const code =
       err.code === "EXPORT_DENIED" ||
@@ -627,6 +642,50 @@ export const exportArtifactRouter = createTRPCRouter({
           );
         }
         const updated = await revokeExportArtifact(getExportPool(), {
+          artifactId: input.artifactId,
+          actorAccountId: ctx.session.accountId,
+          reason: input.reason,
+          correlationId: ctx.correlationId,
+        });
+        return panelDtoFromArtifact(updated);
+      } catch (err) {
+        mapExportError(err);
+      }
+    }),
+
+  dispose: governedProcedure
+    .meta({
+      permission: EXPORT_RETRIEVE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "export",
+      organizationalScope: "org:selfcheck",
+      operation: "export.artifact.dispose",
+      sensitive: true,
+    })
+    .input(
+      z.object({
+        artifactId: z.string().uuid(),
+        reason: z.string().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const hasReport = await softHasReportExport(ctx.session.accountId);
+        const hasPerson = await softHasPersonExport(ctx.session.accountId);
+        if (!hasReport && !hasPerson) {
+          throw new ExportError("EXPORT_DENIED", operationalCopy.exportDenied);
+        }
+        const existing = await getExportArtifactById(
+          getExportPool(),
+          input.artifactId,
+        );
+        if (!existing || existing.ownerAccountId !== ctx.session.accountId) {
+          throw new ExportError(
+            "ARTIFACT_NOT_FOUND",
+            operationalCopy.exportArtifactNotFound,
+          );
+        }
+        const updated = await disposeExportArtifact(getExportPool(), {
           artifactId: input.artifactId,
           actorAccountId: ctx.session.accountId,
           reason: input.reason,

@@ -36,6 +36,7 @@ import { reportRouter } from "./report";
 import { exportArtifactRouter } from "./export-artifact";
 import { auditRouter } from "./audit";
 import { operationsRouter } from "./operations";
+import { retentionRouter } from "./retention";
 import {
   actorHasActiveBulkGrant,
   runGovernedDrillDown,
@@ -106,6 +107,8 @@ export const appRouter = createTRPCRouter({
   audit: auditRouter,
 
   operations: operationsRouter,
+
+  retention: retentionRouter,
 
   migration: migrationRouter,
 

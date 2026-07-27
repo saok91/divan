@@ -9,6 +9,7 @@ import {
 import { auth } from "@/auth";
 import { AccessDenied } from "@/components/access-denied";
 import { PersonnelDictionaryPanel } from "@/components/personnel/personnel-dictionary-panel";
+import { PersonnelLifecyclePanel } from "@/components/personnel/personnel-lifecycle-panel";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 /**
@@ -35,8 +36,9 @@ export default async function PersonnelDictionaryPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="space-y-2 p-6">
       <PersonnelDictionaryPanel />
+      <PersonnelLifecyclePanel />
     </div>
   );
 }

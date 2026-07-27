@@ -217,6 +217,7 @@ export {
   getDataElement,
   getEnabledPersonFieldKeys,
   isMetadataComplete,
+  isRetentionLifecycleClassComplete,
   listDataElements,
   listEnabledProfileFields,
   seedDataDictionary,
@@ -518,6 +519,7 @@ export {
 
 export type {
   BaselineDisclosure,
+  DisposalDisclosure,
   CurrentPersonState,
   CurrentPersonStateActorAuthz,
   CurrentPersonStateFreshnessBlock,
@@ -808,3 +810,24 @@ export type {
   OpsRecalcAggregate,
   RecalcEnqueueFn,
 } from "./personnel-event-recalc";
+
+export {
+  assertNoActiveHoldForArtifact,
+  placeHold,
+  releaseHold,
+  runDisposal,
+  getDisposalLimitDisclosure,
+  findActiveHoldsIntersecting,
+  getDisposalRun,
+  listDisposalRuns,
+  listLegalHolds,
+  listPropagationResults,
+  MSG_DISPOSAL_LIMIT_DISCLOSURE_FA,
+  type DisposalScope,
+  type DisposedFieldMarker,
+  type DisposeArtifactFn,
+  type ListArtifactsForScopeFn,
+  type RunDisposalDeps,
+  type RunDisposalResult,
+  type PgQueryable as LifecyclePgQueryable,
+} from "./data-lifecycle";

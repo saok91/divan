@@ -14,4 +14,6 @@ export type PersonnelListRow = {
   contractParty: string;
   currentColleague: "yes" | "no";
   mobilePhone?: string;
+  disposalLimited?: boolean;
+  disposalMessageFa?: string | null;
 };

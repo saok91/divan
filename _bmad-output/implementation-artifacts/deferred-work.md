@@ -1,3 +1,7 @@
+## Deferred from: code review of 7-3-retention-disposal-legal-hold.md (2026-07-28)
+
+- `listHolds` / `listRuns` return unscoped global sets (holds unbounded; runs capped at 50) ? MVP org:selfcheck listing pattern; revisit org/actor narrowing when multi-tenant lifecycle scopes land
+
 ## Deferred from: code review of 7-1-audit-investigation-surface.md (2026-07-27)
 
 - Full tRPC/web smoke for unauthorized?deny + no row leak / artifact reauth path (`audit.selfcheck.ts`) ? harness gap; domain selfchecks cover helpers only

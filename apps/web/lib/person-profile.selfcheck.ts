@@ -60,6 +60,11 @@ const baseState = {
     limited: false,
     messageFa: "",
   },
+  disposalDisclosure: {
+    limited: false,
+    disposedFieldKeys: [],
+    messageFa: null,
+  },
   person: {
     id: PERSON_ID,
     personnelCode: "10001",

@@ -265,7 +265,7 @@ async function buildOpsHealthSnapshot(
     updatedAt: new Date().toISOString(),
   };
 
-  const honestyFa = [
+  const honestyFa: string[] = [
     OPS_MIGRATION_HONESTY_FA.notCutoverProof,
     OPS_MIGRATION_HONESTY_FA.eventsOnlyZeroTrace,
     OPS_MIGRATION_HONESTY_FA.ad6PersonOrphans,

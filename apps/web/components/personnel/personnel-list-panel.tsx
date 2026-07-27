@@ -178,6 +178,8 @@ export function PersonnelListPanel() {
       contractParty: r.contractParty,
       currentColleague: r.currentColleague,
       mobilePhone: r.mobilePhone,
+      disposalLimited: r.disposalLimited,
+      disposalMessageFa: r.disposalMessageFa,
     }));
   }, [searchQuery.data?.rows]);
 
@@ -243,6 +245,13 @@ export function PersonnelListPanel() {
       {statusMessage ? (
         <p className="text-body text-muted-foreground" role="status">
           {statusMessage}
+        </p>
+      ) : null}
+
+      {!suppressed &&
+      rows.some((r) => r.disposalLimited) ? (
+        <p className="text-body text-muted-foreground" role="status">
+          {operationalCopy.lifecycleListDisposalLimited}
         </p>
       ) : null}
 

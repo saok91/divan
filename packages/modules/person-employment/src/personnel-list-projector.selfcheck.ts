@@ -32,6 +32,11 @@ const baseState = {
     limited: false,
     messageFa: "",
   },
+  disposalDisclosure: {
+    limited: false,
+    disposedFieldKeys: [],
+    messageFa: null,
+  },
   person: {
     id: "550e8400-e29b-41d4-a716-446655440000",
     personnelCode: "10001",
@@ -70,6 +75,28 @@ assert.equal(withoutComp.contractParty, "");
 assert.equal(withoutComp.currentColleague, "yes");
 assert.equal(withoutComp.givenName, "علی");
 assert.equal(withoutComp.jobTitle, "—");
+assert.equal(withoutComp.disposalLimited, false);
+assert.equal(withoutComp.disposalMessageFa, null);
+
+const disposedState = {
+  ...baseState,
+  disposalDisclosure: {
+    limited: true,
+    disposedFieldKeys: ["givenName", "mobilePhone"],
+    messageFa: "محدود پس از حذف",
+  },
+  person: {
+    ...baseState.person,
+    givenName: "نباید-دیده-شود",
+    mobilePhone: "09120000000",
+  },
+};
+const disposedRow = projectPersonnelListRow(disposedState);
+assert.equal(disposedRow.disposalLimited, true);
+assert.equal(disposedRow.disposalMessageFa, "محدود پس از حذف");
+assert.equal(disposedRow.givenName, "—");
+assert.equal(disposedRow.mobilePhone, undefined);
+assert.equal(disposedRow.familyName, "محمدی");
 
 const withComp = projectPersonnelListRow({
   ...baseState,

@@ -488,6 +488,75 @@ const reviewedHash = computeExportSnapshotHash({
   }
   assert.equal(revokedThrown, true);
 
+  /** Story 7.3 — active legal hold blocks dispose */
+  const { placeHold, releaseHold } = await import("@divan/person-employment");
+  const heldArtifact = await createExportArtifact(pool, {
+    ownerAccountId: ownerId,
+    purpose: "hold-block-dispose",
+    sourceSurface: "personnel_list",
+    filtersSnapshot: { q: "" },
+    reviewedSnapshotHash: computeExportSnapshotHash({
+      sourceSurface: "personnel_list",
+      sourceKey: null,
+      filters: { q: "" },
+      fieldIds: ["name"],
+      asOf: "2026-07-26",
+    }),
+    asOf: "2026-07-26",
+    format: "csv",
+    fields: [fields[0]!],
+    rows: [{ id: "p1", cells: { name: "hold-me" } }],
+    categoryRegistry: demoCategories,
+    holdsCategoryExport: () => false,
+    reauth: allowReauth,
+    correlationId: randomUUID(),
+  });
+  let holdSchemaOk = true;
+  try {
+    await pool.query("SELECT 1 FROM data_lifecycle.legal_hold LIMIT 0");
+  } catch {
+    holdSchemaOk = false;
+  }
+  if (holdSchemaOk) {
+    const { DataLifecycleError } = await import("@divan/audit-envelope");
+    const { disposeExportArtifact } = await import("./index");
+    const hold = await placeHold(pool, {
+      scopeKind: "artifact",
+      scopeRef: heldArtifact.artifact.id,
+      reason: "export selfcheck hold",
+      actorAccountId: ownerId,
+      correlationId: randomUUID(),
+    });
+    let holdBlocked = false;
+    try {
+      await disposeExportArtifact(pool, {
+        artifactId: heldArtifact.artifact.id,
+        actorAccountId: ownerId,
+        correlationId: randomUUID(),
+      });
+    } catch (err) {
+      holdBlocked = true;
+      assert.ok(err instanceof DataLifecycleError);
+      assert.equal(err.code, "DISPOSAL_BLOCKED_BY_HOLD");
+    }
+    assert.equal(holdBlocked, true);
+    await releaseHold(pool, {
+      holdId: hold.id,
+      actorAccountId: ownerId,
+      correlationId: randomUUID(),
+    });
+    const disposed = await disposeExportArtifact(pool, {
+      artifactId: heldArtifact.artifact.id,
+      actorAccountId: ownerId,
+      correlationId: randomUUID(),
+    });
+    assert.equal(disposed.state, "disposed");
+  } else {
+    assert.fail(
+      "data_lifecycle schema required for legal-hold dispose selfcheck; apply packages/db/sql/016_data_lifecycle.sql",
+    );
+  }
+
   /** Create-time reauth deny */
   let createReauthThrown = false;
   try {

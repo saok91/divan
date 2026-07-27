@@ -11,7 +11,9 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import type { CategoryRegistry } from "@divan/audit-envelope";
+import { DataLifecycleError } from "@divan/audit-envelope";
 import { appendAccessEvent } from "@divan/event-store";
+import { assertNoActiveHoldForArtifact } from "@divan/person-employment";
 
 import {
   CLASSIFICATION_INTERNAL_FA,
@@ -21,6 +23,14 @@ import {
   EXPORT_CUSTODY_BULK_ROW_THRESHOLD,
   HANDLING_DEFAULT_FA,
 } from "./export-permissions";
+
+function isMissingLifecycleRelation(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = "code" in err ? String((err as { code?: unknown }).code) : "";
+  if (code === "42P01") return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /does not exist|undefined_table|relation .* does not exist/i.test(msg);
+}
 import {
   ExportError,
   MSG_ARTIFACT_DISPOSED_FA,
@@ -424,9 +434,18 @@ function scopeSubjectIds(scope: JsonValue): string[] | undefined {
   if (!scope || typeof scope !== "object" || Array.isArray(scope)) {
     return undefined;
   }
-  const raw = (scope as Record<string, JsonValue>).subjectIds;
-  if (!Array.isArray(raw)) return undefined;
-  const ids = raw.filter((v): v is string => typeof v === "string");
+  const record = scope as Record<string, JsonValue>;
+  const ids: string[] = [];
+  const raw = record.subjectIds;
+  if (Array.isArray(raw)) {
+    for (const v of raw) {
+      if (typeof v === "string" && v.trim()) ids.push(v);
+    }
+  }
+  const personId = record.personId;
+  if (typeof personId === "string" && personId.trim()) {
+    if (!ids.includes(personId)) ids.push(personId);
+  }
   return ids.length > 0 ? ids : undefined;
 }
 
@@ -451,22 +470,60 @@ export async function downloadExportArtifact(
   }
 
   // Lazy expiry mark — clear bytes so expired rows are not PII stores.
+  // Legal hold blocks byte clear (Story 7.3); download still denies as expired.
   if (
     loaded.state === "ready" &&
     new Date(loaded.expiresAt).getTime() <= Date.now()
   ) {
-    await withPgTransaction(db, async (tx) => {
-      await updateExportArtifactState(tx, loaded.id, "expired", {
-        clearContent: true,
-      });
-      await insertLifecycleEvent(tx, {
+    const subjectIds = scopeSubjectIds(loaded.scopeJson);
+    let holdBlocksClear = false;
+    try {
+      await assertNoActiveHoldForArtifact(db, {
         artifactId: loaded.id,
-        eventKind: "expired",
-        actorAccountId: input.retrieverAccountId,
-        reason: "ttl",
-        correlationId: input.correlationId,
+        personIds: subjectIds,
       });
-    });
+    } catch (err) {
+      if (
+        err instanceof DataLifecycleError &&
+        err.code === "DISPOSAL_BLOCKED_BY_HOLD"
+      ) {
+        holdBlocksClear = true;
+        try {
+          await appendAccessEvent(db, {
+            correlationId: input.correlationId,
+            actorAccountId: input.retrieverAccountId,
+            operation: "export.artifact.expire",
+            scope: { channel: "export", artifactId: loaded.id },
+            result: "deny",
+            reason: "legal_hold_active",
+            entityType: "export_artifact",
+            entityId: loaded.id,
+            payload: { outcome: "expiry_clear_blocked_by_hold" },
+          });
+        } catch {
+          /* soft */
+        }
+      } else if (isMissingLifecycleRelation(err)) {
+        // Schema 016 not applied — treat as no hold so TTL clear still runs.
+        holdBlocksClear = false;
+      } else {
+        throw err;
+      }
+    }
+    if (!holdBlocksClear) {
+      await withPgTransaction(db, async (tx) => {
+        await updateExportArtifactState(tx, loaded.id, "expired", {
+          clearContent: true,
+        });
+        await insertLifecycleEvent(tx, {
+          artifactId: loaded.id,
+          eventKind: "expired",
+          actorAccountId: input.retrieverAccountId,
+          reason: "ttl",
+          correlationId: input.correlationId,
+        });
+      });
+    }
     throw new ExportError("ARTIFACT_EXPIRED", MSG_ARTIFACT_EXPIRED_FA);
   }
 
@@ -622,6 +679,36 @@ export async function revokeExportArtifact(
   if (existing.state === "disposed") {
     throw new ExportError("ARTIFACT_DISPOSED", MSG_ARTIFACT_DISPOSED_FA);
   }
+  const subjectIds = scopeSubjectIds(existing.scopeJson);
+  try {
+    await assertNoActiveHoldForArtifact(db, {
+      artifactId: input.artifactId,
+      personIds: subjectIds,
+    });
+  } catch (err) {
+    if (
+      err instanceof DataLifecycleError &&
+      err.code === "DISPOSAL_BLOCKED_BY_HOLD"
+    ) {
+      try {
+        await appendAccessEvent(db, {
+          correlationId: input.correlationId,
+          actorAccountId: input.actorAccountId,
+          operation: "export.artifact.revoke",
+          scope: { channel: "export", artifactId: input.artifactId },
+          result: "deny",
+          reason: "legal_hold_active",
+          entityType: "export_artifact",
+          entityId: input.artifactId,
+          payload: { outcome: "blocked_by_hold" },
+        });
+      } catch {
+        /* soft */
+      }
+      throw err;
+    }
+    if (!isMissingLifecycleRelation(err)) throw err;
+  }
   const updated = await withPgTransaction(db, async (tx) => {
     const next = await updateExportArtifactState(
       tx,
@@ -668,6 +755,36 @@ export async function disposeExportArtifact(
   if (!existing) {
     throw new ExportError("ARTIFACT_NOT_FOUND", MSG_ARTIFACT_NOT_FOUND_FA);
   }
+  const subjectIds = scopeSubjectIds(existing.scopeJson);
+  try {
+    await assertNoActiveHoldForArtifact(db, {
+      artifactId: input.artifactId,
+      personIds: subjectIds,
+    });
+  } catch (err) {
+    if (
+      err instanceof DataLifecycleError &&
+      err.code === "DISPOSAL_BLOCKED_BY_HOLD"
+    ) {
+      try {
+        await appendAccessEvent(db, {
+          correlationId: input.correlationId,
+          actorAccountId: input.actorAccountId,
+          operation: "export.artifact.dispose",
+          scope: { channel: "export", artifactId: input.artifactId },
+          result: "deny",
+          reason: "legal_hold_active",
+          entityType: "export_artifact",
+          entityId: input.artifactId,
+          payload: { outcome: "blocked_by_hold" },
+        });
+      } catch {
+        /* soft */
+      }
+      throw err;
+    }
+    if (!isMissingLifecycleRelation(err)) throw err;
+  }
   const updated = await withPgTransaction(db, async (tx) => {
     const next = await updateExportArtifactState(
       tx,
@@ -699,6 +816,46 @@ export async function disposeExportArtifact(
     return next;
   });
   return updated;
+}
+
+/**
+ * List ready/pending export artifacts intersecting a disposal scope
+ * (artifact ids or subject person ids in scope_json).
+ */
+export async function listExportArtifactIdsForScope(
+  db: PgQueryable,
+  scope: {
+    artifactIds?: string[];
+    personIds?: string[];
+    scopeKind?: string;
+    scopeRef?: string;
+  },
+): Promise<string[]> {
+  const ids = new Set<string>();
+  if (scope.artifactIds) {
+    for (const id of scope.artifactIds) ids.add(id);
+  }
+  if (scope.scopeKind === "artifact" && scope.scopeRef) {
+    ids.add(scope.scopeRef);
+  }
+  const personIds =
+    scope.personIds ??
+    (scope.scopeKind === "person" && scope.scopeRef ? [scope.scopeRef] : []);
+  if (personIds.length > 0) {
+    const result = await db.query(
+      `SELECT id FROM reporting.export_artifact
+       WHERE state IN ('pending', 'ready')
+         AND (
+           scope_json->'subjectIds' ?| $1::text[]
+           OR scope_json->>'personId' = ANY($1::text[])
+         )`,
+      [personIds],
+    );
+    for (const row of result.rows as { id: string }[]) {
+      ids.add(String(row.id));
+    }
+  }
+  return [...ids];
 }
 
 export function panelDtoFromArtifact(

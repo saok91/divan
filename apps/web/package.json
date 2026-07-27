@@ -19,7 +19,8 @@
     "selfcheck:report": "tsx src/server/report.selfcheck.ts",
     "selfcheck:migration": "tsx src/server/migration.selfcheck.ts",
     "selfcheck:audit": "tsx src/server/audit.selfcheck.ts",
-    "selfcheck:operations": "tsx src/server/operations.selfcheck.ts"
+    "selfcheck:operations": "tsx src/server/operations.selfcheck.ts",
+    "selfcheck:retention": "tsx src/server/retention.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",

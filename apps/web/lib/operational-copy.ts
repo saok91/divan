@@ -443,6 +443,52 @@ export const operationalCopy = {
   opsCorrelationLabel: "همبستگی",
   opsGateNote:
     "مسیر SysAdmin فقط هویت/پیکربندی/سلامت است؛ محتوای HR نیازمند break-glass است.",
+
+  /** Data lifecycle / legal hold / disposal (Story 7.3 / FR-50). */
+  lifecycleHeading: "نگهداری قانونی و حذف",
+  lifecycleIntro:
+    "نگهداری قانونی حذف را مسدود می‌کند؛ حذف فقط روی مقادیر عملیاتی و خروجی‌های مدیریت‌شده اعمال می‌شود — نه حذف ردیف ممیزی.",
+  lifecycleLoading: "در حال بارگذاری چرخهٔ عمر…",
+  lifecycleLoadError: "بارگذاری چرخهٔ عمر ممکن نشد.",
+  lifecycleActionFailed: "عملیات چرخهٔ عمر انجام نشد.",
+  lifecycleDenied: "دسترسی ندارید.",
+  lifecycleHoldsEmpty: "نگهداری قانونی فعالی ثبت نشده.",
+  lifecycleRunsEmpty: "اجرای حذفی ثبت نشده.",
+  lifecycleRunNotFound: "اجرای حذف یافت نشد.",
+  lifecyclePlaceHold: "ثبت نگهداری قانونی",
+  lifecycleReleaseHold: "آزادسازی نگهداری",
+  lifecycleRunDisposal: "اجرای حذف",
+  lifecycleConfirmPlaceHold:
+    "نگهداری قانونی ثبت شود؟ تا آزادسازی، حذف مسدود می‌ماند.",
+  lifecycleConfirmReleaseHold: "نگهداری قانونی آزاد شود؟",
+  lifecycleConfirmRunDisposal:
+    "حذف در محدودهٔ مشخص اجرا شود؟ مقادیر عملیاتی و خروجی‌های مدیریت‌شده پاک یا ناشناس می‌شوند.",
+  lifecycleScopeKind: "نوع محدوده",
+  lifecycleScopeRef: "شناسه محدوده",
+  lifecycleReason: "دلیل",
+  lifecyclePersonId: "شناسه فرد (برای حذف دسته/سازمان الزامی)",
+  lifecycleArtifactId: "شناسه خروجی (اختیاری)",
+  lifecycleDisposeSubjectsRequired:
+    "برای حذف با محدودهٔ دسته یا سازمان، حداقل یک شناسهٔ فرد لازم است.",
+  lifecycleListDisposalLimited:
+    "برخی ردیف‌ها پس از حذف/ناشناس‌سازی محدود شده‌اند؛ مقدار قبلی بازسازی نمی‌شود.",
+  lifecycleStatusActive: "فعال",
+  lifecycleStatusReleased: "آزادشده",
+  lifecycleExportTtlNotRetention:
+    "انقضای ۴ساعتهٔ خروجی، سیاست نگهداری AR-DATA نیست.",
+  lifecycleCustodyBoundary:
+    "دیوان لینک/بایت مدیریت‌شده را پاک می‌کند؛ نسخه‌های محلی/ایمیل/اشتراک فرآیند سازمانی است.",
+  lifecycleBlockedByHold:
+    "حذف به‌خاطر نگهداری قانونی مسدود شد. نگهداری را آزاد کنید یا با حقوقی تماس بگیرید.",
+  lifecycleMetadataIncomplete:
+    "کلاس چرخهٔ عمر داده ناقص یا ناشناخته است؛ اقدام پایان ممکن نیست.",
+  lifecycleRestoreCatchUp:
+    "پس از بازیابی، نگهداری و حذف باید دوباره اعمال شوند — اثبات بازیابی اینجا نیست.",
+  lifecycleCancel: "انصراف",
+  lifecycleConfirm: "تأیید",
+  lifecycleHoldsHeading: "نگهداری‌های قانونی",
+  lifecycleRunsHeading: "اجراهای حذف",
+  lifecycleOutcome: "نتیجه",
 } as const;
 
 /**

@@ -101,6 +101,36 @@ export {
   type OpsHealthSnapshot,
 } from "./ops-health";
 
+export {
+  DATA_LIFECYCLE_DATA_CATEGORY,
+  DATA_LIFECYCLE_DISPOSE_PERMISSION,
+  DATA_LIFECYCLE_HOLD_PERMISSION,
+  DATA_LIFECYCLE_READ_PERMISSION,
+  DataLifecycleError,
+  LEGACY_RETENTION_BLURB_TO_CLASS,
+  MSG_DISPOSAL_BLOCKED_BY_HOLD_FA,
+  MSG_DISPOSAL_PROPAGATION_FAILED_FA,
+  MSG_LEGAL_HOLD_ACTIVE_FA,
+  MSG_LIFECYCLE_DENIED_FA,
+  MSG_LIFECYCLE_METADATA_INCOMPLETE_FA,
+  MSG_RESTORE_CATCHUP_REQUIRED_FA,
+  MSG_HOLD_NOT_FOUND_FA,
+  MSG_DISPOSAL_SCOPE_INCOMPLETE_FA,
+  PROVISIONAL_LIFECYCLE_CLASS_CODES,
+  disposalActionForClass,
+  isProvisionalLifecycleClass,
+  parseLifecycleClass,
+  type DataLifecycleErrorCode,
+  type DisposalRunRecord,
+  type DisposalRunStatus,
+  type LegalHoldRecord,
+  type LegalHoldScopeKind,
+  type LegalHoldStatus,
+  type PropagationOutcome,
+  type PropagationTargetResult,
+  type ProvisionalLifecycleClassCode,
+} from "./data-lifecycle";
+
 export type EvaluationMode = "current" | "as_of";
 
 export type CoarseAuthzContext = {
@@ -375,6 +405,25 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       permission: "ops.health.read",
       dataCategory: "ops.platform",
       action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    // Story 7.3 — provisional data lifecycle / legal hold (AR-ACCESS / AR-DATA pending freeze)
+    {
+      permission: "data.lifecycle.read",
+      dataCategory: "data.lifecycle",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "data.lifecycle.hold",
+      dataCategory: "data.lifecycle",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "data.lifecycle.dispose",
+      dataCategory: "data.lifecycle",
+      action: "write",
       organizationalScope: "org:selfcheck",
     },
   ],

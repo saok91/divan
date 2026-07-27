@@ -113,6 +113,7 @@ export {
   downloadExportArtifact,
   revokeExportArtifact,
   disposeExportArtifact,
+  listExportArtifactIdsForScope,
   panelDtoFromArtifact,
   newExportCorrelationId,
   type ExportReauthFn,

@@ -23,6 +23,7 @@ import {
 } from "@divan/temporal-engine";
 
 import { getBaselineBoundaryDate } from "./baseline-boundary";
+import { getDisposalLimitDisclosure } from "./data-lifecycle";
 import { getPersonDb } from "./db";
 import { getActiveEmploymentAsOf, type EmploymentRecord } from "./employment";
 import {
@@ -79,6 +80,13 @@ export type BaselineDisclosure = {
   messageFa: string;
 };
 
+/** Story 7.3 — reconstruction honesty after disposal / anonymize. */
+export type DisposalDisclosure = {
+  limited: boolean;
+  disposedFieldKeys: string[];
+  messageFa: string | null;
+};
+
 export type CurrentPersonStateFreshnessCode =
   | "RECALCULATION_PENDING"
   | "RECALCULATION_FAILED"
@@ -103,6 +111,8 @@ export type CurrentPersonState = {
   /** current = today; historical = past as-of; planned = future as-of (never Effective). */
   viewSemantics: PersonViewSemantics;
   baselineDisclosure: BaselineDisclosure;
+  /** Present when operational fields were disposed/anonymized — never fabricate prior values. */
+  disposalDisclosure: DisposalDisclosure;
   person: Partial<PersonRecord>;
   employment: EmploymentRecord | null;
   primaryAssignment: PrimaryAssignmentRecord | null;
@@ -380,6 +390,36 @@ export async function getCurrentPersonState(
   const { eventDb } = deps;
   const { actorAuthz } = options;
 
+  let disposalDisclosure: DisposalDisclosure = {
+    limited: false,
+    disposedFieldKeys: [],
+    messageFa: null,
+  };
+  try {
+    const disclosure = await getDisposalLimitDisclosure(eventDb, personId);
+    disposalDisclosure = {
+      limited: disclosure.limited,
+      disposedFieldKeys: disclosure.disposedFields.map((f) => f.fieldKey),
+      messageFa: disclosure.messageFa,
+    };
+  } catch (err) {
+    // Soft only when lifecycle schema absent; other errors must not hide limits.
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: unknown }).code)
+        : "";
+    const msg = err instanceof Error ? err.message : String(err);
+    const missingRelation =
+      code === "42P01" ||
+      /does not exist|undefined_table|relation .* does not exist/i.test(msg);
+    if (!missingRelation) throw err;
+    disposalDisclosure = {
+      limited: false,
+      disposedFieldKeys: [],
+      messageFa: null,
+    };
+  }
+
   const personRow = await getPersonById(personId, personDb);
   if (!personRow) {
     throw new PersonIdentityError("PERSON_NOT_FOUND", MSG_PERSON_NOT_FOUND_FA);
@@ -452,6 +492,7 @@ export async function getCurrentPersonState(
     personId,
     viewSemantics,
     baselineDisclosure,
+    disposalDisclosure,
     person,
     employment,
     primaryAssignment,
@@ -501,6 +542,7 @@ export function currentPersonStateFactsForCompare(
     ok: _ok,
     viewSemantics: _viewSemantics,
     baselineDisclosure: _baselineDisclosure,
+    disposalDisclosure: _disposalDisclosure,
     ...rest
   } = state;
   return JSON.parse(

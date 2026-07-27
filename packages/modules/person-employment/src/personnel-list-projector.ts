@@ -36,6 +36,10 @@ export type PersonnelListRowDto = {
   mobilePhone?: string;
   /** Present only when actor has compensation.read and value was projected. */
   compensationPermitted: boolean;
+  /** True when operational fields were disposed — never fabricate prior values. */
+  disposalLimited: boolean;
+  /** Persian disclosure when disposalLimited; null otherwise. */
+  disposalMessageFa: string | null;
 };
 
 export type PersonnelListLabelBundle = {
@@ -73,6 +77,7 @@ export function currentColleagueFromState(
 /**
  * Project one authorized current-state snapshot into a list row.
  * Freshness-blocked results must not reach this helper (caller excludes them).
+ * Disposed operational fields are omitted (dash/empty) with explicit disclosure.
  */
 export function projectPersonnelListRow(
   state: CurrentPersonState,
@@ -86,6 +91,16 @@ export function projectPersonnelListRow(
   const ladderId = primary?.ladderId;
   const gradeId = primary?.gradeId;
 
+  const disposed = new Set(state.disposalDisclosure.disposedFieldKeys);
+  const disposalLimited = state.disposalDisclosure.limited;
+  const fieldOrDash = (
+    key: string,
+    value: string | null | undefined,
+  ): string => {
+    if (disposed.has(key)) return "—";
+    return dash(value);
+  };
+
   const hasCompensation = state.compensation !== undefined;
   const amount = hasCompensation
     ? (state.compensation?.amount ?? null)
@@ -97,11 +112,16 @@ export function projectPersonnelListRow(
     : "—";
   const role = roleId ? dash(labels.roleNameById.get(roleId)) : "—";
 
+  const mobile =
+    disposed.has("mobilePhone") || !person.mobilePhone?.trim()
+      ? undefined
+      : person.mobilePhone.trim();
+
   return {
     id: state.personId,
-    personnelCode: dash(person.personnelCode),
-    givenName: dash(person.givenName),
-    familyName: dash(person.familyName),
+    personnelCode: fieldOrDash("personnelCode", person.personnelCode),
+    givenName: fieldOrDash("givenName", person.givenName),
+    familyName: fieldOrDash("familyName", person.familyName),
     team: teamId ? dash(labels.teamNameById.get(teamId)) : "—",
     role,
     jobTitle,
@@ -121,7 +141,11 @@ export function projectPersonnelListRow(
       ? dash(contractual?.contractingEntity)
       : "",
     currentColleague: currentColleagueFromState(state),
-    mobilePhone: person.mobilePhone?.trim() || undefined,
+    mobilePhone: mobile,
+    disposalLimited,
+    disposalMessageFa: disposalLimited
+      ? state.disposalDisclosure.messageFa
+      : null,
   };
 }
 
