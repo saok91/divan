@@ -55,6 +55,7 @@ import {
   softHasReportExport,
 } from "./export-capability";
 import {
+  applyDevUuidInferenceBulkGuard,
   resolvePersonnelPopulationRegistry,
   runPersonnelScopedSearch,
 } from "./personnel-scoped-search";
@@ -267,6 +268,7 @@ export const exportArtifactRouter = createTRPCRouter({
         const reportKey = input.filter.reportKey as LaunchReportKey;
         const { registry, mode, disclosureFa } =
           await resolvePersonnelPopulationRegistry();
+        const guarded = applyDevUuidInferenceBulkGuard(registry, mode);
 
         const retrieval = await runGovernedRetrieval({
           actorAccountId: ctx.session.accountId,
@@ -278,7 +280,8 @@ export const exportArtifactRouter = createTRPCRouter({
           purpose: `export.report:${reportKey}`,
           organizationalScope:
             ctx.session.organizationalScopeCodes[0] ?? "org:selfcheck",
-          populationRegistry: registry,
+          populationRegistry: guarded.registry,
+          demoBulkApproval: guarded.demoBulkApproval,
         });
 
         const outcome = retrieval.payload.outcome;
@@ -437,6 +440,7 @@ export const exportArtifactRouter = createTRPCRouter({
         // Export channel InferenceBulk — separate from list channel evidence.
         const { registry, mode, disclosureFa } =
           await resolvePersonnelPopulationRegistry();
+        const guarded = applyDevUuidInferenceBulkGuard(registry, mode);
         const retrieval = await runGovernedRetrieval({
           actorAccountId: ctx.session.accountId,
           actorScopeCodes: ctx.session.organizationalScopeCodes,
@@ -447,7 +451,8 @@ export const exportArtifactRouter = createTRPCRouter({
           purpose: "export.personnel_list",
           organizationalScope:
             ctx.session.organizationalScopeCodes[0] ?? "org:selfcheck",
-          populationRegistry: registry,
+          populationRegistry: guarded.registry,
+          demoBulkApproval: guarded.demoBulkApproval,
         });
         if (
           retrieval.payload.outcome !== "allowed" &&

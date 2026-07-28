@@ -7,8 +7,10 @@
  */
 
 import {
+  AuditTrustError,
   AuthorizationError,
   evaluateInferenceBulk,
+  isAuditTrustApiDistinctCode,
   recordInferenceBulkAccessEvent,
   toGovernedRetrievalPayload,
   type GovernedRetrievalPayload,
@@ -153,10 +155,19 @@ async function recordEvidence(input: {
 function mapAuthzError(err: unknown): never {
   if (err instanceof AuthorizationError) {
     throw new TRPCError({
-      code:
-        err.code === "AUDIT_APPEND_FAILED"
-          ? "INTERNAL_SERVER_ERROR"
-          : "FORBIDDEN",
+      code: isAuditTrustApiDistinctCode(err.code)
+        ? "INTERNAL_SERVER_ERROR"
+        : "FORBIDDEN",
+      message: err.messageFa,
+    });
+  }
+  if (err instanceof AuditTrustError) {
+    throw new TRPCError({
+      code: isAuditTrustApiDistinctCode(err.code)
+        ? "INTERNAL_SERVER_ERROR"
+        : err.code === "AUDIT_TRUST_DENIED"
+          ? "FORBIDDEN"
+          : "BAD_REQUEST",
       message: err.messageFa,
     });
   }

@@ -6,6 +6,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
@@ -276,7 +277,32 @@ export function OperationsHealthPanel() {
           title={operationalCopy.opsSectionDependencies}
           section={snapshot.dependencies}
         />
+        {snapshot.auditTrust ? (
+          <HealthSection
+            id="ops-audit-trust"
+            title={operationalCopy.opsSectionAuditTrust}
+            section={snapshot.auditTrust}
+          />
+        ) : null}
       </div>
+      {snapshot.auditTrust?.status === "red" ||
+      snapshot.auditTrust?.status === "degraded" ? (
+        <div className="mt-4 space-y-2">
+          {snapshot.auditTrust.status === "red" ? (
+            <p className="text-body text-destructive" role="alert">
+              {operationalCopy.auditTrustSuspendedBanner}
+            </p>
+          ) : null}
+          <p className="text-body">
+            <Link
+              href="/audit?trust=review"
+              className="underline underline-offset-4"
+            >
+              {operationalCopy.auditTrustReviewDeepLink}
+            </Link>
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

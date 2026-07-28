@@ -18,11 +18,19 @@ import {
 import {
   AuthorizationError,
   MSG_ACCESS_DENIED_FA,
+  MSG_AUDIT_APPEND_FAILED_FA,
 } from "./authorization-error";
+import {
+  assertAuditTrustWriterAllowed,
+  enforceClockAnomalyOrThrow,
+  recordRequiredAppendFailure,
+} from "./audit-trust-gate";
+import { AuditTrustError } from "./audit-trust";
 
 export {
   AuthorizationError,
   MSG_ACCESS_DENIED_FA,
+  MSG_AUDIT_APPEND_FAILED_FA,
   type AuthorizationErrorCode,
 } from "./authorization-error";
 
@@ -130,6 +138,71 @@ export {
   type PropagationTargetResult,
   type ProvisionalLifecycleClassCode,
 } from "./data-lifecycle";
+
+export {
+  AUDIT_TRUST_API_DISTINCT_CODES,
+  AUDIT_TRUST_DATA_CATEGORY,
+  AUDIT_TRUST_DEFAULT_ENV_KEY,
+  AUDIT_TRUST_FORBIDDEN_DTO_KEYS,
+  AUDIT_TRUST_READ_PERMISSION,
+  AUDIT_TRUST_REVIEW_PERMISSION,
+  AuditTrustError,
+  FR51_BASELINE_FAMILIES,
+  MSG_AUDIT_CLOCK_ANOMALY_FA,
+  MSG_AUDIT_INTEGRITY_FAILED_FA,
+  MSG_AUDIT_TRUST_CONFIG_MISSING_FA,
+  MSG_AUDIT_TRUST_DENIED_FA,
+  MSG_AUDIT_TRUST_INCIDENT_NOT_FOUND_FA,
+  MSG_AUDIT_TRUST_METADATA_INCOMPLETE_FA,
+  MSG_AUDIT_TRUST_CLEAR_BLOCKED_FA,
+  MSG_AUDIT_TRUST_SELF_REVIEW_BLOCKED_FA,
+  MSG_AUDIT_TRUST_SUSPENDED_FA,
+  assertAuditTrustSelfReviewAllowed,
+  assertClearWriterSuspendAllowed,
+  auditTrustDtoContainsForbiddenKeys,
+  isAuditTrustApiDistinctCode,
+  isNonMonotonicOccurredAt,
+  loadAuditTrustProvisionalConfig,
+  observeClockSkew,
+  type AuditTrustErrorCode,
+  type AuditTrustIncident,
+  type AuditTrustIncidentKind,
+  type AuditTrustIncidentStatus,
+  type AuditTrustProvisionalConfig,
+  type AuditTrustState,
+  type AuditTrustWriterStatus,
+  type BaselineCoverageRow,
+  type ClockAnomalyObservation,
+  type IntegrityVerificationOutcome,
+  type IntegrityVerificationRun,
+} from "./audit-trust";
+
+export {
+  assertAuditTrustWriterAllowed,
+  enforceClockAnomalyOrThrow,
+  recordCaptureGapIncident,
+  recordRequiredAppendFailure,
+  runIntegrityVerification,
+} from "./audit-trust-gate";
+
+export {
+  acknowledgeTrustIncident,
+  assignTrustIncident,
+  checkAppendOnlyTriggerPresent,
+  clearWriterSuspend,
+  closeTrustIncident,
+  countAccessEventsInWindow,
+  ensureWriterStateRow,
+  getTrustIncident,
+  getWriterState,
+  insertIntegrityVerificationRun,
+  listRecentAccessOccurredAt,
+  listTrustIncidents,
+  openTrustIncident,
+  selectDbNow,
+  setWriterSuspended,
+  type PgQueryable as AuditTrustPgQueryable,
+} from "./audit-trust-repo";
 
 export type EvaluationMode = "current" | "as_of";
 
@@ -423,6 +496,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
     {
       permission: "data.lifecycle.dispose",
       dataCategory: "data.lifecycle",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    // Story 7.4 — provisional audit trust fail-safe (AR-ACCESS / AR-AUDIT pending freeze)
+    {
+      permission: "audit.trust.read",
+      dataCategory: "audit.trust",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "audit.trust.review",
+      dataCategory: "audit.trust",
       action: "write",
       organizationalScope: "org:selfcheck",
     },
@@ -824,6 +910,33 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
         };
       }
 
+      // Required-audit path: trust suspend + clock anomaly fail-closed (Story 7.4)
+      try {
+        await assertAuditTrustWriterAllowed(deps.pool, {
+          correlationId: input.correlationId,
+          permission: input.permission,
+        });
+        await enforceClockAnomalyOrThrow(deps.pool, {
+          correlationId: input.correlationId,
+          actorAccountId: input.context.accountId,
+          permission: input.permission,
+        });
+      } catch (err) {
+        if (err instanceof AuditTrustError) throw err;
+        if (err instanceof AuthorizationError) throw err;
+        await recordRequiredAppendFailure(deps.pool, {
+          correlationId: input.correlationId,
+          actorAccountId: input.context.accountId,
+        });
+        throw new AuthorizationError(
+          "AUDIT_APPEND_FAILED",
+          MSG_AUDIT_APPEND_FAILED_FA,
+          input.correlationId,
+          null,
+          "audit_trust_gate_failed",
+        );
+      }
+
       let decisionId: string;
       try {
         decisionId = await withTransaction(deps.pool, async (client) => {
@@ -843,9 +956,14 @@ export function createAuditEnvelope(deps: AuditEnvelopeDeps): AuditEnvelope {
         });
       } catch (err) {
         if (err instanceof AuthorizationError) throw err;
+        if (err instanceof AuditTrustError) throw err;
+        await recordRequiredAppendFailure(deps.pool, {
+          correlationId: input.correlationId,
+          actorAccountId: input.context.accountId,
+        });
         throw new AuthorizationError(
           "AUDIT_APPEND_FAILED",
-          MSG_ACCESS_DENIED_FA,
+          MSG_AUDIT_APPEND_FAILED_FA,
           input.correlationId,
           null,
           "audit_append_failed",

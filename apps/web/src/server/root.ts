@@ -35,6 +35,7 @@ import { platformStatusRouter } from "./platform-status";
 import { reportRouter } from "./report";
 import { exportArtifactRouter } from "./export-artifact";
 import { auditRouter } from "./audit";
+import { auditTrustRouter } from "./audit-trust";
 import { operationsRouter } from "./operations";
 import { retentionRouter } from "./retention";
 import {
@@ -105,6 +106,8 @@ export const appRouter = createTRPCRouter({
   export: exportArtifactRouter,
 
   audit: auditRouter,
+
+  auditTrust: auditTrustRouter,
 
   operations: operationsRouter,
 

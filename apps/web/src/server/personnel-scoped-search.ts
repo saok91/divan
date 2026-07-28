@@ -180,6 +180,43 @@ export async function resolvePersonnelPopulationRegistry(): Promise<{
 }
 
 /**
+ * Provisional DEV UUID registry can be hundreds of subjects; DEMO InferenceBulk
+ * ceilings (`maxVolumePerRequest=10`) otherwise hard-deny dashboard/report/list.
+ * Cap + local bulk-approval mirror list/search — not production cutover.
+ */
+export function applyDevUuidInferenceBulkGuard(
+  registry: PopulationFixtureRegistry,
+  mode: PopulationAuthzMode,
+): {
+  registry: PopulationFixtureRegistry;
+  demoBulkApproval: boolean;
+  inferenceCapped: boolean;
+} {
+  const hooks = getInferenceBulkHooks();
+  const devUuid =
+    isDevUuidPopulationRegistryEnabled() && mode === "uuid-registry";
+  if (!devUuid) {
+    return { registry, demoBulkApproval: false, inferenceCapped: false };
+  }
+
+  // Prior oversized denies charge DEMO windows and brick the actor for 60s —
+  // clear for provisional local retrieval surfaces only.
+  clearInferenceBulkWindowsForTests();
+  const cap = hooks.maxVolumePerRequest > 0 ? hooks.maxVolumePerRequest : 10;
+  if (registry.subjects.length > cap) {
+    return {
+      registry: {
+        ...registry,
+        subjects: registry.subjects.slice(0, cap),
+      },
+      demoBulkApproval: true,
+      inferenceCapped: true,
+    };
+  }
+  return { registry, demoBulkApproval: true, inferenceCapped: false };
+}
+
+/**
  * Resolve org/job display labels for assembler states (list + profile).
  * Includes secondary-assignment org/role/job/ladder/grade ids (Story 5.2).
  */
@@ -438,27 +475,13 @@ export async function runPersonnelScopedSearch(
   /**
    * DEMO InferenceBulk: maxVolumePerRequest=10 and bulkApprovalVolumeThreshold=5.
    * A full Person UUID registry otherwise hard-denies (≥5 without bulk grant, >10 always).
-   * Provisional DEV path: cap to the DEMO per-request ceiling + treat list/search as
-   * bulk-approved for local UI only (honest disclosure already on the registry).
+   * Provisional DEV path: cap + treat as bulk-approved for local UI only.
    */
-  const hooks = getInferenceBulkHooks();
-  const devUuidList =
-    isDevUuidPopulationRegistryEnabled() && mode === "uuid-registry";
-  let inferenceCapped = false;
-  if (devUuidList) {
-    // Prior oversized denies charge DEMO windows and brick the actor for 60s —
-    // clear for provisional local list only.
-    clearInferenceBulkWindowsForTests();
-    const cap =
-      hooks.maxVolumePerRequest > 0 ? hooks.maxVolumePerRequest : 10;
-    if (registry.subjects.length > cap) {
-      inferenceCapped = true;
-      registry = {
-        ...registry,
-        subjects: registry.subjects.slice(0, cap),
-      };
-    }
-  }
+  const {
+    registry: inferenceRegistry,
+    demoBulkApproval,
+    inferenceCapped,
+  } = applyDevUuidInferenceBulkGuard(registry, mode);
 
   const retrieval = await runGovernedRetrieval({
     actorAccountId: input.actorAccountId,
@@ -470,9 +493,9 @@ export async function runPersonnelScopedSearch(
     correlationId: input.correlationId,
     purpose: `personnel.${input.channel}`,
     organizationalScope: input.actorScopeCodes[0],
-    populationRegistry: registry,
+    populationRegistry: inferenceRegistry,
     skipAccessEvent: input.skipAccessEvent,
-    demoBulkApproval: devUuidList,
+    demoBulkApproval,
   });
 
   const mapped = mapRetrievalOutcome(retrieval);

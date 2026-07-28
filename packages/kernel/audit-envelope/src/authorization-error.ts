@@ -9,6 +9,13 @@
  */
 export const MSG_ACCESS_DENIED_FA = "دسترسی ندارید.";
 
+/**
+ * Distinct operator copy for required-audit append failure (Story 7.4 / AC #7).
+ * Must not collapse to MSG_ACCESS_DENIED_FA alone at API mapping.
+ */
+export const MSG_AUDIT_APPEND_FAILED_FA =
+  "ثبت شواهد دسترسی ممکن نشد؛ عملیات حساس انجام نشد.";
+
 export type AuthorizationErrorCode = "FORBIDDEN" | "AUDIT_APPEND_FAILED";
 
 /**

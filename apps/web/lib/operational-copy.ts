@@ -417,6 +417,7 @@ export const operationalCopy = {
   opsSectionImport: "ورود / مهاجرت",
   opsSectionBackup: "پشتیبان / بازیابی",
   opsSectionDependencies: "وابستگی‌ها",
+  opsSectionAuditTrust: "اعتماد ممیزی",
   opsHonestyTitle: "صداقت عملیاتی",
   opsStatusOk: "سالم",
   opsStatusDegraded: "تضعیف‌شده",
@@ -489,6 +490,35 @@ export const operationalCopy = {
   lifecycleHoldsHeading: "نگهداری‌های قانونی",
   lifecycleRunsHeading: "اجراهای حذف",
   lifecycleOutcome: "نتیجه",
+
+  /** Audit trust fail-safe (Story 7.4 / FR-51 / NFR-9) — no HR content. */
+  auditTrustHeading: "اعتماد ممیزی",
+  auditTrustSuspendedBanner:
+    "ثبت ممیزی متوقف شده است؛ عملیات حساس مسدود است. رخدادهای باز را بررسی کنید یا با امنیت تماس بگیرید.",
+  auditTrustSuspendedDetail:
+    "نویسندهٔ شواهد معلق است — عملیات حساس تا بازبینی اعتماد مسدود است.",
+  auditTrustSuspendTtlElapsed:
+    "مهلت موقت تعلیق گذشته است؛ رفع تعلیق همچنان نیاز به بازبینی صریح دارد (بدون پاک‌سازی خودکار).",
+  auditTrustDegradedDetail:
+    "رخداد اعتماد باز وجود دارد؛ وضعیت تضعیف‌شده.",
+  auditTrustReviewDeepLink: "بازبینی رخدادهای اعتماد در سطح ممیزی",
+  auditTrustOkDetail: "وضعیت نویسندهٔ شواهد سالم است.",
+  auditTrustUnavailable: "وضعیت اعتماد ممیزی در دسترس نیست.",
+  auditTrustHashChainHonesty:
+    "زنجیرهٔ درهم‌سازی تولید هنوز Deferred است — راستی‌آزمایی MVP = تریگر + فاصله + تعلیق.",
+  auditTrustActionFailed: "عملیات اعتماد ممیزی انجام نشد.",
+  auditTrustDenied: "دسترسی ندارید.",
+  auditTrustIncidentsEmpty: "رخداد اعتماد بازی ثبت نشده.",
+  auditTrustAssign: "واگذاری برای بازبینی",
+  auditTrustAcknowledge: "تأیید دریافت",
+  auditTrustClose: "بستن رخداد",
+  auditTrustClearSuspend: "رفع تعلیق نویسنده",
+  auditTrustClearSuspendConfirm:
+    "تعلیق نویسندهٔ شواهد رفع شود؟ این کار قابل انتساب است و نیاز به مجوز بازبینی دارد.",
+  auditTrustSelfReviewBlocked: "بازبینی خودی برای این رخداد اعتماد مجاز نیست.",
+  auditTrustOpenIncidents: "رخدادهای باز",
+  auditTrustLastVerification: "آخرین راستی‌آزمایی",
+  auditTrustRunIntegrity: "اجرای راستی‌آزمایی تمامیت",
 } as const;
 
 /**

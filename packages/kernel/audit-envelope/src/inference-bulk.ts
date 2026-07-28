@@ -25,7 +25,14 @@ import type { Pool } from "pg";
 import {
   AuthorizationError,
   MSG_ACCESS_DENIED_FA,
+  MSG_AUDIT_APPEND_FAILED_FA,
 } from "./authorization-error";
+import { AuditTrustError } from "./audit-trust";
+import {
+  assertAuditTrustWriterAllowed,
+  enforceClockAnomalyOrThrow,
+  recordRequiredAppendFailure,
+} from "./audit-trust-gate";
 
 /** Same surface as PopulationPort RetrievalChannel + optional `list`. */
 export type InferenceBulkChannel =
@@ -475,6 +482,29 @@ export async function recordInferenceBulkAccessEvent(
 ): Promise<{ decisionId: string }> {
   const accessResult = decisionToAccessResult(input.evaluation.decision);
   try {
+    await assertAuditTrustWriterAllowed(input.pool, {
+      correlationId: input.correlationId,
+    });
+    await enforceClockAnomalyOrThrow(input.pool, {
+      correlationId: input.correlationId,
+      actorAccountId: input.actorAccountId,
+    });
+  } catch (err) {
+    if (err instanceof AuditTrustError) throw err;
+    if (err instanceof AuthorizationError) throw err;
+    await recordRequiredAppendFailure(input.pool, {
+      correlationId: input.correlationId,
+      actorAccountId: input.actorAccountId,
+    });
+    throw new AuthorizationError(
+      "AUDIT_APPEND_FAILED",
+      MSG_AUDIT_APPEND_FAILED_FA,
+      input.correlationId,
+      null,
+      "audit_trust_gate_failed",
+    );
+  }
+  try {
     const decisionId = await withTransaction(input.pool, async (client) => {
       const { id } = await appendAccessEvent(client, {
         correlationId: input.correlationId,
@@ -502,9 +532,14 @@ export async function recordInferenceBulkAccessEvent(
     return { decisionId };
   } catch (err) {
     if (err instanceof AuthorizationError) throw err;
+    if (err instanceof AuditTrustError) throw err;
+    await recordRequiredAppendFailure(input.pool, {
+      correlationId: input.correlationId,
+      actorAccountId: input.actorAccountId,
+    });
     throw new AuthorizationError(
       "AUDIT_APPEND_FAILED",
-      MSG_ACCESS_DENIED_FA,
+      MSG_AUDIT_APPEND_FAILED_FA,
       input.correlationId,
       null,
       "audit_append_failed",

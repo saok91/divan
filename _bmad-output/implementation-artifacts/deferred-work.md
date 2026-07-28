@@ -1,3 +1,10 @@
+## Deferred from: code review of 7-4-audit-trust-fail-safe.md (2026-07-29)
+
+- Nested/exotic keys in `incident.detail` JSONB bypass top-level forbidden-key regex (`audit-trust.ts`) ? follow-up redaction depth beyond 7.2-style top-level scan
+- Concurrent append-fail/clock paths can open duplicate incidents per correlation ? MVP opens per attempt; revisit idempotent aggregation
+- `capabilities` returns entitlement shape without access-event ? same soft capability-probe pattern as other routers; revisit if entitlement reads need evidence
+- Writer `degraded` DB status writes ? MVP ops derives degraded from openIncidentCount; schema value reserved until AR-AUDIT freeze defines transitions
+
 ## Deferred from: code review of 7-3-retention-disposal-legal-hold.md (2026-07-28)
 
 - `listHolds` / `listRuns` return unscoped global sets (holds unbounded; runs capped at 50) ? MVP org:selfcheck listing pattern; revisit org/actor narrowing when multi-tenant lifecycle scopes land
@@ -89,7 +96,7 @@
 ## Deferred from: Story 4.13 universal coverage matching & exemptions (2026-07-19)
 
 - **Approval-first matching + exemptions landed** ? `matchCompatibleApprovals` (Team+Title+optional Seniority; oldest valid); `preferredApprovalId` + audited stash; `PrimaryAssignment.headcountApprovalId`; `headcount_exemption` CRUD + fail-closed revoke; SeniorityChanged capacity re-eval; panel exempt + muted overridden foreshadow; `/headcount` exemption admin; `headcount-matching.selfcheck`
-- **Addendum §6.2 open edges not productized:** named seats / Position entity; free-form Correction rebind UI; contracting-entity match dims ? Correction rebind remains via existing Correction/Reverse capacity replay
+- **Addendum ?6.2 open edges not productized:** named seats / Position entity; free-form Correction rebind UI; contracting-entity match dims ? Correction rebind remains via existing Correction/Reverse capacity replay
 - ~~**Still 4.14:** Override catalogue / negative free / 14-day expiry warnings / Scheduled-exception; durable reserve for Scheduled Start (FR-30 remainder)~~ ? **closed in 4.14**
 - **Still Epic 5:** Full dashboard / open-headcount product / report catalogue
 - **Exemption rebind on Primary close+open:** ~~covering exemption stays on source Primary id~~ ? **closed in code review:** `rebindCoveringExemptionToSuccessor` on JobTitle/Seniority open
@@ -118,7 +125,7 @@
 - Planned **capacity** deltas (AC #4 partial) ? only `plannedMembershipDeltas` shipped; facts@today already show current reserved; full planned capacity channel deferred to avoid mid-review DTO scope creep (revisit with 4.12 or a follow-up read story)
 - Planned Transfer scan seeds only from today's scoped members ? persons with future Start?Transfer not yet on roster omitted (reaffirmed; already noted in Story 4.11 deferred block)
 - N+1 `getBusinessEventById` per ledger event id in `reconstructHeadcountQuantitiesAsOf` ? acceptable at MVP ~500; batch when needed
-- Unscoped historical org path is O(teams×members) for membership + freshness ? foreshadow can request all teams; optimize later
+- Unscoped historical org path is O(teams?members) for membership + freshness ? foreshadow can request all teams; optimize later
 - Shared `resolveLifecycleStatus` (person-employment) ignores cancel/reverse asOf ? pre-existing display helper; historical-headcount local copy patched separately in review
 - Scoped `teamId` still returns org-wide `orgUnitCounts` ? foreshadow shows TEAM only; tighten scope semantics later
 
@@ -289,7 +296,7 @@
 
 ## Deferred from: code review of 3-9-derived-management-relationships.md (2026-07-18)
 
-- N+1 / O(teams×members) queries in `deriveManagementEdgesAsOf` / `listManagedPersonsAsOf` / `listTeamMembersAsOf` without batching or caching ? acceptable for ~500 MVP; revisit under NFR-13 pressure
+- N+1 / O(teams?members) queries in `deriveManagementEdgesAsOf` / `listManagedPersonsAsOf` / `listTeamMembersAsOf` without batching or caching ? acceptable for ~500 MVP; revisit under NFR-13 pressure
 - `dateOnlyFromDb` via `toISOString().slice(0,10)` ? same DATE mapping pattern as Employment/Primary/Secondary; harden if non-UTC driver behavior appears
 - `management-relationship.selfcheck` mutates shared seed DB (temp second middle-manager / leave-team) with best-effort restore ? same thin-selfcheck pattern; isolate DB when Vitest/CI lands
 
@@ -521,7 +528,7 @@
 - **AR-ACCESS / AR-TEMPORAL** acting / interim / co-manager / reorganization winner policies still undefined ? ambiguity remains fail-closed (`AMBIGUOUS_TEAM_MANAGER` / `AMBIGUOUS_MANAGEMENT_SCOPE`)
 - **Secondary `acting_manager` inventory** is explicitly **not** a management derivation source
 - **PopulationPort:** adapter `buildManagementRelationshipsFromDerivation` + seed Account username map for demo middle-manager available; **default `intersectPopulation` registry still fixture-backed** (`person:a1`, ?) until AR-IDENTITY Person?Account link + 4.x wiring ? do not claim full cutover
-- Interactive org chart / hierarchy visualization = post-MVP addendum §14.2
+- Interactive org chart / hierarchy visualization = post-MVP addendum ?14.2
 - Profile Assignments UI / headcount / Personnel Event append = Epic 4?5
 
 ## Deferred from: code review of 3-8-secondary-assignment-fidelity.md (2026-07-18)
@@ -635,4 +642,4 @@
 
 ## Deferred from: code review of 7-2-operations-health-without-hr-content.md (2026-07-27)
 
-- Ops/package selfchecks are mostly source greps â€” do not execute unauthorized deny, live LDAPâ†’red, or snapshot round-trip â€” deferred, verification debt from Story 7.2 DoD/selfcheck scope
+- Ops/package selfchecks are mostly source greps ? do not execute unauthorized deny, live LDAP?red, or snapshot round-trip ? deferred, verification debt from Story 7.2 DoD/selfcheck scope

@@ -43,6 +43,8 @@ export type OpsHealthSnapshot = {
   import: OpsHealthSection;
   backup: OpsHealthSection;
   dependencies: OpsHealthSection;
+  /** Story 7.4 — audit trust summary (no HR rows) */
+  auditTrust?: OpsHealthSection;
   /** Optional honesty banners (Epic 6 retro) */
   honestyFa?: string[];
   correlationId: string;

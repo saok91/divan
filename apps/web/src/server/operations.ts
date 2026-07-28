@@ -18,6 +18,7 @@ import {
   OPS_PLATFORM_DATA_CATEGORY,
   OpsHealthError,
   getBackupEvidenceHook,
+  getWriterState,
   type OpsHealthSection,
   type OpsHealthSnapshot,
 } from "@divan/audit-envelope";
@@ -276,6 +277,51 @@ async function buildOpsHealthSnapshot(
     honestyFa.push(OPS_MIGRATION_HONESTY_FA.ldapSeededMode);
   }
 
+  let auditTrust: OpsHealthSection = {
+    status: "unavailable",
+    detailFa: operationalCopy.auditTrustUnavailable,
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    const trustState = await getWriterState(pool);
+    const openCount = trustState.openIncidentCount ?? 0;
+    if (trustState.status === "suspended") {
+      const ttlNote = trustState.suspendTtlElapsed
+        ? ` ${operationalCopy.auditTrustSuspendTtlElapsed}`
+        : "";
+      auditTrust = {
+        status: "red",
+        detailFa: `${operationalCopy.auditTrustSuspendedDetail}${ttlNote}`,
+        pendingCount: openCount,
+        failedCount: openCount > 0 ? openCount : 1,
+        correlationId: trustState.correlationId ?? undefined,
+        updatedAt: trustState.suspendedAt ?? new Date().toISOString(),
+      };
+      honestyFa.push(operationalCopy.auditTrustHashChainHonesty);
+    } else if (openCount > 0 || trustState.status === "degraded") {
+      auditTrust = {
+        status: "degraded",
+        detailFa: operationalCopy.auditTrustDegradedDetail,
+        pendingCount: openCount,
+        correlationId: trustState.correlationId ?? undefined,
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      auditTrust = {
+        status: "ok",
+        detailFa: operationalCopy.auditTrustOkDetail,
+        pendingCount: 0,
+        updatedAt: trustState.lastVerificationAt ?? new Date().toISOString(),
+      };
+    }
+  } catch {
+    auditTrust = {
+      status: "unavailable",
+      detailFa: operationalCopy.auditTrustUnavailable,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   return {
     identity,
     service,
@@ -283,6 +329,7 @@ async function buildOpsHealthSnapshot(
     import: importSection,
     backup: backupSection,
     dependencies,
+    auditTrust,
     honestyFa,
     correlationId,
   };
@@ -324,6 +371,7 @@ export const operationsRouter = createTRPCRouter({
               import: snapshot.import.status,
               backup: snapshot.backup.status,
               dependencies: snapshot.dependencies.status,
+              auditTrust: snapshot.auditTrust?.status ?? "unavailable",
             },
           });
         } catch {

@@ -40,7 +40,7 @@ import {
   computeReportExportSnapshotHash,
   softHasReportExport,
 } from "./export-capability";
-import { resolvePersonnelPopulationRegistry } from "./personnel-scoped-search";
+import { resolvePersonnelPopulationRegistry, applyDevUuidInferenceBulkGuard } from "./personnel-scoped-search";
 import { runGovernedRetrieval } from "./retrieval-control";
 import { createTRPCRouter, governedProcedure } from "./trpc";
 
@@ -349,6 +349,7 @@ export const reportRouter = createTRPCRouter({
 
         const { registry, mode, disclosureFa } =
           await resolvePersonnelPopulationRegistry();
+        const guarded = applyDevUuidInferenceBulkGuard(registry, mode);
 
         const retrieval = await runGovernedRetrieval({
           actorAccountId: ctx.session.accountId,
@@ -360,7 +361,8 @@ export const reportRouter = createTRPCRouter({
           purpose: `report.run:${reportKey}`,
           organizationalScope:
             ctx.session.organizationalScopeCodes[0] ?? "org:selfcheck",
-          populationRegistry: registry,
+          populationRegistry: guarded.registry,
+          demoBulkApproval: guarded.demoBulkApproval,
         });
 
         const outcome = retrieval.payload.outcome;

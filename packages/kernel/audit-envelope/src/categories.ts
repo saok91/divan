@@ -183,6 +183,13 @@ export const DEV_DEMO_CATEGORIES: CategoryRegistry = freezeRegistry([
     sensitivity: "ordinary",
     requiresSeparateExport: false,
   },
+  // Story 7.4 — audit trust fail-safe (ordinary; NOT person `health`)
+  {
+    id: "audit.trust",
+    enabled: true,
+    sensitivity: "ordinary",
+    requiresSeparateExport: false,
+  },
 ]);
 
 /**

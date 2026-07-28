@@ -30,7 +30,7 @@ import { z } from "zod";
 
 import { operationalCopy } from "@/lib/operational-copy";
 
-import { resolvePersonnelPopulationRegistry } from "./personnel-scoped-search";
+import { resolvePersonnelPopulationRegistry, applyDevUuidInferenceBulkGuard } from "./personnel-scoped-search";
 import { runGovernedRetrieval } from "./retrieval-control";
 import { createTRPCRouter, governedProcedure } from "./trpc";
 
@@ -242,6 +242,7 @@ export const dashboardRouter = createTRPCRouter({
 
         const { registry, mode, disclosureFa } =
           await resolvePersonnelPopulationRegistry();
+        const guarded = applyDevUuidInferenceBulkGuard(registry, mode);
 
         const retrieval = await runGovernedRetrieval({
           actorAccountId: ctx.session.accountId,
@@ -253,7 +254,8 @@ export const dashboardRouter = createTRPCRouter({
           purpose: "dashboard.snapshot",
           organizationalScope:
             ctx.session.organizationalScopeCodes[0] ?? "org:selfcheck",
-          populationRegistry: registry,
+          populationRegistry: guarded.registry,
+          demoBulkApproval: guarded.demoBulkApproval,
         });
 
         const outcome = retrieval.payload.outcome;

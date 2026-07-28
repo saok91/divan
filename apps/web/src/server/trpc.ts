@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  AuditTrustError,
   AuthorizationError,
   MSG_ACCESS_DENIED_FA,
   createAuditEnvelope,
+  isAuditTrustApiDistinctCode,
   loadCategoryRegistry,
   loadPolicyRegistry,
   type AuditEnvelope,
@@ -239,9 +241,27 @@ export const governedProcedure = protectedProcedure.use(
           err.decisionId ? `decisionId=${err.decisionId}` : "",
           err.denyReason ? `denyReason=${err.denyReason}` : "",
         );
+        // Story 7.4: append/trust failure ≠ ordinary FORBIDDEN (mirror retrieval-control)
         throw new TRPCError({
-          code: "FORBIDDEN",
+          code: isAuditTrustApiDistinctCode(err.code)
+            ? "INTERNAL_SERVER_ERROR"
+            : "FORBIDDEN",
           message: err.messageFa || MSG_ACCESS_DENIED_FA,
+        });
+      }
+      if (err instanceof AuditTrustError) {
+        console.error(
+          "[governed]",
+          err.code,
+          err.details ? JSON.stringify(err.details) : "",
+        );
+        throw new TRPCError({
+          code: isAuditTrustApiDistinctCode(err.code)
+            ? "INTERNAL_SERVER_ERROR"
+            : err.code === "AUDIT_TRUST_DENIED"
+              ? "FORBIDDEN"
+              : "BAD_REQUEST",
+          message: err.messageFa,
         });
       }
       throw err;
