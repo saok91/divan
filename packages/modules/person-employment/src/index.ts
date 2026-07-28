@@ -831,3 +831,23 @@ export {
   type RunDisposalResult,
   type PgQueryable as LifecyclePgQueryable,
 } from "./data-lifecycle";
+
+export {
+  addCorrectionCaseEvidenceRef,
+  closeCorrectionCase,
+  decideCorrectionCase,
+  escalateOverdueCases,
+  getCorrectionCaseAttachmentDownload,
+  getCorrectionCaseById,
+  getCorrectionCaseDetail,
+  linkCorrectionCaseOutcome,
+  listAttachments as listCorrectionCaseAttachments,
+  listCorrectionCaseSummaries,
+  listOutcomeLinks as listCorrectionCaseOutcomeLinks,
+  openCorrectionCase,
+  updateCorrectionCaseProgress,
+  uploadCorrectionCaseAttachment,
+  type CorrectionCaseDetail,
+} from "./correction-case";
+
+export type { PgQueryable as CorrectionCasePgQueryable } from "./correction-case-repo";

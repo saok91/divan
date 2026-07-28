@@ -1,3 +1,11 @@
+## Deferred from: code review of 7-5-external-data-subject-correction-cases.md (2026-07-29)
+
+- Unscoped list / attachment access within `correction.case.read` trust boundary (`getCorrectionCaseAttachmentDownload` by attachmentId) ? same MVP org:selfcheck / IDOR-narrowing defer as Known gaps + 7.3 hold lists
+- Base64 download streaming / size-cap upgrade (`downloadAttachment` returns `contentBase64`) ? Known gap / 6.5 defer pattern; prefer streaming/proxy later
+- `personnel_correction` validates `kernel_events` existence only, not Correction/FR-17 event type ? Dev Notes honesty (existence-only); Person-org IDOR on Correct mutation also deferred
+- MVP org:selfcheck listing without actor/org narrowing on correction-case list/get ? Known gaps IDOR class; revisit with AR-ACCESS multi-tenant scopes
+- Attachment policy provisional defaults without `DIVAN_CORRECTION_CASE_ENFORCE=1` ? keep documented honesty for local/selfcheck; production fail-closed defaults owned by AR-DATA freeze (decision during 7-5 review)
+
 ## Deferred from: code review of 7-4-audit-trust-fail-safe.md (2026-07-29)
 
 - Nested/exotic keys in `incident.detail` JSONB bypass top-level forbidden-key regex (`audit-trust.ts`) ? follow-up redaction depth beyond 7.2-style top-level scan

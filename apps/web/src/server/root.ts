@@ -38,6 +38,7 @@ import { auditRouter } from "./audit";
 import { auditTrustRouter } from "./audit-trust";
 import { operationsRouter } from "./operations";
 import { retentionRouter } from "./retention";
+import { correctionCaseRouter } from "./correction-case";
 import {
   actorHasActiveBulkGrant,
   runGovernedDrillDown,
@@ -112,6 +113,8 @@ export const appRouter = createTRPCRouter({
   operations: operationsRouter,
 
   retention: retentionRouter,
+
+  correctionCase: correctionCaseRouter,
 
   migration: migrationRouter,
 

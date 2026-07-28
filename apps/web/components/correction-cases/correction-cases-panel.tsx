@@ -1,0 +1,1115 @@
+/**
+ * Correction cases panel (Story 7.5 / FR-53 / UX-DR19 / UX-DR22).
+ * Restricted case tracking — no employee portal; no general DMS.
+ * GovernedDataTable + single-depth Dialog; Persian RTL + digits.
+ */
+
+"use client";
+
+import * as React from "react";
+
+import { GovernedDataTable } from "@/components/governed-data-table";
+import type { GovernedColumn } from "@/components/governed-data-table";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
+import { operationalCopy } from "@/lib/operational-copy";
+import { toPersianDigits } from "@/lib/persian-digits";
+import { api } from "@/lib/trpc/client";
+
+type CaseRow = {
+  id: string;
+  requestReference: string;
+  personId: string;
+  ownerAccountId: string;
+  status: string;
+  deadlineAt: string;
+  breachedPresentation: boolean;
+  decision: string | null;
+};
+
+type DialogKind = "open" | "decide" | "close" | "link" | "evidence" | null;
+
+const ATTACHMENT_MAX_BYTES_CLIENT = 1_048_576;
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case "open":
+      return operationalCopy.correctionCaseStatusOpen;
+    case "in_progress":
+      return operationalCopy.correctionCaseStatusInProgress;
+    case "pending_decision":
+      return operationalCopy.correctionCaseStatusPendingDecision;
+    case "approved":
+      return operationalCopy.correctionCaseStatusApproved;
+    case "rejected":
+      return operationalCopy.correctionCaseStatusRejected;
+    case "constrained":
+      return operationalCopy.correctionCaseStatusConstrained;
+    case "closed":
+      return operationalCopy.correctionCaseStatusClosed;
+    case "breached":
+      return operationalCopy.correctionCaseStatusBreached;
+    default:
+      return status;
+  }
+}
+
+function inspectionLabel(status: string): string {
+  switch (status) {
+    case "allowed":
+      return operationalCopy.correctionCaseInspectionAllowed;
+    case "rejected":
+      return operationalCopy.correctionCaseInspectionRejected;
+    case "quarantined":
+      return operationalCopy.correctionCaseInspectionQuarantined;
+    default:
+      return status;
+  }
+}
+
+function linkTypeLabel(linkType: string): string {
+  switch (linkType) {
+    case "pending_publication_hook":
+      return operationalCopy.correctionCaseLinkPendingPublication;
+    case "personnel_correction":
+      return operationalCopy.correctionCaseLinkPersonnelCorrection;
+    case "disposal_run":
+      return operationalCopy.correctionCaseLinkDisposalRun;
+    case "hold":
+      return operationalCopy.correctionCaseLinkHold;
+    case "recalc":
+      return operationalCopy.correctionCaseLinkRecalc;
+    case "response_evidence":
+      return operationalCopy.correctionCaseLinkResponseEvidence;
+    case "published_artifact":
+      return operationalCopy.correctionCaseLinkPublishedArtifact;
+    default:
+      return linkType;
+  }
+}
+
+function evidenceKindLabel(kind: string): string {
+  switch (kind) {
+    case "request":
+      return operationalCopy.correctionCaseEvidenceKindRequest;
+    case "response":
+      return operationalCopy.correctionCaseEvidenceKindResponse;
+    case "internal":
+      return operationalCopy.correctionCaseEvidenceKindInternal;
+    case "other":
+      return operationalCopy.correctionCaseEvidenceKindOther;
+    default:
+      return kind;
+  }
+}
+
+function trpcErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "message" in err) {
+    const msg = String((err as { message: unknown }).message ?? "").trim();
+    if (msg && !/^(Error|INTERNAL|prisma|ECONN|failed to)/i.test(msg)) {
+      return msg;
+    }
+  }
+  return fallback;
+}
+
+const COLUMNS: GovernedColumn<CaseRow>[] = [
+  {
+    id: "requestReference",
+    header: operationalCopy.correctionCaseRequestRef,
+    accessor: (r) => r.requestReference,
+    sortable: true,
+    sticky: "identifier",
+    cell: (r) => (
+      <span className="font-medium">
+        {toPersianDigits(r.requestReference)}
+        {r.breachedPresentation ? (
+          <span className="ms-2 inline-block rounded bg-destructive/15 px-1.5 py-0.5 text-caption text-destructive">
+            {operationalCopy.correctionCaseBreachedBadge}
+          </span>
+        ) : null}
+      </span>
+    ),
+  },
+  {
+    id: "status",
+    header: operationalCopy.correctionCaseStatus,
+    accessor: (r) => r.status,
+    sortable: true,
+    cell: (r) => statusLabel(r.status),
+  },
+  {
+    id: "deadlineAt",
+    header: operationalCopy.correctionCaseDeadline,
+    accessor: (r) => r.deadlineAt,
+    sortable: true,
+    cell: (r) =>
+      toPersianDigits(formatJalaliDateTimeFromIso(r.deadlineAt) ?? r.deadlineAt),
+  },
+  {
+    id: "personId",
+    header: operationalCopy.correctionCasePersonId,
+    accessor: (r) => r.personId,
+    cell: (r) => (
+      <span className="font-mono text-caption">
+        {toPersianDigits(r.personId.slice(0, 8))}…
+      </span>
+    ),
+  },
+];
+
+export function CorrectionCasesPanel() {
+  const formId = React.useId();
+  const utils = api.useUtils();
+  const [breachedOnly, setBreachedOnly] = React.useState(false);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [dialog, setDialog] = React.useState<DialogKind>(null);
+  const [actionError, setActionError] = React.useState<string | null>(null);
+  const confirmTriggerRef = React.useRef<HTMLElement | null>(null);
+
+  const [requestRef, setRequestRef] = React.useState("");
+  const [authority, setAuthority] = React.useState("");
+  const [personId, setPersonId] = React.useState("");
+  const [deadlineLocal, setDeadlineLocal] = React.useState("");
+  const [decision, setDecision] = React.useState<
+    "approved" | "rejected" | "constrained"
+  >("approved");
+  const [decisionReason, setDecisionReason] = React.useState("");
+  const [closureNote, setClosureNote] = React.useState("");
+  const [linkType, setLinkType] = React.useState<
+    | "personnel_correction"
+    | "disposal_run"
+    | "hold"
+    | "recalc"
+    | "pending_publication_hook"
+    | "response_evidence"
+  >("pending_publication_hook");
+  const [linkTarget, setLinkTarget] = React.useState("");
+  const [uploadName, setUploadName] = React.useState("");
+  const [uploadB64, setUploadB64] = React.useState("");
+  const [evidenceKind, setEvidenceKind] = React.useState<
+    "request" | "response" | "internal" | "other"
+  >("request");
+  const [evidenceUri, setEvidenceUri] = React.useState("");
+
+  const listQuery = api.correctionCase.list.useQuery({
+    breachedOnly: breachedOnly || undefined,
+  });
+  const detailQuery = api.correctionCase.get.useQuery(
+    { caseId: selectedId! },
+    { enabled: Boolean(selectedId) },
+  );
+  const capsQuery = api.correctionCase.capabilities.useQuery();
+
+  const openMutation = api.correctionCase.open.useMutation({
+    onSuccess: async (res) => {
+      setActionError(null);
+      setDialog(null);
+      setRequestRef("");
+      setAuthority("");
+      setPersonId("");
+      setDeadlineLocal("");
+      setSelectedId(res.case.id);
+      await utils.correctionCase.list.invalidate();
+      restoreFocus();
+    },
+    onError: (err) => {
+      setActionError(
+        trpcErrorMessage(err, operationalCopy.correctionCaseActionFailed),
+      );
+      setDialog(null);
+      restoreFocus();
+    },
+  });
+
+  const decideMutation = api.correctionCase.decide.useMutation({
+    onSuccess: async () => {
+      setActionError(null);
+      setDialog(null);
+      setDecisionReason("");
+      await Promise.all([
+        utils.correctionCase.list.invalidate(),
+        utils.correctionCase.get.invalidate(),
+      ]);
+      restoreFocus();
+    },
+    onError: (err) => {
+      setActionError(
+        trpcErrorMessage(err, operationalCopy.correctionCaseActionFailed),
+      );
+      setDialog(null);
+      restoreFocus();
+    },
+  });
+
+  const closeMutation = api.correctionCase.close.useMutation({
+    onSuccess: async () => {
+      setActionError(null);
+      setDialog(null);
+      setClosureNote("");
+      await Promise.all([
+        utils.correctionCase.list.invalidate(),
+        utils.correctionCase.get.invalidate(),
+      ]);
+      restoreFocus();
+    },
+    onError: (err) => {
+      setActionError(
+        trpcErrorMessage(err, operationalCopy.correctionCaseActionFailed),
+      );
+      setDialog(null);
+      restoreFocus();
+    },
+  });
+
+  const linkMutation = api.correctionCase.linkOutcome.useMutation({
+    onSuccess: async () => {
+      setActionError(null);
+      setDialog(null);
+      setLinkTarget("");
+      await utils.correctionCase.get.invalidate();
+      restoreFocus();
+    },
+    onError: (err) => {
+      setActionError(
+        trpcErrorMessage(err, operationalCopy.correctionCaseActionFailed),
+      );
+      setDialog(null);
+      restoreFocus();
+    },
+  });
+
+  const uploadMutation = api.correctionCase.uploadAttachment.useMutation({
+    onSuccess: async () => {
+      setActionError(null);
+      setUploadName("");
+      setUploadB64("");
+      await utils.correctionCase.get.invalidate();
+    },
+    onError: (err) => {
+      setActionError(
+        trpcErrorMessage(err, operationalCopy.correctionCaseActionFailed),
+      );
+    },
+  });
+
+  const evidenceMutation = api.correctionCase.addEvidenceRef.useMutation({
+    onSuccess: async () => {
+      setActionError(null);
+      setDialog(null);
+      setEvidenceUri("");
+      await utils.correctionCase.get.invalidate();
+      restoreFocus();
+    },
+    onError: (err) => {
+      setActionError(
+        trpcErrorMessage(err, operationalCopy.correctionCaseActionFailed),
+      );
+      setDialog(null);
+      restoreFocus();
+    },
+  });
+
+  const updateMutation = api.correctionCase.update.useMutation({
+    onSuccess: async () => {
+      setActionError(null);
+      await Promise.all([
+        utils.correctionCase.list.invalidate(),
+        utils.correctionCase.get.invalidate(),
+      ]);
+    },
+    onError: (err) => {
+      setActionError(
+        trpcErrorMessage(err, operationalCopy.correctionCaseActionFailed),
+      );
+    },
+  });
+
+  function restoreFocus() {
+    confirmTriggerRef.current?.focus();
+  }
+
+  function openDialog(kind: DialogKind, trigger: HTMLElement) {
+    confirmTriggerRef.current = trigger;
+    setDialog(kind);
+  }
+
+  const rows: CaseRow[] = (listQuery.data?.cases ?? []).map((c) => ({
+    id: c.id,
+    requestReference: c.requestReference,
+    personId: c.personId,
+    ownerAccountId: c.ownerAccountId,
+    status: c.status,
+    deadlineAt: c.deadlineAt,
+    breachedPresentation: c.breachedPresentation,
+    decision: c.decision,
+  }));
+
+  const coldLoading = listQuery.isLoading || capsQuery.isLoading;
+  const loadError = listQuery.isError
+    ? trpcErrorMessage(
+        listQuery.error,
+        operationalCopy.correctionCaseLoadError,
+      )
+    : capsQuery.isError
+      ? trpcErrorMessage(
+          capsQuery.error,
+          operationalCopy.correctionCaseCapabilitiesError,
+        )
+      : null;
+
+  const caps = capsQuery.data;
+  const busy =
+    openMutation.isPending ||
+    decideMutation.isPending ||
+    closeMutation.isPending ||
+    linkMutation.isPending ||
+    uploadMutation.isPending ||
+    updateMutation.isPending ||
+    evidenceMutation.isPending;
+
+  async function onFileChosen(file: File | null) {
+    if (!file || !selectedId) return;
+    if (file.size > ATTACHMENT_MAX_BYTES_CLIENT) {
+      setActionError(operationalCopy.correctionCaseAttachmentTooLarge);
+      setUploadName("");
+      setUploadB64("");
+      return;
+    }
+    setUploadName(file.name);
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]!);
+    }
+    setUploadB64(btoa(binary));
+  }
+
+  async function downloadAttachment(
+    attachmentId: string,
+    mode: "download" | "preview",
+  ) {
+    try {
+      const data = await utils.correctionCase.downloadAttachment.fetch({
+        attachmentId,
+        mode,
+      });
+      const bin = atob(data.contentBase64);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const blob = new Blob([arr], {
+        type: data.headers["Content-Type"] ?? "application/octet-stream",
+      });
+      const url = URL.createObjectURL(blob);
+      if (mode === "preview") {
+        window.open(url, "_blank", "noopener,noreferrer");
+        // Revoke later — allow the new tab to load.
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return;
+      }
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.attachment.originalFilenameMinimized;
+      a.rel = "noopener";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setActionError(
+        trpcErrorMessage(err, operationalCopy.correctionCaseActionFailed),
+      );
+    }
+  }
+
+  return (
+    <section
+      className="mx-auto max-w-5xl space-y-6 p-4 text-foreground"
+      aria-labelledby={`${formId}-heading`}
+    >
+      <header className="space-y-2">
+        <h1 id={`${formId}-heading`} className="text-heading-md">
+          {operationalCopy.correctionCaseHeading}
+        </h1>
+        <p className="text-body text-muted-foreground">
+          {operationalCopy.correctionCaseIntro}
+        </p>
+      </header>
+
+      {actionError ? (
+        <p className="text-body text-destructive" role="alert">
+          {actionError}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant={breachedOnly ? "primary" : "outline"}
+          size="sm"
+          onClick={() => setBreachedOnly((v) => !v)}
+        >
+          {breachedOnly
+            ? operationalCopy.correctionCaseFilterAll
+            : operationalCopy.correctionCaseFilterBreached}
+        </Button>
+        {caps?.write ? (
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy}
+            onClick={(e) => openDialog("open", e.currentTarget)}
+          >
+            {operationalCopy.correctionCaseOpen}
+          </Button>
+        ) : null}
+      </div>
+
+      {coldLoading ? (
+        <div className="space-y-2" role="status" aria-live="polite">
+          <span className="sr-only">{operationalCopy.correctionCaseLoading}</span>
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : loadError ? (
+        <p className="text-body text-destructive" role="alert">
+          {loadError}
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="text-body text-muted-foreground">
+          {operationalCopy.correctionCaseEmpty}
+        </p>
+      ) : (
+        <GovernedDataTable
+          aria-label={operationalCopy.correctionCaseHeading}
+          columns={COLUMNS}
+          rows={rows}
+          getRowId={(r) => r.id}
+          sectionDefaultFilters={{}}
+          pageSize={25}
+          emptyMessage={operationalCopy.correctionCaseEmpty}
+          rowActions={(r) => (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedId(r.id)}
+            >
+              {operationalCopy.correctionCaseDetail}
+            </Button>
+          )}
+        />
+      )}
+
+      <div className="space-y-4 border-t border-border pt-4">
+        <h2 className="text-heading-sm">{operationalCopy.correctionCaseDetail}</h2>
+        {!selectedId ? (
+          <p className="text-caption text-muted-foreground">
+            {operationalCopy.correctionCaseNoSelection}
+          </p>
+        ) : detailQuery.isLoading ? (
+          <Skeleton className="h-40 w-full" />
+        ) : detailQuery.isError ? (
+          <p className="text-body text-destructive" role="alert">
+            {trpcErrorMessage(
+              detailQuery.error,
+              operationalCopy.correctionCaseLoadError,
+            )}
+          </p>
+        ) : detailQuery.data ? (
+          <div className="space-y-3 text-body">
+            {detailQuery.data.breachedPresentation ? (
+              <p
+                className="rounded bg-destructive/10 px-3 py-2 text-destructive"
+                role="status"
+              >
+                {operationalCopy.correctionCaseBreachedBadge}
+              </p>
+            ) : null}
+            <dl className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <dt className="text-caption text-muted-foreground">
+                  {operationalCopy.correctionCaseRequestRef}
+                </dt>
+                <dd>{toPersianDigits(detailQuery.data.case.requestReference)}</dd>
+              </div>
+              <div>
+                <dt className="text-caption text-muted-foreground">
+                  {operationalCopy.correctionCaseStatus}
+                </dt>
+                <dd>{statusLabel(detailQuery.data.case.status)}</dd>
+              </div>
+              <div>
+                <dt className="text-caption text-muted-foreground">
+                  {operationalCopy.correctionCaseOwner}
+                </dt>
+                <dd className="font-mono text-caption">
+                  {detailQuery.data.case.ownerAccountId}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-caption text-muted-foreground">
+                  {operationalCopy.correctionCaseDeadline}
+                </dt>
+                <dd>
+                  {toPersianDigits(
+                    formatJalaliDateTimeFromIso(
+                      detailQuery.data.case.deadlineAt,
+                    ) ?? detailQuery.data.case.deadlineAt,
+                  )}
+                </dd>
+              </div>
+              {detailQuery.data.case.decisionReason ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-caption text-muted-foreground">
+                    {operationalCopy.correctionCaseDecisionReason}
+                  </dt>
+                  <dd>{detailQuery.data.case.decisionReason}</dd>
+                </div>
+              ) : null}
+            </dl>
+
+            <div className="flex flex-wrap gap-2">
+              {caps?.write &&
+              (detailQuery.data.case.status === "open" ||
+                detailQuery.data.case.status === "breached") ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    updateMutation.mutate({
+                      caseId: selectedId,
+                      toStatus: "in_progress",
+                    })
+                  }
+                >
+                  {operationalCopy.correctionCaseStatusInProgress}
+                </Button>
+              ) : null}
+              {caps?.write &&
+              (detailQuery.data.case.status === "in_progress" ||
+                detailQuery.data.case.status === "breached") ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    updateMutation.mutate({
+                      caseId: selectedId,
+                      toStatus: "pending_decision",
+                    })
+                  }
+                >
+                  {operationalCopy.correctionCaseStatusPendingDecision}
+                </Button>
+              ) : null}
+              {caps?.decide &&
+              ["pending_decision", "breached"].includes(
+                detailQuery.data.case.status,
+              ) ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy}
+                  onClick={(e) => openDialog("decide", e.currentTarget)}
+                >
+                  {operationalCopy.correctionCaseDecide}
+                </Button>
+              ) : null}
+              {caps?.close &&
+              ["approved", "rejected", "constrained"].includes(
+                detailQuery.data.case.status,
+              ) ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy}
+                  onClick={(e) => openDialog("close", e.currentTarget)}
+                >
+                  {operationalCopy.correctionCaseClose}
+                </Button>
+              ) : null}
+              {caps?.write &&
+              ["approved", "rejected", "constrained"].includes(
+                detailQuery.data.case.status,
+              ) ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={(e) => openDialog("link", e.currentTarget)}
+                >
+                  {operationalCopy.correctionCaseLinkOutcome}
+                </Button>
+              ) : null}
+              {caps?.write && detailQuery.data.case.status !== "closed" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={(e) => openDialog("evidence", e.currentTarget)}
+                >
+                  {operationalCopy.correctionCaseAddEvidence}
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-heading-sm">
+                {operationalCopy.correctionCaseAttachments}
+              </h3>
+              {detailQuery.data.attachments.length === 0 ? (
+                <p className="text-caption text-muted-foreground">—</p>
+              ) : (
+                <ul className="space-y-1">
+                  {detailQuery.data.attachments.map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex flex-wrap items-center gap-2 text-caption"
+                    >
+                      <span>{a.originalFilenameMinimized}</span>
+                      <span className="text-muted-foreground">
+                        ({inspectionLabel(a.inspectionStatus)})
+                      </span>
+                      {a.inspectionStatus === "allowed" ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              void downloadAttachment(a.id, "download")
+                            }
+                          >
+                            {operationalCopy.correctionCaseDownload}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              void downloadAttachment(a.id, "preview")
+                            }
+                          >
+                            {operationalCopy.correctionCasePreview}
+                          </Button>
+                        </>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {caps?.write ? (
+                <div className="flex flex-wrap items-end gap-2">
+                  <Input
+                    type="file"
+                    onChange={(e) =>
+                      void onFileChosen(e.target.files?.[0] ?? null)
+                    }
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busy || !uploadB64 || !uploadName}
+                    onClick={() =>
+                      uploadMutation.mutate({
+                        caseId: selectedId,
+                        filename: uploadName,
+                        contentBase64: uploadB64,
+                      })
+                    }
+                  >
+                    {operationalCopy.correctionCaseUpload}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-heading-sm">
+                {operationalCopy.correctionCaseOutcomeLinks}
+              </h3>
+              {detailQuery.data.outcomeLinks.length === 0 ? (
+                <p className="text-caption text-muted-foreground">—</p>
+              ) : (
+                <ul className="space-y-1 text-caption">
+                  {detailQuery.data.outcomeLinks.map((l) => (
+                    <li key={l.id}>
+                      {linkTypeLabel(l.linkType)}:{" "}
+                      {toPersianDigits(l.targetId)}
+                      {l.note ? ` — ${l.note}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-heading-sm">
+                {operationalCopy.correctionCaseEvidenceRefs}
+              </h3>
+              {detailQuery.data.evidenceRefs.length === 0 ? (
+                <p className="text-caption text-muted-foreground">—</p>
+              ) : (
+                <ul className="space-y-1 text-caption">
+                  {detailQuery.data.evidenceRefs.map((e) => (
+                    <li key={e.id}>
+                      {evidenceKindLabel(e.kind)}: {e.uriOrRef}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <Dialog
+        open={dialog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialog(null);
+            restoreFocus();
+          }
+        }}
+      >
+        <DialogContent>
+          {dialog === "open" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{operationalCopy.correctionCaseOpen}</DialogTitle>
+                <DialogDescription>
+                  {operationalCopy.correctionCaseConfirmOpen}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <label className="block space-y-1 text-caption">
+                  {operationalCopy.correctionCaseRequestRef}
+                  <Input
+                    value={requestRef}
+                    onChange={(e) => setRequestRef(e.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1 text-caption">
+                  {operationalCopy.correctionCaseAuthority}
+                  <Input
+                    value={authority}
+                    onChange={(e) => setAuthority(e.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1 text-caption">
+                  {operationalCopy.correctionCasePersonId}
+                  <Input
+                    value={personId}
+                    onChange={(e) => setPersonId(e.target.value)}
+                    dir="ltr"
+                  />
+                </label>
+                <label className="block space-y-1 text-caption">
+                  {operationalCopy.correctionCaseDeadline}
+                  <Input
+                    type="datetime-local"
+                    value={deadlineLocal}
+                    onChange={(e) => setDeadlineLocal(e.target.value)}
+                  />
+                </label>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialog(null)}
+                >
+                  {operationalCopy.correctionCaseCancel}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    busy ||
+                    !requestRef.trim() ||
+                    !authority.trim() ||
+                    !personId.trim() ||
+                    !deadlineLocal
+                  }
+                  onClick={() =>
+                    openMutation.mutate({
+                      requestReference: requestRef.trim(),
+                      authorityVerifiedBy: authority.trim(),
+                      personId: personId.trim(),
+                      deadlineAt: new Date(deadlineLocal),
+                    })
+                  }
+                >
+                  {operationalCopy.correctionCaseConfirm}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+
+          {dialog === "decide" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{operationalCopy.correctionCaseDecide}</DialogTitle>
+                <DialogDescription>
+                  {operationalCopy.correctionCaseConfirmDecide}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <label className="block space-y-1 text-caption">
+                  {operationalCopy.correctionCaseDecision}
+                  <select
+                    className="w-full rounded border border-border bg-background px-2 py-2"
+                    value={decision}
+                    onChange={(e) =>
+                      setDecision(
+                        e.target.value as
+                          | "approved"
+                          | "rejected"
+                          | "constrained",
+                      )
+                    }
+                  >
+                    <option value="approved">
+                      {operationalCopy.correctionCaseStatusApproved}
+                    </option>
+                    <option value="rejected">
+                      {operationalCopy.correctionCaseStatusRejected}
+                    </option>
+                    <option value="constrained">
+                      {operationalCopy.correctionCaseStatusConstrained}
+                    </option>
+                  </select>
+                </label>
+                <label className="block space-y-1 text-caption">
+                  {operationalCopy.correctionCaseDecisionReason}
+                  <Input
+                    value={decisionReason}
+                    onChange={(e) => setDecisionReason(e.target.value)}
+                  />
+                </label>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialog(null)}
+                >
+                  {operationalCopy.correctionCaseCancel}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy || !decisionReason.trim() || !selectedId}
+                  onClick={() =>
+                    decideMutation.mutate({
+                      caseId: selectedId!,
+                      decision,
+                      decisionReason: decisionReason.trim(),
+                    })
+                  }
+                >
+                  {operationalCopy.correctionCaseConfirm}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+
+          {dialog === "close" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{operationalCopy.correctionCaseClose}</DialogTitle>
+                <DialogDescription>
+                  {operationalCopy.correctionCaseConfirmClose}
+                </DialogDescription>
+              </DialogHeader>
+              <label className="block space-y-1 text-caption">
+                {operationalCopy.correctionCaseClosureEvidence}
+                <Input
+                  value={closureNote}
+                  onChange={(e) => setClosureNote(e.target.value)}
+                />
+              </label>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialog(null)}
+                >
+                  {operationalCopy.correctionCaseCancel}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy || !closureNote.trim() || !selectedId}
+                  onClick={() =>
+                    closeMutation.mutate({
+                      caseId: selectedId!,
+                      closureEvidence: { note: closureNote.trim() },
+                    })
+                  }
+                >
+                  {operationalCopy.correctionCaseConfirm}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+
+          {dialog === "link" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {operationalCopy.correctionCaseLinkOutcome}
+                </DialogTitle>
+                <DialogDescription>
+                  {operationalCopy.correctionCasePendingPublicationHonesty}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <label className="block space-y-1 text-caption">
+                  نوع پیوند
+                  <select
+                    className="w-full rounded border border-border bg-background px-2 py-2"
+                    value={linkType}
+                    onChange={(e) =>
+                      setLinkType(
+                        e.target.value as typeof linkType,
+                      )
+                    }
+                  >
+                    <option value="pending_publication_hook">
+                      {operationalCopy.correctionCaseLinkPendingPublication}
+                    </option>
+                    <option value="personnel_correction">
+                      {operationalCopy.correctionCaseLinkPersonnelCorrection}
+                    </option>
+                    <option value="disposal_run">
+                      {operationalCopy.correctionCaseLinkDisposalRun}
+                    </option>
+                    <option value="hold">
+                      {operationalCopy.correctionCaseLinkHold}
+                    </option>
+                    <option value="recalc">
+                      {operationalCopy.correctionCaseLinkRecalc}
+                    </option>
+                    <option value="response_evidence">
+                      {operationalCopy.correctionCaseLinkResponseEvidence}
+                    </option>
+                  </select>
+                </label>
+                <label className="block space-y-1 text-caption">
+                  شناسه هدف
+                  <Input
+                    value={linkTarget}
+                    onChange={(e) => setLinkTarget(e.target.value)}
+                    dir="ltr"
+                  />
+                </label>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialog(null)}
+                >
+                  {operationalCopy.correctionCaseCancel}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy || !linkTarget.trim() || !selectedId}
+                  onClick={() =>
+                    linkMutation.mutate({
+                      caseId: selectedId!,
+                      linkType,
+                      targetId: linkTarget.trim(),
+                    })
+                  }
+                >
+                  {operationalCopy.correctionCaseConfirm}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+
+          {dialog === "evidence" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {operationalCopy.correctionCaseAddEvidence}
+                </DialogTitle>
+                <DialogDescription>
+                  {operationalCopy.correctionCaseEvidenceRefs}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <label className="block space-y-1 text-caption">
+                  نوع
+                  <select
+                    className="w-full rounded border border-border bg-background px-2 py-2"
+                    value={evidenceKind}
+                    onChange={(e) =>
+                      setEvidenceKind(e.target.value as typeof evidenceKind)
+                    }
+                  >
+                    <option value="request">
+                      {operationalCopy.correctionCaseEvidenceKindRequest}
+                    </option>
+                    <option value="response">
+                      {operationalCopy.correctionCaseEvidenceKindResponse}
+                    </option>
+                    <option value="internal">
+                      {operationalCopy.correctionCaseEvidenceKindInternal}
+                    </option>
+                    <option value="other">
+                      {operationalCopy.correctionCaseEvidenceKindOther}
+                    </option>
+                  </select>
+                </label>
+                <label className="block space-y-1 text-caption">
+                  {operationalCopy.correctionCaseEvidenceUri}
+                  <Input
+                    value={evidenceUri}
+                    onChange={(e) => setEvidenceUri(e.target.value)}
+                  />
+                </label>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialog(null)}
+                >
+                  {operationalCopy.correctionCaseCancel}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy || !evidenceUri.trim() || !selectedId}
+                  onClick={() =>
+                    evidenceMutation.mutate({
+                      caseId: selectedId!,
+                      kind: evidenceKind,
+                      uriOrRef: evidenceUri.trim(),
+                    })
+                  }
+                >
+                  {operationalCopy.correctionCaseConfirm}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}

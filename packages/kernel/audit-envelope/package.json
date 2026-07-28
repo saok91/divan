@@ -16,7 +16,8 @@
     "selfcheck:ops-health": "tsx src/ops-health.selfcheck.ts",
     "selfcheck:data-lifecycle": "tsx src/data-lifecycle.selfcheck.ts",
     "selfcheck:audit-trust": "tsx src/audit-trust.selfcheck.ts",
-    "selfcheck:audit-trust-baseline": "tsx src/audit-trust-baseline.selfcheck.ts"
+    "selfcheck:audit-trust-baseline": "tsx src/audit-trust-baseline.selfcheck.ts",
+    "selfcheck:correction-case": "tsx src/correction-case.selfcheck.ts"
   },
   "dependencies": {
     "@divan/event-store": "workspace:*",
