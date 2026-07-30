@@ -10,6 +10,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 
+import { isWaiverExpired } from "@divan/audit-envelope";
 import type { Pool, PoolClient } from "@divan/db";
 
 import { getLatestBatchEvidence } from "./batch-evidence";
@@ -68,13 +69,6 @@ function assertRunMutable(run: ReconciliationRun): void {
       "این اجرای تطبیق رد یا جایگزین شده و قابل تغییر نیست.",
     );
   }
-}
-
-function isWaiverExpired(expiry: string | null | undefined): boolean {
-  if (!expiry?.trim()) return true;
-  const t = Date.parse(expiry);
-  if (Number.isNaN(t)) return true;
-  return t < Date.now();
 }
 
 function findDomainDisc(

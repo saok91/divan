@@ -1,9 +1,30 @@
 /**
  * Data Dictionary types + field↔element maps (Story 3.3 / FR-7).
  * Registry governs enablement; Person columns hold MVP approve values (not EAV).
+ *
+ * Story 7.7: default foreshadow string binds to AR-DATA partial freeze;
+ * runtime resolver may override via Launch Artifact Register when present.
  */
 
-export const DATA_DICTIONARY_REGISTRY_VERSION = "ar-data-partial-freeze-2026-07-16";
+/** @provisional-pending-AR-DATA-freeze — foreshadow; prefer register controlling version */
+export const DATA_DICTIONARY_REGISTRY_VERSION =
+  "ar-data-partial-freeze-2026-07-16";
+
+/**
+ * Bind dictionary registryVersion to AR-DATA controlling version when registered.
+ * Fail-closed incomplete when enforcement flag is on and unresolved.
+ */
+export function bindDataDictionaryRegistryVersion(
+  controllingVersionLabel: string | null | undefined,
+  opts?: { enforce?: boolean },
+): string {
+  const label = controllingVersionLabel?.trim() ?? "";
+  if (label) return label;
+  if (opts?.enforce) {
+    throw new Error("CONTROLLING_VERSION_UNRESOLVED:AR-DATA");
+  }
+  return DATA_DICTIONARY_REGISTRY_VERSION;
+}
 
 export type DataElementDisposition = "approve" | "later" | "reject";
 

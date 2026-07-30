@@ -47,6 +47,28 @@ export const PROVISIONAL_METRIC_VERSION =
   "@provisional-pending-AR-REPORTING-freeze";
 
 /**
+ * Prefer register-backed AR-REPORTING version label when present;
+ * keep provisional honesty when label still carries provisional marker.
+ */
+export function resolvePublicationVersionStrings(
+  controllingVersionLabel: string | null | undefined,
+): { reportVersion: string; metricVersion: string; provisional: boolean } {
+  const label = controllingVersionLabel?.trim() ?? "";
+  if (!label || label.includes("@provisional-pending")) {
+    return {
+      reportVersion: PROVISIONAL_REPORT_VERSION,
+      metricVersion: PROVISIONAL_METRIC_VERSION,
+      provisional: true,
+    };
+  }
+  return {
+    reportVersion: label,
+    metricVersion: label,
+    provisional: false,
+  };
+}
+
+/**
  * @provisional-pending-AR-DATA-freeze
  * Empty allowlist → disposal forks to `non-reproducible-after-disposal`
  * unless report key is listed (metadata-only package; no unauthorized PII).

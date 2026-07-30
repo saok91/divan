@@ -21,6 +21,7 @@ import {
   DATA_ELEMENT_SEED,
   ELEMENT_TO_PERSON_FIELD,
   PERSON_FIELD_TO_ELEMENT,
+  bindDataDictionaryRegistryVersion,
   type DataElementDisposition,
   type DataElementMandatoryMetaKey,
   type DataElementRecord,
@@ -47,6 +48,7 @@ export {
   ELEMENT_TO_PERSON_FIELD,
   PERSON_FIELD_CATEGORY,
   PERSON_FIELD_TO_ELEMENT,
+  bindDataDictionaryRegistryVersion,
 } from "./data-dictionary-types";
 
 export type {
@@ -183,11 +185,25 @@ export async function getDataElement(
 
 export async function listDataElements(
   db: PrismaClient = getPersonDb(),
+  opts?: {
+    arDataControllingVersionLabel?: string | null;
+    enforceArDataBinding?: boolean;
+  },
 ): Promise<DataElementRecord[]> {
   const rows = await db.dataElement.findMany({
     orderBy: { elementId: "asc" },
   });
-  return rows.map(mapRow);
+  const boundVersion = bindDataDictionaryRegistryVersion(
+    opts?.arDataControllingVersionLabel,
+    { enforce: opts?.enforceArDataBinding === true },
+  );
+  return rows.map((row) => {
+    const mapped = mapRow(row);
+    if (opts?.arDataControllingVersionLabel != null || opts?.enforceArDataBinding) {
+      return { ...mapped, registryVersion: boundVersion };
+    }
+    return mapped;
+  });
 }
 
 /**
@@ -312,7 +328,10 @@ export async function assertPersonFieldEnabled(
   await assertFieldEnabled(elementId, db);
 }
 
-function seedRowData(def: SeedDataElementDef) {
+function seedRowData(
+  def: SeedDataElementDef,
+  registryVersion: string = DATA_DICTIONARY_REGISTRY_VERSION,
+) {
   const meta = def.metadata;
   return {
     elementId: def.elementId,
@@ -331,7 +350,7 @@ function seedRowData(def: SeedDataElementDef) {
     lineage: def.lineage ?? null,
     personFieldKey: def.personFieldKey ?? null,
     labelFa: def.labelFa,
-    registryVersion: DATA_DICTIONARY_REGISTRY_VERSION,
+    registryVersion,
   };
 }
 
@@ -343,15 +362,27 @@ function seedRowData(def: SeedDataElementDef) {
  * - **Update:** sync disposition/metadata from seed; preserve existing
  *   `enabled` for approve rows (operator disable stays durable). later/reject
  *   always forced `enabled=false`.
+ *
+ * Story 7.7: `arDataControllingVersionLabel` binds registryVersion via
+ * `bindDataDictionaryRegistryVersion` when register-backed AR-DATA is known.
  */
 export async function seedDataDictionary(
   db: PrismaClient = getPersonDb(),
+  opts?: {
+    arDataControllingVersionLabel?: string | null;
+    enforceArDataBinding?: boolean;
+  },
 ): Promise<{ seeded: number; enabled: number }> {
   let seeded = 0;
   let enabled = 0;
 
+  const registryVersion = bindDataDictionaryRegistryVersion(
+    opts?.arDataControllingVersionLabel,
+    { enforce: opts?.enforceArDataBinding === true },
+  );
+
   for (const def of DATA_ELEMENT_SEED) {
-    const data = seedRowData(def);
+    const data = seedRowData(def, registryVersion);
     const existing = await db.dataElement.findUnique({
       where: { elementId: def.elementId },
     });

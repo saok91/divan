@@ -28,6 +28,7 @@ import {
   PUBLICATION_STATUS,
   REPRODUCIBILITY_STATE,
   isPublicationPackageRetainAllowed,
+  resolvePublicationVersionStrings,
   type PublicationNoticeKind,
   type PublicationStatus,
 } from "./decision-publication-permissions";
@@ -56,6 +57,10 @@ import {
   type StableSnapshotInput,
 } from "./export-artifact";
 import { withPgTransaction } from "./export-artifact-repo";
+import {
+  assertArtifactsUsable,
+  type ControllingVersionRef,
+} from "@divan/audit-envelope";
 
 export type DecisionPublication = DecisionPublicationRecord & {
   currentlyReproducible: boolean;
@@ -180,12 +185,63 @@ export async function publishDecisionReport(
     );
   }
 
+  // Story 7.7 — honor change-control blocks; provisional honesty only when
+  // AR-REPORTING controlling version is unresolved / register incomplete.
   const correlationId = input.correlationId ?? randomUUID();
+  let controllingVersions: ControllingVersionRef[] = [];
+  let resolvedReportVersion = reportVersion;
+  let resolvedMetricVersion = metricVersion;
+
+  let gate: Awaited<ReturnType<typeof assertArtifactsUsable>> | null = null;
+  try {
+    gate = await assertArtifactsUsable(db, ["AR-REPORTING"]);
+  } catch {
+    // Missing schema / pool / infra → provisional honesty (register not ready)
+    gate = null;
+  }
+
+  if (gate && !gate.ok) {
+    const provisional =
+      gate.code === "CONTROLLING_VERSION_UNRESOLVED" ||
+      gate.code === "LAUNCH_ARTIFACT_NOT_FOUND";
+    if (!provisional) {
+      await appendAccessEvent(db, {
+        correlationId,
+        actorAccountId: input.publisherAccountId,
+        operation: "launch.artifact.gate.deny",
+        scope: {
+          channel: "launch_artifact",
+          consumer: "decision_publication",
+          code: gate.code,
+        },
+        result: "deny",
+        reason: gate.code,
+        entityType: "launch_artifact",
+        entityId: "AR-REPORTING",
+        payload: {
+          messageFa: gate.messageFa,
+          blockedArtifactIds: gate.blockedArtifactIds,
+        },
+      });
+      throw new DecisionPublicationError(
+        "PUBLICATION_DENIED",
+        gate.messageFa || MSG_PUBLICATION_DENIED_FA,
+      );
+    }
+  } else if (gate?.ok && gate.controllingVersions.length > 0) {
+    controllingVersions = gate.controllingVersions;
+    const bound = resolvePublicationVersionStrings(
+      controllingVersions[0]!.versionLabel,
+    );
+    if (!input.reportVersion) resolvedReportVersion = bound.reportVersion;
+    if (!input.metricVersion) resolvedMetricVersion = bound.metricVersion;
+  }
+
   const created = await withPgTransaction(db, async (tx) => {
     const row = await insertDecisionPublication(tx, {
       reportKey: input.reportKey,
-      reportVersion,
-      metricVersion,
+      reportVersion: resolvedReportVersion,
+      metricVersion: resolvedMetricVersion,
       snapshotHash: computed,
       snapshotRef: input.snapshotRef ?? {
         sourceSurface: input.stableSnapshot.sourceSurface,
@@ -199,6 +255,13 @@ export async function publishDecisionReport(
       permittedAudience: input.permittedAudience,
       correlationId,
       sourceExportArtifactId: input.sourceExportArtifactId ?? null,
+      controllingArtifactVersions: controllingVersions.map((v) => ({
+        artifactId: v.artifactId,
+        versionId: v.versionId,
+        versionLabel: v.versionLabel,
+        status: v.status,
+        registerStatus: v.registerStatus,
+      })),
     });
 
     await insertLifecycleEvent(tx, {
@@ -223,8 +286,9 @@ export async function publishDecisionReport(
       entityId: row.id,
       payload: {
         snapshotHash: computed,
-        reportVersion,
-        metricVersion,
+        reportVersion: resolvedReportVersion,
+        metricVersion: resolvedMetricVersion,
+        controllingArtifactVersions: controllingVersions,
         outcome: "published",
       },
     });

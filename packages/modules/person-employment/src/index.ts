@@ -209,6 +209,7 @@ export {
   ELEMENT_TO_PERSON_FIELD,
   PERSON_FIELD_CATEGORY,
   PERSON_FIELD_TO_ELEMENT,
+  bindDataDictionaryRegistryVersion,
   assertDerivedSensitivityAllowed,
   assertFieldEnabled,
   assertFreeTextAllowed,

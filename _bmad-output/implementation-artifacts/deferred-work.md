@@ -1,3 +1,10 @@
+## Deferred from: code review of 7-7-launch-artifact-change-control-hooks.md (2026-07-30)
+
+- Permission helper ignores inactive-role / org-scope filters (`actorHoldsLaunchPermission`) — same MVP pattern as other ops routers; revisit with AR-ACCESS multi-tenant scopes
+- No `assertWaiverAllows` continued-use helper — gates do not yet consult waivers to authorize continued use; add when waiver-bypass gate paths ship
+- SoD on version approve (creator≠approver) / manage+approve on same `hr.admin` set — provisional until AR-ACCESS freeze (matches 7.6 seed SoD defer)
+- Independent-approver attestation remains free-text id ≠ requester/actor — identity-bound / second-session owned by AR-ACCESS freeze
+
 ## Deferred from: code review of 7-6-published-decision-report-reproducibility.md (2026-07-29)
 
 - Retrieve/list do not enforce recorded `permittedAudience` (`decision-publication` router) — MVP `org:selfcheck` / Known gaps IDOR class; revisit with AR-ACCESS audience matrix

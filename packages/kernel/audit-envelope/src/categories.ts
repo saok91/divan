@@ -204,6 +204,13 @@ export const DEV_DEMO_CATEGORIES: CategoryRegistry = freezeRegistry([
     sensitivity: "ordinary",
     requiresSeparateExport: false,
   },
+  // Story 7.7 — Launch Artifact Register change-control (ordinary; NOT health / export)
+  {
+    id: "launch.artifact",
+    enabled: true,
+    sensitivity: "ordinary",
+    requiresSeparateExport: false,
+  },
 ]);
 
 /**

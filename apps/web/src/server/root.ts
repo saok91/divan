@@ -40,6 +40,7 @@ import { operationsRouter } from "./operations";
 import { retentionRouter } from "./retention";
 import { correctionCaseRouter } from "./correction-case";
 import { decisionPublicationRouter } from "./decision-publication";
+import { launchArtifactRouter } from "./launch-artifact";
 import {
   actorHasActiveBulkGrant,
   runGovernedDrillDown,
@@ -118,6 +119,8 @@ export const appRouter = createTRPCRouter({
   correctionCase: correctionCaseRouter,
 
   decisionPublication: decisionPublicationRouter,
+
+  launchArtifact: launchArtifactRouter,
 
   migration: migrationRouter,
 

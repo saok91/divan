@@ -42,6 +42,8 @@ export type DecisionPublicationRecord = {
   correlationId: string;
   sourceExportArtifactId: string | null;
   hasSupersessionNotice: boolean;
+  /** Story 7.7 — controlling AR version refs at publish time (additive). */
+  controllingArtifactVersions: JsonValue;
   createdAt: string;
 };
 
@@ -110,6 +112,9 @@ function mapPublicationRow(
         ? null
         : String(row.source_export_artifact_id),
     hasSupersessionNotice: Boolean(row.has_supersession_notice),
+    controllingArtifactVersions: parseJson(
+      row.controlling_artifact_versions ?? [],
+    ),
     createdAt: new Date(String(row.created_at)).toISOString(),
   };
 }
@@ -152,7 +157,9 @@ const PUBLICATION_COLS = `
   id, report_key, report_version, metric_version, snapshot_hash, snapshot_ref,
   filters_snapshot, evaluation_mode, as_of_date, published_at, publisher_account_id,
   permitted_audience, status, reproducibility_state, correlation_id,
-  source_export_artifact_id, has_supersession_notice, created_at
+  source_export_artifact_id, has_supersession_notice,
+  COALESCE(controlling_artifact_versions, '[]'::jsonb) AS controlling_artifact_versions,
+  created_at
 `;
 
 const NOTICE_COLS = `
@@ -180,6 +187,7 @@ export async function insertDecisionPublication(
     permittedAudience: readonly string[];
     correlationId: string;
     sourceExportArtifactId?: string | null;
+    controllingArtifactVersions?: JsonValue;
   },
 ): Promise<DecisionPublicationRecord> {
   const id = randomUUID();
@@ -188,12 +196,12 @@ export async function insertDecisionPublication(
        id, report_key, report_version, metric_version, snapshot_hash, snapshot_ref,
        filters_snapshot, evaluation_mode, as_of_date, publisher_account_id,
        permitted_audience, status, reproducibility_state, correlation_id,
-       source_export_artifact_id
+       source_export_artifact_id, controlling_artifact_versions
      ) VALUES (
        $1::uuid, $2, $3, $4, $5, $6::jsonb,
        $7::jsonb, $8, $9::date, $10,
        $11::jsonb, 'published', 'reproducible', $12::uuid,
-       $13
+       $13, $14::jsonb
      )
      RETURNING ${PUBLICATION_COLS}`,
     [
@@ -210,6 +218,7 @@ export async function insertDecisionPublication(
       JSON.stringify([...input.permittedAudience]),
       input.correlationId,
       input.sourceExportArtifactId ?? null,
+      JSON.stringify(input.controllingArtifactVersions ?? []),
     ],
   );
   return mapPublicationRow(result.rows[0] as Record<string, unknown>);
