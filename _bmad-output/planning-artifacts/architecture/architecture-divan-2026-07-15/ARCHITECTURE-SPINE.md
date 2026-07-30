@@ -7,8 +7,8 @@ paradigm: modular-monolith + event-sourcing-lite
 scope: Divan HRIS MVP — single-org on-prem workforce system (~500 people)
 status: final
 created: 2026-07-15
-updated: 2026-07-15T05:18+03:30
-binds: [FR-1..FR-56, AR-ACCESS, AR-TEMPORAL, AR-HEADCOUNT, AR-DATA, AR-AUDIT, AR-MIGRATION, AR-IDENTITY, AR-NFR]
+updated: 2026-07-31T03:05+03:30
+binds: [FR-1..FR-60, AR-ACCESS, AR-TEMPORAL, AR-HEADCOUNT, AR-DATA, AR-AUDIT, AR-MIGRATION, AR-IDENTITY, AR-NFR]
 sources:
   - _bmad-output/planning-artifacts/prds/prd-divan-2026-07-11/prd.md
   - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-13/DESIGN.md
@@ -96,6 +96,12 @@ flowchart TB
 - **Prevents:** headcount race on async finalize; Prisma convenience eroding module boundaries; unaudited direct DB access from UI layer
 - **Rule:** **Critical mutations** (finalization affecting current headcount, reservations, atomic transfers) MUST refresh affected projections **synchronously in the same database transaction** as event append. **Heavy historical recalculation** (e.g., deep backdate) MAY run **async** via **pg-boss** on the same PostgreSQL with a visible `recalculation_pending` UI state. **T3 stack is adopted** [ADOPTED]: Next.js + tRPC + Prisma + pg-boss monorepo; organization has no .NET/Java mandate. **Prisma for projections only**; **raw SQL / `$transaction` for kernel event-store**; **ESLint `no-restricted-imports`** blocks direct `@prisma/client` in `apps/web`; tRPC context exposes **envelope-wrapped repositories** only. AR-NFR still pins Node/PostgreSQL versions and ops envelope — not stack re-selection.
 
+### AD-7 — Governed Application Configuration [ADOPTED 2026-07-31]
+
+- **Binds:** FR-60 configuration administration; FR-42 and FR-55 change evidence; FR-45 degraded state
+- **Prevents:** the same parameter existing as a literal in one module and an environment variable in another; silent configuration drift; a UI setting quietly widening a security boundary
+- **Rule:** Governed application parameters live in a **typed registry** (label, description, type, unit, range or allowlist, default, editability, owning domain) with a **database-backed store** read through a **single resolver with cached reads**. Modules MUST NOT read raw environment variables or literals for registered parameters. An unavailable or invalid value **fails closed to the registered code default** and raises the FR-45 degraded state. Every change is attributable through the existing audit envelope and reversible to default. **Security, authorization, audit-integrity, and identity posture parameters remain deployment-managed and read-only in the UI**, surfaced with their real change path. No AD-1…AD-6 change. Authorized by `sprint-change-proposal-2026-07-31.md`.
+
 ```mermaid
 flowchart LR
   subgraph deps["Dependency direction"]
@@ -121,6 +127,7 @@ flowchart LR
 | Logging | Technical logs redacted per FR-45; no LDAP secrets or unnecessary HR content |
 | Sensitive data | Compensation schema isolated; sensitive export requires separate permission via envelope |
 | Async jobs | pg-boss queue names prefixed by domain (`temporal.recalculate`, etc.); idempotent handlers |
+| Configuration | Registered parameters read only through the AD-7 resolver; no direct `process.env` or literal reads for a registered parameter; invalid or unavailable values fail closed to the registered default |
 
 ## Stack
 

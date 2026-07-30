@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>پالت نمودارها — دیوان</title>
+<style>
+/* =====================================================================
+   پالت نمودارها — دو گزینه
+
+   OPTION ۱ — «تک‌رنگ برند» (brand monochrome)
+   categorical (light canvas):
+     #051061  #0B3FB5  #006FFF  #4D9BFF  #9EC8FF   + neutral #808184
+   categorical (dark canvas, lifted for contrast on #12131A):
+     #C2DBFF  #8FBEFF  #4D9BFF  #1E7BFF  #0A4FCC   + neutral #9A9CA3
+   sequential single-hue ramp (light):
+     #E8F1FF  #C2DBFF  #8FBEFF  #4D9BFF  #0F7BFF  #0A4FCC  #051061
+   NOTE: #FDB913 (CTA gold) never appears as a data colour.
+   NOTE: status hues appear ONLY where data encodes status.
+
+   OPTION ۲ — «چندرنگ متمایز» (distinct multi-hue)
+   categorical (light canvas):
+     #1B3BBB  #0B8FA8  #C2255C  #7048E8  #495057
+   categorical (dark canvas, lifted):
+     #6C8CFF  #3BC9DB  #F06595  #A98BFF  #ADB5BD
+   deliberately excluded: gold #FDB913, and all reserved status hues
+     #1864AB (scheduled) #2B8A3E (effective) #E67700 (draft) #862E00 (override)
+   the whole orange/amber band is skipped so nothing reads as draft/override;
+   the green band is skipped in favour of cyan #0B8FA8 so nothing reads as
+   effective; the blue is pushed to indigo #1B3BBB so it separates from the
+   scheduled blue #1864AB.
+   ===================================================================== */
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#F8F9FA;color:#212529;
+  font-family:"Yekan Bakh Fa-En","Segoe UI",Tahoma,sans-serif;
+  font-size:13px;line-height:1.55;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+}
+.wrap{max-width:1400px;margin:0 auto;padding:22px 24px 64px}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* ---------- page chrome ---------- */
+.topbar{background:#051061;color:#fff;border-radius:5px;padding:11px 16px;display:flex;align-items:center;gap:14px}
+.topbar b{font-weight:600;font-size:14px;letter-spacing:.2px}
+.topbar span{color:#B9C0E6;font-size:12px}
+.topbar .cta{margin-inline-start:auto;background:#FDB913;color:#051061;font-weight:600;font-size:12px;padding:5px 14px;border-radius:4px}
+.note{color:#808184;font-size:12px;margin:10px 2px 26px;max-width:78ch}
+
+/* ---------- option heading ---------- */
+.optbar{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid #DEE2E6;padding-bottom:7px;margin:34px 0 12px}
+.optbar h2{margin:0;font-size:15px;font-weight:600;color:#051061}
+.optbar em{font-style:normal;color:#808184;font-size:12px}
+.optbar .tag{margin-inline-start:auto;font-size:11px;color:#808184;border:1px solid #DEE2E6;border-radius:3px;padding:1px 8px}
+
+/* ---------- swatch chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.chip{display:flex;align-items:center;gap:6px;border:1px solid #E9ECEF;border-radius:3px;padding:3px 8px 3px 4px;background:#fff;font-size:11px;color:#495057}
+.chip i{width:14px;height:14px;border-radius:2px;display:block;border:1px solid rgba(0,0,0,.12)}
+.chip code{font-family:"Segoe UI",Tahoma,monospace;direction:ltr;letter-spacing:.3px;color:#212529}
+.chip u{text-decoration:none;color:#808184}
+
+/* ---------- canvases ---------- */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.canvas{border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--panel);color:var(--fg)}
+.canvas .bar{background:var(--chrome);color:var(--chromefg);font-size:11.5px;padding:6px 12px;display:flex;gap:10px;align-items:center}
+.canvas .bar .dot{width:6px;height:6px;border-radius:50%;background:#FDB913}
+.canvas .bar .th{margin-inline-start:auto;opacity:.7}
+.canvas .body{padding:12px 13px 15px}
+
+.canvas.light{--panel:#FFFFFF;--fg:#212529;--rule:#E9ECEF;--hair:#F1F3F5;--sub:#808184;--grid:#F1F3F5;--neutral:#E9ECEF;--chrome:#051061;--chromefg:#FFFFFF;--zebra:#FCFCFD}
+.canvas.dark {--panel:#12131A;--fg:#F1F3F5;--rule:#2A2C36;--hair:#22242E;--sub:#9A9CA3;--grid:#1D1F28;--neutral:#2A2C36;--chrome:#030825;--chromefg:#F1F3F5;--zebra:#15161E}
+
+/* ---------- series colours per option / theme ---------- */
+.opt1 .canvas.light{--s1:#051061;--s2:#0B3FB5;--s3:#006FFF;--s4:#4D9BFF;--s5:#9EC8FF;--sg:#808184;
+  --k1:#0B3FB5;--k2:#4D9BFF;--k3:#E9ECEF;--d1:#051061;--d2:#006FFF;--d3:#9EC8FF}
+.opt1 .canvas.dark {--s1:#C2DBFF;--s2:#8FBEFF;--s3:#4D9BFF;--s4:#1E7BFF;--s5:#0A4FCC;--sg:#9A9CA3;
+  --k1:#4D9BFF;--k2:#8FBEFF;--k3:#2A2C36;--d1:#C2DBFF;--d2:#4D9BFF;--d3:#0A4FCC}
+.opt2 .canvas.light{--s1:#1B3BBB;--s2:#0B8FA8;--s3:#C2255C;--s4:#7048E8;--s5:#495057;--sg:#808184;
+  --k1:#1B3BBB;--k2:#0B8FA8;--k3:#E9ECEF;--d1:#1B3BBB;--d2:#0B8FA8;--d3:#C2255C}
+.opt2 .canvas.dark {--s1:#6C8CFF;--s2:#3BC9DB;--s3:#F06595;--s4:#A98BFF;--s5:#ADB5BD;--sg:#9A9CA3;
+  --k1:#6C8CFF;--k2:#3BC9DB;--k3:#2A2C36;--d1:#6C8CFF;--d2:#3BC9DB;--d3:#F06595}
+
+/* ---------- metric cards ---------- */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.metric{padding:9px 10px;border-inline-start:1px solid var(--hair)}
+.metric:first-child{border-inline-start:0}
+.metric .lbl{font-size:11px;color:var(--sub)}
+.metric .val{font-size:21px;font-weight:600;line-height:1.25;letter-spacing:.4px}
+.metric .cap{font-size:10px;color:var(--sub);opacity:.85}
+
+/* ---------- section titles ---------- */
+.sec{margin-top:14px}
+.sec>h3{margin:0 0 2px;font-size:12px;font-weight:600;color:var(--fg)}
+.sec>.sub{font-size:10.5px;color:var(--sub);margin-bottom:6px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--sub);margin:5px 0 0}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend i{width:9px;height:9px;border-radius:2px;display:block}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+
+/* ---------- line / area ---------- */
+.linewrap{border-bottom:1px solid var(--hair)}
+svg.line{display:block;width:100%;height:auto}
+.xaxis{display:flex;justify-content:space-between;font-size:9.5px;color:var(--sub);padding-top:3px}
+
+/* ---------- grouped bars ---------- */
+.gbars{display:flex;gap:10px;align-items:flex-end;height:96px;border-bottom:1px solid var(--rule);padding-bottom:0}
+.gcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+.gcol .pairbars{display:flex;gap:3px;align-items:flex-end;height:100%;justify-content:center}
+.gcol .pairbars b{width:11px;display:block;border-radius:1px 1px 0 0}
+.gx{display:flex;gap:10px;font-size:9.5px;color:var(--sub);padding-top:3px}
+.gx u{flex:1;text-align:center;text-decoration:none}
+
+/* ---------- horizontal stacked ---------- */
+.hrow{display:grid;grid-template-columns:104px 1fr 46px;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--hair);font-size:11px}
+.hrow:last-of-type{border-bottom:0}
+.hname{color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbar{display:flex;height:9px;border-radius:2px;overflow:hidden;background:var(--neutral)}
+.hbar b{display:block;height:100%}
+.hval{font-size:10.5px;color:var(--sub);text-align:left;direction:ltr}
+
+/* ---------- donut ---------- */
+.donutrow{display:flex;align-items:center;gap:14px}
+.donut{width:104px;height:104px;border-radius:50%;flex:0 0 auto;position:relative;
+  background:conic-gradient(var(--d1) 0 72%,var(--d2) 72% 90%,var(--d3) 90% 100%)}
+.donut::after{content:"";position:absolute;inset:26px;border-radius:50%;background:var(--panel)}
+.donut em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:12px;font-weight:600;z-index:1;color:var(--fg)}
+.dlist{font-size:11px;display:grid;gap:4px}
+.dlist span{display:flex;align-items:center;gap:6px;color:var(--sub)}
+.dlist i{width:9px;height:9px;border-radius:2px}
+.dlist b{color:var(--fg);font-weight:600;margin-inline-start:auto}
+
+/* ---------- data states ---------- */
+.states{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.state{border:1px solid var(--rule);border-radius:4px;padding:8px 9px;min-height:104px;display:flex;flex-direction:column}
+.state h4{margin:0 0 6px;font-size:11px;font-weight:600;color:var(--fg)}
+.state .msg{margin:auto 0;font-size:11px;color:var(--sub);text-align:center;padding:10px 0}
+.state.empty{border-style:dashed}
+.state.suppressed .lock{text-align:center;color:var(--sub);font-size:16px;letter-spacing:2px}
+.state.stale{border-style:dashed}
+.state.stale .mini{opacity:.42;filter:grayscale(.35)}
+.state .cap{font-size:10px;color:var(--sub);margin-top:6px;border-top:1px solid var(--hair);padding-top:4px}
+.mini{display:flex;gap:4px;align-items:flex-end;height:44px}
+.mini b{flex:1;display:block;border-radius:1px 1px 0 0;background:var(--k1)}
+
+/* ---------- status legend (reserved colours) ---------- */
+.statusrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:9px;border-top:1px solid var(--hair)}
+.pill{font-size:10.5px;border-radius:3px;padding:1px 8px;line-height:1.7}
+.p-sch{color:#1864AB;background:#E7F5FF}
+.p-eff{color:#2B8A3E;background:#D3F9D8}
+.p-drf{color:#E67700;background:#FFF9DB}
+.p-ovr{color:#862E00;background:#FFF3BF}
+
+/* ---------- readability strip ---------- */
+.legib{margin-top:16px;border-top:1px solid #DEE2E6;padding-top:10px}
+.legib h3{margin:0 0 6px;font-size:12px;font-weight:600;color:#051061}
+.legib .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.strip{padding:10px 12px;border-radius:5px;border:1px solid #E9ECEF}
+.strip.onlight{background:#fff}
+.strip.ondark{background:#12131A;border-color:#2A2C36}
+.strip .cap{font-size:10.5px;margin-bottom:7px}
+.strip.onlight .cap{color:#808184}
+.strip.ondark .cap{color:#9A9CA3}
+.thin{display:grid;gap:5px}
+.thin b{height:4px;display:block;border-radius:2px}
+.thin .row{display:flex;gap:5px;align-items:center}
+.thin .row b{flex:1}
+.thin .row u{text-decoration:none;font-size:9.5px;direction:ltr;width:62px;flex:0 0 auto}
+.strip.onlight .row u{color:#808184}
+.strip.ondark .row u{color:#9A9CA3}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="topbar"><b>دیوان — کارگاه رنگ نمودار</b><span>مقایسه دو پالت داده برای داشبورد منابع انسانی</span><span class="cta">اقدام اصلی</span></div>
+<p class="note">هر گزینه یک‌بار روی بوم روشن و یک‌بار روی بوم تیره رندر شده است. محتوای داده در هر چهار نمای زیر یکسان است تا فقط رنگ مقایسه شود. طلایی <code>#FDB913</code> فقط برای دکمهٔ اقدام اصلی نوار بالا استفاده شده و در هیچ نموداری به‌کار نرفته است.</p>
+
+<!-- ============================ OPTION ۱ ============================ -->
+<section class="opt1">
+<div class="optbar"><h2>گزینه ۱ — «تک‌رنگ برند»</h2><em>پله‌های آبی برند + خاکستری خنثی</em><span class="tag">رنگ وضعیت فقط جایی که داده واقعاً وضعیت است</span></div>
+<div class="chips">
+  <span class="chip"><i style="background:#051061"></i><code>#051061</code><u>سرمه‌ای</u></span>
+  <span class="chip"><i style="background:#0B3FB5"></i><code>#0B3FB5</code><u>آبی تیره</u></span>
+  <span class="chip"><i style="background:#006FFF"></i><code>#006FFF</code><u>آبی برند</u></span>
+  <span class="chip"><i style="background:#4D9BFF"></i><code>#4D9BFF</code><u>آبی میانی</u></span>
+  <span class="chip"><i style="background:#9EC8FF"></i><code>#9EC8FF</code><u>آبی روشن</u></span>
+  <span class="chip"><i style="background:#808184"></i><code>#808184</code><u>خاکستری</u></span>
+  <span class="chip"><i style="background:#E8F1FF"></i><code>#E8F1FF</code><u>پلهٔ ۱ رمپ</u></span>
+  <span class="chip"><i style="background:#C2DBFF"></i><code>#C2DBFF</code><u>پلهٔ ۲ رمپ</u></span>
+  <span class="chip"><i style="background:#8FBEFF"></i><code>#8FBEFF</code><u>پلهٔ ۳ رمپ</u></span>
+  <span class="chip"><i style="background:#0F7BFF"></i><code>#0F7BFF</code><u>پلهٔ ۵ رمپ</u></span>
+  <span class="chip"><i style="background:#0A4FCC"></i><code>#0A4FCC</code><u>پلهٔ ۶ رمپ</u></span>
+</div>
+
+<div class="pair">
+
+  <!-- ---- OPTION ۱ / LIGHT ---- -->
+  <div class="canvas light">
+    <div class="bar"><span class="dot"></span>دیوان — داشبورد منابع انسانی<span class="th">روشن</span></div>
+    <div class="body">
+
+      <div class="metrics">
+        <div class="metric"><div class="lbl">کارکنان فعال</div><div class="val">۴۸۶</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">تیم‌ها</div><div class="val">۲۴</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">ظرفیت آزاد</div><div class="val">۱۷</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">استخدام‌های ماه</div><div class="val">۹</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+      </div>
+
+      <div class="sec">
+        <h3>روند نیروی انسانی</h3><div class="sub">دوازده ماه سال ۱۴۰۵ — از راست به چپ</div>
+        <div class="linewrap">
+        <svg class="line" viewBox="0 0 600 160" preserveAspectRatio="none" role="img" aria-label="روند نیروی انسانی">
+          <line x1="0" y1="40" x2="600" y2="40" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="80" x2="600" y2="80" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="120" x2="600" y2="120" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="150" x2="600" y2="150" stroke="var(--rule)" stroke-width="1"/>
+          <path d="M580,133.5 532,123 484,114 436,106.5 388,97.5 340,87 292,81 244,73.5 196,66 148,61.5 100,55.5 52,51 L52,150 L580,150 Z" fill="var(--s3)" opacity=".13"/>
+          <polyline points="580,133.5 532,123 484,114 436,106.5 388,97.5 340,87 292,81 244,73.5 196,66 148,61.5 100,55.5 52,51" fill="none" stroke="var(--s2)" stroke-width="2" stroke-linejoin="round"/>
+          <polyline points="580,126 532,134 484,122 436,130 388,114 340,126 292,118 244,130 196,122 148,134 100,126 52,138" fill="none" stroke="var(--sg)" stroke-width="1.6" stroke-dasharray="5 3" stroke-linejoin="round"/>
+        </svg>
+        </div>
+        <div class="xaxis"><u style="text-decoration:none">اسف</u><u style="text-decoration:none">بهم</u><u style="text-decoration:none">دی</u><u style="text-decoration:none">آذر</u><u style="text-decoration:none">آبا</u><u style="text-decoration:none">مهر</u><u style="text-decoration:none">شهر</u><u style="text-decoration:none">مرد</u><u style="text-decoration:none">تیر</u><u style="text-decoration:none">خرد</u><u style="text-decoration:none">ارد</u><u style="text-decoration:none">فرو</u></div>
+        <div class="legend"><span><i style="background:var(--s2)"></i>کارکنان فعال</span><span><i style="background:var(--sg)"></i>خروج‌ها</span></div>
+      </div>
+
+      <div class="duo">
+        <div class="sec" style="margin-top:0">
+          <h3>ورود و خروج به تفکیک ماه</h3><div class="sub">شش ماه دوم ۱۴۰۵</div>
+          <div class="gbars">
+            <div class="gcol"><div class="pairbars"><b style="height:45%;background:var(--k1)"></b><b style="height:30%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:65%;background:var(--k1)"></b><b style="height:20%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:55%;background:var(--k1)"></b><b style="height:35%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:80%;background:var(--k1)"></b><b style="height:25%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:55%;background:var(--k1)"></b><b style="height:40%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:70%;background:var(--k1)"></b><b style="height:30%;background:var(--k2)"></b></div></div>
+          </div>
+          <div class="gx"><u>مهر</u><u>آبان</u><u>آذر</u><u>دی</u><u>بهمن</u><u>اسفند</u></div>
+          <div class="legend"><span><i style="background:var(--k1)"></i>ورود</span><span><i style="background:var(--k2)"></i>خروج</span></div>
+        </div>
+
+        <div class="sec" style="margin-top:0">
+          <h3>توزیع نوع همکاری</h3><div class="sub">۴۸۶ نفر</div>
+          <div class="donutrow">
+            <div class="donut"><em>۴۸۶</em></div>
+            <div class="dlist">
+              <span><i style="background:var(--d1)"></i>تمام‌وقت <b>۷۲٪</b></span>
+              <span><i style="background:var(--d2)"></i>پاره‌وقت <b>۱۸٪</b></span>
+              <span><i style="background:var(--d3)"></i>قراردادی <b>۱۰٪</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h3>ظرفیت تیم‌ها</h3><div class="sub">استفاده‌شده / رزرو / آزاد</div>
+        <div class="hrow"><span class="hname">تیم جذب و استخدام</span><span class="hbar"><b style="width:58%;background:var(--k1)"></b><b style="width:12%;background:var(--k2)"></b><b style="width:30%;background:var(--k3)"></b></span><span class="hval">۵۸٪</span></div>
+        <div class="hrow"><span class="hname">تیم مالی</span><span class="hbar"><b style="width:71%;background:var(--k1)"></b><b style="width:9%;background:var(--k2)"></b><b style="width:20%;background:var(--k3)"></b></span><span class="hval">۷۱٪</span></div>
+        <div class="hrow"><span class="hname">تیم توسعه محصول</span><span class="hbar"><b style="width:84%;background:var(--k1)"></b><b style="width:6%;background:var(--k2)"></b><b style="width:10%;background:var(--k3)"></b></span><span class="hval">۸۴٪</span></div>
+        <div class="hrow"><span class="hname">تیم زیرساخت</span><span class="hbar"><b style="width:45%;background:var(--k1)"></b><b style="width:20%;background:var(--k2)"></b><b style="width:35%;background:var(--k3)"></b></span><span class="hval">۴۵٪</span></div>
+        <div class="hrow"><span class="hname">تیم پشتیبانی</span><span class="hbar"><b style="width:66%;background:var(--k1)"></b><b style="width:14%;background:var(--k2)"></b><b style="width:20%;background:var(--k3)"></b></span><span class="hval">۶۶٪</span></div>
+        <div class="legend"><span><i style="background:var(--k1)"></i>استفاده‌شده</span><span><i style="background:var(--k2)"></i>رزرو</span><span><i style="background:var(--k3);border:1px solid var(--rule)"></i>آزاد</span></div>
+      </div>
+
+      <div class="states">
+        <div class="state empty"><h4>بازهٔ بدون داده</h4><div class="msg">داده‌ای برای این محدوده نیست.</div></div>
+        <div class="state suppressed"><h4>گروه کوچک</h4><div class="lock">▪ ▪ ▪</div><div class="msg">داده قابل نمایش نیست.</div></div>
+        <div class="state stale"><h4>در حال محاسبه</h4><div class="mini"><b style="height:40%"></b><b style="height:62%"></b><b style="height:48%"></b><b style="height:78%"></b><b style="height:55%"></b><b style="height:88%"></b></div><div class="cap">در حال محاسبه — عدد ممکن است تغییر کند.</div></div>
+      </div>
+
+      <div class="statusrow"><span class="pill p-sch">زمان‌بندی‌شده</span><span class="pill p-eff">اعمال‌شده</span><span class="pill p-drf">پیش‌نویس</span><span class="pill p-ovr">بازنویسی</span></div>
+    </div>
+  </div>
+
+  <!-- ---- OPTION ۱ / DARK ---- -->
+  <div class="canvas dark">
+    <div class="bar"><span class="dot"></span>دیوان — داشبورد منابع انسانی<span class="th">تیره</span></div>
+    <div class="body">
+
+      <div class="metrics">
+        <div class="metric"><div class="lbl">کارکنان فعال</div><div class="val">۴۸۶</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">تیم‌ها</div><div class="val">۲۴</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">ظرفیت آزاد</div><div class="val">۱۷</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">استخدام‌های ماه</div><div class="val">۹</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+      </div>
+
+      <div class="sec">
+        <h3>روند نیروی انسانی</h3><div class="sub">دوازده ماه سال ۱۴۰۵ — از راست به چپ</div>
+        <div class="linewrap">
+        <svg class="line" viewBox="0 0 600 160" preserveAspectRatio="none" role="img" aria-label="روند نیروی انسانی">
+          <line x1="0" y1="40" x2="600" y2="40" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="80" x2="600" y2="80" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="120" x2="600" y2="120" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="150" x2="600" y2="150" stroke="var(--rule)" stroke-width="1"/>
+          <path d="M580,133.5 532,123 484,114 436,106.5 388,97.5 340,87 292,81 244,73.5 196,66 148,61.5 100,55.5 52,51 L52,150 L580,150 Z" fill="var(--s3)" opacity=".16"/>
+          <polyline points="580,133.5 532,123 484,114 436,106.5 388,97.5 340,87 292,81 244,73.5 196,66 148,61.5 100,55.5 52,51" fill="none" stroke="var(--s2)" stroke-width="2" stroke-linejoin="round"/>
+          <polyline points="580,126 532,134 484,122 436,130 388,114 340,126 292,118 244,130 196,122 148,134 100,126 52,138" fill="none" stroke="var(--sg)" stroke-width="1.6" stroke-dasharray="5 3" stroke-linejoin="round"/>
+        </svg>
+        </div>
+        <div class="xaxis"><u style="text-decoration:none">اسف</u><u style="text-decoration:none">بهم</u><u style="text-decoration:none">دی</u><u style="text-decoration:none">آذر</u><u style="text-decoration:none">آبا</u><u style="text-decoration:none">مهر</u><u style="text-decoration:none">شهر</u><u style="text-decoration:none">مرد</u><u style="text-decoration:none">تیر</u><u style="text-decoration:none">خرد</u><u style="text-decoration:none">ارد</u><u style="text-decoration:none">فرو</u></div>
+        <div class="legend"><span><i style="background:var(--s2)"></i>کارکنان فعال</span><span><i style="background:var(--sg)"></i>خروج‌ها</span></div>
+      </div>
+
+      <div class="duo">
+        <div class="sec" style="margin-top:0">
+          <h3>ورود و خروج به تفکیک ماه</h3><div class="sub">شش ماه دوم ۱۴۰۵</div>
+          <div class="gbars">
+            <div class="gcol"><div class="pairbars"><b style="height:45%;background:var(--k1)"></b><b style="height:30%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:65%;background:var(--k1)"></b><b style="height:20%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:55%;background:var(--k1)"></b><b style="height:35%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:80%;background:var(--k1)"></b><b style="height:25%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:55%;background:var(--k1)"></b><b style="height:40%;background:var(--k2)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:70%;background:var(--k1)"></b><b style="height:30%;background:var(--k2)"></b></div></div>
+          </div>
+          <div class="gx"><u>مهر</u><u>آبان</u><u>آذر</u><u>دی</u><u>بهمن</u><u>اسفند</u></div>
+          <div class="legend"><span><i style="background:var(--k1)"></i>ورود</span><span><i style="background:var(--k2)"></i>خروج</span></div>
+        </div>
+
+        <div class="sec" style="margin-top:0">
+          <h3>توزیع نوع همکاری</h3><div class="sub">۴۸۶ نفر</div>
+          <div class="donutrow">
+            <div class="donut"><em>۴۸۶</em></div>
+            <div class="dlist">
+              <span><i style="background:var(--d1)"></i>تمام‌وقت <b>۷۲٪</b></span>
+              <span><i style="background:var(--d2)"></i>پاره‌وقت <b>۱۸٪</b></span>
+              <span><i style="background:var(--d3)"></i>قراردادی <b>۱۰٪</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h3>ظرفیت تیم‌ها</h3><div class="sub">استفاده‌شده / رزرو / آزاد</div>
+        <div class="hrow"><span class="hname">تیم جذب و استخدام</span><span class="hbar"><b style="width:58%;background:var(--k1)"></b><b style="width:12%;background:var(--k2)"></b><b style="width:30%;background:var(--k3)"></b></span><span class="hval">۵۸٪</span></div>
+        <div class="hrow"><span class="hname">تیم مالی</span><span class="hbar"><b style="width:71%;background:var(--k1)"></b><b style="width:9%;background:var(--k2)"></b><b style="width:20%;background:var(--k3)"></b></span><span class="hval">۷۱٪</span></div>
+        <div class="hrow"><span class="hname">تیم توسعه محصول</span><span class="hbar"><b style="width:84%;background:var(--k1)"></b><b style="width:6%;background:var(--k2)"></b><b style="width:10%;background:var(--k3)"></b></span><span class="hval">۸۴٪</span></div>
+        <div class="hrow"><span class="hname">تیم زیرساخت</span><span class="hbar"><b style="width:45%;background:var(--k1)"></b><b style="width:20%;background:var(--k2)"></b><b style="width:35%;background:var(--k3)"></b></span><span class="hval">۴۵٪</span></div>
+        <div class="hrow"><span class="hname">تیم پشتیبانی</span><span class="hbar"><b style="width:66%;background:var(--k1)"></b><b style="width:14%;background:var(--k2)"></b><b style="width:20%;background:var(--k3)"></b></span><span class="hval">۶۶٪</span></div>
+        <div class="legend"><span><i style="background:var(--k1)"></i>استفاده‌شده</span><span><i style="background:var(--k2)"></i>رزرو</span><span><i style="background:var(--k3);border:1px solid var(--rule)"></i>آزاد</span></div>
+      </div>
+
+      <div class="states">
+        <div class="state empty"><h4>بازهٔ بدون داده</h4><div class="msg">داده‌ای برای این محدوده نیست.</div></div>
+        <div class="state suppressed"><h4>گروه کوچک</h4><div class="lock">▪ ▪ ▪</div><div class="msg">داده قابل نمایش نیست.</div></div>
+        <div class="state stale"><h4>در حال محاسبه</h4><div class="mini"><b style="height:40%"></b><b style="height:62%"></b><b style="height:48%"></b><b style="height:78%"></b><b style="height:55%"></b><b style="height:88%"></b></div><div class="cap">در حال محاسبه — عدد ممکن است تغییر کند.</div></div>
+      </div>
+
+      <div class="statusrow"><span class="pill p-sch">زمان‌بندی‌شده</span><span class="pill p-eff">اعمال‌شده</span><span class="pill p-drf">پیش‌نویس</span><span class="pill p-ovr">بازنویسی</span></div>
+    </div>
+  </div>
+
+</div><!-- /pair -->
+
+<div class="legib">
+  <h3>خوانایی — همان پالت در میله‌های ۴ پیکسلی</h3>
+  <div class="grid">
+    <div class="strip onlight"><div class="cap">روی بوم روشن</div>
+      <div class="thin">
+        <div class="row"><u>#051061</u><b style="background:#051061"></b></div>
+        <div class="row"><u>#0B3FB5</u><b style="background:#0B3FB5"></b></div>
+        <div class="row"><u>#006FFF</u><b style="background:#006FFF"></b></div>
+        <div class="row"><u>#4D9BFF</u><b style="background:#4D9BFF"></b></div>
+        <div class="row"><u>#9EC8FF</u><b style="background:#9EC8FF"></b></div>
+        <div class="row"><u>#808184</u><b style="background:#808184"></b></div>
+      </div>
+    </div>
+    <div class="strip ondark"><div class="cap">روی بوم تیره</div>
+      <div class="thin">
+        <div class="row"><u>#C2DBFF</u><b style="background:#C2DBFF"></b></div>
+        <div class="row"><u>#8FBEFF</u><b style="background:#8FBEFF"></b></div>
+        <div class="row"><u>#4D9BFF</u><b style="background:#4D9BFF"></b></div>
+        <div class="row"><u>#1E7BFF</u><b style="background:#1E7BFF"></b></div>
+        <div class="row"><u>#0A4FCC</u><b style="background:#0A4FCC"></b></div>
+        <div class="row"><u>#9A9CA3</u><b style="background:#9A9CA3"></b></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============================ OPTION ۲ ============================ -->
+<section class="opt2">
+<div class="optbar"><h2>گزینه ۲ — «چندرنگ متمایز»</h2><em>پنج فام کاملاً جدا، بدون طلایی و بدون تداخل با رنگ وضعیت</em><span class="tag">آزمودهٔ روشنایی پلکانی برای کوررنگی سبز/قرمز</span></div>
+<div class="chips">
+  <span class="chip"><i style="background:#1B3BBB"></i><code>#1B3BBB</code><u>نیلی</u></span>
+  <span class="chip"><i style="background:#0B8FA8"></i><code>#0B8FA8</code><u>فیروزه‌ای</u></span>
+  <span class="chip"><i style="background:#C2255C"></i><code>#C2255C</code><u>زرشکی</u></span>
+  <span class="chip"><i style="background:#7048E8"></i><code>#7048E8</code><u>بنفش</u></span>
+  <span class="chip"><i style="background:#495057"></i><code>#495057</code><u>گرافیتی</u></span>
+  <span class="chip"><i style="background:#6C8CFF"></i><code>#6C8CFF</code><u>نیلی — تیره</u></span>
+  <span class="chip"><i style="background:#3BC9DB"></i><code>#3BC9DB</code><u>فیروزه‌ای — تیره</u></span>
+  <span class="chip"><i style="background:#F06595"></i><code>#F06595</code><u>زرشکی — تیره</u></span>
+  <span class="chip"><i style="background:#A98BFF"></i><code>#A98BFF</code><u>بنفش — تیره</u></span>
+  <span class="chip"><i style="background:#ADB5BD"></i><code>#ADB5BD</code><u>گرافیتی — تیره</u></span>
+</div>
+
+<div class="pair">
+
+  <!-- ---- OPTION ۲ / LIGHT ---- -->
+  <div class="canvas light">
+    <div class="bar"><span class="dot"></span>دیوان — داشبورد منابع انسانی<span class="th">روشن</span></div>
+    <div class="body">
+
+      <div class="metrics">
+        <div class="metric"><div class="lbl">کارکنان فعال</div><div class="val">۴۸۶</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">تیم‌ها</div><div class="val">۲۴</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">ظرفیت آزاد</div><div class="val">۱۷</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">استخدام‌های ماه</div><div class="val">۹</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+      </div>
+
+      <div class="sec">
+        <h3>روند نیروی انسانی</h3><div class="sub">دوازده ماه سال ۱۴۰۵ — از راست به چپ</div>
+        <div class="linewrap">
+        <svg class="line" viewBox="0 0 600 160" preserveAspectRatio="none" role="img" aria-label="روند نیروی انسانی">
+          <line x1="0" y1="40" x2="600" y2="40" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="80" x2="600" y2="80" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="120" x2="600" y2="120" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="150" x2="600" y2="150" stroke="var(--rule)" stroke-width="1"/>
+          <path d="M580,133.5 532,123 484,114 436,106.5 388,97.5 340,87 292,81 244,73.5 196,66 148,61.5 100,55.5 52,51 L52,150 L580,150 Z" fill="var(--s1)" opacity=".12"/>
+          <polyline points="580,133.5 532,123 484,114 436,106.5 388,97.5 340,87 292,81 244,73.5 196,66 148,61.5 100,55.5 52,51" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>
+          <polyline points="580,126 532,134 484,122 436,130 388,114 340,126 292,118 244,130 196,122 148,134 100,126 52,138" fill="none" stroke="var(--s3)" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+        </div>
+        <div class="xaxis"><u style="text-decoration:none">اسف</u><u style="text-decoration:none">بهم</u><u style="text-decoration:none">دی</u><u style="text-decoration:none">آذر</u><u style="text-decoration:none">آبا</u><u style="text-decoration:none">مهر</u><u style="text-decoration:none">شهر</u><u style="text-decoration:none">مرد</u><u style="text-decoration:none">تیر</u><u style="text-decoration:none">خرد</u><u style="text-decoration:none">ارد</u><u style="text-decoration:none">فرو</u></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>کارکنان فعال</span><span><i style="background:var(--s3)"></i>خروج‌ها</span></div>
+      </div>
+
+      <div class="duo">
+        <div class="sec" style="margin-top:0">
+          <h3>ورود و خروج به تفکیک ماه</h3><div class="sub">شش ماه دوم ۱۴۰۵</div>
+          <div class="gbars">
+            <div class="gcol"><div class="pairbars"><b style="height:45%;background:var(--s1)"></b><b style="height:30%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:65%;background:var(--s1)"></b><b style="height:20%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:55%;background:var(--s1)"></b><b style="height:35%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:80%;background:var(--s1)"></b><b style="height:25%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:55%;background:var(--s1)"></b><b style="height:40%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:70%;background:var(--s1)"></b><b style="height:30%;background:var(--s3)"></b></div></div>
+          </div>
+          <div class="gx"><u>مهر</u><u>آبان</u><u>آذر</u><u>دی</u><u>بهمن</u><u>اسفند</u></div>
+          <div class="legend"><span><i style="background:var(--s1)"></i>ورود</span><span><i style="background:var(--s3)"></i>خروج</span></div>
+        </div>
+
+        <div class="sec" style="margin-top:0">
+          <h3>توزیع نوع همکاری</h3><div class="sub">۴۸۶ نفر</div>
+          <div class="donutrow">
+            <div class="donut"><em>۴۸۶</em></div>
+            <div class="dlist">
+              <span><i style="background:var(--d1)"></i>تمام‌وقت <b>۷۲٪</b></span>
+              <span><i style="background:var(--d2)"></i>پاره‌وقت <b>۱۸٪</b></span>
+              <span><i style="background:var(--d3)"></i>قراردادی <b>۱۰٪</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h3>ظرفیت تیم‌ها</h3><div class="sub">استفاده‌شده / رزرو / آزاد</div>
+        <div class="hrow"><span class="hname">تیم جذب و استخدام</span><span class="hbar"><b style="width:58%;background:var(--s1)"></b><b style="width:12%;background:var(--s2)"></b><b style="width:30%;background:var(--k3)"></b></span><span class="hval">۵۸٪</span></div>
+        <div class="hrow"><span class="hname">تیم مالی</span><span class="hbar"><b style="width:71%;background:var(--s1)"></b><b style="width:9%;background:var(--s2)"></b><b style="width:20%;background:var(--k3)"></b></span><span class="hval">۷۱٪</span></div>
+        <div class="hrow"><span class="hname">تیم توسعه محصول</span><span class="hbar"><b style="width:84%;background:var(--s1)"></b><b style="width:6%;background:var(--s2)"></b><b style="width:10%;background:var(--k3)"></b></span><span class="hval">۸۴٪</span></div>
+        <div class="hrow"><span class="hname">تیم زیرساخت</span><span class="hbar"><b style="width:45%;background:var(--s1)"></b><b style="width:20%;background:var(--s2)"></b><b style="width:35%;background:var(--k3)"></b></span><span class="hval">۴۵٪</span></div>
+        <div class="hrow"><span class="hname">تیم پشتیبانی</span><span class="hbar"><b style="width:66%;background:var(--s1)"></b><b style="width:14%;background:var(--s2)"></b><b style="width:20%;background:var(--k3)"></b></span><span class="hval">۶۶٪</span></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>استفاده‌شده</span><span><i style="background:var(--s2)"></i>رزرو</span><span><i style="background:var(--k3);border:1px solid var(--rule)"></i>آزاد</span></div>
+      </div>
+
+      <div class="states">
+        <div class="state empty"><h4>بازهٔ بدون داده</h4><div class="msg">داده‌ای برای این محدوده نیست.</div></div>
+        <div class="state suppressed"><h4>گروه کوچک</h4><div class="lock">▪ ▪ ▪</div><div class="msg">داده قابل نمایش نیست.</div></div>
+        <div class="state stale"><h4>در حال محاسبه</h4><div class="mini"><b style="height:40%"></b><b style="height:62%"></b><b style="height:48%"></b><b style="height:78%"></b><b style="height:55%"></b><b style="height:88%"></b></div><div class="cap">در حال محاسبه — عدد ممکن است تغییر کند.</div></div>
+      </div>
+
+      <div class="statusrow"><span class="pill p-sch">زمان‌بندی‌شده</span><span class="pill p-eff">اعمال‌شده</span><span class="pill p-drf">پیش‌نویس</span><span class="pill p-ovr">بازنویسی</span></div>
+    </div>
+  </div>
+
+  <!-- ---- OPTION ۲ / DARK ---- -->
+  <div class="canvas dark">
+    <div class="bar"><span class="dot"></span>دیوان — داشبورد منابع انسانی<span class="th">تیره</span></div>
+    <div class="body">
+
+      <div class="metrics">
+        <div class="metric"><div class="lbl">کارکنان فعال</div><div class="val">۴۸۶</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">تیم‌ها</div><div class="val">۲۴</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">ظرفیت آزاد</div><div class="val">۱۷</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+        <div class="metric"><div class="lbl">استخدام‌های ماه</div><div class="val">۹</div><div class="cap">آخرین محاسبه: ۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</div></div>
+      </div>
+
+      <div class="sec">
+        <h3>روند نیروی انسانی</h3><div class="sub">دوازده ماه سال ۱۴۰۵ — از راست به چپ</div>
+        <div class="linewrap">
+        <svg class="line" viewBox="0 0 600 160" preserveAspectRatio="none" role="img" aria-label="روند نیروی انسانی">
+          <line x1="0" y1="40" x2="600" y2="40" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="80" x2="600" y2="80" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="120" x2="600" y2="120" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="0" y1="150" x2="600" y2="150" stroke="var(--rule)" stroke-width="1"/>
+          <path d="M580,133.5 532,123 484,114 436,106.5 388,97.5 340,87 292,81 244,73.5 196,66 148,61.5 100,55.5 52,51 L52,150 L580,150 Z" fill="var(--s1)" opacity=".16"/>
+          <polyline points="580,133.5 532,123 484,114 436,106.5 388,97.5 340,87 292,81 244,73.5 196,66 148,61.5 100,55.5 52,51" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>
+          <polyline points="580,126 532,134 484,122 436,130 388,114 340,126 292,118 244,130 196,122 148,134 100,126 52,138" fill="none" stroke="var(--s3)" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+        </div>
+        <div class="xaxis"><u style="text-decoration:none">اسف</u><u style="text-decoration:none">بهم</u><u style="text-decoration:none">دی</u><u style="text-decoration:none">آذر</u><u style="text-decoration:none">آبا</u><u style="text-decoration:none">مهر</u><u style="text-decoration:none">شهر</u><u style="text-decoration:none">مرد</u><u style="text-decoration:none">تیر</u><u style="text-decoration:none">خرد</u><u style="text-decoration:none">ارد</u><u style="text-decoration:none">فرو</u></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>کارکنان فعال</span><span><i style="background:var(--s3)"></i>خروج‌ها</span></div>
+      </div>
+
+      <div class="duo">
+        <div class="sec" style="margin-top:0">
+          <h3>ورود و خروج به تفکیک ماه</h3><div class="sub">شش ماه دوم ۱۴۰۵</div>
+          <div class="gbars">
+            <div class="gcol"><div class="pairbars"><b style="height:45%;background:var(--s1)"></b><b style="height:30%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:65%;background:var(--s1)"></b><b style="height:20%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:55%;background:var(--s1)"></b><b style="height:35%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:80%;background:var(--s1)"></b><b style="height:25%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:55%;background:var(--s1)"></b><b style="height:40%;background:var(--s3)"></b></div></div>
+            <div class="gcol"><div class="pairbars"><b style="height:70%;background:var(--s1)"></b><b style="height:30%;background:var(--s3)"></b></div></div>
+          </div>
+          <div class="gx"><u>مهر</u><u>آبان</u><u>آذر</u><u>دی</u><u>بهمن</u><u>اسفند</u></div>
+          <div class="legend"><span><i style="background:var(--s1)"></i>ورود</span><span><i style="background:var(--s3)"></i>خروج</span></div>
+        </div>
+
+        <div class="sec" style="margin-top:0">
+          <h3>توزیع نوع همکاری</h3><div class="sub">۴۸۶ نفر</div>
+          <div class="donutrow">
+            <div class="donut"><em>۴۸۶</em></div>
+            <div class="dlist">
+              <span><i style="background:var(--d1)"></i>تمام‌وقت <b>۷۲٪</b></span>
+              <span><i style="background:var(--d2)"></i>پاره‌وقت <b>۱۸٪</b></span>
+              <span><i style="background:var(--d3)"></i>قراردادی <b>۱۰٪</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h3>ظرفیت تیم‌ها</h3><div class="sub">استفاده‌شده / رزرو / آزاد</div>
+        <div class="hrow"><span class="hname">تیم جذب و استخدام</span><span class="hbar"><b style="width:58%;background:var(--s1)"></b><b style="width:12%;background:var(--s2)"></b><b style="width:30%;background:var(--k3)"></b></span><span class="hval">۵۸٪</span></div>
+        <div class="hrow"><span class="hname">تیم مالی</span><span class="hbar"><b style="width:71%;background:var(--s1)"></b><b style="width:9%;background:var(--s2)"></b><b style="width:20%;background:var(--k3)"></b></span><span class="hval">۷۱٪</span></div>
+        <div class="hrow"><span class="hname">تیم توسعه محصول</span><span class="hbar"><b style="width:84%;background:var(--s1)"></b><b style="width:6%;background:var(--s2)"></b><b style="width:10%;background:var(--k3)"></b></span><span class="hval">۸۴٪</span></div>
+        <div class="hrow"><span class="hname">تیم زیرساخت</span><span class="hbar"><b style="width:45%;background:var(--s1)"></b><b style="width:20%;background:var(--s2)"></b><b style="width:35%;background:var(--k3)"></b></span><span class="hval">۴۵٪</span></div>
+        <div class="hrow"><span class="hname">تیم پشتیبانی</span><span class="hbar"><b style="width:66%;background:var(--s1)"></b><b style="width:14%;background:var(--s2)"></b><b style="width:20%;background:var(--k3)"></b></span><span class="hval">۶۶٪</span></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>استفاده‌شده</span><span><i style="background:var(--s2)"></i>رزرو</span><span><i style="background:var(--k3);border:1px solid var(--rule)"></i>آزاد</span></div>
+      </div>
+
+      <div class="states">
+        <div class="state empty"><h4>بازهٔ بدون داده</h4><div class="msg">داده‌ای برای این محدوده نیست.</div></div>
+        <div class="state suppressed"><h4>گروه کوچک</h4><div class="lock">▪ ▪ ▪</div><div class="msg">داده قابل نمایش نیست.</div></div>
+        <div class="state stale"><h4>در حال محاسبه</h4><div class="mini"><b style="height:40%"></b><b style="height:62%"></b><b style="height:48%"></b><b style="height:78%"></b><b style="height:55%"></b><b style="height:88%"></b></div><div class="cap">در حال محاسبه — عدد ممکن است تغییر کند.</div></div>
+      </div>
+
+      <div class="statusrow"><span class="pill p-sch">زمان‌بندی‌شده</span><span class="pill p-eff">اعمال‌شده</span><span class="pill p-drf">پیش‌نویس</span><span class="pill p-ovr">بازنویسی</span></div>
+    </div>
+  </div>
+
+</div><!-- /pair -->
+
+<div class="legib">
+  <h3>خوانایی — همان پالت در میله‌های ۴ پیکسلی</h3>
+  <div class="grid">
+    <div class="strip onlight"><div class="cap">روی بوم روشن</div>
+      <div class="thin">
+        <div class="row"><u>#1B3BBB</u><b style="background:#1B3BBB"></b></div>
+        <div class="row"><u>#0B8FA8</u><b style="background:#0B8FA8"></b></div>
+        <div class="row"><u>#C2255C</u><b style="background:#C2255C"></b></div>
+        <div class="row"><u>#7048E8</u><b style="background:#7048E8"></b></div>
+        <div class="row"><u>#495057</u><b style="background:#495057"></b></div>
+      </div>
+    </div>
+    <div class="strip ondark"><div class="cap">روی بوم تیره</div>
+      <div class="thin">
+        <div class="row"><u>#6C8CFF</u><b style="background:#6C8CFF"></b></div>
+        <div class="row"><u>#3BC9DB</u><b style="background:#3BC9DB"></b></div>
+        <div class="row"><u>#F06595</u><b style="background:#F06595"></b></div>
+        <div class="row"><u>#A98BFF</u><b style="background:#A98BFF"></b></div>
+        <div class="row"><u>#ADB5BD</u><b style="background:#ADB5BD"></b></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<p class="note" style="margin-top:30px">یادداشت تداخل: در گزینه ۲ فام آبی عمداً به نیلی <code>#1B3BBB</code> رانده شد تا با آبیِ «زمان‌بندی‌شده» <code>#1864AB</code> اشتباه نشود؛ باند سبز کنار گذاشته و به‌جای آن فیروزه‌ای <code>#0B8FA8</code> انتخاب شد تا با «اعمال‌شده» <code>#2B8A3E</code> هم‌معنا خوانده نشود؛ کل باند نارنجی/کهربایی حذف شد تا نه با «پیش‌نویس» <code>#E67700</code> و «بازنویسی» <code>#862E00</code> و نه با طلایی اقدام اصلی <code>#FDB913</code> برخورد کند.</p>
+
+</div>
+</body>
+</html>

@@ -2,7 +2,7 @@
 title: Divan HRIS
 status: final
 created: 2026-07-11
-updated: 2026-07-16
+updated: 2026-07-31
 ---
 
 # PRD: Divan HRIS
@@ -10,6 +10,8 @@ updated: 2026-07-16
 ## 0. Document Contract and Status
 
 This PRD is the authoritative product-scope contract for the first organizational deployment of Divan HRIS. It is written for product, HR, security, legal, infrastructure, data, UX, architecture, delivery, and acceptance owners. It defines business outcomes and testable capabilities; implementation options, detailed data attributes, delivery sequencing, and test inventories are intentionally separated into `addendum.md`.
+
+**Amendment 2026-07-31 (post-MVP product-fit wave):** §8.12 (FR-57–FR-60) and the appended consequences under FR-33, FR-37, and FR-43 were added after the first product-owner review of the delivered MVP established that identifier ergonomics, interaction consistency, surface completeness, and configuration administration were governed only implicitly. The amendment adds no new business domain and removes no requirement; it makes an existing quality expectation testable. Authorized by `sprint-change-proposal-2026-07-31.md`.
 
 **Document status and interpretation:** `final`. This status finalizes the product-scope contract; it does not mark pending Launch Artifacts as approved. Every Launch Artifact is explicitly `pending`; an unresolved artifact blocks the affected baseline at the staged gate in §§7.1–7.2, not only production launch. No inline assumptions are used. Initial scale (~500 people), single-organization on-premise deployment, Persian RTL desktop UI, and source-defined business boundaries are declared inputs rather than inferred assumptions.
 
@@ -108,6 +110,7 @@ Approved data definitions and clean migration → reliable event entry and tempo
 - CSV/XLSX Baseline/partial-history migration, provenance, reconciliation, audit, and operational readiness.
 - Cross-cutting launch controls in FR-46–FR-56: entitlement and identity lifecycle; temporal/cross-boundary authorization; inference/bulk controls; retention/legal hold; audit trust; secure artifact/custody lifecycle; external correction-case evidence; formal-report reproducibility; artifact change control; and snapshot/reference integrity.
 - FR-53 stores correction evidence as references/metadata by default; only AR-DATA-approved bounded attachments are in scope, never general personnel document management.
+- Usability and administration baseline in FR-57–FR-60: business-identifier-first interaction, one consistent and discoverable interaction system, complete and self-explaining operational surfaces, and governed configuration administration.
 
 ### 5.2 Deferred
 
@@ -493,6 +496,7 @@ Authorized users MUST search and filter approved personnel, event, organization,
 - Launch filters cover Employment status; start/termination date; Legal Entity, Business Unit, Department, and Team; Organizational Role; Job Title; Ladder; Grade; Seniority; collaboration and contract type; Contracting Entity; Insuring Entity; work location; Personnel Event type and Effective Date; registering user; Headcount Approval; and headcount status, subject to permission and applicability.
 - Lists support sorting, pagination over a stable query snapshot with deterministic ordering, result count, approved column selection, filtered export, and clear Persian empty/error states. Concurrent data changes do not create duplicate/missing rows within that snapshot; session-only filter persistence remains non-gating.
 - Query suggestions, facets, counts, and columns cannot reveal out-of-scope values.
+- Search and selection controls used inside forms follow the same permission-safe, enumeration-safe rules as list search; a form-level selector may not reveal subjects the caller cannot list.
 - Before the search feature baseline, AR-ACCESS defines exact/prefix matching, masking, minimum query constraints, enumeration-safe messages/timing, retrieval windows, and acceptance probes for sensitive identifiers.
 
 #### FR-34: Personnel profile and timeline
@@ -531,6 +535,7 @@ Authorized users MUST import approved CSV/XLSX templates through identification,
 **Consequences (testable):**
 - Validation covers structure, required data, identifiers, uniqueness, dates, enums, hierarchy, references, Ladder–Grade, overlaps, order, and duplicate rows.
 - Each error identifies row, column, and actionable Persian reason; the user can cancel before execution.
+- For every supported template the system offers a downloadable sample workbook whose structure, headers, and value formats are generated from the same authoritative template definition used for validation, so a downloaded sample always validates.
 - Execution revalidates previewed data against current authoritative state; overlapping concurrent Import Batches that would change the same target cannot silently overwrite one another.
 
 #### FR-38: Atomic and traceable Import Batch
@@ -576,6 +581,7 @@ All MVP user-facing pages, navigation, forms, tables, charts, validations, warni
 **Consequences (testable):**
 - Essential tasks remain usable from 1280×720 through 2K, with 1920×1080 as reference.
 - Long forms are sectioned, required fields and inline errors are clear, destructive/sensitive consequences are confirmed, and unsaved changes are warned.
+- Interaction consistency, action discoverability, content-driven table sizing, and self-explaining state messages are part of this contract as specified in FR-58 and FR-59.
 
 #### FR-44: Jalali date experience
 The system MUST accept and display user-facing business dates in Jalali while preserving unambiguous Effective Dates and timestamps.
@@ -688,6 +694,47 @@ Business operations spanning mutable reference data or result sets MUST resolve 
 - Finalization, import execution, pagination, export generation, and formal report publication either complete against their validated snapshot/version or fail without mixing versions.
 - Organization/reference changes, concurrent imports, or permission changes cannot produce a partially valid authoritative operation; conflicts are surfaced with no silent overwrite or out-of-scope delivery.
 
+### 8.12 Product Usability, Identifier Ergonomics, and Configuration Administration
+
+#### FR-57: Business-identifier-first interaction
+Users MUST identify people, organizational units, job reference concepts, and governed records by approved business identifiers; the system MUST NOT require internal technical identifiers as user input.
+
+**Consequences (testable):**
+- Every user-facing selection of a Person, Organizational Unit/Team, Organizational Role, Job Title, Ladder, Grade, Seniority, or Headcount Approval is made through a permission-safe search/selection control keyed on Personnel Code, organizational/job code, or approved name — never by typing an internal identifier.
+- Records without a business identifier, such as Employment and Primary Assignment, are selected from the permission-safe records of an already-identified Person with their distinguishing facts shown; they are never typed.
+- Internal identifiers remain available for audit, correlation, and support as explicitly labelled, copyable technical detail; they are never the primary displayed identity of a person, team, or job concept.
+- Selection controls remain permission-safe and enumeration-safe under FR-33 and FR-48: out-of-scope subjects are not revealed through suggestions, counts, or response timing.
+
+#### FR-58: Consistent, discoverable interaction system
+All MVP surfaces MUST present one consistent interaction system in which available actions are visually and programmatically discoverable.
+
+**Consequences (testable):**
+- One shared component system defines control appearance, hierarchy, density, spacing, and focus treatment; equivalent actions look and behave identically across every surface.
+- Every surface follows one page-layout pattern — surface title, purpose line, context indicator, and a single primary action region — with one shared form-layout pattern for label placement, grouping, required marking, help text, inline error, and footer action order.
+- Actionable controls are unambiguously distinguishable from static text at rest, not only on hover, and expose accessible names and keyboard operation.
+- Data tables size to their content: no surface forces horizontal scrolling that its content does not require; long values truncate or wrap with the full value reachable; users can control which approved columns are shown.
+- An action that cannot currently be performed is either absent or visibly disabled with a Persian reason; no control may accept a click and do nothing.
+- Loading, pending, saved, and failed states use one defined feedback vocabulary with a stated precedence between inline, transient, and system-level messages, and honour reduced-motion preferences.
+- Every surface, state, badge, chart, and banner is specified and verified in both light and dark themes at the NFR-12 accessibility contrast floor; visual encodings in charts remain distinguishable in both themes.
+
+#### FR-59: Complete and self-explaining operational surfaces
+Every surface reachable from navigation MUST be functional and MUST explain its purpose, state, and next step in user terms.
+
+**Consequences (testable):**
+- No navigable surface renders a placeholder or empty scaffold at launch; a capability that is not delivered is absent from navigation rather than present and inert.
+- Each surface states its purpose in operational Persian, including who uses it and what it governs; governance-specific surfaces name their real-world trigger.
+- Every system-state message states the fact, its cause, its scope, and the next step available to the user; internal mechanism names and internal timestamps are not presented as user-facing meaning.
+- Bulk data entry for a supported domain is reachable by every role permitted to create that data individually, uses the same validated preview/execute path as FR-37, and offers a downloadable template that matches the accepted structure exactly.
+
+#### FR-60: Governed application configuration administration
+Authorized administrators MUST view and, where explicitly permitted, change governed application parameters through an attributable, audited administration surface.
+
+**Consequences (testable):**
+- Every governed parameter is registered with a Persian label and description, type, unit, allowed range or allowlist, default, current effective value, and source (governed store, environment, or code default).
+- The registry declares each parameter as administrator-editable or read-only-with-evidence; parameters that constitute the fail-closed security, authorization, audit-integrity, or identity posture are read-only in the UI and change only through the approved deployment/artifact path under FR-55.
+- Every change records actor, time, previous value, new value, stated reason, and effect time and produces audit evidence under FR-42; changes are reversible to the registered default.
+- An invalid, missing, or unreadable configuration value fails closed to the registered default and surfaces the degraded state under FR-45; configuration never silently widens permission, retention, or export boundaries.
+
 ## 9. Cross-Cutting Non-Functional Requirements
 
 - **NFR-1 — Transport security:** TLS MUST protect all application traffic, including identity and administrative paths; AR-NFR/AR-IDENTITY MUST fix certificate ownership and protocol/cipher acceptance before the affected infrastructure/security baseline.
@@ -716,7 +763,7 @@ Unknown baselines MUST be collected through pre-build process/data profiling, tr
 - **LG-3 — Governance:** AR-DATA is approved and lifecycle/data-subject evidence passes. Validates FR-3, FR-7, FR-41–FR-42, FR-50, FR-52–FR-53.
 - **LG-4 — Temporal/headcount integrity:** AR-TEMPORAL, AR-HEADCOUNT, and AR-SECONDARY acceptance shows zero over-consumption under approved concurrency and identical reconstruction from the same authoritative event set. Validates FR-9–FR-32, FR-45, FR-54, FR-56.
 - **LG-5 — Operational readiness:** Evidence against the version-frozen AR-NFR thresholds/profile demonstrates TLS, browser/environment, monitoring, security assurance, support, availability, RPO, RTO, protected backups, and witnessed restore/catch-up. Validates NFR-1–NFR-14.
-- **LG-6 — Acceptance and change readiness:** AR-REPORTING targets/oracles, AR-CUTOVER, and FR-55 artifact/version/waiver/change-control acceptance are approved and tested; domain owners sign UAT, launch users complete training, support/runbooks are ready, and parallel-source/rollback rules are rehearsed.
+- **LG-6 — Acceptance and change readiness:** AR-REPORTING targets/oracles, AR-CUTOVER, and FR-55 artifact/version/waiver/change-control acceptance are approved and tested; domain owners sign UAT, launch users complete training, support/runbooks are ready, and parallel-source/rollback rules are rehearsed. UAT also verifies the FR-57–FR-60 usability and administration baseline: no task requires an internal identifier, no navigable surface is a placeholder, no rendered action is inert, and governed configuration changes are attributable and reversible.
 
 ### 10.2 Measured Outcomes
 

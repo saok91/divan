@@ -1,0 +1,769 @@
+﻿<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دیوان — جهت طراحی الف: کنسول متراکم</title>
+<style>
+/* ============================================================
+   DIRECTION A — «کنسول متراکم» (dense console)
+   رنگ‌های استفاده‌شده / HEX INVENTORY
+   ------------------------------------------------------------
+   BRAND (locked, shared across all directions)
+   #051061  navy — چرم ثابت: هدر و نوار کناری (light)
+   #030825  navy dark — چرم در تم تاریک
+   #FFFFFF  white — فورگراند چرم، سطح جدول
+   #FDB913  gold — دکمهٔ اصلی (CTA)
+   #1A1208  gold-foreground — متن روی طلایی
+   #FBC470  gold dark-theme — طلایی تم تاریک
+   #006FFF  blue — ساختار/ثانویه، حلقهٔ فوکوس
+   #808184  muted brand — متن خاموش برند
+
+   STATUS BADGE PAIRS (locked)
+   #E7F5FF / #1864AB   زمان‌بندی‌شده (scheduled)
+   #D3F9D8 / #2B8A3E   اثرگذار (effective)
+   #F1F3F5 / #495057   لغوشده (cancelled)
+   #FFF9DB / #E67700   پیش‌نویس (draft)
+   #FFF3BF / #862E00   بازنویسی (override)
+
+   STALE BANNER (locked)
+   #FFF3BF bg / #862E00 fg / #FDB913 border
+
+   DIRECTION-A NEUTRALS (this direction's own choice: hairlines, no boxes)
+   #F4F5F8  page backdrop پشت قاب‌های ماکت
+   #FFFFFF  surface — سطح اصلی محتوا
+   #FAFBFC  subtle surface — نوار ابزار و سرستون
+   #E8EAEF  hairline — خط جداکنندهٔ مویی بین ردیف‌ها
+   #DCDFE7  hairline strong — مرز نوار ابزار و سرستون
+   #D2D5DF  control border — مرز دکمه‌های اقدام ردیف
+   #11142A  text primary
+   #4A4F63  text secondary
+   #8A8F9E  text tertiary / placeholder
+   #F2F4F8  row hover
+   #EEF1F6  kbd chip bg
+   #E9EAF0  skeleton block
+   #EAF3FF  blue tint — پس‌زمینهٔ تراشهٔ فیلتر فعال
+   #C7DEFF  blue tint border
+   #F9FAFB  disabled surface
+   #B8BCC8  disabled text
+
+   DARK PARITY SNIPPET
+   #030825  dark chrome / صفحه
+   #0A1138  dark surface
+   #131C4A  dark row hover
+   #232C5E  dark border
+   #E6E9F5  dark text primary
+   #9AA1C0  dark text secondary
+   ============================================================ */
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:#F4F5F8;color:#11142A;
+  font-family:"Yekan Bakh Fa-En","Segoe UI",Tahoma,sans-serif;
+  font-size:13px;line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+.ic{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.ic-sm{width:13px;height:13px}
+
+/* ---------- document (rationale) ---------- */
+.doc{max-width:1400px;margin:0 auto;padding:28px 24px 8px}
+.doc h1{margin:0 0 6px;font-size:20px;font-weight:800;letter-spacing:-.01em}
+.doc .kicker{font-size:11px;font-weight:700;color:#006FFF;letter-spacing:.06em;margin-bottom:8px}
+.doc p{margin:0 0 14px;max-width:78ch;color:#4A4F63;font-size:13.5px;line-height:1.85}
+.spec{display:flex;flex-wrap:wrap;gap:0;border:1px solid #DCDFE7;background:#FFFFFF;border-radius:6px;overflow:hidden}
+.spec div{padding:9px 14px;border-inline-start:1px solid #E8EAEF;flex:1 1 auto;min-width:150px}
+.spec div:first-child{border-inline-start:0}
+.spec dt{font-size:10.5px;color:#8A8F9E;font-weight:700;letter-spacing:.04em;margin:0 0 2px}
+.spec dd{margin:0;font-size:12.5px;font-weight:600;color:#11142A}
+
+/* ---------- browser frame mock ---------- */
+.mock{max-width:1400px;margin:0 auto;padding:18px 24px 0;overflow-x:auto}
+.mock-label{font-size:11.5px;font-weight:700;color:#4A4F63;margin:0 0 7px;display:flex;align-items:center;gap:8px}
+.mock-label span{font-weight:500;color:#8A8F9E}
+.frame{width:1280px;border:1px solid #DCDFE7;border-radius:8px;overflow:hidden;background:#FFFFFF;box-shadow:0 1px 2px rgba(5,16,97,.05)}
+.frame-bar{height:32px;background:#FAFBFC;border-bottom:1px solid #E8EAEF;display:flex;align-items:center;gap:8px;padding:0 10px}
+.dot{width:8px;height:8px;border-radius:50%;background:#DCDFE7}
+.frame-url{margin-inline-start:8px;flex:1;height:19px;border-radius:4px;background:#FFFFFF;border:1px solid #E8EAEF;font-size:10.5px;color:#8A8F9E;display:flex;align-items:center;padding:0 8px;direction:ltr;justify-content:flex-start}
+
+/* ---------- app shell ---------- */
+.app{display:grid;grid-template-rows:56px 1fr;height:684px;background:#FFFFFF}
+.app-sm{height:auto}
+.topbar{background:#051061;color:#FFFFFF;display:flex;align-items:center;padding:0 14px;gap:12px}
+.brand{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;letter-spacing:.02em;min-width:212px}
+.brand-mark{width:22px;height:22px;border-radius:4px;background:#FDB913;color:#1A1208;display:grid;place-items:center;font-size:12px;font-weight:900}
+.topbar .spacer{flex:1}
+.top-btn{height:30px;padding:0 9px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:transparent;color:#FFFFFF;font:inherit;font-size:12px;display:flex;align-items:center;gap:6px}
+.top-user{display:flex;align-items:center;gap:7px;font-size:12px}
+.avatar{width:24px;height:24px;border-radius:50%;background:#006FFF;color:#FFFFFF;display:grid;place-items:center;font-size:11px;font-weight:700}
+.body{display:grid;grid-template-columns:240px 1fr;min-height:0}
+.body-collapsed{grid-template-columns:64px 1fr}
+.side{background:#051061;color:#FFFFFF;padding:8px 8px 12px;overflow:auto}
+.side-group{font-size:10px;color:rgba(255,255,255,.5);font-weight:700;letter-spacing:.06em;padding:10px 8px 5px}
+.nav{display:flex;align-items:center;gap:9px;height:30px;padding:0 8px;border-radius:4px;color:rgba(255,255,255,.78);font-size:12.5px;text-decoration:none;margin-bottom:1px}
+.nav:hover{background:rgba(255,255,255,.07);color:#FFFFFF}
+.nav.on{background:rgba(255,255,255,.13);color:#FFFFFF;font-weight:700;box-shadow:inset 2px 0 0 #FDB913}
+.nav .kb{margin-inline-start:auto;font-size:9.5px;color:rgba(255,255,255,.45);background:rgba(255,255,255,.08);border-color:transparent;font-family:inherit}
+.body-collapsed .nav{justify-content:center;padding:0}
+.body-collapsed .nav span.t,.body-collapsed .nav .kb,.body-collapsed .side-group{display:none}
+.main{min-width:0;overflow:auto;background:#FFFFFF}
+
+/* ---------- page header: typographic, no box ---------- */
+.phead{padding:12px 16px 0}
+.crumb{font-size:11px;color:#8A8F9E;margin-bottom:3px}
+.ptitle{display:flex;align-items:baseline;gap:10px}
+.ptitle h2{margin:0;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.ptitle .count{font-size:12px;color:#8A8F9E;font-weight:600}
+.tabs{display:flex;gap:2px;margin-top:8px;border-bottom:1px solid #E8EAEF}
+.tab{padding:0 10px;height:30px;display:flex;align-items:center;font-size:12.5px;color:#4A4F63;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+.tab.on{color:#11142A;font-weight:700;border-bottom-color:#051061}
+
+/* ---------- banner stack ---------- */
+.banners{padding:10px 16px 0}
+.banner{background:#FFF3BF;color:#862E00;border:1px solid #FDB913;border-radius:4px;padding:7px 10px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.7}
+.banner .bi{margin-top:2px}
+details.more{display:inline}
+details.more summary{display:inline;cursor:pointer;color:#862E00;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+details.more summary::-webkit-details-marker{display:none}
+details.more p{margin:5px 0 0;font-size:12px;color:#862E00;opacity:.92;max-width:82ch}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;align-items:center;gap:6px;padding:9px 16px;flex-wrap:wrap}
+.btn{height:28px;padding:0 10px;border-radius:6px;border:1px solid #D2D5DF;background:#FFFFFF;color:#11142A;font:inherit;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#F2F4F8}
+.btn-gold{height:32px;background:#FDB913;border-color:#FDB913;color:#1A1208;font-weight:800}
+.btn-blue{background:#006FFF;border-color:#006FFF;color:#FFFFFF;font-weight:700}
+.btn-ghost{border-color:transparent;background:transparent;color:#4A4F63}
+.btn[disabled]{background:#F9FAFB;border-color:#E8EAEF;color:#B8BCC8;cursor:not-allowed}
+.kb{font-size:10px;font-weight:700;color:#8A8F9E;background:#EEF1F6;border:1px solid #E8EAEF;border-radius:3px;padding:0 4px;line-height:15px;display:inline-block;min-width:16px;text-align:center}
+.btn .kb{background:rgba(0,0,0,.06);border-color:transparent}
+.search{height:28px;flex:0 1 240px;display:flex;align-items:center;gap:6px;border:1px solid #D2D5DF;border-radius:4px;padding:0 8px;color:#8A8F9E;font-size:12.5px;background:#FFFFFF}
+.chip{height:24px;display:inline-flex;align-items:center;gap:6px;padding:0 6px 0 4px;border-radius:4px;background:#EAF3FF;border:1px solid #C7DEFF;color:#1864AB;font-size:11.5px;font-weight:700}
+.chip b{font-weight:800}
+.chip .x{width:15px;height:15px;border-radius:3px;display:grid;place-items:center;color:#1864AB;cursor:pointer}
+.chip .x:hover{background:#C7DEFF}
+.tb-spacer{flex:1}
+.tb-meta{font-size:11.5px;color:#8A8F9E;font-weight:600}
+
+/* ---------- table: hairlines, no zebra, no card ---------- */
+.tbl-wrap{overflow:auto;border-top:1px solid #DCDFE7;max-height:352px}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+thead th{
+  position:sticky;top:0;z-index:3;background:#FAFBFC;color:#4A4F63;
+  font-size:10.5px;font-weight:800;letter-spacing:.03em;text-align:start;
+  height:28px;padding:0 6px;white-space:nowrap;border-bottom:1px solid #DCDFE7;
+}
+tbody td{height:32px;padding:0 6px;border-bottom:1px solid #E8EAEF;white-space:nowrap;background:#FFFFFF;vertical-align:middle}
+tbody tr:hover td{background:#F2F4F8}
+td.num,th.num{font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.name{font-weight:700;color:#11142A}
+.trunc{max-width:104px;overflow:hidden;text-overflow:ellipsis;display:block}
+.trunc-team{max-width:112px;overflow:hidden;text-overflow:ellipsis;display:block}
+tr.ended td{color:#8A8F9E}
+tr.ended .name{color:#4A4F63;font-weight:600}
+
+/* sticky identifier column at inline-start */
+th.c-id,td.c-id{position:sticky;inset-inline-start:0;z-index:2;box-shadow:inset -1px 0 0 #E8EAEF}
+thead th.c-id{z-index:4}
+/* sticky actions column at inline-end */
+th.c-act,td.c-act{position:sticky;inset-inline-end:0;z-index:2;box-shadow:inset 1px 0 0 #DCDFE7;padding-inline:6px}
+thead th.c-act{z-index:4}
+tr:hover td.c-id,tr:hover td.c-act{background:#F2F4F8}
+
+/* Direction A row-action affordance: compact OUTLINED icon+label, 24px, always bordered */
+.rowacts{display:flex;gap:3px;align-items:center}
+.ra{
+  height:24px;padding:0 5px;border-radius:4px;
+  border:1px solid #D2D5DF;background:#FFFFFF;color:#11142A;
+  font:inherit;font-size:10.5px;font-weight:700;
+  display:inline-flex;align-items:center;gap:3px;cursor:pointer;white-space:nowrap;
+}
+.ra .ic-sm{width:12px;height:12px}
+/* icon-only marker used inside the dense table when an action is blocked; full reason text lives in the states panel */
+.ra-flag{width:22px;height:22px;border-radius:4px;background:#FFF3BF;border:1px solid #FDB913;color:#862E00;display:inline-grid;place-items:center;flex:none}
+.ra:hover{background:#F2F4F8;border-color:#8A8F9E}
+.ra-blue{color:#006FFF;border-color:#C7DEFF}
+.ra-blue:hover{background:#EAF3FF;border-color:#006FFF}
+.ra[disabled]{background:#F9FAFB;border-color:#E8EAEF;color:#B8BCC8;cursor:not-allowed}
+.ra-reason{font-size:10.5px;color:#862E00;background:#FFF3BF;border:1px solid #FDB913;border-radius:3px;padding:0 5px;line-height:17px;white-space:nowrap}
+
+.badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:700}
+.b-yes{background:#D3F9D8;color:#2B8A3E}
+.b-no{background:#F1F3F5;color:#495057}
+.b-sched{background:#E7F5FF;color:#1864AB}
+.b-draft{background:#FFF9DB;color:#E67700}
+
+/* ---------- states ---------- */
+.state-strip{display:grid;grid-template-columns:1fr;gap:0}
+.state-block{padding:0}
+.state-head{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#FAFBFC;border-bottom:1px solid #E8EAEF;border-top:1px solid #DCDFE7}
+.state-head h3{margin:0;font-size:12px;font-weight:800}
+.state-head span{font-size:11px;color:#8A8F9E}
+.empty{padding:34px 16px;text-align:center}
+.empty .mark{width:30px;height:30px;border-radius:6px;border:1px solid #DCDFE7;display:inline-grid;place-items:center;color:#8A8F9E;margin-bottom:9px}
+.empty p{margin:0 0 11px;font-size:13px;color:#4A4F63;font-weight:600}
+@keyframes pulseA{0%,100%{opacity:.5}50%{opacity:1}}
+.sk{display:block;height:8px;border-radius:3px;background:#E9EAF0;animation:pulseA 1.5s ease-in-out infinite}
+.sk-btn{height:24px;border-radius:4px;background:#E9EAF0;animation:pulseA 1.5s ease-in-out infinite}
+
+/* ---------- form (screen 3) ---------- */
+.form-wrap{padding:12px 16px 18px;max-width:1120px}
+.fsec{border-top:1px solid #E8EAEF;padding:11px 0 13px;display:grid;grid-template-columns:168px 1fr;gap:16px}
+.fsec:first-of-type{border-top:0}
+.fsec-h h4{margin:0;font-size:12.5px;font-weight:800}
+.fsec-h p{margin:2px 0 0;font-size:11.5px;color:#8A8F9E;line-height:1.6}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+.f label{display:block;font-size:11px;font-weight:700;color:#4A4F63;margin-bottom:3px}
+.inp{height:32px;border:1px solid #D2D5DF;border-radius:4px;background:#FFFFFF;padding:0 8px;font-size:12.5px;display:flex;align-items:center;gap:6px;color:#11142A}
+.inp.focus{border-color:#006FFF;box-shadow:0 0 0 2px rgba(0,111,255,.18)}
+.inp .ph{color:#8A8F9E}
+.inp .cursor{width:1px;height:15px;background:#11142A;display:inline-block}
+.inp.off{background:#F9FAFB;color:#B8BCC8;border-color:#E8EAEF}
+.hint{font-size:10.5px;color:#8A8F9E;margin-top:3px}
+.picker{position:relative}
+.pop{
+  position:absolute;inset-inline-start:0;inset-inline-end:0;top:calc(100% + 3px);z-index:9;
+  background:#FFFFFF;border:1px solid #D2D5DF;border-radius:4px;box-shadow:0 6px 18px rgba(5,16,97,.13);overflow:hidden;
+}
+.pop-h{padding:5px 9px;font-size:10.5px;color:#8A8F9E;font-weight:700;border-bottom:1px solid #E8EAEF;background:#FAFBFC;display:flex;justify-content:space-between}
+.opt{padding:5px 9px;border-bottom:1px solid #F2F4F8;cursor:pointer}
+.opt:last-child{border-bottom:0}
+.opt.on{background:#EAF3FF;box-shadow:inset 2px 0 0 #006FFF}
+.opt .l1{font-size:12.5px;font-weight:700;color:#11142A}
+.opt .l1 .code{color:#006FFF;font-weight:800}
+.opt .l2{font-size:11px;color:#8A8F9E}
+.pop-f{padding:4px 9px;font-size:10.5px;color:#8A8F9E;background:#FAFBFC;border-top:1px solid #E8EAEF;display:flex;gap:10px}
+.token{height:24px;display:inline-flex;align-items:center;gap:6px;padding:0 5px 0 3px;border-radius:4px;background:#EAF3FF;border:1px solid #C7DEFF;color:#11142A;font-size:11.5px;font-weight:700}
+.token .code{color:#006FFF;font-weight:800}
+.token .x{width:16px;height:16px;border-radius:3px;display:grid;place-items:center;color:#4A4F63;cursor:pointer}
+.token .x:hover{background:#C7DEFF}
+details.tech{border:1px solid #E8EAEF;border-radius:4px;background:#FAFBFC;margin-top:2px}
+details.tech summary{list-style:none;cursor:pointer;padding:6px 9px;font-size:11.5px;font-weight:700;color:#4A4F63;display:flex;align-items:center;gap:6px}
+details.tech summary::-webkit-details-marker{display:none}
+details.tech .tech-body{padding:0 9px 8px;display:flex;align-items:center;gap:8px}
+.uuid{direction:ltr;font-family:"Segoe UI",Tahoma,monospace;font-size:11px;background:#FFFFFF;border:1px solid #E8EAEF;border-radius:3px;padding:3px 7px;color:#4A4F63;user-select:all}
+.cap{display:flex;gap:0;border:1px solid #E8EAEF;border-radius:4px;overflow:hidden;max-width:340px}
+.cap div{flex:1;padding:6px 10px;border-inline-start:1px solid #E8EAEF}
+.cap div:first-child{border-inline-start:0}
+.cap dt{font-size:10.5px;color:#8A8F9E;font-weight:700;margin:0}
+.cap dd{margin:0;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.3}
+.cap .free dd{color:#2B8A3E}
+.cap .res dd{color:#E67700}
+.fbar{position:sticky;bottom:0;background:#FFFFFF;border-top:1px solid #DCDFE7;padding:9px 16px;display:flex;align-items:center;gap:8px}
+.fbar .sp{flex:1}
+.fbar .note{font-size:11px;color:#8A8F9E}
+
+/* ---------- dark parity snippet ---------- */
+.dark{background:#030825;border-radius:8px;padding:0;overflow:hidden;border:1px solid #232C5E}
+.dark .dhead{background:#030825;color:#9AA1C0;padding:8px 12px;font-size:11px;font-weight:700;border-bottom:1px solid #232C5E}
+.dark table{color:#E6E9F5}
+.dark thead th{background:#0A1138;color:#9AA1C0;border-bottom:1px solid #232C5E}
+.dark tbody td{background:#030825;border-bottom:1px solid #232C5E;color:#E6E9F5}
+.dark tbody tr:hover td{background:#131C4A}
+.dark .ra{background:#0A1138;border-color:#232C5E;color:#E6E9F5}
+.dark .ra-blue{color:#FBC470;border-color:#5A4620}
+.dark .btn-gold{background:#FBC470;border-color:#FBC470;color:#1A1208}
+.dark .b-yes{background:#123722;color:#8CE0A6}
+.foot{max-width:1400px;margin:0 auto;padding:14px 24px 40px;color:#8A8F9E;font-size:11.5px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-dash" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></symbol>
+  <symbol id="i-people" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.6"/><path d="M1.6 13.6c0-2.4 2-3.9 4.4-3.9s4.4 1.5 4.4 3.9"/><path d="M11 4.2a2.4 2.4 0 0 1 0 4.4M12.2 10.4c1.4.5 2.3 1.6 2.3 3.2"/></symbol>
+  <symbol id="i-event" viewBox="0 0 16 16"><rect x="2" y="3.4" width="12" height="10.6" rx="1.6"/><path d="M2 6.6h12M5.4 1.8v3M10.6 1.8v3"/></symbol>
+  <symbol id="i-org" viewBox="0 0 16 16"><rect x="6" y="1.6" width="4" height="3" rx="1"/><rect x="1.4" y="11" width="4" height="3" rx="1"/><rect x="10.6" y="11" width="4" height="3" rx="1"/><path d="M8 4.6v3.2M3.4 11V7.8h9.2V11"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 16 16"><path d="M2 12.2a6 6 0 1 1 12 0"/><path d="M8 12.2l3.1-3.4"/></symbol>
+  <symbol id="i-report" viewBox="0 0 16 16"><path d="M2 13.6h12"/><rect x="2.8" y="8" width="2.6" height="5.6"/><rect x="6.7" y="4.4" width="2.6" height="9.2"/><rect x="10.6" y="9.6" width="2.6" height="4"/></symbol>
+  <symbol id="i-import" viewBox="0 0 16 16"><path d="M8 2v8M5 7.2L8 10.2l3-3M2.4 13.6h11.2"/></symbol>
+  <symbol id="i-key" viewBox="0 0 16 16"><circle cx="5.4" cy="10.6" r="3"/><path d="M7.6 8.4l6.2-6.2M11.2 4.8l1.6 1.6"/></symbol>
+  <symbol id="i-audit" viewBox="0 0 16 16"><path d="M8 1.8l5.2 2v4.3c0 3.3-2.3 5.4-5.2 6.3-2.9-.9-5.2-3-5.2-6.3V3.8z"/><path d="M5.9 7.9l1.5 1.5 2.8-2.9"/></symbol>
+  <symbol id="i-ops" viewBox="0 0 16 16"><rect x="1.6" y="2.6" width="12.8" height="10.8" rx="1.6"/><path d="M4.6 6.4l2 2-2 2M8.6 11.4h3"/></symbol>
+  <symbol id="i-fix" viewBox="0 0 16 16"><rect x="3" y="1.8" width="8.6" height="12.4" rx="1.4"/><path d="M5.4 5.6h4M5.4 8.2h4M5.4 10.8h2.2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.4v2M8 12.6v2M1.4 8h2M12.6 8h2M3.3 3.3l1.5 1.5M11.2 11.2l1.5 1.5M12.7 3.3l-1.5 1.5M4.8 11.2l-1.5 1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.6"/><path d="M10.4 10.4L14 14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></symbol>
+  <symbol id="i-cols" viewBox="0 0 16 16"><rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.4"/><path d="M6.2 2.6v10.8M10.2 2.6v10.8"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.2v9.6M3.2 8h9.6"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 16 16"><path d="M11.2 2.2l2.6 2.6-8 8-3.4.8.8-3.4z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="8.6" height="8.6" rx="1.4"/><path d="M10.6 5.4V3.4a1.4 1.4 0 0 0-1.4-1.4H3.4A1.4 1.4 0 0 0 2 3.4v5.8a1.4 1.4 0 0 0 1.4 1.4h2"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.2l6 10.4H2z"/><path d="M8 6.4v3M8 11.1v.1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 16 16"><path d="M13.2 9.6A5.8 5.8 0 0 1 6.4 2.8a5.8 5.8 0 1 0 6.8 6.8z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 16 16"><path d="M1.8 3.2h12.4L9.4 8.6v4.4l-2.8 1.4V8.6z"/></symbol>
+</svg>
+
+<!-- ================= RATIONALE ================= -->
+<div class="doc">
+  <div class="kicker">جهت طراحی الف — از خانوادهٔ Linear</div>
+  <h1>«کنسول متراکم»</h1>
+  <p>
+    کنسول متراکم برای اپراتوری طراحی شده که تمام روز داخل جدول زندگی می‌کند: بیشترین تعداد ردیف در یک نگاه، خطوط جداکنندهٔ مویی به‌جای جعبه و کارت، و سلسله‌مراتبی که از وزن و اندازهٔ حروف می‌آید نه از قاب و سایه.
+    هر چیزی که خواندن را کند می‌کند حذف شده؛ فاصله‌ها فشرده‌اند، کنترل‌ها ۳۲ پیکسل‌اند و میان‌برهای صفحه‌کلید کنار خودِ دکمه دیده می‌شوند تا کاربر حرفه‌ای دستش از کیبورد جدا نشود.
+    تنها جایی که این جهت اجازهٔ «تزئین» می‌دهد دکمه‌های اقدام ردیف است: در این حد از تراکم، اقدام باید مرز داشته باشد تا با متن اشتباه گرفته نشود.
+  </p>
+  <dl class="spec">
+    <div><dt>ارتفاع ردیف</dt><dd>۳۲ پیکسل (سرستون ۲۸)</dd></div>
+    <div><dt>ارتفاع کنترل</dt><dd>۳۲ اصلی · ۲۸ ثانویه · ۲۴ اقدام ردیف</dd></div>
+    <div><dt>اندازهٔ قلم</dt><dd>۱۲٫۵ بدنه · ۱۰٫۵ سرستون/برچسب · ۱۷ عنوان صفحه</dd></div>
+    <div><dt>مرز و ارتفاع بصری</dt><dd>خط مویی ۱px بدون سایه؛ صفر کارت، صفر زیبرا</dd></div>
+    <div><dt>اقدام ردیف</dt><dd>دکمهٔ مرزدار فشرده (آیکون + برچسب) — همیشه دیده می‌شود</dd></div>
+    <div><dt>نوار کناری</dt><dd>۲۴۰px باز · ۶۴px جمع‌شده در صفحهٔ فرم</dd></div>
+  </dl>
+</div>
+
+<!-- ================= SCREEN 1: HERO ================= -->
+<div class="mock">
+  <p class="mock-label">۱. صفحهٔ اصلی — اطلاعات پرسنلی / فهرست پرسنل <span>۱۲۸۰×۷۲۰ · تم روشن</span></p>
+  <div class="frame">
+    <div class="frame-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><div class="frame-url">divan.local/personnel?active=true</div></div>
+    <div class="app">
+      <!-- topbar -->
+      <div class="topbar">
+        <div class="brand"><span class="brand-mark">د</span>دیوان</div>
+        <div class="spacer"></div>
+        <button class="top-btn"><svg class="ic ic-sm"><use href="#i-search"/></svg>جست‌وجوی سراسری <span class="kb" style="background:rgba(255,255,255,.14);border-color:transparent;color:#FFFFFF">/</span></button>
+        <button class="top-btn"><svg class="ic ic-sm"><use href="#i-moon"/></svg>تم تاریک</button>
+        <div class="top-user"><span class="avatar">ز</span>زهرا کریمی <svg class="ic ic-sm"><use href="#i-chev"/></svg></div>
+      </div>
+      <div class="body">
+        <!-- sidebar -->
+        <nav class="side">
+          <a class="nav" href="#"><svg class="ic"><use href="#i-dash"/></svg><span class="t">داشبورد</span><span class="kb">۱</span></a>
+          <a class="nav on" href="#"><svg class="ic"><use href="#i-people"/></svg><span class="t">اطلاعات پرسنلی</span><span class="kb">۲</span></a>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-event"/></svg><span class="t">رویدادهای پرسنلی</span><span class="kb">۳</span></a>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-org"/></svg><span class="t">ساختار سازمان</span><span class="kb">۴</span></a>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-cap"/></svg><span class="t">ظرفیت و جذب</span><span class="kb">۵</span></a>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-report"/></svg><span class="t">گزارش‌ها</span><span class="kb">۶</span></a>
+          <div class="side-group">داده و دسترسی</div>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-import"/></svg><span class="t">ورود داده</span></a>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-key"/></svg><span class="t">دسترسی‌ها</span></a>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-audit"/></svg><span class="t">ممیزی</span></a>
+          <div class="side-group">نگهداشت</div>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-ops"/></svg><span class="t">عملیات</span></a>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-fix"/></svg><span class="t">پرونده‌های اصلاح</span></a>
+          <a class="nav" href="#"><svg class="ic"><use href="#i-gear"/></svg><span class="t">تنظیمات</span></a>
+        </nav>
+        <!-- main -->
+        <main class="main">
+          <div class="phead">
+            <div class="crumb">دیوان / اطلاعات پرسنلی</div>
+            <div class="ptitle"><h2>اطلاعات پرسنلی</h2><span class="count">آخرین همگام‌سازی ۱۴۰۵/۰۵/۰۹ ساعت ۰۸:۴۲</span></div>
+            <div class="tabs">
+              <a class="tab on" href="#">فهرست پرسنل</a>
+              <a class="tab" href="#">افزودن</a>
+              <a class="tab" href="#">ورود گروهی</a>
+              <a class="tab" href="#">فرهنگ داده</a>
+            </div>
+          </div>
+
+          <div class="banners">
+            <div class="banner">
+              <svg class="ic bi"><use href="#i-warn"/></svg>
+              <div>
+                محاسبهٔ وضعیت جاری برای ۳ فرد هنوز کامل نشده — نهایی‌سازی رویداد و خروجی گرفتن برای این افراد موقتاً غیرفعال است. معمولاً چند دقیقه طول می‌کشد.
+                <details class="more"><summary>توضیح بیشتر</summary><p>پس از هر رویداد پرسنلی، وضعیت جاری فرد دوباره محاسبه می‌شود. تا پایان محاسبه، ردیف‌های علامت‌خورده فقط خواندنی هستند و در خروجی اکسل نمی‌آیند. اگر بیش از ۱۵ دقیقه طول کشید، از «عملیات ← صف محاسبه» وضعیت را ببینید.</p></details>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button class="btn btn-gold"><svg class="ic ic-sm"><use href="#i-plus"/></svg>افزودن سریع <span class="kb">N</span></button>
+            <div class="search"><svg class="ic ic-sm"><use href="#i-search"/></svg>جست‌وجو در نام یا کد پرسنلی<span class="kb" style="margin-inline-start:auto">/</span></div>
+            <span class="chip"><b>همکار فعلی</b>: بله <span class="x"><svg class="ic ic-sm"><use href="#i-x"/></svg></span></span>
+            <button class="btn"><svg class="ic ic-sm"><use href="#i-filter"/></svg>فیلتر <span class="kb">F</span></button>
+            <button class="btn"><svg class="ic ic-sm"><use href="#i-cols"/></svg>ستون‌ها</button>
+            <div class="tb-spacer"></div>
+            <span class="tb-meta">۱۲۴ نتیجه</span>
+          </div>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="c-id num">کد پرسنلی</th>
+                  <th>نام</th>
+                  <th>نام خانوادگی</th>
+                  <th>تیم</th>
+                  <th>نقش سازمانی</th>
+                  <th>نردبان</th>
+                  <th class="num">گرید</th>
+                  <th>نوع همکاری</th>
+                  <th class="num">تاریخ پایان قرارداد</th>
+                  <th>همکار فعلی</th>
+                  <th class="c-act">اقدامات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="c-id num">۱۰۰۱۲</td><td class="name">سارا</td><td class="name">محمدی</td>
+                  <td><span class="trunc-team" title="تیم جذب و استخدام">تیم جذب و استخدام</span></td><td><span class="trunc">کارشناس ارشد منابع انسانی</span></td>
+                  <td>نردبان تخصصی</td><td class="num">G-۱۲</td><td>تمام‌وقت</td><td class="num">۱۴۰۵/۱۲/۲۹</td>
+                  <td><span class="badge b-yes">بله</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="c-id num">۱۰۰۲۴</td><td class="name">رضا</td><td class="name">کاظمی‌نژاد</td>
+                  <td><span class="trunc-team" title="تیم پشتیبانی منابع انسانی">تیم پشتیبانی منابع انسانی</span></td><td><span class="trunc" title="کارشناس پشتیبانی سامانه‌های منابع انسانی">کارشناس پشتیبانی سامانه‌های منابع انسانی</span></td>
+                  <td>نردبان تخصصی</td><td class="num">G-۰۹</td><td>تمام‌وقت</td><td class="num">۱۴۰۶/۰۳/۳۱</td>
+                  <td><span class="badge b-yes">بله</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="c-id num">۱۰۰۳۷</td><td class="name">مریم</td><td class="name">اسدی</td>
+                  <td><span class="trunc-team" title="تیم مالی">تیم مالی</span></td><td><span class="trunc">کارشناس حقوق و دستمزد</span></td>
+                  <td>نردبان تخصصی</td><td class="num">G-۱۰</td><td>تمام‌وقت</td><td class="num">۱۴۰۵/۰۹/۳۰</td>
+                  <td><span class="badge b-yes">بله</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra" disabled title="تا پایان محاسبه غیرفعال است"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                    <span class="ra-flag" title="تا پایان محاسبه غیرفعال است"><svg class="ic ic-sm"><use href="#i-warn"/></svg></span>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="c-id num">۱۰۰۴۵</td><td class="name">امیرحسین</td><td class="name">طاهری</td>
+                  <td><span class="trunc-team" title="تیم توسعه محصول">تیم توسعه محصول</span></td><td><span class="trunc">مدیر محصول</span></td>
+                  <td>نردبان مدیریتی</td><td class="num">M-۰۳</td><td>تمام‌وقت</td><td class="num">۱۴۰۶/۰۶/۳۱</td>
+                  <td><span class="badge b-yes">بله</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="c-id num">۱۰۰۵۸</td><td class="name">نگار</td><td class="name">رحیمی</td>
+                  <td><span class="trunc-team" title="تیم زیرساخت">تیم زیرساخت</span></td><td><span class="trunc">کارشناس شبکه</span></td>
+                  <td>نردبان تخصصی</td><td class="num">G-۰۸</td><td>قراردادی</td><td class="num">۱۴۰۵/۱۰/۱۵</td>
+                  <td><span class="badge b-yes">بله</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="c-id num">۱۰۰۶۱</td><td class="name">محمد</td><td class="name">شریفی</td>
+                  <td><span class="trunc-team" title="تیم توسعه محصول">تیم توسعه محصول</span></td><td><span class="trunc">کارشناس تضمین کیفیت</span></td>
+                  <td>نردبان تخصصی</td><td class="num">G-۰۷</td><td>پاره‌وقت</td><td class="num">۱۴۰۵/۰۸/۳۰</td>
+                  <td><span class="badge b-yes">بله</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="c-id num">۱۰۰۷۳</td><td class="name">الهام</td><td class="name">نوروزی</td>
+                  <td><span class="trunc-team" title="تیم مالی">تیم مالی</span></td><td><span class="trunc">کارشناس خزانه‌داری</span></td>
+                  <td>نردبان تخصصی</td><td class="num">G-۰۹</td><td>تمام‌وقت</td><td class="num">۱۴۰۶/۰۱/۳۱</td>
+                  <td><span class="badge b-yes">بله</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                  </div></td>
+                </tr>
+                <tr class="ended">
+                  <td class="c-id num">۱۰۰۸۶</td><td class="name">بهنام</td><td class="name">قاسمی</td>
+                  <td><span class="trunc-team" title="تیم پشتیبانی منابع انسانی">تیم پشتیبانی منابع انسانی</span></td><td><span class="trunc">کارشناس اداری</span></td>
+                  <td>نردبان تخصصی</td><td class="num">G-۰۶</td><td>قراردادی</td><td class="num">۱۴۰۴/۱۲/۲۹</td>
+                  <td><span class="badge b-no">خیر</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra" disabled title="همکاری پایان یافته است"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                  </div></td>
+                </tr>
+                <tr>
+                  <td class="c-id num">۱۰۰۹۲</td><td class="name">فاطمه</td><td class="name">علوی‌مقدم</td>
+                  <td><span class="trunc-team" title="تیم جذب و استخدام">تیم جذب و استخدام</span></td><td><span class="trunc">کارشناس جذب</span></td>
+                  <td>نردبان تخصصی</td><td class="num">G-۰۸</td><td>تمام‌وقت</td><td class="num">۱۴۰۶/۰۴/۳۱</td>
+                  <td><span class="badge b-yes">بله</span></td>
+                  <td class="c-act"><div class="rowacts">
+                    <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+                    <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="toolbar" style="border-top:1px solid #E8EAEF">
+            <span class="tb-meta">نمایش ۱ تا ۹ از ۱۲۴</span>
+            <div class="tb-spacer"></div>
+            <button class="btn">قبلی <span class="kb">→</span></button>
+            <button class="btn">بعدی <span class="kb">←</span></button>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SCREEN 2: STATE VARIANTS ================= -->
+<div class="mock">
+  <p class="mock-label">۲. حالت‌های همان جدول <span>خالی · در حال بارگذاری · اقدام غیرفعال با دلیل</span></p>
+  <div class="frame">
+    <div class="frame-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><div class="frame-url">divan.local/personnel — states</div></div>
+    <div class="state-strip">
+
+      <div class="state-head"><h3>حالت خالی</h3><span>فیلتر یا عبارت جست‌وجو نتیجه‌ای نداشت</span></div>
+      <div class="state-block">
+        <div class="toolbar">
+          <button class="btn btn-gold"><svg class="ic ic-sm"><use href="#i-plus"/></svg>افزودن سریع <span class="kb">N</span></button>
+          <div class="search"><svg class="ic ic-sm"><use href="#i-search"/></svg>«کارشناس ایمنی»</div>
+          <span class="chip"><b>همکار فعلی</b>: بله <span class="x"><svg class="ic ic-sm"><use href="#i-x"/></svg></span></span>
+          <div class="tb-spacer"></div><span class="tb-meta">۰ نتیجه</span>
+        </div>
+        <div class="tbl-wrap" style="max-height:none;overflow:visible">
+          <table>
+            <thead><tr>
+              <th class="c-id num">کد پرسنلی</th><th>نام</th><th>نام خانوادگی</th><th>تیم</th><th>نقش سازمانی</th>
+              <th>نردبان</th><th class="num">گرید</th><th>نوع همکاری</th><th class="num">تاریخ پایان قرارداد</th><th>همکار فعلی</th><th class="c-act">اقدامات</th>
+            </tr></thead>
+          </table>
+          <div class="empty">
+            <span class="mark"><svg class="ic"><use href="#i-search"/></svg></span>
+            <p>نتیجه‌ای پیدا نشد. عبارت یا فیلتر را عوض کنید.</p>
+            <button class="btn"><svg class="ic ic-sm"><use href="#i-x"/></svg>پاک کردن فیلترها</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="state-head"><h3>در حال بارگذاری</h3><span>اسکلت سه ردیف — ساختار ستون‌ها حفظ می‌شود</span></div>
+      <div class="state-block">
+        <table>
+          <thead><tr>
+            <th class="c-id num">کد پرسنلی</th><th>نام</th><th>نام خانوادگی</th><th>تیم</th><th>نقش سازمانی</th>
+            <th>نردبان</th><th class="num">گرید</th><th>نوع همکاری</th><th class="num">تاریخ پایان قرارداد</th><th>همکار فعلی</th><th class="c-act">اقدامات</th>
+          </tr></thead>
+          <tbody>
+            <tr><td class="c-id"><i class="sk" style="width:38px"></i></td><td><i class="sk" style="width:46px"></i></td><td><i class="sk" style="width:62px"></i></td><td><i class="sk" style="width:104px"></i></td><td><i class="sk" style="width:130px"></i></td><td><i class="sk" style="width:74px"></i></td><td><i class="sk" style="width:34px"></i></td><td><i class="sk" style="width:52px"></i></td><td><i class="sk" style="width:70px"></i></td><td><i class="sk" style="width:28px"></i></td><td class="c-act"><div class="rowacts"><i class="sk-btn" style="width:118px"></i><i class="sk-btn" style="width:78px"></i></div></td></tr>
+            <tr><td class="c-id"><i class="sk" style="width:38px"></i></td><td><i class="sk" style="width:40px"></i></td><td><i class="sk" style="width:70px"></i></td><td><i class="sk" style="width:92px"></i></td><td><i class="sk" style="width:118px"></i></td><td><i class="sk" style="width:74px"></i></td><td><i class="sk" style="width:34px"></i></td><td><i class="sk" style="width:44px"></i></td><td><i class="sk" style="width:70px"></i></td><td><i class="sk" style="width:28px"></i></td><td class="c-act"><div class="rowacts"><i class="sk-btn" style="width:118px"></i><i class="sk-btn" style="width:78px"></i></div></td></tr>
+            <tr><td class="c-id"><i class="sk" style="width:38px"></i></td><td><i class="sk" style="width:52px"></i></td><td><i class="sk" style="width:56px"></i></td><td><i class="sk" style="width:110px"></i></td><td><i class="sk" style="width:96px"></i></td><td><i class="sk" style="width:74px"></i></td><td><i class="sk" style="width:34px"></i></td><td><i class="sk" style="width:56px"></i></td><td><i class="sk" style="width:70px"></i></td><td><i class="sk" style="width:28px"></i></td><td class="c-act"><div class="rowacts"><i class="sk-btn" style="width:118px"></i><i class="sk-btn" style="width:78px"></i></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="state-head"><h3>اقدام غیرفعال با دلیل</h3><span>ردیف‌هایی که محاسبهٔ وضعیت جاری‌شان تمام نشده</span></div>
+      <div class="state-block" style="padding:12px 16px 16px;display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:#8A8F9E;font-weight:700;margin-bottom:5px">در حالت عادی</div>
+          <div class="rowacts">
+            <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+            <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#8A8F9E;font-weight:700;margin-bottom:5px">در حال محاسبه</div>
+          <div class="rowacts">
+            <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+            <button class="ra" disabled><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+            <span class="ra-reason">تا پایان محاسبه غیرفعال است</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#8A8F9E;font-weight:700;margin-bottom:5px">همکاری پایان‌یافته</div>
+          <div class="rowacts">
+            <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+            <button class="ra" disabled><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+            <span class="ra-reason">همکاری پایان یافته است</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= SCREEN 3: EVENT FORM ================= -->
+<div class="mock">
+  <p class="mock-label">۳. رویدادهای پرسنلی / ثبت رویداد <span>فرم شناسه‌محور با انتخابگر جست‌وجویی · نوار کناری جمع‌شده</span></p>
+  <div class="frame">
+    <div class="frame-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><div class="frame-url">divan.local/personnel-events/new</div></div>
+    <div class="app">
+      <div class="topbar">
+        <div class="brand" style="min-width:44px"><span class="brand-mark">د</span></div>
+        <div class="spacer"></div>
+        <button class="top-btn"><svg class="ic ic-sm"><use href="#i-search"/></svg>جست‌وجوی سراسری <span class="kb" style="background:rgba(255,255,255,.14);border-color:transparent;color:#FFFFFF">/</span></button>
+        <button class="top-btn"><svg class="ic ic-sm"><use href="#i-moon"/></svg>تم تاریک</button>
+        <div class="top-user"><span class="avatar">ز</span>زهرا کریمی <svg class="ic ic-sm"><use href="#i-chev"/></svg></div>
+      </div>
+      <div class="body body-collapsed">
+        <nav class="side">
+          <a class="nav" href="#" title="داشبورد"><svg class="ic"><use href="#i-dash"/></svg><span class="t">داشبورد</span></a>
+          <a class="nav" href="#" title="اطلاعات پرسنلی"><svg class="ic"><use href="#i-people"/></svg><span class="t">اطلاعات پرسنلی</span></a>
+          <a class="nav on" href="#" title="رویدادهای پرسنلی"><svg class="ic"><use href="#i-event"/></svg><span class="t">رویدادهای پرسنلی</span></a>
+          <a class="nav" href="#" title="ساختار سازمان"><svg class="ic"><use href="#i-org"/></svg><span class="t">ساختار سازمان</span></a>
+          <a class="nav" href="#" title="ظرفیت و جذب"><svg class="ic"><use href="#i-cap"/></svg><span class="t">ظرفیت و جذب</span></a>
+          <a class="nav" href="#" title="گزارش‌ها"><svg class="ic"><use href="#i-report"/></svg><span class="t">گزارش‌ها</span></a>
+          <a class="nav" href="#" title="ورود داده"><svg class="ic"><use href="#i-import"/></svg><span class="t">ورود داده</span></a>
+          <a class="nav" href="#" title="دسترسی‌ها"><svg class="ic"><use href="#i-key"/></svg><span class="t">دسترسی‌ها</span></a>
+          <a class="nav" href="#" title="ممیزی"><svg class="ic"><use href="#i-audit"/></svg><span class="t">ممیزی</span></a>
+          <a class="nav" href="#" title="عملیات"><svg class="ic"><use href="#i-ops"/></svg><span class="t">عملیات</span></a>
+          <a class="nav" href="#" title="پرونده‌های اصلاح"><svg class="ic"><use href="#i-fix"/></svg><span class="t">پرونده‌های اصلاح</span></a>
+          <a class="nav" href="#" title="تنظیمات"><svg class="ic"><use href="#i-gear"/></svg><span class="t">تنظیمات</span></a>
+        </nav>
+        <main class="main">
+          <div class="phead">
+            <div class="crumb">دیوان / رویدادهای پرسنلی / ثبت رویداد</div>
+            <div class="ptitle"><h2>ثبت رویداد</h2><span class="count">پیش‌نویس ذخیره‌نشده</span></div>
+            <div class="tabs">
+              <a class="tab" href="#">فهرست رویدادها</a>
+              <a class="tab on" href="#">ثبت رویداد</a>
+              <a class="tab" href="#">زمان‌بندی‌شده‌ها</a>
+            </div>
+          </div>
+
+          <div class="form-wrap">
+            <!-- 1 نوع رویداد -->
+            <div class="fsec">
+              <div class="fsec-h"><h4>نوع رویداد</h4><p>نوع رویداد، بقیهٔ فیلدهای لازم را تعیین می‌کند.</p></div>
+              <div>
+                <div class="grid3">
+                  <div class="f"><label>نوع رویداد</label><div class="inp">انتقال داخلی<svg class="ic ic-sm" style="margin-inline-start:auto"><use href="#i-chev"/></svg></div></div>
+                  <div class="f"><label>وضعیت</label><div class="inp"><span class="badge b-draft">پیش‌نویس</span></div></div>
+                  <div class="f"><label>شمارهٔ رویداد</label><div class="inp off">پس از نهایی‌سازی صادر می‌شود</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2 فرد و همکاری -->
+            <div class="fsec">
+              <div class="fsec-h"><h4>فرد و همکاری</h4><p>جست‌وجو با کد پرسنلی یا نام؛ شناسهٔ داخلی لازم نیست.</p></div>
+              <div>
+                <div class="grid2">
+                  <div class="f picker">
+                    <label>فرد <span style="color:#006FFF">*</span></label>
+                    <div class="inp focus"><svg class="ic ic-sm"><use href="#i-search"/></svg>محمدی<i class="cursor"></i><span class="kb" style="margin-inline-start:auto">↑↓ انتخاب · Enter تأیید</span></div>
+                    <div class="pop">
+                      <div class="pop-h"><span>۴ نتیجه برای «محمدی»</span><span>کد پرسنلی — نام خانوادگی، نام</span></div>
+                      <div class="opt on"><div class="l1"><span class="code">۱۰۰۱۲</span> — محمدی، سارا</div><div class="l2">تیم جذب و استخدام · کارشناس ارشد منابع انسانی</div></div>
+                      <div class="opt"><div class="l1"><span class="code">۱۰۱۰۴</span> — محمدی، سارا</div><div class="l2">تیم مالی · کارشناس حسابداری</div></div>
+                      <div class="opt"><div class="l1"><span class="code">۱۰۲۳۹</span> — محمدی‌فر، حسین</div><div class="l2">تیم زیرساخت · کارشناس سیستم</div></div>
+                      <div class="opt"><div class="l1"><span class="code">۱۰۳۱۸</span> — محمدی، لیلا</div><div class="l2">تیم توسعه محصول · طراح تجربهٔ کاربری</div></div>
+                      <div class="pop-f"><span><span class="kb">↑↓</span> حرکت</span><span><span class="kb">Enter</span> انتخاب</span><span><span class="kb">Esc</span> بستن</span></div>
+                    </div>
+                  </div>
+                  <div class="f">
+                    <label>همکاری فعال فرد</label>
+                    <div class="inp off">پس از انتخاب فرد پر می‌شود</div>
+                    <div class="hint">اگر فرد بیش از یک همکاری فعال داشته باشد، اینجا انتخاب می‌شود.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3 مقصد شغلی -->
+            <div class="fsec">
+              <div class="fsec-h"><h4>مقصد شغلی</h4><p>تیم مقصد با کد کسب‌وکاری انتخاب می‌شود؛ گرید وابسته به نردبان است.</p></div>
+              <div>
+                <div class="grid3">
+                  <div class="f">
+                    <label>تیم مقصد <span style="color:#006FFF">*</span></label>
+                    <div class="inp"><span class="token"><span class="code">TEAM-SALES</span> — تیم فروش <span class="x"><svg class="ic ic-sm"><use href="#i-x"/></svg></span></span></div>
+                  </div>
+                  <div class="f">
+                    <label>نردبان <span style="color:#006FFF">*</span></label>
+                    <div class="inp">نردبان تخصصی<svg class="ic ic-sm" style="margin-inline-start:auto"><use href="#i-chev"/></svg></div>
+                  </div>
+                  <div class="f">
+                    <label>گرید <span style="color:#006FFF">*</span></label>
+                    <div class="inp">G-۱۳<svg class="ic ic-sm" style="margin-inline-start:auto"><use href="#i-chev"/></svg></div>
+                    <div class="hint">فهرست گریدها پس از انتخاب «نردبان تخصصی» فعال شد.</div>
+                  </div>
+                  <div class="f">
+                    <label>نقش سازمانی مقصد</label>
+                    <div class="inp">کارشناس ارشد فروش<svg class="ic ic-sm" style="margin-inline-start:auto"><use href="#i-chev"/></svg></div>
+                  </div>
+                  <div class="f" style="grid-column:span 2">
+                    <label>شناسهٔ فنی</label>
+                    <details class="tech">
+                      <summary><svg class="ic ic-sm"><use href="#i-chev"/></svg>شناسهٔ فنی — فقط برای پشتیبانی و ممیزی</summary>
+                      <div class="tech-body">
+                        <span style="font-size:11px;color:#8A8F9E;font-weight:700">شناسهٔ تیم مقصد</span>
+                        <code class="uuid">7c1f9ab2-4e30-4b6d-9a51-0f2c8d3e6b74</code>
+                        <button class="ra"><svg class="ic ic-sm"><use href="#i-copy"/></svg>کپی</button>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4 تاریخ اثر -->
+            <div class="fsec">
+              <div class="fsec-h"><h4>تاریخ اثر</h4><p>رویداد از این تاریخ اثرگذار می‌شود؛ تاریخ گذشته نیاز به دلیل دارد.</p></div>
+              <div>
+                <div class="grid3">
+                  <div class="f"><label>تاریخ اثر <span style="color:#006FFF">*</span></label><div class="inp"><svg class="ic ic-sm"><use href="#i-event"/></svg>۱۴۰۵/۰۶/۰۱</div></div>
+                  <div class="f"><label>وضعیت زمانی</label><div class="inp"><span class="badge b-sched">زمان‌بندی‌شده</span> <span style="color:#8A8F9E;font-size:11.5px">۲۲ روز مانده</span></div></div>
+                  <div class="f"><label>یادداشت</label><div class="inp"><span class="ph">اختیاری — دلیل یا شمارهٔ نامه</span></div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5 ظرفیت -->
+            <div class="fsec">
+              <div class="fsec-h"><h4>ظرفیت</h4><p>وضعیت ظرفیت تیم مقصد در تاریخ اثر.</p></div>
+              <div>
+                <dl class="cap">
+                  <div><dt>مصرف‌شده</dt><dd>۷</dd></div>
+                  <div class="res"><dt>رزرو</dt><dd>۲</dd></div>
+                  <div class="free"><dt>آزاد</dt><dd>۳</dd></div>
+                </dl>
+                <div class="hint">پس از نهایی‌سازی، «آزاد» به ۲ کاهش می‌یابد.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fbar">
+            <span class="note">تاریخ اثر ۱۴۰۵/۰۶/۰۱ · تیم فروش · گرید G-۱۳</span>
+            <div class="sp"></div>
+            <button class="btn btn-ghost">انصراف</button>
+            <button class="btn btn-blue">ذخیره پیش‌نویس <span class="kb" style="background:rgba(255,255,255,.2);color:#FFFFFF">S</span></button>
+            <button class="btn btn-gold">نهایی‌سازی <span class="kb">⏎</span></button>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DARK PARITY ================= -->
+<div class="mock">
+  <p class="mock-label">۴. برابری تم تاریک <span>سرستون + یک ردیف + دکمه‌های اقدام</span></p>
+  <div class="dark">
+    <div class="dhead">تم تاریک — چرم ‎#030825‎ · طلایی ‎#FBC470‎ روی ‎#1A1208‎</div>
+    <table>
+      <thead><tr>
+        <th class="c-id num" style="box-shadow:inset -1px 0 0 #232C5E">کد پرسنلی</th><th>نام</th><th>نام خانوادگی</th><th>تیم</th><th>نقش سازمانی</th><th class="num">گرید</th><th>همکار فعلی</th><th class="c-act" style="box-shadow:inset 1px 0 0 #232C5E">اقدامات</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="c-id num" style="box-shadow:inset -1px 0 0 #232C5E">۱۰۰۱۲</td><td class="name" style="color:#E6E9F5">سارا</td><td class="name" style="color:#E6E9F5">محمدی</td>
+          <td><span class="trunc-team" title="تیم جذب و استخدام">تیم جذب و استخدام</span></td><td><span class="trunc">کارشناس ارشد منابع انسانی</span></td><td class="num">G-۱۲</td>
+          <td><span class="badge b-yes">بله</span></td>
+          <td class="c-act" style="box-shadow:inset 1px 0 0 #232C5E"><div class="rowacts">
+            <button class="ra"><svg class="ic ic-sm"><use href="#i-pencil"/></svg>اطلاعات کامل/ویرایش</button>
+            <button class="ra ra-blue"><svg class="ic ic-sm"><use href="#i-event"/></svg>ثبت رویداد</button>
+          </div></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="padding:10px 12px;display:flex;gap:8px;align-items:center;border-top:1px solid #232C5E">
+      <button class="btn btn-gold">نهایی‌سازی</button>
+      <button class="btn" style="background:#0A1138;border-color:#232C5E;color:#E6E9F5">ذخیره پیش‌نویس</button>
+      <button class="btn" style="background:transparent;border-color:transparent;color:#9AA1C0">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<div class="foot">جهت طراحی الف — «کنسول متراکم». همهٔ ارقام فارسی‌اند؛ قلم «Yekan Bakh Fa-En» با جایگزین Segoe UI/Tahoma.</div>
+
+</body>
+</html>

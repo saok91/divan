@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-31T00:30:00+03:30
+# last_updated: 2026-07-31T03:15:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-31T00:30:00+03:30
+last_updated: 2026-07-31T03:15:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -134,6 +134,40 @@ development_status:
   7-7-launch-artifact-change-control-hooks: done
   7-8-authoritative-evaluation-snapshot-integrity: done
   epic-7-retrospective: done
+
+  epic-8: in-progress
+  8-1-interaction-system-audit-control-contract: ready-for-dev
+  8-2-visual-design-language-layout-system: backlog
+  8-3-entity-picker-primitive-code-resolvers: backlog
+  8-4-personnel-event-form-identifier-first-retrofit: backlog
+  8-5-remaining-uuid-inputs-retrofit: backlog
+  8-6-governed-table-readability-upgrade: backlog
+  8-7-row-action-affordance-dead-click-elimination: backlog
+  8-8-feedback-loading-motion-system: backlog
+  8-9-self-explaining-state-operational-copy: backlog
+  8-10-design-qa-consistency-accessibility-gate: backlog
+  epic-8-retrospective: optional
+
+  epic-9: backlog
+  9-1-sample-workbook-generation-template-catalogue: backlog
+  9-2-shared-bulk-entry-flow: backlog
+  9-3-bulk-entry-personnel-events-headcount: backlog
+  9-4-capacity-hiring-ia-restructure: backlog
+  9-5-reports-section-tabs-workspace: backlog
+  9-6-personnel-events-list-real-data: backlog
+  9-7-profile-access-cross-surface-drill-through: backlog
+  9-8-governance-surface-discoverability: backlog
+  9-9-no-dead-end-ia-gate: backlog
+  9-10-dashboard-report-visual-quality: backlog
+  epic-9-retrospective: optional
+
+  epic-10: backlog
+  10-1-governed-settings-registry-store: backlog
+  10-2-settings-surface-admin-access: backlog
+  10-3-editable-parameter-wave-1: backlog
+  10-4-readonly-infrastructure-security-inventory: backlog
+  10-5-configuration-change-control-evidence: backlog
+  epic-10-retrospective: optional
 
 action_items:
   - epic: 1
@@ -423,7 +457,8 @@ action_items:
   - epic: 7
     action: "Do not invent Epic 8; require PO-approved PRD/epic update before next committed epic"
     owner: "John + Mary"
-    status: open
+    status: done
+    resolved_in: "sprint-change-proposal-2026-07-31.md (PO-approved) + PRD FR-57-FR-60 amendment + epics.md Epics 8-10 + ux-divan-2026-07-31 spines"
   - epic: 7
     action: "Document MVP substrate-done vs production/LG-complete honesty boundary (SoD seed, list IDOR, PopulationPort, AD-6, no hash-chain)"
     owner: "Paige + Winston + Mary"

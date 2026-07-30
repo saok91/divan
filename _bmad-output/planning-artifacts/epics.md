@@ -4,17 +4,20 @@ inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-divan-2026-07-11/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-divan-2026-07-15/ARCHITECTURE-SPINE.md
   - _bmad-output/planning-artifacts/architecture/architecture-divan-2026-07-15/infra-security-brief.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-31/DESIGN.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-31/EXPERIENCE.md
+  - _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-19.md
+  - _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-31.md
+excludedDocuments:
   - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-19/DESIGN.md
   - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-19/EXPERIENCE.md
-  - _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-19.md
-excludedDocuments:
   - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-13/DESIGN.md
   - _bmad-output/planning-artifacts/ux-designs/ux-divan-2026-07-13/EXPERIENCE.md
   - docs/pre-prd.md
   - _bmad-output/planning-artifacts/prds/prd-divan-2026-07-11/addendum.md
   - _bmad-output/specs/spec-divan/SPEC.md
   - review/reconcile artifacts under prd and ux folders
-exclusionRationale: PRD is authoritative product-scope contract; Architecture Spine + infra companion cover build substrate; UX spine pair (2026-07-19) is first-class UX contract — 2026-07-13 retained as historical reference only (spines win on conflict). Addendum/SPEC/pre-prd remain reference only to avoid duplicate or non-MVP scope bleed into stories. Sprint Change Proposal 2026-07-19 authorized Epic 4b insertion before Epic 5.
+exclusionRationale: PRD is authoritative product-scope contract; Architecture Spine + infra companion cover build substrate; UX spine pair (2026-07-31) is the forward UX contract — 2026-07-19 and 2026-07-13 retained as historical reference only (spines win on conflict). Epic 1–7 and 4b acceptance criteria remain historically true against 2026-07-19; Epic 8 onward are written against 2026-07-31. Addendum/SPEC/pre-prd remain reference only to avoid duplicate or non-MVP scope bleed into stories. Sprint Change Proposal 2026-07-19 authorized Epic 4b insertion before Epic 5; Sprint Change Proposal 2026-07-31 authorized PRD FR-57–FR-60 and Epics 8–10.
 ---
 
 # divan - Epic Breakdown
@@ -83,6 +86,10 @@ FR53: Track restricted external data-subject correction-case evidence without em
 FR54: Formal decision-report publications are reproducible only while lawful source/evidence exists; retroactive Correction creates supersession notice rather than silent rewrite; post-disposal may mark `non-reproducible-after-disposal`.
 FR55: Every Launch Artifact Register item is versioned, attributable, approved for stated scope/period, and governed through change, waiver, expiry, and reapproval; conflicting artifacts block affected baseline until resolved.
 FR56: Business operations spanning mutable reference data or result sets resolve against one attributable valid evaluation snapshot; finalization, import, pagination, export, and formal publication complete against validated snapshot or fail without mixing versions.
+FR57: Users identify people, organizational units, job reference concepts, and governed records by approved business identifiers; internal technical identifiers are never required as user input and never stand as primary displayed identity; selection controls stay permission-safe and enumeration-safe.
+FR58: All MVP surfaces present one consistent interaction system in which available actions are visually and programmatically discoverable; one feedback vocabulary with stated precedence; every surface, state, badge, chart, and banner verified in light and dark at the NFR12 contrast floor.
+FR59: Every surface reachable from navigation is functional and explains its purpose, state, and next step in user terms; bulk entry is reachable by every role permitted to create that data individually, uses the FR37 validated preview/execute path, and offers a template matching the accepted structure exactly.
+FR60: Authorized administrators view and, where explicitly permitted, change governed application parameters through an attributable, audited administration surface, with defaults, sources, editability, and change paths stated.
 
 ### NonFunctional Requirements
 
@@ -148,6 +155,21 @@ UX-DR26: Implement `tree-navigator` for سلسله‌مراتب and لدر و گ
 UX-DR27: Access administration person-first IA — tabs افراد و دسترسی · نقش‌ها · محدوده‌ها · دسترسی اضطراری; OrganizationalScope ≠ org units; toxic/self-approval blocked with Persian reason + audit; break-glass tab uses warning posture.
 UX-DR28: Implement `personnel-quick-edit-modal` from فهرست پرسنل — non-event fields only; Save; link «باز کردن پروفایل کامل»; dirty Stay · Discard · Save; block profile link, ثبت رویداد, Esc/overlay dismiss, and nav until resolved.
 
+**UX-DR29…UX-DR40 are governed by `ux-divan-2026-07-31` (DESIGN.md + EXPERIENCE.md) and apply to Epic 8 onward.**
+
+UX-DR29: Implement the `entity-picker` primitive — async, permission-safe, code-first; displays «کد — نام» plus a disambiguating second line; accepts Latin or Persian digits; combobox semantics (`role="combobox"`, `aria-expanded`, `aria-activedescendant`) with full keyboard operation; scoped defaults; empty and out-of-scope states indistinguishable in wording and timing. Variants: person, org unit/team, organizational role, job title, ladder→grade (cascading), seniority, headcount approval, account; dependent-record variants (employment, primary assignment) list the chosen person's permission-safe records with dates, never free text. Selected values render as an `entity-token` with a clear control.
+UX-DR30: Implement the action-affordance system — a documented mapping from action semantics to control appearance (primary CTA, secondary, tertiary/row action, destructive, disabled-with-reason). Row actions are icon-only buttons with a visible boundary at rest, mandatory `aria-label`, tooltip on hover and keyboard focus, a fixed per-action icon mapping, consistent size/padding, and identical placement across surfaces; overflow beyond two row actions uses a labelled menu. `ghost` is retired for row and toolbar actions. No control may be clickable and inert; row click opens the record while row actions never navigate as a side effect.
+UX-DR31: Implement table readability — content-driven column widths with per-column max width, truncation with an accessible full value, and wrapping for designated long-text columns; no fixed `min-width` that forces horizontal scroll; user-controlled column visibility with persistence; sticky identifier and actions columns keep an inset separator when scrolled; density toggle (compact default 32px / comfortable 48px).
+UX-DR32: Implement self-explaining state — every banner, empty state, and blocking message states fact + cause + scope + next step, with an optional «توضیح بیشتر» disclosure. The recalculation banner names what is stale, which actions are blocked, and what the user should do; it never presents an internal timestamp as a deadline. Each surface carries a one-line purpose statement and definition entries for domain terms.
+UX-DR33: Implement گزارش‌ها IA — section tabs grouping the launch catalogue by subject (نیروی انسانی · سازمان · رویدادها · ظرفیت و جذب · ورود داده), with a report workspace of catalogue rail + parameters + result table + run metadata (as-of, last calculation, row count) + export; report selection is reflected in the URL.
+UX-DR34: Implement ظرفیت و جذب IA — tabs هدکانت · ایجاد · ورود گروهی; «هدکانت» is a governed table with toolbar create; «ایجاد» hosts the approval creation form; exemptions, overrides, and historical reconstruction move into a record-scoped `record-drawer` (480px, inline-end) opened from the approval row instead of stacking panels on one page.
+UX-DR35: Implement the shared bulk-entry pattern — per-section «ورود گروهی» uses one inline five-step flow (قالب → آپلود → پیش‌نمایش و خطاها → تأیید → نتیجه) over the FR37 engine, reusing `import-preview-table`, scoped to that domain and the caller's permissions, with errors cited by row number, column name, and business code; distinct from the sidebar migration wizard with a stated difference in copy.
+UX-DR36: Implement تنظیمات IA — admin-only surface with section tabs by domain (عمومی و نمایش · داده و نگه‌داشت · ورود و خروجی · ظرفیت و جذب · دسترسی و نشست · ممیزی و یکپارچگی · زیرساخت); tabs are role-split so `hr_admin` sees business domains and `system_admin` sees technical domains, each seeing only its own; each parameter row shows Persian label, description, unit, current value, default, source, allowed range, editability, and last change actor/time; edit uses inline validation, a reason field where required, «بازگشت به پیش‌فرض», and confirmation with a stated blast radius for high-impact parameters; read-only parameters state why and where they actually change.
+UX-DR37: Implement wayfinding and terminology — navigation labels state user outcomes; «پرونده‌های اصلاح» becomes «اصلاح اطلاعات» with a purpose line and contextual entry from a person's profile/timeline; other governance-only surfaces get the same treatment; a glossary/help disclosure defines internal terms encountered in the UI.
+UX-DR38: Implement the visual hierarchy and layout system — one `page-header` pattern (breadcrumb, surface title, result count, purpose line, then section tabs, with the primary action in the toolbar row); the DESIGN spacing rhythm and layout grid on every surface; a hairline-based panel/section system with rules for when a surface uses a panel versus a full-bleed table; content max-widths per surface type; one form-layout pattern (label column, field grouping, required marking, help text, inline error, sticky footer action order) used by every form; a single icon set with size/stroke/pairing rules; semantic use of the DESIGN typography roles with no ad-hoc sizes or weights.
+UX-DR39: Implement feedback, loading, and motion — content-shaped skeletons for initial loads; in-place pending states for filters, saves, and finalize actions; one result-feedback pattern with fixed precedence (inline at the form or row for direct results, toast for background work, banner for system-wide state) and one channel per event; destructive/sensitive confirmation posture unchanged; transitions 150–250ms and purposeful, fully disabled under `prefers-reduced-motion` including skeleton pulse.
+UX-DR40: Implement theme parity and data-visualization quality — every surface, state, badge, chart, and banner specified and verified in light and dark at the NFR12 contrast floor; the fixed chart palette with categorical, sequential, and status roles (`chart.categorical` / `chart.categorical-dark` / `chart.sequential`), where gold is never a data color, status colors encode status only, and the green and orange bands stay excluded from data color; chart typography, axis/label, legend, tooltip, tabular numeral, empty, suppressed-cohort, and stale-data treatments defined once and reused by dashboard and reports.
+
 ### FR Coverage Map
 
 FR1: Epic 1 — LDAP/AD authentication (Story 1.8, infra-gated); seeded auth bootstrap in Story 1.4
@@ -182,17 +204,17 @@ FR29: Epic 4 — Universal Primary Assignment headcount coverage
 FR30: Epic 4 — Deterministic future capacity reservation
 FR31: Epic 4 — Atomic headcount consumption and release
 FR32: Epic 4 — Headcount Override with audit visibility
-FR33: Epic 5 — Permission-safe search and lists
+FR33: Epic 5 — Permission-safe search and lists; Epic 8 — in-form permission-safe, enumeration-safe selectors
 FR34: Epic 5 — Personnel profile and event timeline
 FR35: Epic 5 — Core launch dashboard
-FR36: Epic 5 — Operational and historical launch reports
-FR37: Epic 6 — Controlled CSV/XLSX import wizard
+FR36: Epic 5 — Operational and historical launch reports; Epic 9 — subject-tabbed report workspace
+FR37: Epic 6 — Controlled CSV/XLSX import wizard; Epic 9 — sample templates and per-section bulk entry
 FR38: Epic 6 — Atomic and traceable Import Batch
 FR39: Epic 6 — Baseline and migration provenance
 FR40: Epic 6 — Migration reconciliation and cutover gate
 FR41: Epic 6 — Governed export
 FR42: Epic 7 — Business and security audit evidence
-FR43: Epic 1 — Persian RTL desktop experience (initial shell); Epic 4b — shell/IA alignment to ux-divan-2026-07-19
+FR43: Epic 1 — Persian RTL desktop experience (initial shell); Epic 4b — shell/IA alignment to ux-divan-2026-07-19; Epic 8 — interaction consistency baseline
 FR44: Epic 1 — Jalali date experience
 FR45: Epic 7 — Operational health without HR content exposure
 FR46: Epic 2 — Entitlement lifecycle and privileged/break-glass access
@@ -202,10 +224,14 @@ FR49: Epic 1 — Identity and account lifecycle (seeded bootstrap Story 1.4; LDA
 FR50: Epic 7 — Data retention, disposal, and legal hold
 FR51: Epic 7 — Audit trust boundary and fail-safe evidence
 FR52: Epic 6 — Secure import/export artifact lifecycle
-FR53: Epic 7 — External data-subject correction cases
+FR53: Epic 7 — External data-subject correction cases; Epic 9 — «اصلاح اطلاعات» discoverability and contextual entry
 FR54: Epic 7 — Published decision-report reproducibility
 FR55: Epic 7 — Policy and Launch Artifact change control
 FR56: Epic 7 — Authoritative reference and snapshot integrity
+FR57: Epic 8 — Business-identifier-first pickers and resolvers
+FR58: Epic 8 — Consistent interaction system, affordance, and table readability
+FR59: Epic 9 — Complete, self-explaining operational surfaces and bulk entry
+FR60: Epic 10 — Governed application configuration administration
 
 ## Epic List
 
@@ -241,6 +267,18 @@ Migration actors import approved CSV/XLSX through validated preview and atomic I
 ### Epic 7: Audit, Operations & Evidence Controls
 Audit reviewers and operators investigate attributable business/access evidence and service health without routine HR content exposure; the system enforces retention/hold, audit trust, correction-case evidence, formal-report reproducibility, Launch Artifact change control, and evaluation-snapshot integrity.
 **FRs covered:** FR42, FR45, FR50, FR51, FR53, FR54, FR55, FR56
+
+### Epic 8: Experience Foundation & Identifier Ergonomics
+Operators and admins work with people, teams, and job concepts by their real business codes inside one coherent visual and interaction system — a single page-layout, form, table, feedback, and theming language — removing UUID entry, inconsistent controls, unreadable tables, and unexplained system messages from every existing surface.
+**FRs covered:** FR57, FR58; FR33, FR43 (extended consequences). **UX contract:** ux-divan-2026-07-31. **Sequencing:** after Epic 7 (done); before Epic 9. Authorized by sprint-change-proposal-2026-07-31.
+
+### Epic 9: Operational Surface Completion & IA Coherence
+Every navigable surface does real work: per-section bulk entry with downloadable templates, a coherent capacity-and-hiring structure, a tabbed report workspace, a real personnel-events list, and discoverable governance surfaces — with no placeholder tabs remaining in navigation.
+**FRs covered:** FR59; FR33, FR36, FR37, FR53 (surface completion). **UX contract:** ux-divan-2026-07-31. **Sequencing:** after Epic 8.
+
+### Epic 10: Administrative Settings & Governed Parameters
+An authorized administrator sees every governed application parameter in one place and changes the explicitly permitted ones with validation, reason, audit evidence, and reset-to-default, while security-critical parameters stay read-only with their change path stated.
+**FRs covered:** FR60; FR42, FR45, FR55 (evidence and change control). **UX contract:** ux-divan-2026-07-31. **Sequencing:** after Epic 9.
 
 ## Epic 1: Secure Access & Persian Desktop Shell
 
@@ -1302,3 +1340,456 @@ So that concurrent changes cannot produce partially valid authoritative operatio
 **Then** it completes against one validated snapshot/version or fails without mixing versions
 **And** organization/reference changes, concurrent imports, or permission changes cannot produce partially valid authoritative outcomes
 **And** conflicts are surfaced with no silent overwrite or out-of-scope delivery
+
+## Epic 8: Experience Foundation & Identifier Ergonomics
+
+Operators and admins work with people, teams, and job concepts by their real business codes inside one coherent visual and interaction system — a single page-layout, form, table, feedback, and theming language — removing UUID entry, inconsistent controls, unreadable tables, and unexplained system messages from every existing surface.
+
+**UX contract:** `ux-divan-2026-07-31` (EXPERIENCE.md + DESIGN.md), with the `mockups/` set as the visual acceptance reference: `direction-a-dense-console.html` (personnel list, event form, states), `screens-settings.html`, `screens-reports-capacity.html`, `screens-bulk-entry-profile.html`, and `chart-palettes.html`. Epic 1–7 and 4b acceptance criteria remain historically true against `ux-divan-2026-07-19`; forward contract is this epic. Authorized by `sprint-change-proposal-2026-07-31`. No domain, permission, or governance rule changes in this epic — presentation and interaction only, except where a defect makes a governed action unreachable.
+
+### Story 8.1: Interaction System Audit & Control Contract
+
+As a developer working across Divan surfaces,
+I want a published mapping from action semantics to control appearance, enforced in code,
+So that the same kind of action looks and behaves the same on every surface (UX-DR30, FR58).
+
+**Acceptance Criteria:**
+
+**Given** the delivered Epic 1–7 surfaces
+**When** the interaction audit runs
+**Then** every button, row action, table, panel, and form in `apps/web` is inventoried with its current variant, size, placement, and semantics, and the gap list is published as the input to Stories 8.2–8.9
+**When** the control contract is implemented
+**Then** action semantics map to typed variants — primary CTA, secondary, tertiary/row action, destructive, disabled-with-reason — and the mapping is documented next to the component
+**And** `ghost` is removed from row and toolbar actions and remains available only for dialog cancel and inline dismiss
+**And** one gold `button-primary` per surface region is preserved
+**And** existing drift is fixed, including the `org-flat` surface and padding inconsistencies found by the audit
+**And** a lint rule or selfcheck fails when a row or toolbar action uses a retired variant
+
+### Story 8.2: Visual Design Language & Layout System
+
+As any Divan user,
+I want every surface to use the same header, spacing, panel, form, and typography system,
+So that the product reads as one professional application rather than several (UX-DR38, FR58).
+
+**Acceptance Criteria:**
+
+**Given** the `ux-divan-2026-07-31` DESIGN tokens
+**When** the layout system is implemented
+**Then** every surface uses one `page-header` pattern — breadcrumb, surface title, result count, purpose line, then section tabs — with the primary action in the toolbar row beneath, never in the header
+**And** the DESIGN spacing rhythm is applied, including `content-padding-inline` 16px, `section-tabs-height` 30px with a 2px navy active border, and the three control heights (24px row action, 28px toolbar, 32px form and CTA)
+**And** the hairline-based panel/section system is used with documented rules for when a surface uses a panel versus a full-bleed table
+**And** every form uses one layout pattern — label column, field grouping, required marking, help text, inline error, sticky footer with Cancel · Save draft · Finalize order
+**And** one icon set is used with fixed size and stroke rules and a fixed per-action icon mapping
+**And** typography roles are used semantically with no ad-hoc sizes or weights, verified by the 8.10 gate
+**And** a dev-only component gallery renders every primitive in light and dark as the living reference
+**And** these values supersede the Story 4b.1 `section-tabs-height` 44px assumption for forward work
+
+### Story 8.3: `entity-picker` Primitive & Code Resolvers
+
+As an operator filling any form,
+I want to find people, teams, and job concepts by typing their business code or name,
+So that I never need an internal identifier to do my job (UX-DR29, FR57, FR33).
+
+**Acceptance Criteria:**
+
+**Given** the shared UI library and the module APIs
+**When** `entity-picker` is implemented
+**Then** it searches asynchronously from the first character, accepts Latin or Persian digits, and renders each option as «کد — نام» with a disambiguating second line
+**And** it exposes combobox semantics (`role="combobox"`, `aria-expanded`, `aria-activedescendant`) and is fully keyboard operable including Escape and Enter
+**And** the selected value renders as an `entity-token` with a clear control, and cascading pickers disable and clear dependents when the parent changes, stating why
+**And** variants exist for person, org unit/team, organizational role, job title, ladder→grade, seniority, headcount approval, and account
+**And** dependent-record variants list the chosen person's permission-safe employments and primary assignments with their dates, never free text
+**When** the caller lacks permission for a subject
+**Then** it is absent from suggestions, and out-of-scope and not-found results are indistinguishable in wording, count, and response timing (FR33, FR48)
+**And** the missing server resolvers `organization.getByCode` and `jobReference.getByCode` are added alongside the existing `person.search` and `person.getByPersonnelCode`, with the same authorization posture
+**And** picker search never widens what the caller could already list
+
+### Story 8.4: Personnel Event Form — Identifier-First Retrofit
+
+As an HR operator registering an event,
+I want to choose the person, teams, and job concepts by code and name,
+So that I can register an event without looking up a UUID (UX-DR29, FR57).
+
+**Acceptance Criteria:**
+
+**Given** `personnel-event-form` with its current UUID text inputs
+**When** the retrofit is complete
+**Then** all fifteen identifier inputs are replaced by the matching `entity-picker` variants and no free-text UUID input remains on the form
+**And** ladder→grade cascades, with grade disabled until a ladder is chosen and cleared when the ladder changes
+**And** employment and primary assignment are chosen from the selected person's own records, shown with their dates
+**And** the capacity panel and approval selection display human labels and codes rather than identifiers
+**And** the form adopts the Story 8.2 layout pattern and footer action order
+**And** the technical identifier of the selected records is available in a collapsed «شناسهٔ فنی» disclosure with a copy control
+**And** mutation payloads, draft/finalize semantics, and all Epic 4 validation and capacity rules are unchanged, proven by the existing Epic 4 tests passing unmodified
+**And** inbound prefill while the form is dirty still runs the leave-guard before any person swap (UX-DR11)
+
+### Story 8.5: Remaining UUID Inputs Retrofit
+
+As any user of the remaining admin and analysis surfaces,
+I want the same code-first selection everywhere,
+So that no corner of the product still demands an internal identifier (FR57).
+
+**Acceptance Criteria:**
+
+**Given** the surfaces outside the personnel event form
+**When** the retrofit is complete
+**Then** pickers replace identifier inputs in dashboard, report, and historical team filters; headcount exemption and override panels; correction-case person and link target; lifecycle scope and disposal person lists; audit investigation actor and entity; reconciliation owner and approver; and launch-artifact owner and approver
+**And** every displayed record identity is code plus human name, in that order
+**And** internal identifiers appear only inside a labelled «شناسهٔ فنی» disclosure or in exported evidence where correlation requires them
+**And** audit investigation retains the ability to look up by raw identifier, because that is a legitimate support path, but it is not the default input
+**And** a selfcheck fails when a form input is bound to a UUID-typed field without a picker
+
+### Story 8.6: Governed Table Readability Upgrade
+
+As an operator reading any list,
+I want tables to fit the content instead of forcing horizontal scroll,
+So that I can read a row without dragging a scrollbar (UX-DR31, FR58).
+
+**Acceptance Criteria:**
+
+**Given** `governed-data-table` and `ui/table`
+**When** the readability upgrade is complete
+**Then** the five `min-w-[…]` wrappers are removed and no fixed table minimum width remains anywhere in the app
+**And** column widths follow content with a per-column max width; long values truncate with an ellipsis and expose the full value accessibly and via tooltip
+**And** designated long-text columns wrap instead of truncating
+**And** column visibility is user-controlled and persists per operator
+**And** the density toggle offers compact 32px (default) and comfortable 48px without changing any other token
+**And** sticky identifier and actions columns keep an inset hairline separator while scrolling, not a drop shadow
+**And** at 1280×720 with a realistic row set the personnel list and the access administration table are readable without page-level horizontal scroll
+**And** the Story 4b.4 primitive contract — filters, sort, snapshot pagination, live-region counts, permission-omitted columns — is preserved
+
+### Story 8.7: Row-Action Affordance & Dead-Click Elimination
+
+As an operator scanning a list,
+I want row actions that look like buttons and always do something,
+So that I stop clicking controls that appear inert (UX-DR30, FR58).
+
+**Acceptance Criteria:**
+
+**Given** every list surface with row actions
+**When** the affordance pattern is applied
+**Then** row actions are 24px icon-only buttons, outlined at rest with a visible border and surface fill, never hover-revealed and never borderless
+**And** each carries a mandatory `aria-label` and a tooltip shown on hover and on keyboard focus, with a fixed per-action icon mapping shared across surfaces
+**And** more than two actions on a row collapse into a labelled overflow menu
+**And** row click opens the record while row actions stop propagation, so no action triggers navigation as a side effect
+**Given** the leave-guard early return in `leave-guard-provider.tsx`
+**When** a navigation or action is blocked by unsaved work
+**Then** the user always sees a dialog or an explicit reason, and the blocked path never fails silently
+**And** «اطلاعات کامل/ویرایش» and «ثبت رویداد» in the personnel list are verifiably actionable, including from the keyboard
+**And** a selfcheck asserts that no rendered action is inert — every enabled action has a handler and every disabled action has a reason
+
+### Story 8.8: Feedback, Loading & Motion System
+
+As any user waiting on the system,
+I want consistent, in-place feedback about what is happening,
+So that I can tell the difference between loading, blocked, and done (UX-DR39, FR58).
+
+**Acceptance Criteria:**
+
+**Given** the feedback contract in EXPERIENCE
+**When** the system is implemented
+**Then** initial loads use content-shaped skeletons — tables keep row height and column rhythm, the header renders immediately, and no layout shift occurs on arrival
+**And** filters, saves, and finalize actions show in-place pending states rather than replacing the surface
+**And** result feedback follows one precedence: inline at the form or row for direct results, toast for background work such as import batches, banner for system-wide state — with exactly one channel per event
+**And** no success is reported optimistically; a commit reports only after the server confirms
+**And** transitions run 150–250ms and are purposeful, and `prefers-reduced-motion` disables all of them including the skeleton pulse
+**And** the destructive and sensitive confirmation posture from Epic 2 and Epic 4 is unchanged
+
+### Story 8.9: Self-Explaining State & Operational Copy Overhaul
+
+As an operator facing a blocked or unusual state,
+I want the system to tell me what happened and what to do,
+So that I do not have to guess what a message means (UX-DR32, UX-DR37, FR58, FR59).
+
+**Acceptance Criteria:**
+
+**Given** the recalculation banner that currently renders an internal timestamp
+**When** the copy overhaul is complete
+**Then** it states scope, consequence, and expectation in the form «محاسبهٔ وضعیت جاری برای N فرد هنوز کامل نشده — نهایی‌سازی رویداد و خروجی گرفتن برای این افراد موقتاً غیرفعال است. معمولاً چند دقیقه طول می‌کشد.» with a «توضیح بیشتر» disclosure
+**And** no internal timestamp is presented as a deadline anywhere in the UI
+**And** affected rows are marked in place and affected figures render muted with «در حال محاسبه — عدد ممکن است تغییر کند.»
+**And** every surface carries a one-line purpose statement under its title
+**And** empty states distinguish no-data-yet, filtered-to-nothing, and not-permitted, each with its own copy and next step
+**And** every disabled control states its Persian reason, exposed both visually and to assistive technology
+**And** domain terms encountered in the UI have glossary entries reachable from where they appear
+**And** the direct-operational voice from UX-DR24 is preserved — fact, then consequence, then next step, with no ceremonial success copy
+
+### Story 8.10: Design QA, Consistency & Accessibility Gate
+
+As the product owner accepting this wave,
+I want a repeatable check that surfaces match the contract,
+So that consistency does not decay in Epics 9 and 10 (FR58, NFR12).
+
+**Acceptance Criteria:**
+
+**Given** the `ux-divan-2026-07-31` spines and mockups
+**When** the design QA gate runs
+**Then** each key screen is compared screen-by-screen against its mockup — personnel list, personnel event form, person profile, reports workspace, dashboard, هدکانت with drawer, bulk-entry wizard, and settings — and deviations are either fixed or recorded as spine amendments
+**And** the cross-surface consistency checklist passes for page header, panel system, form layout, table chrome, button variants, icon mapping, and feedback channel
+**And** light and dark parity is verified for every surface, state, badge, chart, and banner, with AA contrast at 13px body and 10.5px column headers
+**And** essential tasks pass at 1280×720 and 1920×1080 without page-level horizontal scroll
+**And** accessibility probes pass for the picker (combobox semantics, keyboard, announcement), tables (sort, live-region counts, sticky columns), dialogs and drawers (focus trap and focus return), and icon-only actions (accessible name, tooltip on focus)
+**And** the whole gate is runnable as a selfcheck that Epics 9 and 10 must pass before their own baselines
+
+## Epic 9: Operational Surface Completion & IA Coherence
+
+Every navigable surface does real work: per-section bulk entry with downloadable templates, a coherent capacity-and-hiring structure, a tabbed report workspace, a real personnel-events list, and discoverable governance surfaces — with no placeholder tabs remaining in navigation.
+
+**UX contract:** `ux-divan-2026-07-31`. **Depends on:** Epic 8 primitives (`entity-picker`, page-header and layout system, table readability, feedback system) and the Story 8.10 gate. Domain rules from Epics 3–7 are unchanged; this epic completes and restructures surfaces over them.
+
+### Story 9.1: Sample-Workbook Generation & Template Catalogue
+
+As anyone about to enter data in bulk,
+I want a downloadable sample workbook for the template I need,
+So that I can prepare a file that is accepted the first time (FR37, FR59).
+
+**Acceptance Criteria:**
+
+**Given** the registered import template definitions
+**When** an operator requests a sample for a template
+**Then** the workbook is generated from the same authoritative definition used for validation — same columns, same headers, same value formats, same order
+**And** a downloaded sample, filled with valid values and re-uploaded unchanged in structure, passes validation
+**And** generated workbooks are formula-safe per FR52 and follow the FR52 artifact lifecycle
+**And** sample columns that reference entities use business codes with a documented example value, never internal identifiers
+**And** a template catalogue is visible in «ورود داده» and in each bulk-entry tab, showing the template name, its purpose, and the permission required
+**And** a template a caller may not use states its access requirement rather than being silently absent
+
+### Story 9.2: Shared Bulk-Entry Flow
+
+As an operator permitted to create records one at a time,
+I want the same bulk path in every section,
+So that entering forty records does not mean forty forms (UX-DR35, FR37, FR59).
+
+**Acceptance Criteria:**
+
+**Given** the FR37 import engine and `import-preview-table`
+**When** the shared bulk-entry flow is implemented
+**Then** every «ورود گروهی» tab uses one inline five-step flow: قالب → آپلود → پیش‌نمایش و خطاها → تأیید → نتیجه
+**And** the flow is permission-scoped so every role that may create a record individually may also create it in bulk, and no wider
+**And** preview errors cite row number, column name, and the business code of the subject, never an internal identifier
+**And** commit is atomic per FR38 and the result reports created, updated, and rejected counts
+**And** the concurrent-batch block message, owner, and correlation id rules from Epic 6 are inherited unchanged
+**And** an unsaved preview triggers the leave-guard citing the batch
+**And** copy distinguishes this day-to-day path from the sidebar migration wizard, and neither is presented as the other
+
+### Story 9.3: Bulk Entry for Personnel, Events & Headcount
+
+As an HR admin,
+I want the three empty «ورود گروهی» tabs to actually work,
+So that navigation stops leading to blank pages (FR59).
+
+**Acceptance Criteria:**
+
+**Given** the three placeholder bulk-import pages in personnel, personnel events, and capacity
+**When** this story is complete
+**Then** each tab hosts the Story 9.2 flow wired to its domain template and validators
+**And** personnel bulk entry validates against the data-dictionary-governed fields from Epic 3
+**And** event bulk entry runs the same Epic 4 validation as single-event finalization, including effective-date, conflict, and capacity rules, with no bypass
+**And** headcount bulk entry runs Epic 4 approval and capacity rules unchanged
+**And** no placeholder page remains in the repository or in navigation
+
+### Story 9.4: ظرفیت و جذب IA Restructure
+
+As a capacity owner,
+I want one readable headcount page instead of four stacked panels,
+So that I can see the capacity picture without scrolling through unrelated blocks (UX-DR34, FR59).
+
+**Acceptance Criteria:**
+
+**Given** the current capacity surface with stacked panels
+**When** the restructure is complete
+**Then** section tabs are هدکانت · ایجاد · ورود گروهی
+**And** «هدکانت» is a governed table of approvals with toolbar create and per-row icon actions
+**And** «ایجاد» hosts the full approval creation form using the Story 8.2 form pattern, and is no longer empty
+**And** exemptions, overrides, and historical reconstruction open in a `record-drawer` scoped to the approval row they belong to, with the record identity in the drawer header
+**And** the drawer closes on Escape and returns focus to the originating row
+**And** all Epic 4 headcount domain rules — coverage matching, reservation, atomic consumption, override audit — are unchanged
+
+### Story 9.5: گزارش‌ها Section Tabs & Report Workspace
+
+As an HR business partner,
+I want reports grouped by subject with a clear run-and-export flow,
+So that finding and running a report is not a hunt (UX-DR33, FR36, FR59).
+
+**Acceptance Criteria:**
+
+**Given** the approved launch report catalogue
+**When** the report workspace is implemented
+**Then** section tabs group reports by subject: نیروی انسانی · سازمان · رویدادها · ظرفیت و جذب · ورود داده
+**And** each tab shows a catalogue rail with report names and one-line purposes, a parameters strip, a run action, and a result area
+**And** report selection and parameters are reflected in the URL so a run is shareable and re-openable
+**And** the result shows run metadata: as-of date, last calculation time, and row count
+**And** export follows FR41 and FR52 unchanged, including reauth and custody rules
+**And** a report the caller may not run states its access requirement rather than failing after the click
+**And** current versus as-of semantics from Epic 5 are unchanged
+
+### Story 9.6: Personnel Events List — Real Data
+
+As an operator,
+I want the events list to show real organization-wide events,
+So that the surface is usable rather than a fixture (FR33, FR59).
+
+**Acceptance Criteria:**
+
+**Given** the events list currently backed by `FIXTURE_EVENTS`
+**When** the real list is delivered
+**Then** it reads from a permission-safe organization-wide event query with the Epic 5 search and scope posture
+**And** it supports filters for event type, status, effective-date range, team, and person, using pickers where the filter is an entity
+**And** rows show status badges and offer row actions to open the event and open the person
+**And** pagination uses the Story 4b.4 stable-snapshot contract
+**And** the fixture is removed from the codebase
+
+### Story 9.7: Profile Access & Cross-Surface Drill-Through
+
+As any authorized user,
+I want to move between a person, their events, and the numbers that reference them,
+So that I can follow a question to its answer without retyping anything (FR34, FR59).
+
+**Acceptance Criteria:**
+
+**Given** the personnel list, event surfaces, dashboard, and reports
+**When** drill-through is implemented
+**Then** a personnel list row opens the full profile, and the profile is reachable by personnel code deep-link with a canonical redirect
+**And** an event links to its person and a person's timeline links to each event
+**And** dashboard and report reconciliation links land on the filtered detail that produced the figure
+**And** every drill-through target respects the caller's permissions and shows the standard not-permitted state rather than an empty surface
+**And** «ثبت درخواست اصلاح» is available from the profile as the contextual entry into «اصلاح اطلاعات»
+
+### Story 9.8: Governance Surface Discoverability
+
+As an HR admin,
+I want governance surfaces to say what they are for,
+So that a nav item is not a mystery I avoid (UX-DR37, FR53, FR59).
+
+**Acceptance Criteria:**
+
+**Given** the surface currently labelled «پرونده‌های اصلاح»
+**When** this story is complete
+**Then** it is labelled «اصلاح اطلاعات» and carries a one-line purpose statement naming what it holds, who raises it, and who can close it
+**And** it is reachable contextually from a person's profile and timeline, not only from the sidebar
+**And** the same treatment — purpose line plus contextual entry — is applied to the other governance-only surfaces identified in the Epic 8 audit
+**And** FR53 domain behaviour, including bounded attachments, deadline states, and evidence links, is unchanged
+
+### Story 9.9: No-Dead-End IA Gate
+
+As the product owner,
+I want an automated guarantee that navigation never leads nowhere,
+So that a placeholder can never ship into navigation again (FR59).
+
+**Acceptance Criteria:**
+
+**Given** the full route table and navigation configuration
+**When** the IA gate runs
+**Then** every sidebar entry and every section tab resolves to functional content for at least one role
+**And** a route rendering only placeholder content fails the gate
+**And** navigation entries the caller cannot use are omitted from the DOM rather than shown inert, consistent with UX-DR3
+**And** the gate runs in CI and in the selfcheck suite alongside the Story 8.10 gate
+
+### Story 9.10: Dashboard & Report Visual Quality
+
+As a manager reading numbers,
+I want charts and metrics that are legible, honest, and consistent,
+So that I can trust what I take into a meeting (UX-DR40, FR35, FR36).
+
+**Acceptance Criteria:**
+
+**Given** the DESIGN chart tokens
+**When** the visual quality pass is complete
+**Then** categorical series use `chart.categorical` on light and `chart.categorical-dark` on dark, and single-measure ramps use `chart.sequential`
+**And** gold is never used as a data color and status colors are never used as a data series
+**And** chart typography, axis and label treatment, legend, tooltip, and tabular numerals follow DESIGN once and are reused by dashboard and reports
+**And** series remain distinguishable in both themes and under common color-vision deficiency, verified at the stroke widths actually rendered
+**And** empty, suppressed-cohort, and stale-data chart treatments are consistent — a suppressed cohort renders «داده قابل نمایش نیست.» and never zero (FR48, UX-DR15)
+**And** metric cards adopt the Story 8.2 panel system and show their last calculation time
+**And** nothing is communicated by color alone
+
+## Epic 10: Administrative Settings & Governed Parameters
+
+An authorized administrator sees every governed application parameter in one place and changes the explicitly permitted ones with validation, reason, audit evidence, and reset-to-default, while security-critical parameters stay read-only with their change path stated.
+
+**UX contract:** `ux-divan-2026-07-31`. **Depends on:** Epics 8 and 9. **Architecture:** governed parameters live in a typed registry with a database-backed store read through a single resolver with cached reads; modules never read raw environment variables or literals for registered parameters; unavailable or invalid values fail closed to the registered code default and raise the FR45 degraded state; no AD-1…AD-6 change.
+
+### Story 10.1: Governed Settings Registry & Store
+
+As a developer of any module,
+I want one typed registry and resolver for governed parameters,
+So that a parameter has exactly one definition and one source of truth (FR60).
+
+**Acceptance Criteria:**
+
+**Given** the parameters currently expressed as constants and environment variables
+**When** the registry is implemented
+**Then** each registered parameter declares Persian label, description, type, unit, allowed range or allowlist, default, editability, and owning domain
+**And** a persisted store holds overrides, and a single resolver serves values with cached reads and explicit invalidation on change
+**And** module constants for registered parameters are read through the resolver, and a lint rule or selfcheck blocks direct environment or literal reads for them
+**When** a stored value is missing, unparsable, or out of range
+**Then** the resolver fails closed to the registered code default and raises the FR45 degraded state rather than applying an invalid value
+**And** resolution never blocks a request path on a database round trip beyond the cached read
+
+### Story 10.2: تنظیمات Surface & Admin-Only Access
+
+As an administrator,
+I want one place that shows the parameters I am allowed to see,
+So that configuration is not scattered across code and environments (UX-DR36, FR60).
+
+**Acceptance Criteria:**
+
+**Given** the registry from Story 10.1
+**When** the settings surface is delivered
+**Then** a «تنظیمات» nav entry exists at the end of the sidebar with its own permission, omitted from the DOM for callers without it
+**And** section tabs are عمومی و نمایش · داده و نگه‌داشت · ورود و خروجی · ظرفیت و جذب · دسترسی و نشست · ممیزی و یکپارچگی · زیرساخت
+**And** tabs are role-split: `hr_admin` sees the business domains, `system_admin` sees the technical domains, عمومی و نمایش is visible to both, and each role sees only its own tabs
+**And** rows render from the registry rather than being hand-written per parameter
+**And** each row shows label, description, current value, default, source, allowed range, editability, and last change actor and Jalali time
+**And** a caller with no settings permission never sees the nav entry, and a direct deep link shows «دسترسی ندارید.» and is audited (UX-DR18)
+
+### Story 10.3: Editable Parameter Wave 1
+
+As an administrator,
+I want to change the operational limits that actually get asked about,
+So that a tuning request does not require a deployment (FR60).
+
+**Acceptance Criteria:**
+
+**Given** the settings surface
+**When** wave 1 is delivered
+**Then** the editable set is import limits (file size, row count, draft count and TTL), export artifact TTL and custody threshold, list and search page sizes and caps, headcount reservation-expiry warning window, correction-case attachment limits and allowlist, and entitlement recertification window
+**And** each edit validates inline against the registry range or allowlist before it can be applied
+**And** a high-impact parameter requires confirmation stating the blast radius — which surfaces recompute and whether existing records are re-evaluated
+**And** «بازگشت به پیش‌فرض» is available on every editable row
+**And** a change takes effect through the resolver without a restart
+**And** no parameter in this wave can widen a permission, retention, export, or audit boundary
+
+### Story 10.4: Read-Only Inventory of Infrastructure & Security Parameters
+
+As a system administrator or auditor,
+I want to see the deployment-managed settings without being able to change them here,
+So that the real configuration is visible without weakening its change control (FR60, FR42, FR45).
+
+**Acceptance Criteria:**
+
+**Given** parameters sourced from environment or code that must stay deployment-managed
+**When** the read-only inventory is delivered
+**Then** identity and LDAP posture, session timeouts, audit-envelope policy and category paths, inference and bulk thresholds, audit-trust thresholds, pool size, and baseline boundary are listed with their current effective value and source
+**And** each states its real change path in plain Persian, for example «فقط با استقرار قابل تغییر است.», rather than appearing as a disabled input that implies a missing permission
+**And** no secret, credential, or connection string is rendered, in full or in part
+**And** the inventory is exportable as evidence under the FR52 artifact lifecycle
+**And** viewing the inventory is itself audited where the values are security-relevant
+
+### Story 10.5: Configuration Change Control & Evidence
+
+As an auditor,
+I want every configuration change to be attributable and reversible,
+So that configuration is governed like any other privileged act (FR60, FR42, FR55).
+
+**Acceptance Criteria:**
+
+**Given** a permitted parameter change
+**When** it is applied
+**Then** the audit envelope records actor, parameter, previous value, new value, reason where required, effect time, and Jalali timestamp
+**And** the change is visible in the audit surface with the same evidence posture as other privileged actions
+**And** reset-to-default is recorded as a change with the same evidence
+**When** configuration is invalid or the store is unavailable
+**Then** the system fails closed to defaults and shows the FR45 degraded state rather than operating on an unknown configuration
+**And** a selfcheck proves that no registered parameter can widen a permission, retention, export, or audit boundary
+**And** audit-required failure prevents or safely suspends the configuration change, consistent with FR51
