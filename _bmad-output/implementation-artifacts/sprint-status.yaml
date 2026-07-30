@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-30T23:50:00+03:30
+# last_updated: 2026-07-31T00:30:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-30T23:30:00+03:30
+last_updated: 2026-07-31T00:30:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -124,7 +124,7 @@ development_status:
   6-5-governed-export-artifact-panel: done
   epic-6-retrospective: done
 
-  epic-7: in-progress
+  epic-7: done
   7-1-audit-investigation-surface: done
   7-2-operations-health-without-hr-content: done
   7-3-retention-disposal-legal-hold: done
@@ -133,7 +133,7 @@ development_status:
   7-6-published-decision-report-reproducibility: done
   7-7-launch-artifact-change-control-hooks: done
   7-8-authoritative-evaluation-snapshot-integrity: done
-  epic-7-retrospective: optional
+  epic-7-retrospective: done
 
 action_items:
   - epic: 1
@@ -409,8 +409,66 @@ action_items:
   - epic: 6
     action: "Keep AR-AUDIT / AR-ACCESS / AR-DATA / AR-NFR / AR-MIGRATION fail-closed; do not invent in Epic 7"
     owner: "Mary + John"
-    status: open
+    status: done
+    resolved_in: "Epic 7 Gates 7.1–7.8 held fail-closed; 7.7 AR register seeded pending/partial_freeze; succeeded by Epic 7 AR fail-closed for post-MVP"
   - epic: 6
     action: "Carry forward still-open Epic 2/3/4/4b/5 items: InferenceBulkPort ops; sticky break-glass; PopulationPort actual cutover; ensure*Schema migrations-only; BOM tooling; export streaming/size cap"
+    owner: "Winston / Amelia+Sally / Paige+Winston"
+    status: open
+  - epic: 7
+    action: "Mark epic-7 done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-7-retro-2026-07-31.md + sprint-status epic-7/epic-7-retrospective"
+  - epic: 7
+    action: "Do not invent Epic 8; require PO-approved PRD/epic update before next committed epic"
+    owner: "John + Mary"
+    status: open
+  - epic: 7
+    action: "Document MVP substrate-done vs production/LG-complete honesty boundary (SoD seed, list IDOR, PopulationPort, AD-6, no hash-chain)"
+    owner: "Paige + Winston + Mary"
+    status: open
+  - epic: 7
+    action: "Add enforcement-matrix DoD to create-story for consumer/integration work (router + UI consume + TX append + mid-flight revalidate + status guards)"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 7
+    action: "Plan AR-ACCESS SoD PermissionSet split (manage≠approve≠publish) on next authz freeze touch"
+    owner: "Winston + Amelia + John"
+    status: open
+  - epic: 7
+    action: "Narrow org:selfcheck unscoped lists (holds, correction cases, publications) when multi-tenant scopes land"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 7
+    action: "Wire evaluation-snapshot manage UI (expire/supersede) + enforce server pagination token end-to-end"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 7
+    action: "Plan AD-6 Prisma↔PoolClient single-connection cutover hardening (carry Epic 6 #4)"
+    owner: "Winston + Amelia"
+    status: open
+  - epic: 7
+    action: "Plan BaselineRecorded → Employment/Assignment projector or AR oracle (carry Epic 6 #5)"
+    owner: "Winston + Amelia"
+    status: open
+  - epic: 7
+    action: "Add person-org scope on Cancel/Reverse/Correct (carry Epic 5/6) on next lifecycle-write touch"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 7
+    action: "Deduplicate person-create form; wire logout leave-guard or document exemption (carry Epic 4b/5/6)"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 7
+    action: "Prefer Vitest/ephemeral isolation + deeper UI selfchecks when next quality opportunity lands"
+    owner: "Amelia"
+    status: open
+  - epic: 7
+    action: "Keep AR-* fail-closed; do not invent freeze numbers in post-MVP work"
+    owner: "Mary + John"
+    status: open
+  - epic: 7
+    action: "Carry forward still-open Epic 2/3/4/4b/5/6 items: InferenceBulkPort ops; sticky break-glass; PopulationPort cutover; ensure*Schema migrations-only; BOM tooling; export/attachment streaming"
     owner: "Winston / Amelia+Sally / Paige+Winston"
     status: open
