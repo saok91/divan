@@ -293,6 +293,43 @@ export {
 } from "./launch-artifact";
 
 export {
+  EVALUATION_SNAPSHOT_DATA_CATEGORY,
+  EVALUATION_SNAPSHOT_KINDS,
+  EVALUATION_SNAPSHOT_MANAGE_PERMISSION,
+  EVALUATION_SNAPSHOT_READ_PERMISSION,
+  EVALUATION_SNAPSHOT_STATUSES,
+  EvaluationSnapshotError,
+  MSG_EVAL_SNAPSHOT_DENIED_FA,
+  MSG_EVAL_SNAPSHOT_EXPIRED_FA,
+  MSG_EVAL_SNAPSHOT_MISMATCH_FA,
+  MSG_EVAL_SNAPSHOT_NOT_FOUND_FA,
+  MSG_EVAL_SNAPSHOT_PERMISSION_CHANGED_FA,
+  MSG_EVAL_SNAPSHOT_REF_CHANGED_FA,
+  MSG_EVAL_SNAPSHOT_STALE_FA,
+  MSG_EVAL_SNAPSHOT_VERSION_MIX_FA,
+  assertEvaluationFingerprintMatch,
+  assertSameEvaluationSnapshot,
+  beginEvaluationSnapshot,
+  bindOperationToSnapshot,
+  computeContentFingerprint,
+  countEvaluationSnapshotSignals,
+  getEvaluationSnapshot,
+  listRecentEvaluationSnapshots,
+  markEvaluationSnapshotTerminal,
+  revalidateEvaluationSnapshot,
+  stableStringify,
+  throwEvaluationSnapshotConflict,
+  type AuthoritativeEvaluationSnapshot,
+  type BeginEvaluationSnapshotInput,
+  type BindOperationToSnapshotInput,
+  type EvaluationSnapshotBindResult,
+  type EvaluationSnapshotConflict,
+  type EvaluationSnapshotErrorCode,
+  type EvaluationSnapshotKind,
+  type EvaluationSnapshotStatus,
+} from "./evaluation-snapshot";
+
+export {
   acknowledgeTrustIncident,
   assignTrustIncident,
   checkAppendOnlyTriggerPresent,
@@ -697,6 +734,19 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
     {
       permission: "launch.artifact.rebaseline",
       dataCategory: "launch.artifact",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    // Story 7.8 — provisional evaluation snapshot metadata (AR-ACCESS / FR-56 pending freeze)
+    {
+      permission: "evaluation.snapshot.read",
+      dataCategory: "evaluation.snapshot",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "evaluation.snapshot.manage",
+      dataCategory: "evaluation.snapshot",
       action: "write",
       organizationalScope: "org:selfcheck",
     },

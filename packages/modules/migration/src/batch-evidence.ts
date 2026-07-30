@@ -13,6 +13,9 @@ export type BatchEvidenceActors = {
   approvedAt: string | null;
   executedBy: string | null;
   executedAt: string | null;
+  /** Story 7.8 — additive evaluation-snapshot stamp; absent on pre-7.8 rows. */
+  evaluationSnapshotId?: string | null;
+  evaluationSnapshotFingerprint?: string | null;
 };
 
 export type BatchEvidenceCounts = {

@@ -6,6 +6,10 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  beginEvaluationSnapshot,
+  bindOperationToSnapshot,
+} from "@divan/audit-envelope";
+import {
   appendBusinessEvent,
   appendAccessEvent,
   BusinessEventValidationError,
@@ -170,6 +174,9 @@ export type FinalizeDraftResult =
       projectionHookInvoked: boolean;
       /** Set when past-dated Effective triggered heavy historical recalc. */
       recalcScheduled?: RecalcJobPayload | null;
+      /** Story 7.8 — TX-local authoritative evaluation snapshot binding (no durable persist). */
+      evaluationSnapshotId?: string;
+      evaluationSnapshotFingerprint?: string;
     }
   | {
       outcome: "pending_review";
@@ -944,6 +951,39 @@ export async function finalizeDraft(
       const finalRow = await lockDraftRow(client, draft.id);
       draft = mapDraftRow(finalRow!);
 
+      // Story 7.8 — TX-local authoritative evaluation snapshot (FR-56).
+      // persist:false — finalize honesty is scoped to this TX; no durable registry row.
+      const authSnap = await beginEvaluationSnapshot(null, {
+        kind: "finalize",
+        persist: false,
+        payload: {
+          person: liveSnapshot.person,
+          employment: liveSnapshot.employment,
+          asOf: liveSnapshot.asOfDate,
+          permissionFingerprint: liveSnapshot.permissionSetFingerprint,
+          refs: liveSnapshot.refs,
+        },
+        attribution: {
+          actorAccountId: input.actorId,
+          permissionFingerprint: liveSnapshot.permissionSetFingerprint,
+          asOf: liveSnapshot.asOfDate,
+        },
+        correlationId,
+        boundRefs: {
+          personId: liveSnapshot.person.id,
+          draftId: draft.id,
+          eventId: eventId!,
+        },
+      });
+      await bindOperationToSnapshot(null, {
+        snapshot: authSnap,
+        operationRef: {
+          entityType: "personnel_event",
+          entityId: eventId!,
+          draftId: draft.id,
+        },
+      });
+
       return {
         outcome: "finalized" as const,
         draft,
@@ -953,6 +993,8 @@ export async function finalizeDraft(
         snapshot: liveSnapshot,
         projectionHookInvoked: Boolean(hookCtx.invoked),
         recalcScheduled: pendingRecalc,
+        evaluationSnapshotId: authSnap.id,
+        evaluationSnapshotFingerprint: authSnap.contentFingerprint,
       };
     } catch (err) {
       // Only compensate newly created / applied projections — never undo idempotent re-apply

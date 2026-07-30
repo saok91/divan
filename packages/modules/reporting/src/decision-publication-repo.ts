@@ -44,6 +44,8 @@ export type DecisionPublicationRecord = {
   hasSupersessionNotice: boolean;
   /** Story 7.7 — controlling AR version refs at publish time (additive). */
   controllingArtifactVersions: JsonValue;
+  /** Story 7.8 — bound authoritative evaluation snapshot ref (additive). */
+  evaluationSnapshotId: string | null;
   createdAt: string;
 };
 
@@ -115,6 +117,10 @@ function mapPublicationRow(
     controllingArtifactVersions: parseJson(
       row.controlling_artifact_versions ?? [],
     ),
+    evaluationSnapshotId:
+      row.evaluation_snapshot_id == null
+        ? null
+        : String(row.evaluation_snapshot_id),
     createdAt: new Date(String(row.created_at)).toISOString(),
   };
 }
@@ -159,6 +165,7 @@ const PUBLICATION_COLS = `
   permitted_audience, status, reproducibility_state, correlation_id,
   source_export_artifact_id, has_supersession_notice,
   COALESCE(controlling_artifact_versions, '[]'::jsonb) AS controlling_artifact_versions,
+  evaluation_snapshot_id,
   created_at
 `;
 
@@ -188,6 +195,7 @@ export async function insertDecisionPublication(
     correlationId: string;
     sourceExportArtifactId?: string | null;
     controllingArtifactVersions?: JsonValue;
+    evaluationSnapshotId?: string | null;
   },
 ): Promise<DecisionPublicationRecord> {
   const id = randomUUID();
@@ -196,12 +204,12 @@ export async function insertDecisionPublication(
        id, report_key, report_version, metric_version, snapshot_hash, snapshot_ref,
        filters_snapshot, evaluation_mode, as_of_date, publisher_account_id,
        permitted_audience, status, reproducibility_state, correlation_id,
-       source_export_artifact_id, controlling_artifact_versions
+       source_export_artifact_id, controlling_artifact_versions, evaluation_snapshot_id
      ) VALUES (
        $1::uuid, $2, $3, $4, $5, $6::jsonb,
        $7::jsonb, $8, $9::date, $10,
        $11::jsonb, 'published', 'reproducible', $12::uuid,
-       $13, $14::jsonb
+       $13, $14::jsonb, $15::uuid
      )
      RETURNING ${PUBLICATION_COLS}`,
     [
@@ -219,6 +227,7 @@ export async function insertDecisionPublication(
       input.correlationId,
       input.sourceExportArtifactId ?? null,
       JSON.stringify(input.controllingArtifactVersions ?? []),
+      input.evaluationSnapshotId ?? null,
     ],
   );
   return mapPublicationRow(result.rows[0] as Record<string, unknown>);

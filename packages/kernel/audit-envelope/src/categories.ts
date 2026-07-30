@@ -211,6 +211,13 @@ export const DEV_DEMO_CATEGORIES: CategoryRegistry = freezeRegistry([
     sensitivity: "ordinary",
     requiresSeparateExport: false,
   },
+  // Story 7.8 — Authoritative evaluation snapshot integrity (ordinary; NOT health / export)
+  {
+    id: "evaluation.snapshot",
+    enabled: true,
+    sensitivity: "ordinary",
+    requiresSeparateExport: false,
+  },
 ]);
 
 /**

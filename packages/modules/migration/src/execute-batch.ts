@@ -15,6 +15,15 @@
  * source=migration is audit metadata only — never an authz or cutover unlock.
  */
 
+import {
+  beginEvaluationSnapshot,
+  bindOperationToSnapshot,
+  computeContentFingerprint,
+  EvaluationSnapshotError,
+  markEvaluationSnapshotTerminal,
+  revalidateEvaluationSnapshot,
+  throwEvaluationSnapshotConflict,
+} from "@divan/audit-envelope";
 import type { Pool, PoolClient } from "@divan/db";
 import {
   appendBusinessEvent,
@@ -250,6 +259,51 @@ function mapPersonIdentityToMigration(err: PersonIdentityError): never {
   );
 }
 
+/**
+ * Story 7.8 — canonical payload for the batch-wide evaluation snapshot.
+ * Structural refs + personnel codes only — never given/family names or other PII.
+ */
+function buildImportEvaluationPayload(
+  batch: StagingBatchRecord,
+): Record<string, unknown> {
+  return {
+    batchId: batch.id,
+    rows: batch.rows.map((r) => ({
+      personnelCode: (r.values.personnelCode ?? "").trim(),
+      teamId: r.values.teamId ?? null,
+      organizationalRoleId: r.values.organizationalRoleId ?? null,
+      jobTitleId: r.values.jobTitleId ?? null,
+      ladderId: r.values.ladderId ?? null,
+      gradeId: r.values.gradeId ?? null,
+    })),
+  };
+}
+
+/** Story 7.8 — bound refs re-checked at each revalidation point. */
+function buildImportEvaluationBoundRefs(
+  batch: StagingBatchRecord,
+  overlapKeys: readonly string[],
+): Record<string, unknown> {
+  return {
+    batchId: batch.id,
+    overlapKeys: [...overlapKeys].sort(),
+    rowCount: batch.rows.length,
+  };
+}
+
+/** Fail-closed message/code resolution across MigrationError / EvaluationSnapshotError. */
+function resolveFailureMessageFa(err: unknown): string {
+  if (err instanceof MigrationError) return err.messageFa;
+  if (err instanceof EvaluationSnapshotError) return err.messageFa;
+  return "اجرای دسته ناموفق بود.";
+}
+
+function resolveFailureCode(err: unknown): string {
+  if (err instanceof MigrationError) return err.code;
+  if (err instanceof EvaluationSnapshotError) return err.code;
+  return "CUTOVER_FAILED";
+}
+
 async function cutoverRowsInTx(
   client: PoolClient,
   batch: StagingBatchRecord,
@@ -431,6 +485,9 @@ export async function executeImportBatch(
   const executorDisplay =
     opts.executorDisplayName?.trim() || opts.executorAccountId;
 
+  let evalSnapId: string | null = null;
+  let evalSnapFingerprint: string | null = null;
+
   try {
     const result = await withTransaction(pool, async (client) => {
       const claimed = await client.query(
@@ -468,6 +525,33 @@ export async function executeImportBatch(
         },
       });
 
+      // Story 7.8 — bind under claim/mutex (AC4 Task 3).
+      const evalSnap = await beginEvaluationSnapshot(client, {
+        kind: "import_execution",
+        payload: buildImportEvaluationPayload(batch),
+        attribution: { actorAccountId: opts.executorAccountId },
+        correlationId: batch.correlationId,
+        boundRefs: buildImportEvaluationBoundRefs(batch, overlapKeys),
+      });
+      evalSnapId = evalSnap.id;
+      evalSnapFingerprint = evalSnap.contentFingerprint;
+
+      // Live org/role/ref re-check + fingerprint — concurrent drift fails closed.
+      await revalidateAuthoritativeReferences(batch);
+      const preCutoverCheck = await revalidateEvaluationSnapshot(
+        client,
+        { id: evalSnap.id },
+        {
+          liveFingerprint: computeContentFingerprint(
+            buildImportEvaluationPayload(batch),
+          ),
+          boundRefs: buildImportEvaluationBoundRefs(batch, overlapKeys),
+        },
+      );
+      if (!("ok" in preCutoverCheck)) {
+        throwEvaluationSnapshotConflict(preCutoverCheck);
+      }
+
       const { createdPersonIds, matchedPersonIds, eventIds } =
         await cutoverRowsInTx(client, batch, opts.executorAccountId);
 
@@ -477,6 +561,31 @@ export async function executeImportBatch(
       });
 
       await releaseOverlapLocksForBatch(client, batch.id);
+
+      await revalidateAuthoritativeReferences(batch);
+      const preCommitCheck = await revalidateEvaluationSnapshot(
+        client,
+        { id: evalSnap.id },
+        {
+          liveFingerprint: computeContentFingerprint(
+            buildImportEvaluationPayload(batch),
+          ),
+          boundRefs: buildImportEvaluationBoundRefs(batch, overlapKeys),
+        },
+      );
+      if (!("ok" in preCommitCheck)) {
+        throwEvaluationSnapshotConflict(preCommitCheck);
+      }
+
+      await bindOperationToSnapshot(client, {
+        snapshot: evalSnap,
+        operationRef: {
+          entityType: "import_batch",
+          entityId: batch.id,
+          eventIds,
+        },
+        markConsumed: true,
+      });
 
       const allRecordIds = [...createdPersonIds, ...matchedPersonIds];
       const evidence = await persistBatchEvidence(client, {
@@ -490,6 +599,8 @@ export async function executeImportBatch(
           approvedAt: batch.approvedAt,
           executedBy: opts.executorAccountId,
           executedAt: new Date().toISOString(),
+          evaluationSnapshotId: evalSnap.id,
+          evaluationSnapshotFingerprint: evalSnap.contentFingerprint,
         },
         counts: {
           rowCount: batch.rows.length,
@@ -511,8 +622,19 @@ export async function executeImportBatch(
       idempotentReplay: false,
     };
   } catch (err) {
-    // Pre-cutover / mid-cutover abort before COMMIT → TX rolled back by withTransaction.
-    // Drop staging rows + failed evidence; assert zero production event trace.
+    // Pre-cutover / mid-cutover abort before COMMIT → TX rolled back by withTransaction
+    // (including any in-TX evaluation_snapshot insert). Best-effort staging cleanup.
+    // If a durable snapshot somehow survived outside this TX, expire it.
+    if (evalSnapId) {
+      try {
+        await markEvaluationSnapshotTerminal(pool, evalSnapId, "expired", {
+          reason: "import_execution_failed",
+          code: resolveFailureCode(err),
+        });
+      } catch {
+        // best-effort
+      }
+    }
     try {
       await withTransaction(pool, async (client) => {
         await assertZeroProductionTrace(client, batch.correlationId);
@@ -522,11 +644,8 @@ export async function executeImportBatch(
           executedBy: opts.executorAccountId,
           executedAt: new Date(),
           errorSummary: {
-            messageFa:
-              err instanceof MigrationError
-                ? err.messageFa
-                : "اجرای دسته ناموفق بود.",
-            code: err instanceof MigrationError ? err.code : "CUTOVER_FAILED",
+            messageFa: resolveFailureMessageFa(err),
+            code: resolveFailureCode(err),
           },
         });
         await persistBatchEvidence(client, {
@@ -540,6 +659,12 @@ export async function executeImportBatch(
             approvedAt: batch.approvedAt,
             executedBy: opts.executorAccountId,
             executedAt: new Date().toISOString(),
+            ...(evalSnapId && evalSnapFingerprint
+              ? {
+                  evaluationSnapshotId: evalSnapId,
+                  evaluationSnapshotFingerprint: evalSnapFingerprint,
+                }
+              : {}),
           },
           counts: {
             rowCount: batch.rows.length,
@@ -547,11 +672,7 @@ export async function executeImportBatch(
             createdEventCount: 0,
             errorCount: 1,
           },
-          errors: [
-            err instanceof MigrationError
-              ? err.messageFa
-              : "اجرای دسته ناموفق بود.",
-          ],
+          errors: [resolveFailureMessageFa(err)],
         });
       });
     } catch {
@@ -560,6 +681,10 @@ export async function executeImportBatch(
 
     if (err instanceof MigrationError) throw err;
     if (err instanceof PersonIdentityError) mapPersonIdentityToMigration(err);
+    // Story 7.8 — evaluation-snapshot conflicts are fail-closed, never swallowed.
+    if (err instanceof EvaluationSnapshotError) {
+      throw new MigrationError("REVALIDATION_FAILED", err.messageFa);
+    }
     throw new MigrationError(
       "CUTOVER_FAILED",
       "اجرای دسته ناموفق بود؛ وضعیت تولید تغییر نکرد.",

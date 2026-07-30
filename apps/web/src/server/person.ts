@@ -6,6 +6,7 @@
  */
 import {
   DEV_DEMO_CATEGORIES,
+  EvaluationSnapshotError,
 } from "@divan/audit-envelope";
 import { COMPENSATION_DATA_CATEGORY } from "@divan/compensation-facts";
 import { getSharedPgPool, type Pool } from "@divan/db";
@@ -223,22 +224,44 @@ export const personRouter = createTRPCRouter({
         .object({
           channel: z.enum(["search", "list"]).default("list"),
           normalizedQuery: z.string().max(200).optional(),
+          /** Story 7.8 — 1-based page number. Defaults to 1. */
+          page: z.number().int().min(1).optional(),
+          /** Default 50, capped at 100 (enforced server-side too). */
+          pageSize: z.number().int().min(1).max(100).optional(),
+          /** Continuation token from a prior page===1 response. */
+          evaluationSnapshotId: z.string().min(1).optional(),
+          sortKey: z.string().max(100).optional(),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
       await requirePersonRead(ctx.session.accountId);
-      const result = await runPersonnelScopedSearch({
-        actorAccountId: ctx.session.accountId,
-        actorScopeCodes: ctx.session.organizationalScopeCodes,
-        correlationId: ctx.correlationId,
-        channel: input?.channel ?? "list",
-        normalizedQuery: input?.normalizedQuery,
-      });
-      return {
-        ...result,
-        profileHrefPrefix: "/personnel/profile/",
-      };
+      try {
+        const result = await runPersonnelScopedSearch({
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+          channel: input?.channel ?? "list",
+          normalizedQuery: input?.normalizedQuery,
+          page: input?.page,
+          pageSize: input?.pageSize,
+          evaluationSnapshotId: input?.evaluationSnapshotId,
+          sortKey: input?.sortKey,
+        });
+        return {
+          ...result,
+          profileHrefPrefix: "/personnel/profile/",
+        };
+      } catch (err) {
+        if (err instanceof EvaluationSnapshotError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err.messageFa,
+            cause: err,
+          });
+        }
+        throw err;
+      }
     }),
 
   /**

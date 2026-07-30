@@ -59,6 +59,10 @@ import {
 import { withPgTransaction } from "./export-artifact-repo";
 import {
   assertArtifactsUsable,
+  beginEvaluationSnapshot,
+  bindOperationToSnapshot,
+  markEvaluationSnapshotTerminal,
+  stableStringify,
   type ControllingVersionRef,
 } from "@divan/audit-envelope";
 
@@ -129,20 +133,6 @@ function requireVersions(reportVersion: string, metricVersion: string): void {
   }
 }
 
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => stableStringify(v)).join(",")}]`;
-  }
-  const obj = value as Record<string, unknown>;
-  const keys = Object.keys(obj).sort();
-  return `{${keys
-    .map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`)
-    .join(",")}}`;
-}
-
 function filtersHash(filters: JsonValue): string {
   return createHash("sha256").update(stableStringify(filters)).digest("hex");
 }
@@ -185,22 +175,48 @@ export async function publishDecisionReport(
     );
   }
 
-  // Story 7.7 — honor change-control blocks; provisional honesty only when
-  // AR-REPORTING controlling version is unresolved / register incomplete.
   const correlationId = input.correlationId ?? randomUUID();
+
+  // Story 7.8 — bind the shared authoritative evaluation snapshot before
+  // persisting the publication (one attributable validated snapshot per op).
+  const evalSnap = await beginEvaluationSnapshot(db, {
+    kind: "publication",
+    payload: {
+      sourceSurface: input.stableSnapshot.sourceSurface,
+      sourceKey: input.stableSnapshot.sourceKey ?? null,
+      filters: input.stableSnapshot.filters,
+      fieldIds: [...input.stableSnapshot.fieldIds].sort(),
+      asOf: input.stableSnapshot.asOf,
+    },
+    contentFingerprint: computed,
+    attribution: {
+      actorAccountId: input.publisherAccountId,
+    },
+    correlationId,
+    boundRefs: { reportKey: input.reportKey },
+  });
+
+  try {
+  // Story 7.7 — honor change-control blocks; provisional honesty only when
+  // AR-REPORTING controlling version is unresolved / register incomplete
+  // (based on the gate's own returned code — never a swallowed exception).
   let controllingVersions: ControllingVersionRef[] = [];
   let resolvedReportVersion = reportVersion;
   let resolvedMetricVersion = metricVersion;
 
-  let gate: Awaited<ReturnType<typeof assertArtifactsUsable>> | null = null;
+  let gate: Awaited<ReturnType<typeof assertArtifactsUsable>>;
   try {
     gate = await assertArtifactsUsable(db, ["AR-REPORTING"]);
-  } catch {
-    // Missing schema / pool / infra → provisional honesty (register not ready)
-    gate = null;
+  } catch (err) {
+    // Story 7.8 — fail-closed: gate infra failures must not continue unbound.
+    throw new DecisionPublicationError(
+      "PUBLICATION_DENIED",
+      MSG_PUBLICATION_DENIED_FA,
+      { reason: err instanceof Error ? err.message : String(err) },
+    );
   }
 
-  if (gate && !gate.ok) {
+  if (!gate.ok) {
     const provisional =
       gate.code === "CONTROLLING_VERSION_UNRESOLVED" ||
       gate.code === "LAUNCH_ARTIFACT_NOT_FOUND";
@@ -228,7 +244,7 @@ export async function publishDecisionReport(
         gate.messageFa || MSG_PUBLICATION_DENIED_FA,
       );
     }
-  } else if (gate?.ok && gate.controllingVersions.length > 0) {
+  } else if (gate.ok && gate.controllingVersions.length > 0) {
     controllingVersions = gate.controllingVersions;
     const bound = resolvePublicationVersionStrings(
       controllingVersions[0]!.versionLabel,
@@ -262,6 +278,16 @@ export async function publishDecisionReport(
         status: v.status,
         registerStatus: v.registerStatus,
       })),
+      evaluationSnapshotId: evalSnap.id,
+    });
+
+    await bindOperationToSnapshot(tx, {
+      snapshot: evalSnap,
+      operationRef: {
+        entityType: "decision_publication",
+        entityId: row.id,
+      },
+      markConsumed: true,
     });
 
     await insertLifecycleEvent(tx, {
@@ -297,6 +323,16 @@ export async function publishDecisionReport(
   });
 
   return toDto(created);
+  } catch (err) {
+    try {
+      await markEvaluationSnapshotTerminal(db, evalSnap.id, "expired", {
+        reason: "publication_failed",
+      });
+    } catch {
+      // best-effort orphan cleanup
+    }
+    throw err;
+  }
 }
 
 export async function getDecisionPublication(

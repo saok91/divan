@@ -670,6 +670,26 @@ export const operationalCopy = {
   launchArtifactFieldImpact: "ارزیابی اثر",
   launchArtifactFieldRegressionRefs: "مراجع رگرسیون/پذیرش",
   launchArtifactFieldBuildRef: "مرجع ساخت",
+
+  // Story 7.8 — evaluation snapshot integrity honesty (ops; no HR rows)
+  evaluationSnapshotHonestyHeading: "صداقت اسنپ‌شات ارزیابی",
+  evaluationSnapshotHonestyIntro:
+    "شمارش توکن‌های اسنپ‌شات ارزیابی معتبر — بدون ردیف پرسنل. عدم تطابق در مسیرهای نهایی‌سازی، واردات، خروجی و انتشار با پیام فارسی مسدود می‌شود.",
+  evaluationSnapshotLoading: "در حال بارگذاری وضعیت اسنپ‌شات ارزیابی…",
+  evaluationSnapshotLoadError: "بارگذاری سیگنال اسنپ‌شات ارزیابی ممکن نشد.",
+  evaluationSnapshotCapabilitiesError:
+    "بررسی قابلیت اسنپ‌شات ارزیابی ممکن نشد.",
+  evaluationSnapshotActionFailed: "عملیات اسنپ‌شات ارزیابی انجام نشد.",
+  evaluationSnapshotDenied: "دسترسی به فرادادهٔ اسنپ‌شات ارزیابی ندارید.",
+  evaluationSnapshotSignalActive: "فعال",
+  evaluationSnapshotSignalConsumed: "مصرف‌شده",
+  evaluationSnapshotSignalExpired: "منقضی",
+  evaluationSnapshotMismatch:
+    "اسنپ‌شات ارزیابی با نسخهٔ بازبینی‌شده هم‌خوان نیست.",
+  evaluationSnapshotStale:
+    "اسنپ‌شات ارزیابی کهنه شده است؛ عملیات را از ابتدا تکرار کنید.",
+  evaluationSnapshotVersionMix:
+    "نسخه‌های ارزیابی مخلوط شده‌اند؛ فیلتر یا مرتب‌سازی را از صفحهٔ اول از سر بگیرید.",
 } as const;
 
 /**

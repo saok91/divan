@@ -11,7 +11,13 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import type { CategoryRegistry } from "@divan/audit-envelope";
-import { DataLifecycleError } from "@divan/audit-envelope";
+import {
+  beginEvaluationSnapshot,
+  bindOperationToSnapshot,
+  DataLifecycleError,
+  markEvaluationSnapshotTerminal,
+  stableStringify,
+} from "@divan/audit-envelope";
 import { appendAccessEvent } from "@divan/event-store";
 import { assertNoActiveHoldForArtifact } from "@divan/person-employment";
 
@@ -90,6 +96,7 @@ export type StableSnapshotInput = {
 
 /**
  * Canonical SHA-256 over filters + fields + as-of + source — tamper evidence.
+ * Uses shared audit-envelope stableStringify (Story 7.8 — one hash algorithm).
  */
 export function computeExportSnapshotHash(input: StableSnapshotInput): string {
   const canonical = {
@@ -102,20 +109,6 @@ export function computeExportSnapshotHash(input: StableSnapshotInput): string {
   return createHash("sha256")
     .update(stableStringify(canonical))
     .digest("hex");
-}
-
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => stableStringify(v)).join(",")}]`;
-  }
-  const obj = value as Record<string, unknown>;
-  const keys = Object.keys(obj).sort();
-  return `{${keys
-    .map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`)
-    .join(",")}}`;
 }
 
 /**
@@ -312,80 +305,129 @@ export async function createExportArtifact(
   const expiresAt = new Date(Date.now() + ttl);
   const safeName = `divan-export-${input.sourceSurface}-${Date.now()}.${input.format}`;
 
-  const artifact = await withPgTransaction(db, async (tx) => {
-    const created = await insertExportArtifact(tx, {
-      ownerAccountId: input.ownerAccountId,
-      purpose: input.purpose,
-      classification,
-      classificationFa,
-      handlingFa: HANDLING_DEFAULT_FA,
-      scopeJson: {
+  // Story 7.8 — bind shared evaluation-snapshot ref alongside snapshot_hash
+  let orphanSnapId: string | undefined;
+  try {
+    const evalSnap = await beginEvaluationSnapshot(db, {
+      kind: "export",
+      payload: {
         sourceSurface: input.sourceSurface,
         sourceKey: input.sourceKey ?? null,
+        filters: input.filtersSnapshot,
+        fieldIds: [...input.fields.map((f) => f.id)].sort(),
         asOf: input.asOf,
-        fieldIds,
-        rowCount: projected.length,
-        subjectIds: input.objectIds ?? [],
       },
-      fieldIds,
-      sourceSurface: input.sourceSurface,
-      sourceKey: input.sourceKey,
-      filtersSnapshot: input.filtersSnapshot,
-      snapshotHash: recomputedHash,
-      format: input.format,
-      expiresAt,
-      rowCount: projected.length,
-      requiresCustodyAck,
-      hasSensitiveFields: filtered.hasSensitiveIncluded,
+      contentFingerprint: recomputedHash,
+      attribution: {
+        actorAccountId: input.ownerAccountId,
+        asOf: input.asOf,
+      },
       correlationId: input.correlationId,
-      contentBytes,
-      contentFilename: safeName,
-      populationAuthzMode: input.populationAuthzMode,
-    });
-
-    await insertLifecycleEvent(tx, {
-      artifactId: created.id,
-      eventKind: "ready",
-      actorAccountId: input.ownerAccountId,
-      reason: `reauth:${reauth.reason}`,
-      correlationId: input.correlationId,
-    });
-
-    await appendAccessEvent(tx, {
-      correlationId: input.correlationId,
-      actorAccountId: input.ownerAccountId,
-      operation: "export.artifact.create",
-      scope: {
-        channel: "export",
-        purpose: input.purpose,
+      boundRefs: {
         sourceSurface: input.sourceSurface,
-        format: input.format,
-        volumeAuthorized: projected.length,
         fieldCount: fieldIds.length,
-        fieldIds,
-        filtersSnapshot: input.filtersSnapshot,
+        rowCount: projected.length,
+      },
+      expiresAt: expiresAt.toISOString(),
+    });
+    orphanSnapId = evalSnap.id;
+
+    const artifact = await withPgTransaction(db, async (tx) => {
+      const created = await insertExportArtifact(tx, {
+        ownerAccountId: input.ownerAccountId,
+        purpose: input.purpose,
         classification,
-        requiresCustodyAck,
-      },
-      result: "allow",
-      reason: reauth.reason,
-      entityType: "export_artifact",
-      entityId: created.id,
-      payload: {
+        classificationFa,
+        handlingFa: HANDLING_DEFAULT_FA,
+        scopeJson: {
+          sourceSurface: input.sourceSurface,
+          sourceKey: input.sourceKey ?? null,
+          asOf: input.asOf,
+          fieldIds,
+          rowCount: projected.length,
+          subjectIds: input.objectIds ?? [],
+        },
+        fieldIds,
+        sourceSurface: input.sourceSurface,
+        sourceKey: input.sourceKey,
+        filtersSnapshot: input.filtersSnapshot,
         snapshotHash: recomputedHash,
-        omittedSensitiveCount: filtered.omittedSensitiveIds.length,
-        outcome: "ready",
-      },
+        format: input.format,
+        expiresAt,
+        rowCount: projected.length,
+        requiresCustodyAck,
+        hasSensitiveFields: filtered.hasSensitiveIncluded,
+        correlationId: input.correlationId,
+        contentBytes,
+        contentFilename: safeName,
+        populationAuthzMode: input.populationAuthzMode,
+        evaluationSnapshotId: evalSnap.id,
+      });
+
+      await bindOperationToSnapshot(tx, {
+        snapshot: evalSnap,
+        operationRef: {
+          entityType: "export_artifact",
+          entityId: created.id,
+        },
+        markConsumed: true,
+      });
+
+      await insertLifecycleEvent(tx, {
+        artifactId: created.id,
+        eventKind: "ready",
+        actorAccountId: input.ownerAccountId,
+        reason: `reauth:${reauth.reason}`,
+        correlationId: input.correlationId,
+      });
+
+      await appendAccessEvent(tx, {
+        correlationId: input.correlationId,
+        actorAccountId: input.ownerAccountId,
+        operation: "export.artifact.create",
+        scope: {
+          channel: "export",
+          purpose: input.purpose,
+          sourceSurface: input.sourceSurface,
+          format: input.format,
+          volumeAuthorized: projected.length,
+          fieldCount: fieldIds.length,
+          fieldIds,
+          filtersSnapshot: input.filtersSnapshot,
+          classification,
+          requiresCustodyAck,
+        },
+        result: "allow",
+        reason: reauth.reason,
+        entityType: "export_artifact",
+        entityId: created.id,
+        payload: {
+          snapshotHash: recomputedHash,
+          omittedSensitiveCount: filtered.omittedSensitiveIds.length,
+          outcome: "ready",
+        },
+      });
+
+      return created;
     });
 
-    return created;
-  });
-
-  return {
-    artifact,
-    omittedSensitiveIds: filtered.omittedSensitiveIds,
-    custodyBoundaryFa: CUSTODY_BOUNDARY_FA,
-  };
+    return {
+      artifact,
+      omittedSensitiveIds: filtered.omittedSensitiveIds,
+      custodyBoundaryFa: CUSTODY_BOUNDARY_FA,
+    };
+  } catch (err) {
+    if (orphanSnapId) {
+      try {
+        await markEvaluationSnapshotTerminal(db, orphanSnapId, "expired", {
+          reason: "export_create_failed",
+        });
+      } catch {
+        // best-effort orphan cleanup
+      }
+    }
+    throw err;
+  }
 }
 
 export type DownloadExportArtifactInput = {

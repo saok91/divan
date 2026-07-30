@@ -1,3 +1,9 @@
+## Deferred from: code review of 7-8-authoritative-evaluation-snapshot-integrity.md (2026-07-30)
+
+- UI مدیریت expire/supersede برای `evaluation.snapshot.manage` سیم‌کشی نشده (`evaluation-snapshot-honesty.tsx`) — MVP ops honesty counts only; manage seed موجود است برای repair بعدی
+- ستون‌های `evaluation_snapshot_id` روی export/publication بدون FK به `governance.evaluation_snapshot` — الگوی stamp nullable افزایشی؛ FK سخت‌گیرانه بعداً
+- `emptyDeniedResult` در pagination continuation خطای اسنپ‌شات را با شکل outcome انکار دسترسی برمی‌گرداند — الگوی soft mapping موجود search؛ قرارداد خطای صریح‌تر بعداً
+
 ## Deferred from: code review of 7-7-launch-artifact-change-control-hooks.md (2026-07-30)
 
 - Permission helper ignores inactive-role / org-scope filters (`actorHoldsLaunchPermission`) — same MVP pattern as other ops routers; revisit with AR-ACCESS multi-tenant scopes

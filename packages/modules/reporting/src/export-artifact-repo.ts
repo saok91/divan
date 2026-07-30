@@ -50,6 +50,8 @@ export type ExportArtifactRecord = {
   correlationId: string;
   contentFilename: string | null;
   populationAuthzMode: string | null;
+  /** Story 7.8 — shared authoritative evaluation snapshot ref (nullable). */
+  evaluationSnapshotId: string | null;
 };
 
 export type ExportArtifactWithBytes = ExportArtifactRecord & {
@@ -118,6 +120,10 @@ function mapArtifactRow(
       row.population_authz_mode == null
         ? null
         : String(row.population_authz_mode),
+    evaluationSnapshotId:
+      row.evaluation_snapshot_id == null
+        ? null
+        : String(row.evaluation_snapshot_id),
   };
   if (!includeBytes) return base;
   const bytes = row.content_bytes;
@@ -131,7 +137,8 @@ const ARTIFACT_COLS = `
   id, owner_account_id, purpose, classification, classification_fa, handling_fa,
   scope_json, field_ids, source_surface, source_key, filters_snapshot, snapshot_hash,
   format, state, created_at, expires_at, row_count, requires_custody_ack,
-  has_sensitive_fields, correlation_id, content_filename, population_authz_mode
+  has_sensitive_fields, correlation_id, content_filename, population_authz_mode,
+  evaluation_snapshot_id
 `;
 
 export async function insertExportArtifact(
@@ -157,6 +164,7 @@ export async function insertExportArtifact(
     contentBytes: Buffer;
     contentFilename: string;
     populationAuthzMode?: string | null;
+    evaluationSnapshotId?: string | null;
   },
 ): Promise<ExportArtifactRecord> {
   const id = randomUUID();
@@ -165,12 +173,13 @@ export async function insertExportArtifact(
        id, owner_account_id, purpose, classification, classification_fa, handling_fa,
        scope_json, field_ids, source_surface, source_key, filters_snapshot, snapshot_hash,
        format, state, expires_at, row_count, requires_custody_ack, has_sensitive_fields,
-       correlation_id, content_bytes, content_filename, population_authz_mode
+       correlation_id, content_bytes, content_filename, population_authz_mode,
+       evaluation_snapshot_id
      ) VALUES (
        $1::uuid, $2, $3, $4, $5, $6,
        $7::jsonb, $8::jsonb, $9, $10, $11::jsonb, $12,
        $13, 'ready', $14, $15, $16, $17,
-       $18::uuid, $19, $20, $21
+       $18::uuid, $19, $20, $21, $22::uuid
      )
      RETURNING ${ARTIFACT_COLS}`,
     [
@@ -195,6 +204,7 @@ export async function insertExportArtifact(
       input.contentBytes,
       input.contentFilename,
       input.populationAuthzMode ?? null,
+      input.evaluationSnapshotId ?? null,
     ],
   );
   return mapArtifactRow(result.rows[0] as Record<string, unknown>, false);

@@ -21,6 +21,7 @@ import { seedAuditTrustPermissionFixtures } from "./seed-audit-trust";
 import { seedCorrectionCasePermissionFixtures } from "./seed-correction-case";
 import { seedPublicationPermissionFixtures } from "./seed-publication";
 import { seedLaunchArtifactPermissionFixtures } from "./seed-launch-artifact";
+import { seedEvaluationSnapshotPermissionFixtures } from "./seed-evaluation-snapshot";
 import type { CoarseRole } from "./types";
 
 /** Shared local/dev/CI password — documented in README; never for production. */
@@ -170,6 +171,7 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
     await seedCorrectionCasePermissionFixtures(tx as unknown as PrismaClient);
     await seedPublicationPermissionFixtures(tx as unknown as PrismaClient);
     await seedLaunchArtifactPermissionFixtures(tx as unknown as PrismaClient);
+    await seedEvaluationSnapshotPermissionFixtures(tx as unknown as PrismaClient);
 
     return { createdOrUpdated };
   });

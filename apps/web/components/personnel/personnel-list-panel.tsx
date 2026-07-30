@@ -151,15 +151,35 @@ function buildColumns(
 }
 
 /**
- * فهرست پرسنل — GovernedDataTable bound to person.search (FR-33).
+ * فهرست پرسنل — GovernedDataTable bound to person.search (FR-33 / Story 7.8).
+ * Server snapshot token + page drive membership; client table shows one server page.
  */
 export function PersonnelListPanel() {
   const leaveGuard = useLeaveGuardOptional();
   const utils = api.useUtils();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editRow, setEditRow] = React.useState<PersonnelListRow | null>(null);
+  const [page, setPage] = React.useState(1);
+  const [evaluationSnapshotId, setEvaluationSnapshotId] = React.useState<
+    string | undefined
+  >(undefined);
+  const snapshotTokenRef = React.useRef<string | undefined>(undefined);
+  const pageSize = 25;
 
-  const searchQuery = api.person.search.useQuery({ channel: "list" });
+  const searchQuery = api.person.search.useQuery({
+    channel: "list",
+    page,
+    pageSize,
+    evaluationSnapshotId,
+  });
+
+  React.useEffect(() => {
+    const token = searchQuery.data?.evaluationSnapshotId;
+    if (typeof token === "string" && token.length > 0) {
+      snapshotTokenRef.current = token;
+      setEvaluationSnapshotId(token);
+    }
+  }, [searchQuery.data?.evaluationSnapshotId]);
 
   const rows = React.useMemo((): PersonnelListRow[] => {
     return (searchQuery.data?.rows ?? []).map((r) => ({
@@ -204,6 +224,12 @@ export function PersonnelListPanel() {
         ? disclosure
         : null;
 
+  const totalInSnapshot = searchQuery.data?.totalInSnapshot ?? null;
+  const totalPages =
+    totalInSnapshot != null && totalInSnapshot > 0
+      ? Math.max(1, Math.ceil(totalInSnapshot / pageSize))
+      : 1;
+
   function openCreate() {
     setEditRow(null);
     setCreateOpen(true);
@@ -224,11 +250,31 @@ export function PersonnelListPanel() {
   }
 
   async function invalidateList() {
+    setPage(1);
+    snapshotTokenRef.current = undefined;
+    setEvaluationSnapshotId(undefined);
     await utils.person.search.invalidate();
+  }
+
+  function goToServerPage(next: number) {
+    const token =
+      evaluationSnapshotId ??
+      snapshotTokenRef.current ??
+      searchQuery.data?.evaluationSnapshotId ??
+      undefined;
+    const clamped = Math.min(Math.max(1, next), totalPages);
+    if (clamped > 1 && !token) return;
+    if (token) {
+      snapshotTokenRef.current = token;
+      setEvaluationSnapshotId(token);
+    }
+    setPage(clamped);
   }
 
   const tableRows =
     searchQuery.isLoading || searchQuery.isError || suppressed ? [] : rows;
+  // One server page of rows — disable client re-slice of the same page.
+  const clientPageSize = Math.max(tableRows.length, 1);
 
   return (
     <section className="space-y-3" aria-labelledby="personnel-list-heading">
@@ -262,7 +308,7 @@ export function PersonnelListPanel() {
           rows={tableRows}
           getRowId={(row) => row.id}
           sectionDefaultFilters={PERSONNEL_SECTION_DEFAULT_FILTERS}
-          pageSize={25}
+          pageSize={clientPageSize}
           toolbar={
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="primary" onClick={openCreate}>
@@ -315,6 +361,37 @@ export function PersonnelListPanel() {
           )}
         />
       </div>
+
+      {!suppressed && totalInSnapshot != null && totalInSnapshot > pageSize ? (
+        <nav
+          className="flex flex-wrap items-center gap-3"
+          aria-label="صفحه‌بندی فهرست پرسنل"
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={page <= 1 || searchQuery.isFetching}
+            onClick={() => goToServerPage(page - 1)}
+          >
+            صفحه قبل
+          </Button>
+          <p className="text-caption text-muted-foreground" role="status">
+            صفحه {toPersianDigits(page)} از {toPersianDigits(totalPages)}
+            {" — "}
+            {toPersianDigits(totalInSnapshot)} ردیف در اسنپ‌شات
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={page >= totalPages || searchQuery.isFetching}
+            onClick={() => goToServerPage(page + 1)}
+          >
+            صفحه بعد
+          </Button>
+        </nav>
+      ) : null}
 
       <PersonnelQuickCreateDialog
         open={createOpen}

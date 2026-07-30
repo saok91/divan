@@ -16,8 +16,18 @@
 
 import {
   DEV_DEMO_CATEGORIES,
+  EvaluationSnapshotError,
+  MSG_EVAL_SNAPSHOT_NOT_FOUND_FA,
+  MSG_EVAL_SNAPSHOT_REF_CHANGED_FA,
+  MSG_EVAL_SNAPSHOT_VERSION_MIX_FA,
+  beginEvaluationSnapshot,
   clearInferenceBulkWindowsForTests,
+  computeContentFingerprint,
+  getEvaluationSnapshot,
   getInferenceBulkHooks,
+  revalidateEvaluationSnapshot,
+  throwEvaluationSnapshotConflict,
+  type AuthoritativeEvaluationSnapshot,
 } from "@divan/audit-envelope";
 import { COMPENSATION_DATA_CATEGORY } from "@divan/compensation-facts";
 import { getSharedPgPool, type Pool } from "@divan/db";
@@ -95,7 +105,119 @@ export type PersonnelScopedSearchResult = {
   /** True when authorized subject set exceeded PERSONNEL_LIST_MAX_ROWS. */
   truncated: boolean;
   decisionId?: string;
+  /** Story 7.8 — pagination snapshot token; null when not applicable. */
+  evaluationSnapshotId: string | null;
+  page: number;
+  pageSize: number;
+  /** Frozen membership size for the active snapshot token; null when not applicable. */
+  totalInSnapshot: number | null;
 };
+
+/** Story 7.8 — FR-33 authoritative pagination defaults. */
+export const PERSONNEL_SEARCH_PAGE_SIZE_DEFAULT = 50;
+export const PERSONNEL_SEARCH_PAGE_SIZE_MAX = 100;
+const PERSONNEL_SEARCH_PAGINATION_TTL_MS = 60 * 60 * 1000;
+const EVAL_SNAPSHOT_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function resolvePageParams(input: {
+  page?: number;
+  pageSize?: number;
+}): { page: number; pageSize: number } {
+  const page =
+    Number.isInteger(input.page) && (input.page as number) >= 1
+      ? (input.page as number)
+      : 1;
+  const rawSize = Number.isInteger(input.pageSize)
+    ? (input.pageSize as number)
+    : PERSONNEL_SEARCH_PAGE_SIZE_DEFAULT;
+  const pageSize = Math.min(
+    Math.max(rawSize, 1),
+    PERSONNEL_SEARCH_PAGE_SIZE_MAX,
+  );
+  return { page, pageSize };
+}
+
+/** Canonical fingerprint payload — filter/sort/pageSize change must mint a new snapshot. */
+function personnelPaginationPayload(input: {
+  channel: "search" | "list";
+  normalizedQuery?: string;
+  sortKey?: string;
+  pageSize: number;
+}): Record<string, unknown> {
+  return {
+    channel: input.channel,
+    normalizedQuery: input.normalizedQuery?.trim() || null,
+    sortKey: input.sortKey?.trim() || null,
+    pageSize: input.pageSize,
+  };
+}
+
+/** Filter/sort/pageSize drift vs the token's frozen payload → VERSION_MIX (restart at page 1). */
+function assertPaginationTokenMatches(
+  snapshot: AuthoritativeEvaluationSnapshot,
+  input: {
+    channel: "search" | "list";
+    normalizedQuery?: string;
+    sortKey?: string;
+    pageSize: number;
+  },
+): void {
+  if (snapshot.kind !== "pagination") {
+    throw new EvaluationSnapshotError(
+      "EVAL_SNAPSHOT_VERSION_MIX",
+      MSG_EVAL_SNAPSHOT_VERSION_MIX_FA,
+    );
+  }
+  const liveFingerprint = computeContentFingerprint(
+    personnelPaginationPayload(input),
+  );
+  if (liveFingerprint !== snapshot.contentFingerprint) {
+    throw new EvaluationSnapshotError(
+      "EVAL_SNAPSHOT_VERSION_MIX",
+      MSG_EVAL_SNAPSHOT_VERSION_MIX_FA,
+    );
+  }
+}
+
+async function actorPermissionFingerprint(accountId: string): Promise<string> {
+  const db = getPersonDb();
+  const rows = await db.accountAccessRole.findMany({
+    where: { accountId },
+    include: { accessRole: { include: { permissionSet: true } } },
+  });
+  const perms = new Set<string>();
+  for (const row of rows) {
+    const raw = row.accessRole.permissionSet?.permissions;
+    if (!Array.isArray(raw)) continue;
+    for (const p of raw) {
+      if (typeof p === "string" && p.trim()) perms.add(p.trim());
+    }
+  }
+  return computeContentFingerprint([...perms].sort());
+}
+
+function paginationMemberIds(
+  snapshot: AuthoritativeEvaluationSnapshot,
+): string[] {
+  const raw = snapshot.boundRefs?.memberIds;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string");
+}
+
+/**
+ * Story 7.8 §6 — soft-fail only: local envs without migration `021_*` applied
+ * must not hard-crash page 1 search; pagination just runs without a token.
+ */
+function isMissingEvaluationSnapshotRelation(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = "code" in err ? String((err as { code?: unknown }).code) : "";
+  if (code === "42P01") return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /governance\.evaluation_snapshot|does not exist|undefined_table/i.test(
+    msg,
+  );
+}
 
 let eventPool: Pool | null = null;
 
@@ -406,6 +528,8 @@ function emptyDeniedResult(
     populationAuthzMode: PopulationAuthzMode;
     populationDisclosureFa: string | null;
     hasCompensationRead: boolean;
+    page: number;
+    pageSize: number;
   },
 ): PersonnelScopedSearchResult {
   return {
@@ -416,6 +540,8 @@ function emptyDeniedResult(
     hasExportPermission: false,
     exportSnapshotHash: null,
     truncated: false,
+    evaluationSnapshotId: null,
+    totalInSnapshot: null,
     ...partial,
   };
 }
@@ -434,6 +560,14 @@ export type RunPersonnelScopedSearchInput = {
   populationRegistryOverride?: PopulationFixtureRegistry;
   populationAuthzModeOverride?: PopulationAuthzMode;
   populationDisclosureOverride?: string | null;
+  /** Story 7.8 — 1-based page number. Defaults to 1. */
+  page?: number;
+  /** Default 50, capped at 100. */
+  pageSize?: number;
+  /** Continuation token from a prior page===1 response; required for page>1. */
+  evaluationSnapshotId?: string;
+  /** Opaque sort key — part of the pagination snapshot fingerprint. */
+  sortKey?: string;
 };
 
 /**
@@ -442,6 +576,7 @@ export type RunPersonnelScopedSearchInput = {
 export async function runPersonnelScopedSearch(
   input: RunPersonnelScopedSearchInput,
 ): Promise<PersonnelScopedSearchResult> {
+  const { page, pageSize } = resolvePageParams(input);
   const hasCompensationRead = await actorHasCompensationRead(
     input.actorAccountId,
   );
@@ -451,7 +586,142 @@ export async function runPersonnelScopedSearch(
       populationAuthzMode: "fixture-fail-closed",
       populationDisclosureFa: null,
       hasCompensationRead,
+      page,
+      pageSize,
     });
+  }
+
+  // Story 7.8 — pagination continuation: page>1 always requires a token; a
+  // token supplied on page 1 re-serves the same frozen membership (refresh).
+  if (page > 1 || input.evaluationSnapshotId) {
+    if (!input.evaluationSnapshotId) {
+      return emptyDeniedResult({
+        populationAuthzMode: "fixture-fail-closed",
+        populationDisclosureFa: null,
+        hasCompensationRead,
+        page,
+        pageSize,
+        messageFa: MSG_EVAL_SNAPSHOT_NOT_FOUND_FA,
+      });
+    }
+    if (!EVAL_SNAPSHOT_UUID_RE.test(input.evaluationSnapshotId)) {
+      return emptyDeniedResult({
+        populationAuthzMode: "fixture-fail-closed",
+        populationDisclosureFa: null,
+        hasCompensationRead,
+        page,
+        pageSize,
+        messageFa: MSG_EVAL_SNAPSHOT_NOT_FOUND_FA,
+      });
+    }
+    const eventDb = getEventPool();
+    if (!eventDb) {
+      return emptyDeniedResult({
+        populationAuthzMode: "fixture-fail-closed",
+        populationDisclosureFa: null,
+        hasCompensationRead,
+        page,
+        pageSize,
+        messageFa: operationalCopy.accessDeniedTitle,
+      });
+    }
+    try {
+      const snapshot = await getEvaluationSnapshot(
+        eventDb,
+        input.evaluationSnapshotId,
+      );
+      // Never serve another actor's frozen membership (IDOR).
+      if (snapshot.attribution.actorAccountId !== input.actorAccountId) {
+        throw new EvaluationSnapshotError(
+          "EVAL_SNAPSHOT_NOT_FOUND",
+          MSG_EVAL_SNAPSHOT_NOT_FOUND_FA,
+        );
+      }
+      assertPaginationTokenMatches(snapshot, {
+        channel: input.channel,
+        normalizedQuery: input.normalizedQuery,
+        sortKey: input.sortKey,
+        pageSize,
+      });
+
+      const livePermFp = await actorPermissionFingerprint(input.actorAccountId);
+      const permCheck = await revalidateEvaluationSnapshot(eventDb, snapshot, {
+        permissionFingerprint: livePermFp,
+      });
+      if (!("ok" in permCheck)) {
+        throwEvaluationSnapshotConflict(permCheck);
+      }
+
+      const memberIds = paginationMemberIds(snapshot);
+      const start = (page - 1) * pageSize;
+      const pageIds = memberIds.slice(start, start + pageSize);
+
+      const projected = await projectAuthorizedPersonnelRows({
+        subjectIds: pageIds,
+        accountId: input.actorAccountId,
+        hasCompensationRead,
+      });
+
+      if (pageIds.length > 0 && projected.rows.length !== pageIds.length) {
+        throw new EvaluationSnapshotError(
+          "EVAL_SNAPSHOT_REF_CHANGED",
+          MSG_EVAL_SNAPSHOT_REF_CHANGED_FA,
+        );
+      }
+
+      const hasExportPermission = await softHasPersonExport(
+        input.actorAccountId,
+      );
+      const fieldIds = PERSONNEL_EXPORT_FIELDS.filter(
+        (f) => hasCompensationRead || f.id !== "compensation",
+      ).map((f) => f.id);
+      const exportSnapshotHash = hasExportPermission
+        ? computePersonnelExportSnapshotHash({
+            normalizedQuery: input.normalizedQuery?.trim() || null,
+            asOf: currentAsOfDate(),
+            fieldIds,
+          })
+        : null;
+
+      return {
+        outcome: memberIds.length === 0 || pageIds.length > 0 ? "allowed" : "empty",
+        rows: projected.rows,
+        volume: projected.rows.length,
+        populationAuthzMode: "uuid-registry",
+        populationDisclosureFa: null,
+        hasCompensationRead,
+        hasExportPermission,
+        exportSnapshotHash,
+        truncated: false,
+        evaluationSnapshotId: snapshot.id,
+        page,
+        pageSize,
+        totalInSnapshot: memberIds.length,
+      };
+    } catch (err) {
+      // Map snapshot conflicts to operational Persian copy, never raw 500.
+      if (err instanceof EvaluationSnapshotError) {
+        return emptyDeniedResult({
+          populationAuthzMode: "fixture-fail-closed",
+          populationDisclosureFa: null,
+          hasCompensationRead,
+          page,
+          pageSize,
+          messageFa: err.messageFa,
+        });
+      }
+      if (isMissingEvaluationSnapshotRelation(err)) {
+        return emptyDeniedResult({
+          populationAuthzMode: "fixture-fail-closed",
+          populationDisclosureFa: null,
+          hasCompensationRead,
+          page,
+          pageSize,
+          messageFa: MSG_EVAL_SNAPSHOT_NOT_FOUND_FA,
+        });
+      }
+      throw err;
+    }
   }
 
   let registry: PopulationFixtureRegistry;
@@ -509,14 +779,21 @@ export async function runPersonnelScopedSearch(
       hasExportPermission: false,
       exportSnapshotHash: null,
       truncated: inferenceCapped,
+      evaluationSnapshotId: null,
+      page,
+      pageSize,
+      totalInSnapshot: null,
     };
   }
 
-  if (!getEventPool()) {
+  const eventDb = getEventPool();
+  if (!eventDb) {
     return emptyDeniedResult({
       populationAuthzMode: mode,
       populationDisclosureFa: disclosureFa,
       hasCompensationRead,
+      page,
+      pageSize,
       messageFa: operationalCopy.accessDeniedTitle,
     });
   }
@@ -545,9 +822,62 @@ export async function runPersonnelScopedSearch(
       })
     : null;
 
+  // Story 7.8 — mint the pagination snapshot over the full (pre-slice) membership.
+  // Fail-closed (AC1/AC6): no allowed page-1 without an attributable snapshot token.
+  const permissionFingerprint = await actorPermissionFingerprint(
+    input.actorAccountId,
+  );
+  let evaluationSnapshotId: string;
+  try {
+    const snap = await beginEvaluationSnapshot(eventDb, {
+      kind: "pagination",
+      payload: personnelPaginationPayload({
+        channel: input.channel,
+        normalizedQuery: q,
+        sortKey: input.sortKey,
+        pageSize,
+      }),
+      attribution: {
+        actorAccountId: input.actorAccountId,
+        permissionFingerprint,
+      },
+      correlationId: input.correlationId,
+      boundRefs: { memberIds: rows.map((r) => r.id) },
+      expiresAt: new Date(
+        Date.now() + PERSONNEL_SEARCH_PAGINATION_TTL_MS,
+      ).toISOString(),
+    });
+    evaluationSnapshotId = snap.id;
+  } catch (err) {
+    if (isMissingEvaluationSnapshotRelation(err)) {
+      return emptyDeniedResult({
+        populationAuthzMode: mode,
+        populationDisclosureFa: disclosureFa,
+        hasCompensationRead,
+        page,
+        pageSize,
+        messageFa: MSG_EVAL_SNAPSHOT_NOT_FOUND_FA,
+      });
+    }
+    if (err instanceof EvaluationSnapshotError) {
+      return emptyDeniedResult({
+        populationAuthzMode: mode,
+        populationDisclosureFa: disclosureFa,
+        hasCompensationRead,
+        page,
+        pageSize,
+        messageFa: err.messageFa,
+      });
+    }
+    throw err;
+  }
+
+  const totalInSnapshot = rows.length;
+  const pageRows = rows.slice(0, pageSize);
+
   return {
     outcome: "allowed",
-    rows,
+    rows: pageRows,
     volume: rows.length,
     populationAuthzMode: mode,
     populationDisclosureFa: disclosureFa,
@@ -556,6 +886,10 @@ export async function runPersonnelScopedSearch(
     exportSnapshotHash,
     truncated: projected.truncated || inferenceCapped,
     decisionId: mapped.decisionId,
+    evaluationSnapshotId,
+    page,
+    pageSize,
+    totalInSnapshot,
   };
 }
 
