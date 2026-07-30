@@ -1,3 +1,11 @@
+## Deferred from: code review of 7-6-published-decision-report-reproducibility.md (2026-07-29)
+
+- Retrieve/list do not enforce recorded `permittedAudience` (`decision-publication` router) — MVP `org:selfcheck` / Known gaps IDOR class; revisit with AR-ACCESS audience matrix
+- Person-intersection helper uses JSON text `LIKE` + `LIMIT 100` (`listPublicationsIntersectingPerson`) — auto-Correction wire honesty-deferred; harden when automatic notices ship
+- Selfchecks are mostly string/optional-DB and skip disposal-scope / immutability trigger proofs — Vitest/harness carry-in
+- Seed grants read+publish+supersede+manage on single `hr.admin` PermissionSet — provisional AR-ACCESS SoD freeze
+- Client-supplied `fieldIds` not re-intersected with actor-permitted catalogue fields on publish API — MVP trust of reviewed-run hash from UI session; harden with catalogue capability intersect later
+
 ## Deferred from: code review of 7-5-external-data-subject-correction-cases.md (2026-07-29)
 
 - Unscoped list / attachment access within `correction.case.read` trust boundary (`getCorrectionCaseAttachmentDownload` by attachmentId) ? same MVP org:selfcheck / IDOR-narrowing defer as Known gaps + 7.3 hold lists

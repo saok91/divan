@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "selfcheck:dashboard": "tsx src/dashboard.selfcheck.ts",
     "selfcheck:report": "tsx src/report.selfcheck.ts",
-    "selfcheck:export-artifact": "tsx src/export-artifact.selfcheck.ts"
+    "selfcheck:export-artifact": "tsx src/export-artifact.selfcheck.ts",
+    "selfcheck:decision-publication": "tsx src/decision-publication.selfcheck.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

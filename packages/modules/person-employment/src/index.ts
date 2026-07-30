@@ -827,6 +827,7 @@ export {
   type DisposedFieldMarker,
   type DisposeArtifactFn,
   type ListArtifactsForScopeFn,
+  type OnPublicationSourceDisposedFn,
   type RunDisposalDeps,
   type RunDisposalResult,
   type PgQueryable as LifecyclePgQueryable,

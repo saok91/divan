@@ -40,6 +40,7 @@ import {
   getDisposalRun,
   getLegalHoldById,
 } from "./data-lifecycle-repo";
+import { isMissingRelationError } from "./data-lifecycle";
 import {
   correctionEventExists,
   countAttachmentsForCase,
@@ -749,10 +750,44 @@ async function validateOutcomeTarget(
     case "pending_publication_hook":
     case "recalc":
     case "response_evidence":
-    case "published_artifact":
-      // Honesty: published_artifact may be a stub id; prefer pending_publication_hook
-      // when 7.6 product is absent. Do not fabricate reproducibility.
+      // Honesty stubs — pending_publication_hook for backlog when no publication id;
+      // prefer decision_publication / published_artifact when a real id exists.
       return;
+    case "published_artifact":
+    case "decision_publication": {
+      // FR-54: prefer decision_publication; published_artifact aliases same store.
+      if (!UUID_RE.test(id)) {
+        throw new CorrectionCaseError(
+          "CORRECTION_CASE_OUTCOME_TARGET_INVALID",
+          MSG_CORRECTION_CASE_OUTCOME_TARGET_INVALID_FA,
+          { linkType, targetId: id },
+        );
+      }
+      let pub;
+      try {
+        pub = await db.query(
+          `SELECT 1 AS ok FROM reporting.decision_publication WHERE id = $1::uuid`,
+          [id],
+        );
+      } catch (err) {
+        if (isMissingRelationError(err)) {
+          throw new CorrectionCaseError(
+            "CORRECTION_CASE_OUTCOME_TARGET_INVALID",
+            MSG_CORRECTION_CASE_OUTCOME_TARGET_INVALID_FA,
+            { linkType, targetId: id, reason: "schema_missing" },
+          );
+        }
+        throw err;
+      }
+      if (pub.rows.length === 0) {
+        throw new CorrectionCaseError(
+          "CORRECTION_CASE_OUTCOME_TARGET_INVALID",
+          MSG_CORRECTION_CASE_OUTCOME_TARGET_INVALID_FA,
+          { linkType, targetId: id },
+        );
+      }
+      return;
+    }
   }
 }
 

@@ -585,6 +585,31 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 7.6 — provisional decision publication (AR-ACCESS / AR-REPORTING pending freeze)
+    {
+      permission: "report.publication.read",
+      dataCategory: "report.publication",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "report.publication.publish",
+      dataCategory: "report.publication",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "report.publication.supersede",
+      dataCategory: "report.publication",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "report.publication.manage",
+      dataCategory: "report.publication",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
   ],
 };
 

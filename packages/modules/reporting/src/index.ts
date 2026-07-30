@@ -148,3 +148,68 @@ export {
   type ExportCellValue,
   type ExportRow,
 } from "./formula-safe-export";
+
+export {
+  DecisionPublicationError,
+  MSG_PUBLICATION_DENIED_FA,
+  MSG_PUBLICATION_NOT_FOUND_FA,
+  MSG_PUBLICATION_STALE_BLOCKED_FA,
+  MSG_PUBLICATION_SNAPSHOT_MISMATCH_FA,
+  MSG_PUBLICATION_IMMUTABLE_REWRITE_FA,
+  MSG_PUBLICATION_REPRODUCIBILITY_FORBIDDEN_FA,
+  MSG_PUBLICATION_PACKAGE_NOT_ALLOWED_FA,
+  MSG_PUBLICATION_PACKAGE_RETAINED_FORCE_FA,
+  MSG_PUBLICATION_ALREADY_NON_REPRODUCIBLE_FA,
+  MSG_PUBLICATION_METADATA_INCOMPLETE_FA,
+  MSG_PUBLICATION_NOT_CURRENTLY_REPRODUCIBLE_FA,
+  type DecisionPublicationErrorCode,
+} from "./decision-publication-errors";
+
+export {
+  REPORT_PUBLICATION_READ_PERMISSION,
+  REPORT_PUBLICATION_PUBLISH_PERMISSION,
+  REPORT_PUBLICATION_SUPERSEDE_PERMISSION,
+  REPORT_PUBLICATION_MANAGE_PERMISSION,
+  REPORT_PUBLICATION_DATA_CATEGORY,
+  PROVISIONAL_REPORT_VERSION,
+  PROVISIONAL_METRIC_VERSION,
+  PUBLICATION_PACKAGE_ALLOWED_REPORT_KEYS,
+  isPublicationPackageRetainAllowed,
+  PUBLICATION_STATUS,
+  REPRODUCIBILITY_STATE,
+  PUBLICATION_NOTICE_KINDS,
+  type PublicationStatus,
+  type ReproducibilityState,
+  type PublicationNoticeKind,
+} from "./decision-publication-permissions";
+
+export {
+  isCurrentlyReproducible,
+  publishDecisionReport,
+  getDecisionPublication,
+  listDecisionPublicationDtos,
+  createPublicationNotice,
+  notifyPublicationsForCorrection,
+  bumpMetricVersionNotices,
+  listNoticesForPublication,
+  retainReproducibilityPackage,
+  markNonReproducibleAfterDisposal,
+  onRequiredSourceDisposed,
+  getPackageRefForPublication,
+  type DecisionPublication,
+  type PublicationNotice,
+  type ReproducibilityPackageRef,
+  type PublishDecisionInput,
+  type OnRequiredSourceDisposedResult,
+  type DisposalIntersectionScope,
+} from "./decision-publication";
+
+export {
+  decisionPublicationExists,
+  getDecisionPublicationById,
+  listDecisionPublications,
+  type DecisionPublicationRecord,
+  type PublicationNoticeRecord,
+  type ReproducibilityPackageRecord,
+  type PgQueryable as DecisionPublicationPgQueryable,
+} from "./decision-publication-repo";

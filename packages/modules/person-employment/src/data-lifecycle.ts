@@ -74,11 +74,32 @@ export type ListArtifactsForScopeFn = (
   scope: DisposalScope,
 ) => Promise<string[]>;
 
+/** Optional FR-54 publication disposal fork (injected from reporting — avoid BC cycle). */
+export type OnPublicationSourceDisposedFn = (
+  db: PgQueryable,
+  input: {
+    disposalRunId: string;
+    actorAccountId: string;
+    correlationId: string;
+    scope: DisposalScope;
+  },
+) => Promise<
+  ReadonlyArray<{
+    publicationId: string;
+    outcome: "package_retained" | "non-reproducible-after-disposal";
+  }>
+>;
+
 export type RunDisposalDeps = {
   disposeExportArtifact: DisposeArtifactFn;
   listExportArtifactIds: ListArtifactsForScopeFn;
   /** Prisma for Person/DataElement reads — defaults to getPersonDb(). */
   prisma?: PrismaClient;
+  /**
+   * After export dispose propagation — mark publications package_retained
+   * or non-reproducible-after-disposal. Never blocks disposal.
+   */
+  onRequiredSourceDisposed?: OnPublicationSourceDisposedFn;
 };
 
 /** Postgres undefined_table / missing relation — schema not applied yet. */
@@ -660,6 +681,62 @@ export async function runDisposal(
           );
         }
       }
+    }
+  }
+
+  // --- Decision publications (FR-54) — package or non-reproducible; never block disposal ---
+  if (deps.onRequiredSourceDisposed) {
+    try {
+      const pubOutcomes = await deps.onRequiredSourceDisposed(db, {
+        disposalRunId: run.id,
+        actorAccountId: input.actorAccountId,
+        correlationId,
+        scope: {
+          ...input.scope,
+          personIds: personIds.length > 0 ? personIds : undefined,
+          artifactIds: artifactIds.length > 0 ? artifactIds : undefined,
+          elementCategory,
+        },
+      });
+      for (const o of pubOutcomes) {
+        anyApplied = true;
+        results.push(
+          await insertPropagationResult(db, {
+            runId: run.id,
+            targetKind: "decision_publication",
+            targetId: o.publicationId,
+            outcome: "applied",
+            detailFa:
+              o.outcome === "package_retained"
+                ? "بستهٔ بازتولید حداقلی نگهداری شد."
+                : "انتشار غیرقابل‌بازتولید پس از امحا علامت‌گذاری شد.",
+            correlationId,
+          }),
+        );
+      }
+      if (pubOutcomes.length === 0) {
+        results.push(
+          await insertPropagationResult(db, {
+            runId: run.id,
+            targetKind: "decision_publication",
+            outcome: "skipped",
+            detailFa: "انتشار قابل‌بازتولید در محدوده نبود.",
+            correlationId,
+          }),
+        );
+      }
+    } catch {
+      // Never refuse disposal to keep reproducibility — soft-skip publication fork.
+      results.push(
+        await insertPropagationResult(db, {
+          runId: run.id,
+          targetKind: "decision_publication",
+          outcome: "skipped",
+          detailFa:
+            "انشعاب بازتولید انتشار اعمال نشد؛ امحا ادامه یافت.",
+          correlationId,
+        }),
+      );
     }
   }
 

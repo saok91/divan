@@ -77,6 +77,7 @@ export type CorrectionCaseOutcomeLinkType =
   | "hold"
   | "recalc"
   | "published_artifact"
+  | "decision_publication"
   | "response_evidence"
   | "pending_publication_hook";
 
@@ -200,7 +201,7 @@ export const MSG_CORRECTION_CASE_ATTACHMENT_NOT_DOWNLOADABLE_FA =
   "این پیوست برای دریافت یا پیش‌نمایش در دسترس نیست.";
 export const MSG_CORRECTION_CASE_BREACHED_FA = "مهلت گذشته";
 export const MSG_CORRECTION_CASE_PENDING_PUBLICATION_HOOK_FA =
-  "پیوند انتظار انتشار — محصول بازتولید گزارش (۷٫۶) هنوز ساخته نشده.";
+  "پیوند انتظار انتشار — وقتی شناسهٔ انتشار تصمیم (۷٫۶) مشخص نیست از این نوع استفاده کنید؛ در صورت وجود شناسه، «انتشار گزارش تصمیم» را ترجیح دهید.";
 
 /** Allowed transitions (from → to). Closed is terminal. */
 const TRANSITIONS: Readonly<

@@ -252,7 +252,7 @@ export type ReportRunResponse = ReportRunResult & {
   };
   /** Governed export affordance (Story 6.5) — false when unauthorized (no theater). */
   exportAvailable: boolean;
-  /** Stable snapshot hash for export.create binding; null when export unavailable. */
+  /** Stable snapshot hash for export/publication binding (always when run succeeds). */
   exportSnapshotHash: string | null;
 };
 
@@ -435,17 +435,16 @@ export const reportRouter = createTRPCRouter({
         const permittedFieldIds = run.columns
           .filter((c) => c.permitted !== false)
           .map((c) => c.id);
-        const exportSnapshotHash = exportAvailable
-          ? computeReportExportSnapshotHash({
-              reportKey,
-              teamId: input.teamId,
-              asOf,
-              rangeStart: input.rangeStart?.trim() || null,
-              rangeEnd: input.rangeEnd?.trim() || null,
-              evaluationMode: ctx.evaluationMode,
-              fieldIds: permittedFieldIds,
-            })
-          : null;
+        // Always bind reviewed-run hash (6.5 export + 7.6 publication reuse same spirit).
+        const exportSnapshotHash = computeReportExportSnapshotHash({
+          reportKey,
+          teamId: input.teamId,
+          asOf,
+          rangeStart: input.rangeStart?.trim() || null,
+          rangeEnd: input.rangeEnd?.trim() || null,
+          evaluationMode: ctx.evaluationMode,
+          fieldIds: permittedFieldIds,
+        });
 
         return {
           ...run,

@@ -93,6 +93,8 @@ function linkTypeLabel(linkType: string): string {
       return operationalCopy.correctionCaseLinkResponseEvidence;
     case "published_artifact":
       return operationalCopy.correctionCaseLinkPublishedArtifact;
+    case "decision_publication":
+      return operationalCopy.correctionCaseLinkDecisionPublication;
     default:
       return linkType;
   }
@@ -193,7 +195,9 @@ export function CorrectionCasesPanel() {
     | "recalc"
     | "pending_publication_hook"
     | "response_evidence"
-  >("pending_publication_hook");
+    | "published_artifact"
+    | "decision_publication"
+  >("decision_publication");
   const [linkTarget, setLinkTarget] = React.useState("");
   const [uploadName, setUploadName] = React.useState("");
   const [uploadB64, setUploadB64] = React.useState("");
@@ -988,6 +992,12 @@ export function CorrectionCasesPanel() {
                       )
                     }
                   >
+                    <option value="decision_publication">
+                      {operationalCopy.correctionCaseLinkDecisionPublication}
+                    </option>
+                    <option value="published_artifact">
+                      {operationalCopy.correctionCaseLinkPublishedArtifact}
+                    </option>
                     <option value="pending_publication_hook">
                       {operationalCopy.correctionCaseLinkPendingPublication}
                     </option>

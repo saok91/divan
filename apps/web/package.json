@@ -22,7 +22,8 @@
     "selfcheck:operations": "tsx src/server/operations.selfcheck.ts",
     "selfcheck:retention": "tsx src/server/retention.selfcheck.ts",
     "selfcheck:audit-trust": "tsx src/server/audit-trust.selfcheck.ts",
-    "selfcheck:correction-case": "tsx src/server/correction-case.selfcheck.ts"
+    "selfcheck:correction-case": "tsx src/server/correction-case.selfcheck.ts",
+    "selfcheck:decision-publication": "tsx src/server/decision-publication.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",

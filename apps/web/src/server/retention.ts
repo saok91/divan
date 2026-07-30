@@ -30,6 +30,7 @@ import {
 import {
   disposeExportArtifact,
   listExportArtifactIdsForScope,
+  onRequiredSourceDisposed,
 } from "@divan/reporting";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -324,6 +325,19 @@ export const retentionRouter = createTRPCRouter({
                 personIds: scope.personIds,
                 scopeKind: scope.scopeKind,
                 scopeRef: scope.scopeRef,
+              }),
+            onRequiredSourceDisposed: async (db, pubInput) =>
+              onRequiredSourceDisposed(db, {
+                disposalRunId: pubInput.disposalRunId,
+                actorAccountId: pubInput.actorAccountId,
+                correlationId: pubInput.correlationId,
+                scope: {
+                  scopeKind: pubInput.scope.scopeKind,
+                  scopeRef: pubInput.scope.scopeRef,
+                  personIds: pubInput.scope.personIds,
+                  artifactIds: pubInput.scope.artifactIds,
+                  elementCategory: pubInput.scope.elementCategory,
+                },
               }),
           },
         );

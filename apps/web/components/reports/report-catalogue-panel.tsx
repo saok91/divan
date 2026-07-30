@@ -7,6 +7,7 @@ import { ExportArtifactPanel } from "@/components/export/export-artifact-panel";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import { useLeaveGuardOptional } from "@/components/leave-guard";
+import { DecisionPublicationPanel } from "@/components/reports/decision-publication-panel";
 import {
   ReportFilters,
   type ReportFilterState,
@@ -336,6 +337,23 @@ export function ReportCataloguePanel() {
             }
           />
         </div>
+      ) : null}
+
+      {runQuery.data &&
+      outcome === "allowed" &&
+      runQuery.data.exportSnapshotHash ? (
+        <DecisionPublicationPanel
+          reportKey={runQuery.data.filter.reportKey}
+          reviewedSnapshotHash={runQuery.data.exportSnapshotHash}
+          fieldIds={runQuery.data.columns
+            .filter((c) => c.permitted !== false)
+            .map((c) => c.id)}
+          evaluationMode={runQuery.data.evaluationMode}
+          asOfDate={runQuery.data.filter.asOf}
+          teamId={runQuery.data.filter.teamId}
+          rangeStart={runQuery.data.filter.rangeStart || undefined}
+          rangeEnd={runQuery.data.filter.rangeEnd || undefined}
+        />
       ) : null}
 
       {runQuery.data &&

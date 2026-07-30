@@ -170,6 +170,7 @@ const outcomeLinkSchema = z.enum([
   "hold",
   "recalc",
   "published_artifact",
+  "decision_publication",
   "response_evidence",
   "pending_publication_hook",
 ]);
