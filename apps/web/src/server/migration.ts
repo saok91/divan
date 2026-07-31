@@ -27,7 +27,9 @@ import {
   confirmImportPreviewDraft,
   createReconciliationRun,
   executeImportBatch,
+  generateSampleWorkbook,
   getImportPreviewBatch,
+  getLaunchImportTemplate,
   getLatestBatchEvidence,
   getReconciliation,
   getStagingBatch,
@@ -52,8 +54,10 @@ import {
 } from "@divan/migration";
 import {
   PERSON_DATA_CATEGORY,
+  PERSON_READ_PERMISSION,
   PERSON_WRITE_PERMISSION,
   PersonIdentityError,
+  assertActorHasPersonRead,
   assertActorHasPersonWrite,
 } from "@divan/person-employment";
 import { TRPCError } from "@trpc/server";
@@ -194,9 +198,65 @@ function assertValidBase64(contentBase64: string): void {
 export type MigrationTemplateEntry = {
   key: string;
   titleFa: string;
+  purposeFa: string;
+  requiredPermission: string;
+  /** True when the caller holds `requiredPermission`. */
+  callerMayUse: boolean;
+  /** Persian access requirement when `!callerMayUse`; null when usable. */
+  accessRequirementFa: string | null;
   arMigrationStatus: "provisional-pending-freeze";
-  columns: Array<{ key: string; headerFa: string; required: boolean }>;
+  columns: Array<{
+    key: string;
+    headerFa: string;
+    required: boolean;
+    exampleValue: string;
+  }>;
 };
+
+export type MigrationSampleWorkbookResponse = {
+  fileName: string;
+  contentBase64: string;
+  contentType: string;
+  templateKey: string;
+  purpose: string;
+  classificationFa: string;
+  arMigrationStatus: "provisional-pending-freeze";
+  samplePurpose: "sample_workbook";
+};
+
+function accessRequirementFaFor(permission: string): string {
+  return operationalCopy.importTemplateAccessRequired.replace(
+    "{permission}",
+    permission,
+  );
+}
+
+async function mapCatalogueEntry(
+  accountId: string,
+  t: ReturnType<typeof requireLaunchImportTemplateCatalogue>[number],
+): Promise<MigrationTemplateEntry> {
+  const callerMayUse = await actorHoldsMigrationPermission(
+    accountId,
+    t.requiredPermission,
+  );
+  return {
+    key: t.key,
+    titleFa: t.titleFa,
+    purposeFa: t.purposeFa,
+    requiredPermission: t.requiredPermission,
+    callerMayUse,
+    accessRequirementFa: callerMayUse
+      ? null
+      : accessRequirementFaFor(t.requiredPermission),
+    arMigrationStatus: t.arMigrationStatus,
+    columns: t.columns.map((c) => ({
+      key: c.key,
+      headerFa: c.headerFa,
+      required: c.required,
+      exampleValue: c.exampleValue,
+    })),
+  };
+}
 
 export type MigrationPreviewResponse = ImportPreviewBatch & {
   populationAuthzMode: "fixture-fail-closed" | "uuid-registry";
@@ -260,33 +320,84 @@ const stagingIdSchema = z.object({
 export const migrationRouter = createTRPCRouter({
   templates: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
+      permission: PERSON_READ_PERMISSION,
       dataCategory: PERSON_DATA_CATEGORY,
-      action: "write",
+      action: "read",
       organizationalScope: "org:selfcheck",
       operation: "migration.templates",
       sensitive: false,
     })
     .query(async ({ ctx }): Promise<{ templates: MigrationTemplateEntry[] }> => {
       try {
-        await assertActorHasPersonWrite(ctx.session.accountId);
+        // Surface visibility: person.read. Per-template usability via callerMayUse.
+        await assertActorHasPersonRead(ctx.session.accountId);
         const catalogue = requireLaunchImportTemplateCatalogue();
-        return {
-          templates: catalogue.map((t) => ({
-            key: t.key,
-            titleFa: t.titleFa,
-            arMigrationStatus: t.arMigrationStatus,
-            columns: t.columns.map((c) => ({
-              key: c.key,
-              headerFa: c.headerFa,
-              required: c.required,
-            })),
-          })),
-        };
+        const templates = await Promise.all(
+          catalogue.map((t) => mapCatalogueEntry(ctx.session.accountId, t)),
+        );
+        return { templates };
       } catch (err) {
         mapMigrationError(err);
       }
     }),
+
+  downloadSampleWorkbook: governedProcedure
+    .meta({
+      permission: PERSON_WRITE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "write",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.sample_workbook",
+      sensitive: true,
+    })
+    .input(z.object({ templateKey: z.string().min(1) }))
+    .mutation(
+      async ({ ctx, input }): Promise<MigrationSampleWorkbookResponse> => {
+        try {
+          await assertActorHasPersonWrite(ctx.session.accountId);
+
+          if (!isLaunchImportTemplateKey(input.templateKey)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: MSG_TEMPLATE_INVALID_FA,
+            });
+          }
+
+          const template = getLaunchImportTemplate(input.templateKey);
+          if (!template) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: MSG_TEMPLATE_INVALID_FA,
+            });
+          }
+
+          const mayUse = await actorHoldsMigrationPermission(
+            ctx.session.accountId,
+            template.requiredPermission,
+          );
+          if (!mayUse) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: accessRequirementFaFor(template.requiredPermission),
+            });
+          }
+
+          const sample = await generateSampleWorkbook(input.templateKey);
+          return {
+            fileName: sample.fileName,
+            contentBase64: sample.buffer.toString("base64"),
+            contentType: sample.contentType,
+            templateKey: sample.templateKey,
+            purpose: sample.purposeFa,
+            classificationFa: operationalCopy.importSampleClassificationFa,
+            arMigrationStatus: sample.arMigrationStatus,
+            samplePurpose: "sample_workbook",
+          };
+        } catch (err) {
+          mapMigrationError(err);
+        }
+      },
+    ),
 
   uploadAndValidate: governedProcedure
     .meta({
@@ -306,6 +417,24 @@ export const migrationRouter = createTRPCRouter({
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: MSG_TEMPLATE_INVALID_FA,
+          });
+        }
+
+        const uploadTemplate = getLaunchImportTemplate(input.templateKey);
+        if (!uploadTemplate) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: MSG_TEMPLATE_INVALID_FA,
+          });
+        }
+        const mayUpload = await actorHoldsMigrationPermission(
+          ctx.session.accountId,
+          uploadTemplate.requiredPermission,
+        );
+        if (!mayUpload) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: accessRequirementFaFor(uploadTemplate.requiredPermission),
           });
         }
 

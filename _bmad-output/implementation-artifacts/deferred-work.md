@@ -715,3 +715,11 @@
 - Contrast asserts hardcode hex instead of parsing `globals.css` ? pre-existing mirrored-token pattern; full CSS sync parse out of gate scope
 - Expand AA asserts to tertiary-on-subtle / non-canvas panel backgrounds ? beyond current a11y-floor canvas pairs; revisit if parity probes fail on panels
 - Checklist Form layout automated proof overstated vs suite (no dedicated form selfcheck) ? residual layout-system / event-form path coverage gap
+
+## Deferred from: code review of 9-1-sample-workbook-generation-template-catalogue.md (2026-08-01)
+
+- `downloadBase64File` immediate `revokeObjectURL` / no DOM append ? pre-existing export-panel pattern extracted in 9.1; harden Safari/timing later
+- Catalogue `mapCatalogueEntry` N+1 permission reads ? acceptable with one launch template; batch when catalogue grows
+- Wire `selfcheck:sample-workbook` into design-qa / aggregate CI ? DoD ran standalone; orchestrate later if gate should own migration package checks
+- Catalogue selection `aria-pressed` / richer a11y ? Epic 8 interactive a11y ceiling is AST + gallery; expand when bulk wizard a11y DoD lands
+- `downloadSampleWorkbook` governed meta hard-codes `person.write` while DTO uses per-template `requiredPermission` ? revisit when a non-`person.write` template is registered

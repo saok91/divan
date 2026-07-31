@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
+import { downloadBase64File } from "@/lib/download-base64-file";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -51,25 +52,6 @@ type PanelState = {
   custodyBoundaryFa: string;
   omittedSensitiveIds: string[];
 };
-
-function downloadBase64File(
-  base64: string,
-  filename: string,
-  contentType: string,
-) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  const blob = new Blob([bytes], { type: contentType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 /**
  * Governed export artifact panel (Story 6.5 / UX-DR17).

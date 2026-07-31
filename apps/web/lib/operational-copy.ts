@@ -165,6 +165,16 @@ export const operationalCopy = {
     "تأیید فقط پیش‌نویس را برای اجرای بعدی نگه می‌دارد؛ قطعی‌سازی تولید در داستان ۶٫۲ است.",
   importBulkDayHint:
     "ورود گروهی روزمره در تب‌های بخش‌هاست؛ این صفحه ویزارد پیشرفتهٔ مهاجرت است.",
+  importCatalogueTitle: "فهرست قالب‌ها",
+  importCataloguePurposeLabel: "هدف",
+  importCataloguePermissionLabel: "مجوز لازم",
+  importSampleDownload: "دانلود قالب نمونه",
+  importTemplateAccessRequired:
+    "برای استفاده از این قالب، مجوز «{permission}» لازم است.",
+  importSampleClassificationFa: "نمونهٔ قالب واردسازی — غیرحساس عملیاتی",
+  importSampleDownloadError: "دانلود قالب نمونه ممکن نشد.",
+  importBulkCatalogueHint:
+    "فهرست قالب و دانلود نمونه اینجاست؛ جریان پنج‌مرحله‌ای ورود گروهی در داستان ۹٫۲ تکمیل می‌شود. ویزارد پیشرفتهٔ مهاجرت در «ورود داده» است.",
   importPreviewTitle: "پیش‌نمایش واردسازی",
   importNoTemplates: "قالب واردسازی ثبت نشده.",
   importErrorsLabel: "خطا",

@@ -39,6 +39,15 @@ assert.ok(LAUNCH_IMPORT_TEMPLATE_KEYS.includes("person_employment_start"));
 for (const t of catalogue) {
   assert.equal(t.arMigrationStatus, "provisional-pending-freeze");
   assert.ok(t.columns.some((c) => c.required));
+  assert.ok(typeof t.purposeFa === "string" && t.purposeFa.length > 0);
+  assert.ok(typeof t.requiredPermission === "string" && t.requiredPermission.length > 0);
+  for (const col of t.columns) {
+    assert.ok(typeof col.exampleValue === "string");
+  }
+  // Entity columns must be business-code keys — never UUID *Id leftovers
+  assert.ok(t.columns.some((c) => c.key === "teamCode"));
+  assert.ok(!t.columns.some((c) => c.key === "teamId"));
+  assert.ok(t.columns.every((c) => !/شناسه/.test(c.headerFa)));
 }
 
 /** Formula-control literalization (FR-52) */
@@ -86,18 +95,18 @@ const headers = [
   "ملیت",
   "تاریخ شروع",
   "نوع همکاری",
-  "شناسه تیم",
-  "شناسه نقش سازمانی",
-  "شناسه عنوان شغلی",
-  "شناسه نردبان",
-  "شناسه گرید",
-  "شناسه ارشدیت",
+  "کد تیم",
+  "کد نقش سازمانی",
+  "کد عنوان شغلی",
+  "کد نردبان",
+  "کد گرید",
+  "کد ارشدیت",
 ];
-const teamId = "11111111-1111-4111-8111-111111111111";
-const roleId = "22222222-2222-4222-8222-222222222222";
-const jobId = "33333333-3333-4333-8333-333333333333";
-const ladderId = "44444444-4444-4444-8444-444444444444";
-const gradeId = "55555555-5555-4555-8555-555555555555";
+const teamCode = "TEAM-DEMO";
+const roleCode = "ROLE-HR-SPEC";
+const jobCode = "JT-HR-SPEC";
+const ladderCode = "LAD-DEMO";
+const gradeCode = "G-12";
 
 function csvLine(cells: string[]): string {
   return cells.map((c) => `"${c.replace(/"/g, '""')}"`).join(",");
@@ -114,11 +123,11 @@ const goodRow = [
   "IR",
   "2026-03-01",
   "employee",
-  teamId,
-  roleId,
-  jobId,
-  ladderId,
-  gradeId,
+  teamCode,
+  roleCode,
+  jobCode,
+  ladderCode,
+  gradeCode,
   "",
 ];
 

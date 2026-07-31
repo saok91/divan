@@ -4,9 +4,11 @@ import * as React from "react";
 
 import { ImportPreviewTable } from "@/components/import/import-preview-table";
 import { MigrationReconciliationWorkspace } from "@/components/import/migration-reconciliation-workspace";
+import { TemplateCatalogue } from "@/components/import/template-catalogue";
 import { useLeaveGuardRegistration } from "@/components/leave-guard";
 import { SensitiveConfirmationDialog } from "@/components/personnel/sensitive-confirmation-dialog";
 import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import {
   Dialog,
   DialogContent,
@@ -112,8 +114,12 @@ export function ImportWizard() {
   const approveMutation = api.migration.approveBatch.useMutation();
   const executeMutation = api.migration.executeBatch.useMutation();
 
+  const usableTemplates =
+    templatesQuery.data?.templates.filter((t) => t.callerMayUse) ?? [];
   const resolvedTemplateKey =
-    templateKey || templatesQuery.data?.templates[0]?.key || "";
+    (templateKey && usableTemplates.some((t) => t.key === templateKey)
+      ? templateKey
+      : usableTemplates[0]?.key) || "";
 
   const preview = confirmMutation.data ?? uploadMutation.data ?? null;
   const previewBatchId = preview?.previewBatchId;
@@ -315,34 +321,59 @@ export function ImportWizard() {
         </h2>
 
         {templatesQuery.isLoading ? (
-          <p className="text-caption text-muted-foreground">…</p>
+          <FeedbackMessage kind="loading">
+            {operationalCopy.actionPending}
+          </FeedbackMessage>
         ) : templatesQuery.isError ? (
-          <p className="text-caption text-destructive" role="alert">
+          <FeedbackMessage kind="error">
             {templatesQuery.error.message || operationalCopy.importLoadError}
-          </p>
+          </FeedbackMessage>
         ) : (templatesQuery.data?.templates.length ?? 0) === 0 ? (
-          <p className="text-caption">{operationalCopy.importNoTemplates}</p>
+          <FeedbackMessage kind="empty">
+            {operationalCopy.importNoTemplates}
+          </FeedbackMessage>
         ) : (
-          <div className="space-y-2">
-            <label className="text-caption" htmlFor="import-template">
-              {operationalCopy.importSelectTemplate}
-            </label>
-            <select
-              id="import-template"
-              className="flex h-9 w-full max-w-md rounded-md border border-border bg-background px-3 text-body"
-              value={resolvedTemplateKey}
-              onChange={(e) => setTemplateKey(e.target.value)}
+          <div className="space-y-4">
+            <TemplateCatalogue
+              variant="migration"
+              selectedTemplateKey={resolvedTemplateKey}
               disabled={busy || previewLoaded}
-            >
-              {templatesQuery.data?.templates.map((t) => (
-                <option key={t.key} value={t.key}>
-                  {t.titleFa}
-                </option>
-              ))}
-            </select>
-            <p className="text-caption text-muted-foreground">
-              قالب موقتی — انجماد AR-MIGRATION هنوز انجام نشده.
-            </p>
+              onSelectTemplate={(key) => {
+                if (key === resolvedTemplateKey) return;
+                setTemplateKey(key);
+                // Cascade (8.3): clear file bound to previous template.
+                setFile(null);
+                setUploadError(null);
+              }}
+            />
+            <div className="space-y-2">
+              <label className="text-caption" htmlFor="import-template">
+                {operationalCopy.importSelectTemplate}
+              </label>
+              <select
+                id="import-template"
+                className="flex h-9 w-full max-w-md rounded-md border border-border bg-background px-3 text-body"
+                value={resolvedTemplateKey}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next !== resolvedTemplateKey) {
+                    setTemplateKey(next);
+                    setFile(null);
+                    setUploadError(null);
+                  }
+                }}
+                disabled={busy || previewLoaded || usableTemplates.length === 0}
+              >
+                {usableTemplates.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.titleFa}
+                  </option>
+                ))}
+              </select>
+              <p className="text-caption text-muted-foreground">
+                قالب موقتی — انجماد AR-MIGRATION هنوز انجام نشده.
+              </p>
+            </div>
           </div>
         )}
 

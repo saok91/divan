@@ -1,12 +1,15 @@
 /**
- * FR-37 import validators → row/column Persian issues (Story 6.1).
+ * FR-37 import validators → row/column Persian issues (Story 6.1 / 9.1).
  *
  * Covers: structure, required, identifiers, uniqueness, dates, enums,
  * hierarchy, references, Ladder–Grade, overlaps, order, duplicate rows.
- * Reference/hierarchy checks are structural (UUID shape / pairing) — live DB
- * FK resolution is cutover (6.2), not preview fabrication.
+ * Reference/hierarchy checks are structural (business-code shape / pairing) —
+ * live DB FK resolution is cutover (6.2), not preview fabrication.
+ *
+ * Story 9.1: entity refs are business codes — UUID-shaped values fail closed.
  */
 
+import { toLatinDigits } from "@divan/person-employment";
 import { parseDateOnly } from "@divan/temporal-engine";
 
 import type { ParsedImportMatrix } from "./parse-workbook";
@@ -25,8 +28,20 @@ export type ImportIssue = {
   messageFa: string;
 };
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** Same shape as personnel codes — business identifiers, never UUIDs. */
+const BUSINESS_CODE_RE = /^[A-Za-z0-9._\-/]{1,32}$/;
+
+const UUID_HYPHEN_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_HEX32_RE = /^[0-9a-f]{32}$/i;
+
+function looksLikeInternalId(raw: string): boolean {
+  return UUID_HYPHEN_RE.test(raw) || UUID_HEX32_RE.test(raw);
+}
+
+function normalizeBusinessCode(raw: string): string {
+  return toLatinDigits(raw).trim();
+}
 
 const COLLABORATION_ENUM = new Set([
   "employee",
@@ -36,6 +51,15 @@ const COLLABORATION_ENUM = new Set([
 ]);
 
 const GENDER_ENUM = new Set(["male", "female", "other", "unspecified", ""]);
+
+const ENTITY_CODE_FIELDS = [
+  "teamCode",
+  "organizationalRoleCode",
+  "jobTitleCode",
+  "ladderCode",
+  "gradeCode",
+  "seniorityCode",
+] as const;
 
 function captionFor(
   template: LaunchImportTemplate,
@@ -93,35 +117,29 @@ function validateIdentifiers(
   record: Record<string, string>,
   template: LaunchImportTemplate,
 ): void {
-  const code = record.personnelCode?.trim() ?? "";
-  if (code && !/^[A-Za-z0-9._\-/]{1,32}$/.test(code)) {
+  const code = normalizeBusinessCode(record.personnelCode ?? "");
+  if (code && (looksLikeInternalId(code) || !BUSINESS_CODE_RE.test(code))) {
     pushIssue(issues, {
       row: rowNum,
       column: "personnelCode",
       columnCaptionFa: captionFor(template, "personnelCode"),
       severity: "error",
-      messageFa: "کد پرسنلی فقط حروف/رقم و جداکننده‌های مجاز تا ۳۲ نویسه است.",
+      messageFa: looksLikeInternalId(code)
+        ? "کد پرسنلی نباید شناسه داخلی (UUID) باشد."
+        : "کد پرسنلی فقط حروف/رقم و جداکننده‌های مجاز تا ۳۲ نویسه است.",
     });
   }
 
-  const uuidFields = [
-    "teamId",
-    "organizationalRoleId",
-    "jobTitleId",
-    "ladderId",
-    "gradeId",
-    "seniorityId",
-  ] as const;
-  for (const key of uuidFields) {
-    const raw = record[key]?.trim() ?? "";
+  for (const key of ENTITY_CODE_FIELDS) {
+    const raw = normalizeBusinessCode(record[key] ?? "");
     if (!raw) continue;
-    if (!UUID_RE.test(raw)) {
+    if (looksLikeInternalId(raw) || !BUSINESS_CODE_RE.test(raw)) {
       pushIssue(issues, {
         row: rowNum,
         column: key,
         columnCaptionFa: captionFor(template, key),
         severity: "error",
-        messageFa: `«${captionFor(template, key)}» باید شناسه UUID معتبر باشد.`,
+        messageFa: `«${captionFor(template, key)}» باید کد کسب‌وکار معتبر باشد (نه شناسه داخلی).`,
       });
     }
   }
@@ -189,15 +207,15 @@ function validateLadderGrade(
   record: Record<string, string>,
   template: LaunchImportTemplate,
 ): void {
-  const ladder = record.ladderId?.trim() ?? "";
-  const grade = record.gradeId?.trim() ?? "";
+  const ladder = record.ladderCode?.trim() ?? "";
+  const grade = record.gradeCode?.trim() ?? "";
   if ((ladder && !grade) || (!ladder && grade)) {
     pushIssue(issues, {
       row: rowNum,
-      column: grade ? "ladderId" : "gradeId",
+      column: grade ? "ladderCode" : "gradeCode",
       columnCaptionFa: captionFor(
         template,
-        grade ? "ladderId" : "gradeId",
+        grade ? "ladderCode" : "gradeCode",
       ),
       severity: "error",
       messageFa: "نردبان و گرید باید با هم مشخص شوند (زوج Ladder–Grade).",
@@ -212,21 +230,21 @@ function validateHierarchy(
   record: Record<string, string>,
   template: LaunchImportTemplate,
 ): void {
-  const team = record.teamId?.trim() ?? "";
-  const role = record.organizationalRoleId?.trim() ?? "";
-  const job = record.jobTitleId?.trim() ?? "";
+  const team = record.teamCode?.trim() ?? "";
+  const role = record.organizationalRoleCode?.trim() ?? "";
+  const job = record.jobTitleCode?.trim() ?? "";
   if ((role || job) && !team) {
     pushIssue(issues, {
       row: rowNum,
-      column: "teamId",
-      columnCaptionFa: captionFor(template, "teamId"),
+      column: "teamCode",
+      columnCaptionFa: captionFor(template, "teamCode"),
       severity: "error",
-      messageFa: "برای نقش/عنوان شغلی، شناسه تیم الزامی است (سلسله‌مراتب).",
+      messageFa: "برای نقش/عنوان شغلی، کد تیم الزامی است (سلسله‌مراتب).",
     });
   }
 }
 
-/** Reference shape already covered by UUID; flag empty optional seniority as ok. */
+/** Reference shape covered by business-code checks; flag copy-paste across cols. */
 function validateReferences(
   issues: ImportIssue[],
   rowNum: number,
@@ -234,25 +252,25 @@ function validateReferences(
   template: LaunchImportTemplate,
 ): void {
   // Preview cannot invent live org/job existence — structural only.
-  // Duplicate identical UUID across distinct semantic columns → warning.
-  const ids = [
-    record.teamId,
-    record.organizationalRoleId,
-    record.jobTitleId,
-    record.ladderId,
-    record.gradeId,
+  // Duplicate identical code across distinct semantic columns → warning.
+  const codes = [
+    record.teamCode,
+    record.organizationalRoleCode,
+    record.jobTitleCode,
+    record.ladderCode,
+    record.gradeCode,
   ]
     .map((v) => v?.trim() ?? "")
     .filter(Boolean);
-  const unique = new Set(ids);
-  if (ids.length >= 2 && unique.size === 1) {
+  const unique = new Set(codes);
+  if (codes.length >= 2 && unique.size === 1) {
     pushIssue(issues, {
       row: rowNum,
-      column: "teamId",
-      columnCaptionFa: captionFor(template, "teamId"),
+      column: "teamCode",
+      columnCaptionFa: captionFor(template, "teamCode"),
       severity: "warning",
       messageFa:
-        "همه شناسه‌های مرجع یکسان‌اند؛ احتمال خطای کپی در ستون‌های مرجع.",
+        "همه کدهای مرجع یکسان‌اند؛ احتمال خطای کپی در ستون‌های مرجع.",
     });
   }
 }

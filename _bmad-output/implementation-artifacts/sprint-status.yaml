@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-31T23:55:00+03:30
+# last_updated: 2026-08-01T01:15:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-31T23:55:00+03:30
+last_updated: 2026-08-01T01:15:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -150,8 +150,8 @@ development_status:
   8-10-design-qa-consistency-accessibility-gate: done
   epic-8-retrospective: done
 
-  epic-9: backlog
-  9-1-sample-workbook-generation-template-catalogue: backlog
+  epic-9: in-progress
+  9-1-sample-workbook-generation-template-catalogue: done
   9-2-shared-bulk-entry-flow: backlog
   9-3-bulk-entry-personnel-events-headcount: backlog
   9-4-capacity-hiring-ia-restructure: backlog
@@ -519,11 +519,13 @@ action_items:
   - epic: 8
     action: "Encode into Story 9.1+ create-story: mandatory selfcheck:design-qa; amendment rows are work-to-close; first-touch require EntityPicker / RowActionButton / FeedbackMessage"
     owner: "Amelia + Sally"
-    status: open
+    status: done
+    resolved_in: "9-1-sample-workbook-generation-template-catalogue.md (Gate, AC #7, Tasks 4–5, first-touch + design-qa + amendment honesty)"
   - epic: 8
     action: "Publish UX alignment honesty note for Epic 9 kickoff: foundation pass vs 8.10-A3 amendments vs residual hotspots"
     owner: "Paige + Sally + Mary"
-    status: open
+    status: done
+    resolved_in: "9-1-sample-workbook-generation-template-catalogue.md (Dev Notes — UX alignment honesty table)"
   - epic: 8
     action: "Close FeedbackMessage / PendingSurface adoption on panels touched in Epic 9"
     owner: "Amelia + Sally"

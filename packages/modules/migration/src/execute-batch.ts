@@ -32,12 +32,13 @@ import {
 import {
   PersonIdentityError,
   createPerson,
-  getGradeById,
-  getJobTitleById,
-  getLadderById,
-  getOrgUnitById,
-  getOrganizationalRoleById,
+  getGradeByCode,
+  getJobTitleByCode,
+  getLadderByCode,
+  getOrgUnitByCode,
+  getOrganizationalRoleByCode,
   getPersonByPersonnelCode,
+  getSeniorityByCode,
   type CreatePersonInput,
 } from "@divan/person-employment";
 
@@ -153,58 +154,77 @@ export function revalidateStagingBatch(batch: StagingBatchRecord): ImportIssue[]
 
 /**
  * Authoritative live FK checks via published PE APIs (AC #3).
+ * Story 9.1: staging rows carry business codes; resolve via *ByCode.
  */
 export async function revalidateAuthoritativeReferences(
   batch: StagingBatchRecord,
 ): Promise<void> {
   for (const row of batch.rows) {
-    const teamId = (row.values.teamId ?? "").trim();
-    if (teamId) {
-      const unit = await getOrgUnitById(teamId);
+    const teamCode = (row.values.teamCode ?? "").trim();
+    if (teamCode) {
+      const unit = await getOrgUnitByCode(teamCode);
       if (!unit || unit.unitType !== "TEAM") {
         throw new MigrationError(
           "REVALIDATION_FAILED",
-          `ردیف ${row.sourceRow}: شناسه تیم در وضعیت جاری معتبر نیست.`,
+          `ردیف ${row.sourceRow}: کد تیم در وضعیت جاری معتبر نیست.`,
         );
       }
     }
-    const roleId = (row.values.organizationalRoleId ?? "").trim();
-    if (roleId) {
-      const role = await getOrganizationalRoleById(roleId);
+    const roleCode = (row.values.organizationalRoleCode ?? "").trim();
+    if (roleCode) {
+      const role = await getOrganizationalRoleByCode(roleCode);
       if (!role) {
         throw new MigrationError(
           "REVALIDATION_FAILED",
-          `ردیف ${row.sourceRow}: شناسه نقش سازمانی یافت نشد.`,
+          `ردیف ${row.sourceRow}: کد نقش سازمانی یافت نشد.`,
         );
       }
     }
-    const jobTitleId = (row.values.jobTitleId ?? "").trim();
-    if (jobTitleId) {
-      const job = await getJobTitleById(jobTitleId);
+    const jobTitleCode = (row.values.jobTitleCode ?? "").trim();
+    if (jobTitleCode) {
+      const job = await getJobTitleByCode(jobTitleCode);
       if (!job) {
         throw new MigrationError(
           "REVALIDATION_FAILED",
-          `ردیف ${row.sourceRow}: شناسه عنوان شغلی یافت نشد.`,
+          `ردیف ${row.sourceRow}: کد عنوان شغلی یافت نشد.`,
         );
       }
     }
-    const ladderId = (row.values.ladderId ?? "").trim();
-    if (ladderId) {
-      const ladder = await getLadderById(ladderId);
+    const ladderCode = (row.values.ladderCode ?? "").trim();
+    let resolvedLadderId: string | null = null;
+    if (ladderCode) {
+      const ladder = await getLadderByCode(ladderCode);
       if (!ladder) {
         throw new MigrationError(
           "REVALIDATION_FAILED",
-          `ردیف ${row.sourceRow}: شناسه نردبان یافت نشد.`,
+          `ردیف ${row.sourceRow}: کد نردبان یافت نشد.`,
         );
       }
+      resolvedLadderId = ladder.id;
     }
-    const gradeId = (row.values.gradeId ?? "").trim();
-    if (gradeId) {
-      const grade = await getGradeById(gradeId);
+    const gradeCode = (row.values.gradeCode ?? "").trim();
+    if (gradeCode) {
+      if (!resolvedLadderId) {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: برای اعتبارسنجی کد گرید، کد نردبان الزامی است.`,
+        );
+      }
+      const grade = await getGradeByCode(resolvedLadderId, gradeCode);
       if (!grade) {
         throw new MigrationError(
           "REVALIDATION_FAILED",
-          `ردیف ${row.sourceRow}: شناسه گرید یافت نشد.`,
+          `ردیف ${row.sourceRow}: کد گرید یافت نشد.`,
+        );
+      }
+    }
+    const seniorityCode = (row.values.seniorityCode ?? "").trim();
+    if (seniorityCode) {
+      const seniority = await getSeniorityByCode(seniorityCode);
+      if (!seniority) {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: کد ارشدیت یافت نشد.`,
         );
       }
     }
@@ -270,11 +290,11 @@ function buildImportEvaluationPayload(
     batchId: batch.id,
     rows: batch.rows.map((r) => ({
       personnelCode: (r.values.personnelCode ?? "").trim(),
-      teamId: r.values.teamId ?? null,
-      organizationalRoleId: r.values.organizationalRoleId ?? null,
-      jobTitleId: r.values.jobTitleId ?? null,
-      ladderId: r.values.ladderId ?? null,
-      gradeId: r.values.gradeId ?? null,
+      teamCode: r.values.teamCode ?? null,
+      organizationalRoleCode: r.values.organizationalRoleCode ?? null,
+      jobTitleCode: r.values.jobTitleCode ?? null,
+      ladderCode: r.values.ladderCode ?? null,
+      gradeCode: r.values.gradeCode ?? null,
     })),
   };
 }
@@ -368,12 +388,12 @@ async function cutoverRowsInTx(
       payload: {
         source: "migration",
         rowId: row.rowId,
-        teamId: row.values.teamId ?? null,
-        organizationalRoleId: row.values.organizationalRoleId ?? null,
-        jobTitleId: row.values.jobTitleId ?? null,
-        ladderId: row.values.ladderId ?? null,
-        gradeId: row.values.gradeId ?? null,
-        seniorityId: row.values.seniorityId ?? null,
+        teamCode: row.values.teamCode ?? null,
+        organizationalRoleCode: row.values.organizationalRoleCode ?? null,
+        jobTitleCode: row.values.jobTitleCode ?? null,
+        ladderCode: row.values.ladderCode ?? null,
+        gradeCode: row.values.gradeCode ?? null,
+        seniorityCode: row.values.seniorityCode ?? null,
         collaborationType: row.values.collaborationType ?? null,
       },
       afterEvidence: {

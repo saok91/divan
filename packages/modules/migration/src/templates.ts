@@ -1,10 +1,14 @@
 /**
- * Launch import template catalogue (Story 6.1).
+ * Launch import template catalogue (Story 6.1 / 9.1).
  *
  * AR-MIGRATION-pluggable: provisional column contracts aligned to already-shipped
  * domain fields (Person / Employment / Assignment). Signed template freeze is
  * pending — unknown templates and header mismatches fail closed with Persian
  * explanation. Do not invent columns from AR-DATA open dispositions.
+ *
+ * Story 9.1 contract evolution: entity reference columns use **business codes**
+ * (not UUIDs) in headers, keys, examples, and structural validation. Old
+ * UUID-header workbooks fail closed intentionally — no silent dual accept.
  */
 
 export type ImportTemplateColumn = {
@@ -15,11 +19,22 @@ export type ImportTemplateColumn = {
   required: boolean;
   /** Data category hint for permission omit (never invent new categories). */
   dataCategory: string;
+  /** Documented example cell for sample workbook generation (Story 9.1). */
+  exampleValue: string;
+  /** Optional Persian hint for dates/enums/value shape. */
+  valueFormatHintFa?: string;
 };
 
 export type LaunchImportTemplate = {
   key: string;
   titleFa: string;
+  /** Operator-facing purpose (catalogue / sample lifecycle). */
+  purposeFa: string;
+  /**
+   * Existing documented permission string required to use/download this template.
+   * Prefer seeded keys (e.g. person.write) — do not invent AR-ACCESS SoD splits.
+   */
+  requiredPermission: string;
   /** Provisional — pending AR-MIGRATION freeze. */
   arMigrationStatus: "provisional-pending-freeze";
   columns: readonly ImportTemplateColumn[];
@@ -27,11 +42,14 @@ export type LaunchImportTemplate = {
 
 /**
  * Person identity + employment start assignment facts for launch migration.
- * IDs are UUID strings as already used in domain create/start payloads.
+ * Entity columns are business codes (Epic 8 identifier-first) — never UUIDs.
  */
 export const LAUNCH_IMPORT_TEMPLATE_PERSON_EMPLOYMENT: LaunchImportTemplate = {
   key: "person_employment_start",
   titleFa: "هویت پرسنل و شروع اشتغال",
+  purposeFa:
+    "بارگذاری هویت پرسنل و حقایق شروع اشتغال برای مهاجرت کنترل‌شدهٔ راه‌اندازی.",
+  requiredPermission: "person.write",
   arMigrationStatus: "provisional-pending-freeze",
   columns: [
     {
@@ -39,96 +57,117 @@ export const LAUNCH_IMPORT_TEMPLATE_PERSON_EMPLOYMENT: LaunchImportTemplate = {
       headerFa: "کد پرسنلی",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "P-100",
+      valueFormatHintFa: "حروف/رقم و جداکننده‌های مجاز تا ۳۲ نویسه",
     },
     {
       key: "givenName",
       headerFa: "نام",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "نیلوفر",
     },
     {
       key: "familyName",
       headerFa: "نام خانوادگی",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "احمدی",
     },
     {
       key: "mobilePhone",
       headerFa: "موبایل",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "09121234567",
     },
     {
       key: "fatherName",
       headerFa: "نام پدر",
       required: false,
       dataCategory: "identity.person",
+      exampleValue: "علی",
     },
     {
       key: "birthDate",
       headerFa: "تاریخ تولد",
       required: false,
       dataCategory: "identity.person",
+      exampleValue: "1990-01-15",
+      valueFormatHintFa: "تاریخ میلادی YYYY-MM-DD",
     },
     {
       key: "gender",
       headerFa: "جنسیت",
       required: false,
       dataCategory: "identity.person",
+      exampleValue: "female",
+      valueFormatHintFa: "male / female / other / unspecified",
     },
     {
       key: "nationality",
       headerFa: "ملیت",
       required: false,
       dataCategory: "identity.person",
+      exampleValue: "IR",
     },
     {
       key: "startDate",
       headerFa: "تاریخ شروع",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "2026-03-01",
+      valueFormatHintFa: "تاریخ میلادی YYYY-MM-DD",
     },
     {
       key: "collaborationType",
       headerFa: "نوع همکاری",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "employee",
+      valueFormatHintFa: "employee / contractor / intern / consultant",
     },
     {
-      key: "teamId",
-      headerFa: "شناسه تیم",
+      key: "teamCode",
+      headerFa: "کد تیم",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "TEAM-DEMO",
     },
     {
-      key: "organizationalRoleId",
-      headerFa: "شناسه نقش سازمانی",
+      key: "organizationalRoleCode",
+      headerFa: "کد نقش سازمانی",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "ROLE-HR-SPEC",
     },
     {
-      key: "jobTitleId",
-      headerFa: "شناسه عنوان شغلی",
+      key: "jobTitleCode",
+      headerFa: "کد عنوان شغلی",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "JT-HR-SPEC",
     },
     {
-      key: "ladderId",
-      headerFa: "شناسه نردبان",
+      key: "ladderCode",
+      headerFa: "کد نردبان",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "LAD-DEMO",
     },
     {
-      key: "gradeId",
-      headerFa: "شناسه گرید",
+      key: "gradeCode",
+      headerFa: "کد گرید",
       required: true,
       dataCategory: "identity.person",
+      exampleValue: "G-12",
     },
     {
-      key: "seniorityId",
-      headerFa: "شناسه ارشدیت",
+      key: "seniorityCode",
+      headerFa: "کد ارشدیت",
       required: false,
       dataCategory: "identity.person",
+      exampleValue: "SEN-MID",
     },
   ],
 };

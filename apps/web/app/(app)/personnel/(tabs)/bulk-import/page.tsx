@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { SectionTabPlaceholder } from "@/components/section-tab-placeholder";
+import { BulkImportCatalogueHost } from "@/components/import/bulk-import-catalogue-host";
+import { PageHeader } from "@/components/page-header";
 import { assertPageAccess } from "@/lib/assert-page-access";
+import { operationalCopy } from "@/lib/operational-copy";
 
 /**
- * ورود گروهی (پرسنل) — thin placeholder; Epic 6 / day-to-day bulk later.
+ * ورود گروهی (پرسنل) — catalogue/sample substrate (Story 9.1).
+ * Full five-step bulk flow arrives in Story 9.2.
  */
 export default async function PersonnelBulkImportPage() {
   const session = await auth();
@@ -15,12 +18,14 @@ export default async function PersonnelBulkImportPage() {
   assertPageAccess(session.user.coarseRole, "/personnel");
 
   return (
-    <div className="space-y-2">
-      <SectionTabPlaceholder />
-      <p className="text-caption text-text-secondary px-content-padding-inline">
-        ورود گروهی روزمرهٔ پرسنل بعداً تکمیل می‌شود. ویزارد پیشرفته در «ورود داده»
-        باقی می‌ماند.
-      </p>
+    <div className="space-y-4">
+      <PageHeader
+        title="ورود گروهی"
+        purpose={operationalCopy.importBulkCatalogueHint}
+      />
+      <div className="px-content-padding-inline pb-6">
+        <BulkImportCatalogueHost />
+      </div>
     </div>
   );
 }

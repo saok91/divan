@@ -50,6 +50,13 @@ export {
 } from "./validate-import";
 
 export {
+  SAMPLE_FORMULA_SAFE_TAB_PREFIX,
+  generateSampleWorkbook,
+  neutralizeSampleCellValue,
+  type SampleWorkbookResult,
+} from "./sample-workbook";
+
+export {
   IMPORT_DRAFT_TTL_MS,
   IMPORT_MAX_DRAFTS_GLOBAL,
   IMPORT_MAX_DRAFTS_PER_ACTOR,

@@ -34,6 +34,11 @@ assert.ok(operationalCopy.importExecuteConfirmTitle);
 assert.ok(operationalCopy.importExecuteConsequence);
 assert.ok(operationalCopy.importConcurrentBatch.includes("دسته دیگری"));
 assert.ok(operationalCopy.importContentsReadOnly);
+assert.ok(operationalCopy.importSampleDownload);
+assert.ok(operationalCopy.importCatalogueTitle);
+assert.ok(operationalCopy.importTemplateAccessRequired.includes("{permission}"));
+assert.ok(operationalCopy.importBulkCatalogueHint.includes("ورود داده"));
+assert.ok(operationalCopy.importSampleClassificationFa.length > 0);
 
 assert.ok(operationalCopy.reconWorkspaceTitle);
 assert.ok(operationalCopy.reconProductionBlocked);

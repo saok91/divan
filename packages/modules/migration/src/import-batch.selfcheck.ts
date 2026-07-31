@@ -145,12 +145,12 @@ const headers = [
   "ملیت",
   "تاریخ شروع",
   "نوع همکاری",
-  "شناسه تیم",
-  "شناسه نقش سازمانی",
-  "شناسه عنوان شغلی",
-  "شناسه نردبان",
-  "شناسه گرید",
-  "شناسه ارشدیت",
+  "کد تیم",
+  "کد نقش سازمانی",
+  "کد عنوان شغلی",
+  "کد نردبان",
+  "کد گرید",
+  "کد ارشدیت",
 ];
 
 function csvLine(cells: string[]): string {
@@ -199,11 +199,11 @@ async function main() {
     });
     assert.ok(team && role && job && ladder && grade, "seed refs missing");
 
-    const teamId = team!.id;
-    const roleId = role!.id;
-    const jobId = job!.id;
-    const ladderId = ladder!.id;
-    const gradeId = grade!.id;
+    const teamCode = team!.code;
+    const roleCode = role!.code;
+    const jobCode = job!.code;
+    const ladderCode = ladder!.code;
+    const gradeCode = grade!.code;
 
     const suffix = randomUUID().slice(0, 8);
     const code1 = `M${suffix.slice(0, 7)}`;
@@ -222,11 +222,11 @@ async function main() {
       "",
       "2026-01-15",
       "employee",
-      teamId,
-      roleId,
-      jobId,
-      ladderId,
-      gradeId,
+      teamCode,
+      roleCode,
+      jobCode,
+      ladderCode,
+      gradeCode,
       "",
     ];
     const csv = [csvLine(headers), csvLine(goodRow)].join("\n");
