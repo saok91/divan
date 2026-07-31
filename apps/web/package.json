@@ -27,7 +27,8 @@
     "selfcheck:launch-artifact": "tsx src/server/launch-artifact.selfcheck.ts",
     "selfcheck:evaluation-snapshot": "tsx src/server/evaluation-snapshot.selfcheck.ts",
     "selfcheck:control-contract": "tsx lib/control-contract.selfcheck.ts",
-    "selfcheck:layout-system": "tsx lib/layout-system.selfcheck.ts"
+    "selfcheck:layout-system": "tsx lib/layout-system.selfcheck.ts",
+    "selfcheck:entity-picker": "tsx lib/entity-picker.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",

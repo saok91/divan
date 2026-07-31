@@ -30,6 +30,9 @@ import {
   getPersonByPersonnelCode,
   listDataElements,
   listEmploymentsForPerson,
+  listPrimaryAssignmentsForEmployment,
+  getOrgUnitById,
+  getJobTitleById,
   listEnabledProfileFields,
   matchReturn,
   mergePersons,
@@ -437,6 +440,90 @@ export const personRouter = createTRPCRouter({
         });
         const rows = await listEmploymentsForPerson(input.personId);
         return filterPriorEmployments(rows, todayDateOnlyTehran());
+      } catch (err) {
+        mapPersonError(err);
+      }
+    }),
+
+  /**
+   * Permission-safe employments for entity-picker (Story 8.3).
+   * Same scope gate as profile; returns open + historical rows with dates.
+   */
+  listSelectableEmployments: governedProcedure
+    .meta({
+      ...personReadMeta,
+      operation: "person.list_selectable_employments",
+    })
+    .input(z.object({ personId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await requirePersonRead(ctx.session.accountId);
+      try {
+        await assertPersonInScopedPopulation({
+          personId: input.personId,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
+        const rows = await listEmploymentsForPerson(input.personId);
+        return rows.map((e) => ({
+          id: e.id,
+          personId: e.personId,
+          startDate: e.startDate,
+          endDateExclusive: e.endDateExclusive,
+          collaborationType: e.collaborationType,
+        }));
+      } catch (err) {
+        mapPersonError(err);
+      }
+    }),
+
+  /**
+   * Permission-safe primary assignments for entity-picker (Story 8.3).
+   * Scope-gated; rows include dates + cheap team/job labels (no parallel SoT).
+   */
+  listSelectablePrimaryAssignments: governedProcedure
+    .meta({
+      ...personReadMeta,
+      operation: "person.list_selectable_primary_assignments",
+    })
+    .input(z.object({ personId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await requirePersonRead(ctx.session.accountId);
+      try {
+        await assertPersonInScopedPopulation({
+          personId: input.personId,
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+        });
+        const employments = await listEmploymentsForPerson(input.personId);
+        const primaries = (
+          await Promise.all(
+            employments.map((emp) => listPrimaryAssignmentsForEmployment(emp.id)),
+          )
+        ).flat();
+        const teamIds = [...new Set(primaries.map((pa) => pa.teamId))];
+        const titleIds = [...new Set(primaries.map((pa) => pa.jobTitleId))];
+        const [teams, titles] = await Promise.all([
+          Promise.all(teamIds.map((id) => getOrgUnitById(id))),
+          Promise.all(titleIds.map((id) => getJobTitleById(id))),
+        ]);
+        const teamById = new Map(
+          teamIds.map((id, i) => [id, teams[i] ?? null] as const),
+        );
+        const titleById = new Map(
+          titleIds.map((id, i) => [id, titles[i] ?? null] as const),
+        );
+        return primaries.map((pa) => ({
+          id: pa.id,
+          employmentId: pa.employmentId,
+          startDate: pa.startDate,
+          endDateExclusive: pa.endDateExclusive,
+          teamId: pa.teamId,
+          teamNameFa: teamById.get(pa.teamId)?.nameFa ?? null,
+          jobTitleId: pa.jobTitleId,
+          jobTitleNameFa: titleById.get(pa.jobTitleId)?.nameFa ?? null,
+        }));
       } catch (err) {
         mapPersonError(err);
       }

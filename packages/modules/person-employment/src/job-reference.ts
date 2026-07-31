@@ -11,7 +11,7 @@ import type { PrismaClient } from "@divan/db";
 import { Prisma } from "@divan/db";
 
 import { getPersonDb } from "./db";
-import { toLatinDigits } from "./digits";
+import { normalizeDigitsForMatch, toLatinDigits } from "./digits";
 import {
   JobRefError,
   MSG_BLOCKED_JOB_REF_OPERATION_FA,
@@ -642,6 +642,24 @@ export async function getOrganizationalRoleById(
   return row ? mapBase(row) : null;
 }
 
+/** Resolve organizational role by business code (digit-normalized). Empty / inactive → null. */
+export async function getOrganizationalRoleByCode(
+  code: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<OrganizationalRoleRecord | null> {
+  const latin = toLatinDigits(code).trim();
+  const compact = normalizeDigitsForMatch(code);
+  if (!latin && !compact) return null;
+  let row = latin
+    ? await db.organizationalRole.findUnique({ where: { code: latin } })
+    : null;
+  if (!row && compact && compact !== latin) {
+    row = await db.organizationalRole.findUnique({ where: { code: compact } });
+  }
+  if (!row || !row.active) return null;
+  return mapBase(row);
+}
+
 export async function listOrganizationalRoles(
   options: { includeInactive?: boolean } = {},
   db: PrismaClient = getPersonDb(),
@@ -712,6 +730,24 @@ export async function getJobTitleById(
   return row ? mapBase(row) : null;
 }
 
+/** Resolve job title by business code (digit-normalized). Empty / inactive → null. */
+export async function getJobTitleByCode(
+  code: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<JobTitleRecord | null> {
+  const latin = toLatinDigits(code).trim();
+  const compact = normalizeDigitsForMatch(code);
+  if (!latin && !compact) return null;
+  let row = latin
+    ? await db.jobTitle.findUnique({ where: { code: latin } })
+    : null;
+  if (!row && compact && compact !== latin) {
+    row = await db.jobTitle.findUnique({ where: { code: compact } });
+  }
+  if (!row || !row.active) return null;
+  return mapBase(row);
+}
+
 export async function listJobTitles(
   options: { includeInactive?: boolean } = {},
   db: PrismaClient = getPersonDb(),
@@ -777,6 +813,24 @@ export async function getLadderById(
 ): Promise<LadderRecord | null> {
   const row = await db.ladder.findUnique({ where: { id } });
   return row ? mapBase(row) : null;
+}
+
+/** Resolve ladder by business code (digit-normalized). Empty / inactive → null. */
+export async function getLadderByCode(
+  code: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<LadderRecord | null> {
+  const latin = toLatinDigits(code).trim();
+  const compact = normalizeDigitsForMatch(code);
+  if (!latin && !compact) return null;
+  let row = latin
+    ? await db.ladder.findUnique({ where: { code: latin } })
+    : null;
+  if (!row && compact && compact !== latin) {
+    row = await db.ladder.findUnique({ where: { code: compact } });
+  }
+  if (!row || !row.active) return null;
+  return mapBase(row);
 }
 
 export async function listLadders(
@@ -1042,6 +1096,33 @@ export async function getGradeById(
 }
 
 /**
+ * Resolve grade by (ladderId, code). Grade codes are unique per ladder only.
+ * Missing ladderId / empty code / inactive → null.
+ */
+export async function getGradeByCode(
+  ladderId: string,
+  code: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<GradeRecord | null> {
+  const latin = toLatinDigits(code).trim();
+  const compact = normalizeDigitsForMatch(code);
+  const ladder = ladderId.trim();
+  if ((!latin && !compact) || !ladder) return null;
+  let row = latin
+    ? await db.grade.findUnique({
+        where: { ladderId_code: { ladderId: ladder, code: latin } },
+      })
+    : null;
+  if (!row && compact && compact !== latin) {
+    row = await db.grade.findUnique({
+      where: { ladderId_code: { ladderId: ladder, code: compact } },
+    });
+  }
+  if (!row || !row.active) return null;
+  return mapGrade(row);
+}
+
+/**
  * Grades for a ladder only (incl. half-grades). Empty if ladder missing/inactive
  * when `requireActiveLadder` (default true for picker use).
  */
@@ -1141,6 +1222,24 @@ export async function getSeniorityById(
 ): Promise<SeniorityRecord | null> {
   const row = await db.seniority.findUnique({ where: { id } });
   return row ? mapBase(row) : null;
+}
+
+/** Resolve seniority by business code (digit-normalized). Empty / inactive → null. */
+export async function getSeniorityByCode(
+  code: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<SeniorityRecord | null> {
+  const latin = toLatinDigits(code).trim();
+  const compact = normalizeDigitsForMatch(code);
+  if (!latin && !compact) return null;
+  let row = latin
+    ? await db.seniority.findUnique({ where: { code: latin } })
+    : null;
+  if (!row && compact && compact !== latin) {
+    row = await db.seniority.findUnique({ where: { code: compact } });
+  }
+  if (!row || !row.active) return null;
+  return mapBase(row);
 }
 
 export async function listSeniorities(

@@ -29,6 +29,8 @@ import { SectionTabs } from "@/components/section-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+import { EntityPickerGalleryDemos } from "./entity-picker-demos";
+
 /**
  * Dev-only living reference for layout primitives (Story 8.2).
  * Gated out of production builds.
@@ -228,13 +230,12 @@ export default function DevGalleryPage() {
         </FormLayout>
       </section>
 
+      <EntityPickerGalleryDemos />
+
       <section className="space-y-2 px-content-padding-inline" aria-labelledby="gallery-stubs">
         <h2 id="gallery-stubs" className="text-heading-sm">
           Stub slots
         </h2>
-        <p className="text-caption text-text-tertiary">
-          entity-picker — Story 8.3
-        </p>
         <p className="text-caption text-text-tertiary">skeleton — Story 8.8</p>
       </section>
     </div>

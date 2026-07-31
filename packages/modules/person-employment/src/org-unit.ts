@@ -8,7 +8,7 @@
 import type { PrismaClient } from "@divan/db";
 
 import { getPersonDb } from "./db";
-import { toLatinDigits } from "./digits";
+import { normalizeDigitsForMatch, toLatinDigits } from "./digits";
 import {
   MSG_CORRUPT_ORG_UNIT_TYPE_FA,
   MSG_DEACTIVATION_BLOCKED_DEPENDENCIES_FA,
@@ -596,6 +596,27 @@ export async function getOrgUnitById(
 ): Promise<OrgUnitRecord | null> {
   const row = await db.organizationalUnit.findUnique({ where: { id } });
   return row ? mapOrgUnit(row) : null;
+}
+
+/**
+ * Resolve org unit by business code (Latin/Persian/Arabic-Indic digits normalized).
+ * Missing / empty code → null (caller maps to uniform NOT_FOUND).
+ */
+export async function getOrgUnitByCode(
+  code: string,
+  db: PrismaClient = getPersonDb(),
+): Promise<OrgUnitRecord | null> {
+  const latin = toLatinDigits(code).trim();
+  const compact = normalizeDigitsForMatch(code);
+  if (!latin && !compact) return null;
+  let row = latin
+    ? await db.organizationalUnit.findUnique({ where: { code: latin } })
+    : null;
+  if (!row && compact && compact !== latin) {
+    row = await db.organizationalUnit.findUnique({ where: { code: compact } });
+  }
+  if (!row || !row.active) return null;
+  return mapOrgUnit(row);
 }
 
 export async function getOrgUnitAsOf(

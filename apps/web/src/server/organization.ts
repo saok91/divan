@@ -20,6 +20,7 @@ import {
   getHierarchyAsOf,
   getHistoricalOrgHeadcountState,
   getOrgUnitById,
+  getOrgUnitByCode,
   listOrgUnits,
   reparentOrgUnit,
   updateOrgUnitIdentity,
@@ -165,6 +166,25 @@ export const organizationRouter = createTRPCRouter({
       await assertActorHasOrganizationRead(ctx.session.accountId);
       try {
         const unit = await getOrgUnitById(input.id);
+        if (!unit) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "واحد سازمانی یافت نشد.",
+          });
+        }
+        return unit;
+      } catch (err) {
+        mapOrgError(err);
+      }
+    }),
+
+  getByCode: governedProcedure
+    .meta({ ...organizationReadMeta, operation: "organization.getByCode" })
+    .input(z.object({ code: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await assertActorHasOrganizationRead(ctx.session.accountId);
+      try {
+        const unit = await getOrgUnitByCode(input.code);
         if (!unit) {
           throw new TRPCError({
             code: "NOT_FOUND",

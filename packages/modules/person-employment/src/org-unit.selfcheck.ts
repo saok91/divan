@@ -26,6 +26,7 @@ import {
   deactivateOrgUnit,
   getHierarchyAsOf,
   getOrgUnitAsOf,
+  getOrgUnitByCode,
   getOrgUnitById,
   getPersonDb,
   isOrgUnitActiveAsOf,
@@ -95,6 +96,13 @@ async function main() {
   });
   assert.ok(teamActive, "seed active team");
   assert.equal(teamActive!.active, true);
+
+  // Story 8.3: getOrgUnitByCode happy path + missing → null
+  const byCode = await getOrgUnitByCode(seed.teamActive.code, db);
+  assert.ok(byCode);
+  assert.equal(byCode!.id, teamActive!.id);
+  const missingOrg = await getOrgUnitByCode("NO-SUCH-ORG-CODE-8-3", db);
+  assert.equal(missingOrg, null);
 
   // Hierarchy as-of current: historical team omitted
   const treeNow = await getHierarchyAsOf("2024-06-01", db);

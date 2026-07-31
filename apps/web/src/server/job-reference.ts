@@ -30,6 +30,11 @@ import {
   getLadderById,
   getOrganizationalRoleById,
   getSeniorityById,
+  getGradeByCode,
+  getJobTitleByCode,
+  getLadderByCode,
+  getOrganizationalRoleByCode,
+  getSeniorityByCode,
   listGradesForLadder,
   listJobTitles,
   listLadders,
@@ -321,6 +326,61 @@ export const jobReferenceRouter = createTRPCRouter({
           );
         }
         return row;
+      } catch (err) {
+        mapJobRefError(err);
+      }
+    }),
+
+  /**
+   * Resolve job-ref concept by business code (Story 8.3).
+   * Grade requires ladderId — codes are unique per ladder only.
+   */
+  getByCode: governedProcedure
+    .meta({ ...jobRefReadMeta, operation: "job_reference.getByCode" })
+    .input(
+      z.discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("organizationalRole"),
+          code: z.string().min(1),
+        }),
+        z.object({ kind: z.literal("jobTitle"), code: z.string().min(1) }),
+        z.object({ kind: z.literal("ladder"), code: z.string().min(1) }),
+        z.object({
+          kind: z.literal("grade"),
+          code: z.string().min(1),
+          ladderId: z.string().min(1),
+        }),
+        z.object({ kind: z.literal("seniority"), code: z.string().min(1) }),
+      ]),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertActorHasJobReferenceRead(ctx.session.accountId);
+      try {
+        let row = null;
+        switch (input.kind) {
+          case "organizationalRole":
+            row = await getOrganizationalRoleByCode(input.code);
+            break;
+          case "jobTitle":
+            row = await getJobTitleByCode(input.code);
+            break;
+          case "ladder":
+            row = await getLadderByCode(input.code);
+            break;
+          case "grade":
+            row = await getGradeByCode(input.ladderId, input.code);
+            break;
+          case "seniority":
+            row = await getSeniorityByCode(input.code);
+            break;
+        }
+        if (!row) {
+          throw new JobRefError(
+            "JOB_REF_NOT_FOUND",
+            "مرجع شغلی یافت نشد.",
+          );
+        }
+        return { kind: input.kind, ...row };
       } catch (err) {
         mapJobRefError(err);
       }

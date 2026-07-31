@@ -23,7 +23,12 @@ import {
   deactivateLadder,
   deactivateOrganizationalRole,
   deactivateSeniority,
+  getGradeByCode,
+  getJobTitleByCode,
+  getLadderByCode,
+  getOrganizationalRoleByCode,
   getPersonDb,
+  getSeniorityByCode,
   listGradesForLadder,
   registerJobRefDependencyHook,
   seedJobReferenceFixtures,
@@ -86,6 +91,33 @@ async function main() {
     where: { code: seed.seniority.code },
   });
   assert.ok(seniority, "seed seniority");
+
+  // Story 8.3: get*ByCode happy path + missing → null
+  const roleByCode = await getOrganizationalRoleByCode(seed.role.code, db);
+  assert.ok(roleByCode);
+  assert.equal(roleByCode!.id, role!.id);
+  const ladderByCode = await getLadderByCode(seed.ladder.code, db);
+  assert.ok(ladderByCode);
+  assert.equal(ladderByCode!.id, ladder!.id);
+  const gradeByCode = await getGradeByCode(
+    ladder!.id,
+    seed.gradeHalf.code,
+    db,
+  );
+  assert.ok(gradeByCode);
+  assert.equal(gradeByCode!.id, gradeHalf!.id);
+  const senByCode = await getSeniorityByCode(seed.seniority.code, db);
+  assert.ok(senByCode);
+  assert.equal(senByCode!.id, seniority!.id);
+  const jobTitleByCode = await getJobTitleByCode(seed.jobTitle.code, db);
+  assert.ok(jobTitleByCode);
+  assert.equal(jobTitleByCode!.id, jobTitle!.id);
+  assert.equal(await getJobTitleByCode("NO-SUCH-TITLE-8-3", db), null);
+  assert.equal(await getLadderByCode("NO-SUCH-LADDER-8-3", db), null);
+  assert.equal(
+    await getGradeByCode(ladder!.id, "NO-SUCH-GRADE-8-3", db),
+    null,
+  );
 
   const senHist = await db.seniority.findUnique({
     where: { code: seed.seniorityHistorical.code },
