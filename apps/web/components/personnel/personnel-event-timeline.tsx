@@ -153,7 +153,7 @@ export function PersonnelEventTimeline({ personId }: PersonnelEventTimelineProps
       {canLoadMore ? (
         <Button
           type="button"
-          variant="outline"
+          variant="tertiary"
           size="sm"
           disabled={timelineQuery.isFetching}
           onClick={() =>

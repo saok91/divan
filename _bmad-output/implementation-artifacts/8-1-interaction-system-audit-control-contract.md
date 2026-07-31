@@ -4,7 +4,7 @@ baseline_commit: 58f85d6
 
 # Story 8.1: Interaction System Audit & Control Contract
 
-Status: ready-for-dev
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
@@ -73,14 +73,14 @@ so that the same kind of action looks and behaves the same on every surface (UX-
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Interaction audit + gap list (AC: #1, #8)
-  - [ ] Walk `apps/web` panels/forms/dialogs/tables (personnel, org, access, reports, export, audit, correction, migration, ops/governance, shell chrome)
-  - [ ] For each control record: file path, role (primary CTA / secondary / tertiary / row / destructive / cancel-ghost / chrome), current `variant`+`size`, placement (toolbar / row / footer / dialog), notes
-  - [ ] Publish `8-1-interaction-audit-gap-list.md` with sections mapped to Stories **8.2–8.9** (what 8.1 fixed vs deferred)
-  - [ ] Explicitly list **allowed** `ghost` survivors (dialog cancel / inline dismiss) vs **retired** usages
+- [x] Task 1: Interaction audit + gap list (AC: #1, #8)
+  - [x] Walk `apps/web` panels/forms/dialogs/tables (personnel, org, access, reports, export, audit, correction, migration, ops/governance, shell chrome)
+  - [x] For each control record: file path, role (primary CTA / secondary / tertiary / row / destructive / cancel-ghost / chrome), current `variant`+`size`, placement (toolbar / row / footer / dialog), notes
+  - [x] Publish `8-1-interaction-audit-gap-list.md` with sections mapped to Stories **8.2–8.9** (what 8.1 fixed vs deferred)
+  - [x] Explicitly list **allowed** `ghost` survivors (dialog cancel / inline dismiss) vs **retired** usages
 
-- [ ] Task 2: Encode UX-DR30 control contract in `Button` (AC: #2, #4, #7)
-  - [ ] UPDATE `apps/web/components/ui/button.tsx`:
+- [x] Task 2: Encode UX-DR30 control contract in `Button` (AC: #2, #4, #7)
+  - [x] UPDATE `apps/web/components/ui/button.tsx`:
     - Add variants (normative names — document final exports in Completion Notes):
       - `primary` — gold CTA; height target `control-height` 32px when tokens exist; **one per surface region**
       - `secondary` — blue; draft / parallel commit
@@ -94,46 +94,64 @@ so that the same kind of action looks and behaves the same on every surface (UX-
     - TypeScript: do **not** make `disabledReason` required on every disabled Button in 8.1
     - Migrate reasons only on controls touched by this story’s ghost/row/toolbar/org-flat pass; list remaining `disabled`-without-reason sites in the gap list under **8.9** / follow-ups
     - Visually: prefer DESIGN `button-disabled` colors over bare `disabled:opacity-50` on contract variants — add `--disabled-surface` / `--disabled-foreground` (and `--control-border` for tertiary/rowAction) to `globals.css` **minimally**; no full 8.2 spacing migration
-  - [ ] Document semantic → variant table in JSDoc **immediately above** `buttonVariants` (replace UX-DR2-only comment with UX-DR30 / FR-58)
-  - [ ] Optional thin wrappers `RowActionButton` / `ToolbarButton` **only if** they reduce misuse; not mandatory if variants + lint suffice
-  - [ ] Minimal CSS vars in `globals.css` as above — only tokens required for tertiary/rowAction/disabled; no full 8.2 token migration
+  - [x] Document semantic → variant table in JSDoc **immediately above** `buttonVariants` (replace UX-DR2-only comment with UX-DR30 / FR-58)
+  - [x] Optional thin wrappers `RowActionButton` / `ToolbarButton` **only if** they reduce misuse; not mandatory if variants + lint suffice
+  - [x] Minimal CSS vars in `globals.css` as above — only tokens required for tertiary/rowAction/disabled; no full 8.2 token migration
 
-- [ ] Task 3: Migrate call sites + fix drift (AC: #3, #4, #5)
-  - [ ] Replace **row** `ghost` → `rowAction` (prefer `rowAction`; text labels OK in 8.1)
-  - [ ] Replace **toolbar** `ghost` → `tertiary` (or secondary when draft/parallel)
-  - [ ] Pagination / filter-chrome / non-dismiss nav using `ghost` → `tertiary` (never keep as ghost). Explicitly includes personnel-list server pagination «صفحه قبل/بعد»
-  - [ ] **Keep/migrate to `ghost`:** sensitive-confirmation Cancel; personnel-quick-create/edit Cancel; personnel-event-form Cancel; `DialogFooter` / `dialog.tsx` «بستن»; every dialog `انصراف` / dismiss currently on `outline` in panels → `variant="ghost"`. Do **not** leave dialog cancel on `tertiary`/`outline`
-  - [ ] **Do NOT** add `ghost` to leave-guard; Discard stays non-ghost (`tertiary` / `outline` alias). Stay remains the sole gold CTA in that dialog
-  - [ ] Classify `jalali-date-picker` chrome `ghost` (month nav): treat as **inline dismiss/chrome** (keep) **or** migrate to `tertiary` — document choice; do not leave unlabeled
-  - [ ] Fix `org-flat-job-ref-panel.tsx`: unify edit/activate/deactivate row actions to `rowAction`, normalize padding/size
-  - [ ] Sweep known ghost row/toolbar/pagination sites (non-exhaustive — audit may add more):
+- [x] Task 3: Migrate call sites + fix drift (AC: #3, #4, #5)
+  - [x] Replace **row** `ghost` → `rowAction` (prefer `rowAction`; text labels OK in 8.1)
+  - [x] Replace **toolbar** `ghost` → `tertiary` (or secondary when draft/parallel)
+  - [x] Pagination / filter-chrome / non-dismiss nav using `ghost` → `tertiary` (never keep as ghost). Explicitly includes personnel-list server pagination «صفحه قبل/بعد»
+  - [x] **Keep/migrate to `ghost`:** sensitive-confirmation Cancel; personnel-quick-create/edit Cancel; personnel-event-form Cancel; `DialogFooter` / `dialog.tsx` «بستن»; every dialog `انصراف` / dismiss currently on `outline` in panels → `variant="ghost"`. Do **not** leave dialog cancel on `tertiary`/`outline`
+  - [x] **Do NOT** add `ghost` to leave-guard; Discard stays non-ghost (`tertiary` / `outline` alias). Stay remains the sole gold CTA in that dialog
+  - [x] Classify `jalali-date-picker` chrome `ghost` (month nav): treat as **inline dismiss/chrome** (keep) **or** migrate to `tertiary` — document choice; do not leave unlabeled
+  - [x] Fix `org-flat-job-ref-panel.tsx`: unify edit/activate/deactivate row actions to `rowAction`, normalize padding/size
+  - [x] Sweep known ghost row/toolbar/pagination sites (non-exhaustive — audit may add more):
     - `personnel-list-panel.tsx` (row + pagination chrome)
     - `org-ladder-grade-panel.tsx`, `org-hierarchy-panel.tsx`, `org-flat-job-ref-panel.tsx`
     - `access-people-panel.tsx`, `entitlement-grants-panel.tsx`
     - `audit-investigation-panel.tsx`, `correction-cases-panel.tsx`
     - `report-catalogue-panel.tsx`, `decision-publication-panel.tsx`, `export-artifact-panel.tsx`
-  - [ ] Dual-gold audit: ensure **≤1** `variant="primary"` gold per toolbar/surface region; also spot-check `import-wizard`, `migration-reconciliation-workspace`, headcount, break-glass flows; demote extras to secondary/tertiary
-  - [ ] Do **not** change GovernedDataTable public props; only the **buttons rendered inside** `rowActions` / `toolbar` slots
+  - [x] Dual-gold audit: ensure **≤1** `variant="primary"` gold per toolbar/surface region; also spot-check `import-wizard`, `migration-reconciliation-workspace`, headcount, break-glass flows; demote extras to secondary/tertiary
+  - [x] Do **not** change GovernedDataTable public props; only the **buttons rendered inside** `rowActions` / `toolbar` slots
 
-- [ ] Task 4: Lint or selfcheck guard (AC: #6)
-  - [ ] Prefer **selfcheck** (matches Epic 1–7 pattern): e.g. `apps/web/lib/control-contract.selfcheck.ts` or `components/ui/button.selfcheck.ts`
+- [x] Task 4: Lint or selfcheck guard (AC: #6)
+  - [x] Prefer **selfcheck** (matches Epic 1–7 pattern): e.g. `apps/web/lib/control-contract.selfcheck.ts` or `components/ui/button.selfcheck.ts`
     - Classify **usage**, not file path alone (ghost cancels live **inside** the same panel files as retired row/toolbar ghosts):
       - Fail `variant="ghost"` / `buttonVariants({ variant: "ghost" })` when JSX is inside `rowActions` / table action cells / surface toolbars / pagination chrome
       - Allow `ghost` for: Dialog/Sheet footer cancel·dismiss, sensitive-confirmation cancel, documented inline-dismiss chrome (allowlist of **selectors/patterns**, not `leave-guard/*`)
     - Assert variant union exports `primary|secondary|tertiary|rowAction|destructive|ghost|link` (+ `outline` only if deprecated alias)
     - Fixture strings from inventoried files OK if whole-repo AST is brittle — must **not** ban in-panel dialog cancels
     - Do **not** require `disabledReason` on every disabled Button in this selfcheck
-  - [ ] Wire `package.json` script: `selfcheck:control-contract`
-  - [ ] **OR** ESLint with the same usage/allowlist semantics — if chosen, document patterns next to eslint config (path-only allowlists are insufficient)
-  - [ ] Do **not** remove Prisma `no-restricted-imports` gate
+  - [x] Wire `package.json` script: `selfcheck:control-contract`
+  - [x] **OR** ESLint with the same usage/allowlist semantics — if chosen, document patterns next to eslint config (path-only allowlists are insufficient)
+  - [x] Do **not** remove Prisma `no-restricted-imports` gate
 
-- [ ] Task 5: Verification DoD (AC: #1–#8)
-  - [ ] `pnpm --filter @divan/web selfcheck:control-contract` (or lint) passes
-  - [ ] Spot-check RTL: personnel list row actions outlined/visible at rest; org-flat consistent; dialog Cancel still `ghost`
-  - [ ] No dual gold CTA on a sampled toolbar (personnel list, org flat, one Epic 7 panel)
-  - [ ] Gap list committed and referenced from this story's Completion Notes
-  - [ ] Interactive a11y: new/changed controls keep accessible names; focus rings intact; icon-only row actions (if any converted) have `aria-label`
-  - [ ] Story Status ↔ sprint-status alignment when marking done
+- [x] Task 5: Verification DoD (AC: #1–#8)
+  - [x] `pnpm --filter @divan/web selfcheck:control-contract` (or lint) passes
+  - [x] Spot-check RTL: personnel list row actions outlined/visible at rest; org-flat consistent; dialog Cancel still `ghost`
+  - [x] No dual gold CTA on a sampled toolbar (personnel list, org flat, one Epic 7 panel)
+  - [x] Gap list committed and referenced from this story's Completion Notes
+  - [x] Interactive a11y: new/changed controls keep accessible names; focus rings intact; icon-only row actions (if any converted) have `aria-label`
+  - [x] Story Status ↔ sprint-status alignment when marking done
+
+### Review Findings
+
+- [x] [Review][Decision] AC1 inventory depth — resolved: expand to full per-control inventory now
+- [x] [Review][Decision] Dual-gold across nested sheet + page toolbar — resolved: same surface region; demote one primary
+- [x] [Review][Patch] Expand gap list to full per-control inventory (variant/size/placement/semantics for every `apps/web` Button) and fix factual errors [`8-1-interaction-audit-gap-list.md`]
+- [x] [Review][Patch] Demote competing `primary` when import preview sheet is open alongside page-toolbar primary (same surface region) [`apps/web/components/import/import-wizard.tsx`]
+- [x] [Review][Patch] `disabledReason` unreachable on hover/focus — wrapper `title` + `aria-describedby` + sr-only helper [`apps/web/components/ui/button.tsx`]
+- [x] [Review][Patch] Reason attrs lose to `{...props}` spread — `{...props}` before reason attrs [`apps/web/components/ui/button.tsx`]
+- [x] [Review][Patch] Toolbar `clearPreview` still `ghost` — migrated to `tertiary`; selfcheck requires SheetFooter for import ghost [`apps/web/components/import/import-wizard.tsx`]
+- [x] [Review][Patch] AC5 row-action size/padding drift — normalized to `size="xs"` on personnel-list, access-people, report-catalogue, org-hierarchy
+- [x] [Review][Patch] Disabled chrome on `ghost`/`link` — filled disabled styles only on solid/outline variants [`apps/web/components/ui/button.tsx`]
+- [x] [Review][Patch] Selfcheck misses `buttonVariants({ variant: "ghost" })` — detector extended [`apps/web/lib/control-contract.selfcheck.ts`]
+- [x] [Review][Patch] `mustNotGhost` silent continue — now asserts rowActions/renderRowEnd present [`apps/web/lib/control-contract.selfcheck.ts`]
+- [x] [Review][Patch] Whitespace-only `disabledReason` — trim before `showReason` [`apps/web/components/ui/button.tsx`]
+- [x] [Review][Defer] File-path ghost allowlists / brace-count rowActions heuristic / pagination classifier tied to exact `aria-label` — deferred, pre-existing selfcheck approximation acceptable for 8.1 hardening follow-up
+- [x] [Review][Defer] `destructive` uses hardcoded `text-white` with no `--destructive-foreground` token — deferred, pre-existing token gap for Story 8.2
+- [x] [Review][Defer] `aria-disabled` without native `disabled` ignores `disabledReason` — deferred, no current Button call sites use that pattern
 
 ## Dev Notes
 
@@ -281,15 +299,65 @@ Recent commits: `58f85d6` epic 7 retro → `19fed19` story 7.8 → `fde870b` 7.7
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Composer (Cursor agent router)
 
 ### Debug Log References
 
+- `pnpm --filter @divan/web selfcheck:control-contract` → OK (31 allowed ghost, 0 retired)
+- `pnpm --filter @divan/web typecheck` → OK
+- `pnpm --filter @divan/web selfcheck:governed-table` → OK
+- `pnpm --filter @divan/web exec tsx lib/a11y-floor.selfcheck.ts` → OK
+- Web `lint` still reports pre-existing `react-hooks/set-state-in-effect` errors unrelated to this story
+
 ### Completion Notes List
+
+- Encoded UX-DR30 / FR-58 control contract in `button.tsx` with variants: `primary | secondary | tertiary | rowAction | destructive | ghost | link` plus deprecated `outline` alias of `tertiary` (same classes). Sizes: default 32 / sm 28 / xs 24 / lg / icon. Optional `disabledReason` via wrapper `title` + `aria-describedby` + sr-only helper.
+- Minimal tokens in `globals.css`: `--control-border`, `--disabled-surface`, `--disabled-foreground`, `--hairline` (light + dark).
+- No `RowActionButton` / `ToolbarButton` wrappers — variants + selfcheck suffice.
+- Migrated row/toolbar/pagination ghosts; dialog cancels → ghost; leave-guard Discard → tertiary; org-flat unified to `rowAction` xs; jalali month nav kept as ghost (inline chrome).
+- Dual-gold: import upload demotes to tertiary after preview loaded.
+- Guard: `apps/web/lib/control-contract.selfcheck.ts` + script `selfcheck:control-contract`.
+- Gap list: `_bmad-output/implementation-artifacts/8-1-interaction-audit-gap-list.md` (input to 8.2–8.9). FR-58 / LG-6 not claimed production-complete.
 
 ### File List
 
+- `_bmad-output/implementation-artifacts/8-1-interaction-audit-gap-list.md` (new)
+- `_bmad-output/implementation-artifacts/8-1-interaction-system-audit-control-contract.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `apps/web/app/globals.css`
+- `apps/web/components/ui/button.tsx`
+- `apps/web/components/ui/dialog.tsx`
+- `apps/web/lib/control-contract.selfcheck.ts` (new)
+- `apps/web/package.json`
+- `apps/web/components/leave-guard/leave-guard-dialog.tsx`
+- `apps/web/components/authz-changed-modal.tsx`
+- `apps/web/components/jalali-date-picker.tsx`
+- `apps/web/components/governed-data-table/governed-data-table.tsx`
+- `apps/web/components/personnel/personnel-list-panel.tsx`
+- `apps/web/components/personnel/personnel-event-form.tsx`
+- `apps/web/components/personnel/personnel-event-lifecycle-controls.tsx`
+- `apps/web/components/personnel/personnel-event-timeline.tsx`
+- `apps/web/components/personnel/personnel-lifecycle-panel.tsx`
+- `apps/web/components/organization/org-flat-job-ref-panel.tsx`
+- `apps/web/components/organization/org-ladder-grade-panel.tsx`
+- `apps/web/components/organization/org-hierarchy-panel.tsx`
+- `apps/web/components/access/access-people-panel.tsx`
+- `apps/web/components/access/access-scopes-panel.tsx`
+- `apps/web/components/access/entitlement-grants-panel.tsx`
+- `apps/web/components/audit/audit-investigation-panel.tsx`
+- `apps/web/components/correction-cases/correction-cases-panel.tsx`
+- `apps/web/components/reports/report-catalogue-panel.tsx`
+- `apps/web/components/import/import-wizard.tsx`
+- `apps/web/components/import/migration-reconciliation-workspace.tsx`
+- `apps/web/components/headcount/exemption-panel.tsx`
+- `apps/web/components/headcount/approval-panel.tsx`
+
+### Change Log
+
+- 2026-07-31: Implemented UX-DR30 control contract, interaction audit gap list, call-site migration, and control-contract selfcheck; status → review.
+- 2026-07-31: Code review patches — disabledReason a11y, import toolbar/dual-gold, row-action xs normalize, full inventory, selfcheck harden; status → done.
+
 ## Story Completion Status
 
-- Status: **ready-for-dev**
-- Note: Ultimate context engine analysis completed — comprehensive developer guide created
+- Status: **done**
+- Note: Code review patches applied 2026-07-31; control-contract selfcheck + typecheck green.

@@ -86,7 +86,7 @@ export function LeaveGuardDialog() {
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="tertiary"
             disabled={busy}
             onClick={() => {
               void resolvePending("discard");

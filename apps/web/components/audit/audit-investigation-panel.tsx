@@ -560,8 +560,8 @@ export function AuditInvestigationPanel() {
           rowActions={(row) => (
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="rowAction"
+              size="xs"
               onClick={() => {
                 setDetail(row);
                 setArtifactError(null);
@@ -725,7 +725,7 @@ export function AuditInvestigationPanel() {
           <DialogFooter>
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               onClick={() => setDetail(null)}
             >
               بستن

@@ -108,7 +108,7 @@ export function PersonnelEventLifecycleControls({
         {showCancel ? (
           <Button
             type="button"
-            variant="outline"
+            variant="tertiary"
             size="sm"
             disabled={isMutationBlockedByAuthzChange}
             onClick={() => openLifecycle("cancel")}
@@ -119,7 +119,7 @@ export function PersonnelEventLifecycleControls({
         {showReverse ? (
           <Button
             type="button"
-            variant="outline"
+            variant="tertiary"
             size="sm"
             disabled={isMutationBlockedByAuthzChange}
             onClick={() => openLifecycle("reverse")}
@@ -130,7 +130,7 @@ export function PersonnelEventLifecycleControls({
         {showCorrect ? (
           <Button
             type="button"
-            variant="outline"
+            variant="tertiary"
             size="sm"
             disabled={isMutationBlockedByAuthzChange}
             onClick={() => openLifecycle("correct")}

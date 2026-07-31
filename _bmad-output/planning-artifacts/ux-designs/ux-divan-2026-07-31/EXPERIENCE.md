@@ -8,7 +8,7 @@ inherits: "{planning_artifacts}/ux-designs/ux-divan-2026-07-19/EXPERIENCE.md"
 
 # Divan HRIS — Experience Spine (Usability Revision)
 
-> Visual counterpart: `DESIGN.md`. Rendered reference: `mockups/direction-a-dense-console.html` and `mockups/chart-palettes.html`.
+> Visual counterpart: `DESIGN.md`. Rendered reference: `mockups/direction-a-dense-console.html`, `mockups/screens-settings.html`, `mockups/screens-reports-capacity.html`, `mockups/screens-bulk-entry-profile.html`, and `mockups/chart-palettes.html`.
 
 > Revision of `ux-divan-2026-07-19`, authorized by `sprint-change-proposal-2026-07-31.md` and PRD FR-57–FR-60. The governed-record model, permission model, and Persian/RTL foundation are unchanged. What changes: **the operator addresses records by business code, every navigable surface does its job, every rendered action is real, and every configurable parameter has one governed home.** Spines win on conflict with any mock.
 

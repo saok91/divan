@@ -559,8 +559,8 @@ export function OrgLadderGradePanel() {
               {node.active ? (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="rowAction"
+                  size="xs"
                   disabled={busyId === node.id}
                   onClick={() => void openDeactivate(node)}
                 >
@@ -569,8 +569,8 @@ export function OrgLadderGradePanel() {
               ) : (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="rowAction"
+                  size="xs"
                   disabled={busyId === node.id}
                   onClick={() => {
                     if (node.kind === "ladder") {
@@ -585,8 +585,8 @@ export function OrgLadderGradePanel() {
               )}
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
+                variant="rowAction"
+                size="xs"
                 onClick={() => openEdit(node)}
               >
                 ویرایش
@@ -651,7 +651,7 @@ export function OrgLadderGradePanel() {
             <DialogFooter className="gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   resetForm();
                   setModal(null);
@@ -742,7 +742,7 @@ export function OrgLadderGradePanel() {
             <DialogFooter className="gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   resetForm();
                   setModal(null);
@@ -819,7 +819,7 @@ export function OrgLadderGradePanel() {
             <DialogFooter className="gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   resetForm();
                   setModal(null);
@@ -886,7 +886,7 @@ export function OrgLadderGradePanel() {
           <DialogFooter className="gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => {
                 resetForm();
                 setModal(null);

@@ -290,7 +290,7 @@ export function ReportCataloguePanel() {
                 {runQuery.data.reconcileHref ? (
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="tertiary"
                     size="sm"
                     onClick={() => openHref(runQuery.data!.reconcileHref!)}
                   >
@@ -325,9 +325,8 @@ export function ReportCataloguePanel() {
                     row.href ? (
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2"
+                        variant="rowAction"
+                        size="xs"
                         onClick={() => openHref(row.href!)}
                       >
                         مشاهده

@@ -438,8 +438,8 @@ export function OrgHierarchyPanel() {
               {node.active ? (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="rowAction"
+                  size="xs"
                   disabled={busyId === node.id}
                   onClick={() => openDeactivate(node)}
                 >
@@ -448,8 +448,8 @@ export function OrgHierarchyPanel() {
               ) : (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="rowAction"
+                  size="xs"
                   disabled={busyId === node.id}
                   onClick={() => activateMutation.mutate({ id: node.id })}
                 >
@@ -458,8 +458,8 @@ export function OrgHierarchyPanel() {
               )}
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
+                variant="rowAction"
+                size="xs"
                 onClick={() => openEdit(node)}
               >
                 ویرایش
@@ -486,8 +486,8 @@ export function OrgHierarchyPanel() {
                 </span>
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="rowAction"
+                  size="xs"
                   disabled={busyId === u.id}
                   onClick={() => activateMutation.mutate({ id: u.id })}
                 >
@@ -609,7 +609,7 @@ export function OrgHierarchyPanel() {
             <DialogFooter className="gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   resetForm();
                   setModal(null);
@@ -702,7 +702,7 @@ export function OrgHierarchyPanel() {
             <DialogFooter className="gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   resetForm();
                   setModal(null);
@@ -773,7 +773,7 @@ export function OrgHierarchyPanel() {
           <DialogFooter className="gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => {
                 resetForm();
                 setModal(null);

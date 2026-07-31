@@ -341,18 +341,16 @@ export function PersonnelListPanel() {
             <div className="flex flex-wrap items-center gap-1">
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2"
+                variant="rowAction"
+                size="xs"
                 onClick={() => openEdit(row)}
               >
                 اطلاعات کامل/ویرایش
               </Button>
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2"
+                variant="rowAction"
+                size="xs"
                 onClick={() => navigateRegister(row.id)}
               >
                 ثبت رویداد
@@ -369,9 +367,16 @@ export function PersonnelListPanel() {
         >
           <Button
             type="button"
-            variant="ghost"
+            variant="tertiary"
             size="sm"
             disabled={page <= 1 || searchQuery.isFetching}
+            disabledReason={
+              page <= 1
+                ? "شما در اولین صفحه هستید."
+                : searchQuery.isFetching
+                  ? "در حال بارگذاری صفحه…"
+                  : undefined
+            }
             onClick={() => goToServerPage(page - 1)}
           >
             صفحه قبل
@@ -383,9 +388,16 @@ export function PersonnelListPanel() {
           </p>
           <Button
             type="button"
-            variant="ghost"
+            variant="tertiary"
             size="sm"
             disabled={page >= totalPages || searchQuery.isFetching}
+            disabledReason={
+              page >= totalPages
+                ? "شما در آخرین صفحه هستید."
+                : searchQuery.isFetching
+                  ? "در حال بارگذاری صفحه…"
+                  : undefined
+            }
             onClick={() => goToServerPage(page + 1)}
           >
             صفحه بعد

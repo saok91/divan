@@ -332,7 +332,7 @@ export function EntitlementGrantsPanel({
                   {canWaive ? (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="tertiary"
                       disabled={waiveGrant.isPending}
                       onClick={() => {
                         setActionError(null);
@@ -349,7 +349,7 @@ export function EntitlementGrantsPanel({
                   {canRevoke ? (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="tertiary"
                       disabled={revokeGrant.isPending}
                       onClick={() => {
                         setActionError(null);
@@ -366,7 +366,7 @@ export function EntitlementGrantsPanel({
                   {canRecert ? (
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="rowAction"
                       disabled={recertifyGrant.isPending}
                       onClick={() => {
                         setActionError(null);

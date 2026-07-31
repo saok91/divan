@@ -32,6 +32,9 @@ colors:
   disabled-foreground: '#B8BCC8'
   skeleton: '#E9EAF0'
   keycap-background: '#EEF1F6'
+  destructive: '#C92A2A'
+  destructive-background: '#FFF5F5'
+  dirty-border: '#E09E00'
   surface-page-dark: '#030825'
   surface-dark: '#0A1138'
   hairline-dark: '#232C5E'
@@ -192,11 +195,17 @@ components:
     shadow: '0 6px 24px rgba(5,16,97,0.16)'
   settings-row:
     height: 'auto'
+    layout: 'two-column 1fr / 348px with hairline separator; per-parameter apply, no global save bar'
     labelTypography: '{body-medium}'
     descriptionTypography: '{caption}'
     metaTypography: '{caption}'
     border: '1px solid {colors.hairline}'
     readonly-background: '{colors.surface-subtle}'
+    dirty-border: '1px solid {colors.dirty-border}'
+    error-foreground: '{colors.destructive}'
+    error-background: '{colors.destructive-background}'
+    reset-control: 'icon-only row-action with tooltip «بازگشت به پیش‌فرض»'
+    readonly-pattern: 'plain value text with lock glyph and stated change path — never a disabled input'
   keycap:
     background: '{colors.keycap-background}'
     border: '1px solid {colors.hairline}'
@@ -218,7 +227,7 @@ components:
 
 > Revision of `ux-divan-2026-07-19`. The brand layer — navy chrome, gold CTA, blue structure, Yekan Bakh, light/dark canvases — is unchanged. This revision adds what the prior spine left to each implementer: a neutral scale, a page-layout system, a control-affordance contract, dense table chrome, the entity picker, and the feedback/skeleton language. **Spines win on conflict** with any mock. Authorized by `sprint-change-proposal-2026-07-31.md` (FR-57–FR-60).
 
-→ Visual reference: `mockups/direction-a-dense-console.html` (the approved direction, rendered on فهرست پرسنل and ثبت رویداد) and `mockups/chart-palettes.html` (data color). `mockups/explored-direction-b-*.html` and `-c-*.html` are the rejected alternatives, kept as the record of why the dense register was chosen.
+→ Visual reference: `mockups/direction-a-dense-console.html` (personnel list, event form, states), `mockups/screens-settings.html`, `mockups/screens-reports-capacity.html`, `mockups/screens-bulk-entry-profile.html`, and `mockups/chart-palettes.html` (data color). `mockups/explored-direction-b-*.html` and `-c-*.html` are the rejected alternatives, kept as the record of why the dense register was chosen.
 
 ## Brand & Style
 
@@ -242,6 +251,8 @@ Brand pairs are inherited unchanged. This revision adds the neutral scale the pr
 | Row hover | `{colors.row-hover}` | `{colors.row-hover-dark}` |
 | Selection tint (picker option, token, active filter chip) | `{colors.selection-tint}` + `{colors.selection-tint-border}` | `{colors.row-hover-dark}` + `{colors.hairline-dark}` |
 | Disabled | `{colors.disabled-surface}` + `{colors.disabled-foreground}` | `{colors.surface-dark}` + `{colors.text-secondary-dark}` |
+| Destructive / validation error | `{colors.destructive}` on `{colors.destructive-background}` | `{colors.destructive}` on `{colors.surface-dark}` |
+| Dirty / unsaved confirm border | `{colors.dirty-border}` | `{colors.accent-dark}` |
 
 Status badge pairs, `stale-banner`, and `break-glass-banner` are inherited unchanged and remain reserved for status meaning. **A status color never encodes a data series.**
 
@@ -313,7 +324,7 @@ New and revised:
 | **skeleton** | `{colors.skeleton}` blocks shaped like the content they replace — table rows keep row height and column rhythm; cards keep their box. Opacity pulse only; static under `prefers-reduced-motion`. |
 | **tooltip** | Navy `{colors.chrome}` on `{colors.chrome-foreground}`, `{caption}`, `{rounded.sm}`, 6px offset. Appears on hover **and** on keyboard focus. |
 | **record-drawer** | Inline-end panel `{spacing.drawer-width}` with its own header (record identity + close), hairline-separated sections, and a sticky footer for its actions. One drawer at a time; never over a dialog. |
-| **settings-row** | Label `{body-medium}` + description `{caption}` on one side; current value control on the other; a meta line `{caption}` carrying source, default, and last change (actor + Jalali datetime). Read-only rows use `{settings-row.readonly-background}` with a lock glyph and the stated change path. |
+| **settings-row** | Two-column hairline row (`1fr / 348px`): label `{body-medium}` + operational description `{caption}` + meta line (source · default · last change) on one side; value control and icon-only «بازگشت به پیش‌فرض» on the other. Dirty rows grow a full-width confirm bar with blast-radius note and per-parameter «اعمال تغییر» — there is no global save bar. Invalid values use `{colors.destructive}` on `{colors.destructive-background}` and disable apply. Read-only rows use `{settings-row.readonly-background}` with a lock glyph and the real change path stated in plain Persian; they are never a disabled input that implies a missing permission. |
 | **keycap** | Small key chip for keyboard hints in nav, picker footer, and toolbar. |
 | **chart** | Categorical series follow `{chart.categorical}` in order, swapped for `{chart.categorical-dark}` on the dark canvas; single-measure ramps and heat scales use the single-hue `{chart.sequential}`. Gridlines `{chart.gridline}`, axis labels `{caption}`, values `{tabular}`, legend inline above the plot. Gold is forbidden as a data color; status colors encode status only. |
 

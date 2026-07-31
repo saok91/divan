@@ -85,7 +85,7 @@ export function AccessScopesPanel() {
                 </span>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="tertiary"
                   size="sm"
                   disabled={updateScope.isPending}
                   onClick={() => {

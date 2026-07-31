@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دیوان — گزارش‌ها و ظرفیت (کنسول متراکم)</title>
+<style>
+/* ============================================================
+   DIRECTION A — «کنسول متراکم» (dense console)
+   رنگ‌های استفاده‌شده / HEX INVENTORY
+   ------------------------------------------------------------
+   BRAND (locked, shared across all directions)
+   #051061  navy — چرم ثابت: هدر و نوار کناری (light)
+   #030825  navy dark — چرم در تم تاریک
+   #FFFFFF  white — فورگراند چرم، سطح جدول
+   #FDB913  gold — دکمهٔ اصلی (CTA)
+   #1A1208  gold-foreground — متن روی طلایی
+   #FBC470  gold dark-theme — طلایی تم تاریک
+   #006FFF  blue — ساختار/ثانویه، حلقهٔ فوکوس
+   #808184  muted brand — متن خاموش برند
+
+   STATUS BADGE PAIRS (locked)
+   #E7F5FF / #1864AB   زمان‌بندی‌شده (scheduled)
+   #D3F9D8 / #2B8A3E   اثرگذار (effective)
+   #F1F3F5 / #495057   لغوشده (cancelled)
+   #FFF9DB / #E67700   پیش‌نویس (draft)
+   #FFF3BF / #862E00   بازنویسی (override)
+
+   STALE BANNER (locked)
+   #FFF3BF bg / #862E00 fg / #FDB913 border
+
+   DIRECTION-A NEUTRALS (this direction's own choice: hairlines, no boxes)
+   #F4F5F8  page backdrop پشت قاب‌های ماکت
+   #FFFFFF  surface — سطح اصلی محتوا
+   #FAFBFC  subtle surface — نوار ابزار و سرستون
+   #E8EAEF  hairline — خط جداکنندهٔ مویی بین ردیف‌ها
+   #DCDFE7  hairline strong — مرز نوار ابزار و سرستون
+   #D2D5DF  control border — مرز دکمه‌های اقدام ردیف
+   #11142A  text primary
+   #4A4F63  text secondary
+   #8A8F9E  text tertiary / placeholder
+   #F2F4F8  row hover
+   #EEF1F6  kbd chip bg
+   #E9EAF0  skeleton block
+   #EAF3FF  blue tint — پس‌زمینهٔ تراشهٔ فیلتر فعال
+   #C7DEFF  blue tint border
+   #F9FAFB  disabled surface
+   #B8BCC8  disabled text
+
+   DARK PARITY SNIPPET
+   #030825  dark chrome / صفحه
+   #0A1138  dark surface
+   #131C4A  dark row hover
+   #232C5E  dark border
+   #E6E9F5  dark text primary
+   #9AA1C0  dark text secondary
+   ============================================================ */
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:#F4F5F8;color:#11142A;
+  font-family:"Yekan Bakh Fa-En","Segoe UI",Tahoma,sans-serif;
+  font-size:13px;line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+.ic{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.ic-sm{width:13px;height:13px}
+
+/* ---------- document (rationale) ---------- */
+.doc{max-width:1400px;margin:0 auto;padding:28px 24px 8px}
+.doc h1{margin:0 0 6px;font-size:20px;font-weight:800;letter-spacing:-.01em}
+.doc .kicker{font-size:11px;font-weight:700;color:#006FFF;letter-spacing:.06em;margin-bottom:8px}
+.doc p{margin:0 0 14px;max-width:78ch;color:#4A4F63;font-size:13.5px;line-height:1.85}
+.spec{display:flex;flex-wrap:wrap;gap:0;border:1px solid #DCDFE7;background:#FFFFFF;border-radius:6px;overflow:hidden}
+.spec div{padding:9px 14px;border-inline-start:1px solid #E8EAEF;flex:1 1 auto;min-width:150px}
+.spec div:first-child{border-inline-start:0}
+.spec dt{font-size:10.5px;color:#8A8F9E;font-weight:700;letter-spacing:.04em;margin:0 0 2px}
+.spec dd{margin:0;font-size:12.5px;font-weight:600;color:#11142A}
+
+/* ---------- browser frame mock ---------- */
+.mock{max-width:1400px;margin:0 auto;padding:18px 24px 0;overflow-x:auto}
+.mock-label{font-size:11.5px;font-weight:700;color:#4A4F63;margin:0 0 7px;display:flex;align-items:center;gap:8px}
+.mock-label span{font-weight:500;color:#8A8F9E}
+.frame{width:1280px;border:1px solid #DCDFE7;border-radius:8px;overflow:hidden;background:#FFFFFF;box-shadow:0 1px 2px rgba(5,16,97,.05)}
+.frame-bar{height:32px;background:#FAFBFC;border-bottom:1px solid #E8EAEF;display:flex;align-items:center;gap:8px;padding:0 10px}
+.dot{width:8px;height:8px;border-radius:50%;background:#DCDFE7}
+.frame-url{margin-inline-start:8px;flex:1;height:19px;border-radius:4px;background:#FFFFFF;border:1px solid #E8EAEF;font-size:10.5px;color:#8A8F9E;display:flex;align-items:center;padding:0 8px;direction:ltr;justify-content:flex-start}
+
+/* ---------- app shell ---------- */
+.app{display:grid;grid-template-rows:56px 1fr;height:684px;background:#FFFFFF}
+.app-sm{height:auto}
+.topbar{background:#051061;color:#FFFFFF;display:flex;align-items:center;padding:0 14px;gap:12px}
+.brand{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;letter-spacing:.02em;min-width:212px}
+.brand-mark{width:22px;height:22px;border-radius:4px;background:#FDB913;color:#1A1208;display:grid;place-items:center;font-size:12px;font-weight:900}
+.topbar .spacer{flex:1}
+.top-btn{height:30px;padding:0 9px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:transparent;color:#FFFFFF;font:inherit;font-size:12px;display:flex;align-items:center;gap:6px}
+.top-user{display:flex;align-items:center;gap:7px;font-size:12px}
+.avatar{width:24px;height:24px;border-radius:50%;background:#006FFF;color:#FFFFFF;display:grid;place-items:center;font-size:11px;font-weight:700}
+.body{display:grid;grid-template-columns:240px 1fr;min-height:0}
+.body-collapsed{grid-template-columns:64px 1fr}
+.side{background:#051061;color:#FFFFFF;padding:8px 8px 12px;overflow:auto}
+.side-group{font-size:10px;color:rgba(255,255,255,.5);font-weight:700;letter-spacing:.06em;padding:10px 8px 5px}
+.nav{display:flex;align-items:center;gap:9px;height:30px;padding:0 8px;border-radius:4px;color:rgba(255,255,255,.78);font-size:12.5px;text-decoration:none;margin-bottom:1px}
+.nav:hover{background:rgba(255,255,255,.07);color:#FFFFFF}
+.nav.on{background:rgba(255,255,255,.13);color:#FFFFFF;font-weight:700;box-shadow:inset 2px 0 0 #FDB913}
+.nav .kb{margin-inline-start:auto;font-size:9.5px;color:rgba(255,255,255,.45);background:rgba(255,255,255,.08);border-color:transparent;font-family:inherit}
+.body-collapsed .nav{justify-content:center;padding:0}
+.body-collapsed .nav span.t,.body-collapsed .nav .kb,.body-collapsed .side-group{display:none}
+.main{min-width:0;overflow:auto;background:#FFFFFF}
+
+/* ---------- page header: typographic, no box ---------- */
+.phead{padding:12px 16px 0}
+.crumb{font-size:11px;color:#8A8F9E;margin-bottom:3px}
+.ptitle{display:flex;align-items:baseline;gap:10px}
+.ptitle h2{margin:0;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.ptitle .count{font-size:12px;color:#8A8F9E;font-weight:600}
+.tabs{display:flex;gap:2px;margin-top:8px;border-bottom:1px solid #E8EAEF}
+.tab{padding:0 10px;height:30px;display:flex;align-items:center;font-size:12.5px;color:#4A4F63;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+.tab.on{color:#11142A;font-weight:700;border-bottom-color:#051061}
+
+/* ---------- banner stack ---------- */
+.banners{padding:10px 16px 0}
+.banner{background:#FFF3BF;color:#862E00;border:1px solid #FDB913;border-radius:4px;padding:7px 10px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.7}
+.banner .bi{margin-top:2px}
+details.more{display:inline}
+details.more summary{display:inline;cursor:pointer;color:#862E00;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+details.more summary::-webkit-details-marker{display:none}
+details.more p{margin:5px 0 0;font-size:12px;color:#862E00;opacity:.92;max-width:82ch}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;align-items:center;gap:6px;padding:9px 16px;flex-wrap:wrap}
+.btn{height:28px;padding:0 10px;border-radius:6px;border:1px solid #D2D5DF;background:#FFFFFF;color:#11142A;font:inherit;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#F2F4F8}
+.btn-gold{height:32px;background:#FDB913;border-color:#FDB913;color:#1A1208;font-weight:800}
+.btn-blue{background:#006FFF;border-color:#006FFF;color:#FFFFFF;font-weight:700}
+.btn-ghost{border-color:transparent;background:transparent;color:#4A4F63}
+.btn[disabled]{background:#F9FAFB;border-color:#E8EAEF;color:#B8BCC8;cursor:not-allowed}
+.kb{font-size:10px;font-weight:700;color:#8A8F9E;background:#EEF1F6;border:1px solid #E8EAEF;border-radius:3px;padding:0 4px;line-height:15px;display:inline-block;min-width:16px;text-align:center}
+.btn .kb{background:rgba(0,0,0,.06);border-color:transparent}
+.search{height:28px;flex:0 1 240px;display:flex;align-items:center;gap:6px;border:1px solid #D2D5DF;border-radius:4px;padding:0 8px;color:#8A8F9E;font-size:12.5px;background:#FFFFFF}
+.chip{height:24px;display:inline-flex;align-items:center;gap:6px;padding:0 6px 0 4px;border-radius:4px;background:#EAF3FF;border:1px solid #C7DEFF;color:#1864AB;font-size:11.5px;font-weight:700}
+.chip b{font-weight:800}
+.chip .x{width:15px;height:15px;border-radius:3px;display:grid;place-items:center;color:#1864AB;cursor:pointer}
+.chip .x:hover{background:#C7DEFF}
+.tb-spacer{flex:1}
+.tb-meta{font-size:11.5px;color:#8A8F9E;font-weight:600}
+
+/* ---------- table: hairlines, no zebra, no card ---------- */
+.tbl-wrap{overflow:auto;border-top:1px solid #DCDFE7;max-height:352px}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+thead th{
+  position:sticky;top:0;z-index:3;background:#FAFBFC;color:#4A4F63;
+  font-size:10.5px;font-weight:800;letter-spacing:.03em;text-align:start;
+  height:28px;padding:0 6px;white-space:nowrap;border-bottom:1px solid #DCDFE7;
+}
+tbody td{height:32px;padding:0 6px;border-bottom:1px solid #E8EAEF;white-space:nowrap;background:#FFFFFF;vertical-align:middle}
+tbody tr:hover td{background:#F2F4F8}
+td.num,th.num{font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.name{font-weight:700;color:#11142A}
+.trunc{max-width:104px;overflow:hidden;text-overflow:ellipsis;display:block}
+.trunc-team{max-width:112px;overflow:hidden;text-overflow:ellipsis;display:block}
+tr.ended td{color:#8A8F9E}
+tr.ended .name{color:#4A4F63;font-weight:600}
+
+/* sticky identifier column at inline-start */
+th.c-id,td.c-id{position:sticky;inset-inline-start:0;z-index:2;box-shadow:inset -1px 0 0 #E8EAEF}
+thead th.c-id{z-index:4}
+/* sticky actions column at inline-end */
+th.c-act,td.c-act{position:sticky;inset-inline-end:0;z-index:2;box-shadow:inset 1px 0 0 #DCDFE7;padding-inline:6px}
+thead th.c-act{z-index:4}
+tr:hover td.c-id,tr:hover td.c-act{background:#F2F4F8}
+
+/* Direction A row-action affordance: compact OUTLINED icon+label, 24px, always bordered */
+.rowacts{display:flex;gap:3px;align-items:center}
+.ra{
+  height:24px;padding:0 5px;border-radius:4px;
+  border:1px solid #D2D5DF;background:#FFFFFF;color:#11142A;
+  font:inherit;font-size:10.5px;font-weight:700;
+  display:inline-flex;align-items:center;gap:3px;cursor:pointer;white-space:nowrap;
+}
+.ra .ic-sm{width:12px;height:12px}
+/* icon-only marker used inside the dense table when an action is blocked; full reason text lives in the states panel */
+.ra-flag{width:22px;height:22px;border-radius:4px;background:#FFF3BF;border:1px solid #FDB913;color:#862E00;display:inline-grid;place-items:center;flex:none}
+.ra:hover{background:#F2F4F8;border-color:#8A8F9E}
+.ra-blue{color:#006FFF;border-color:#C7DEFF}
+.ra-blue:hover{background:#EAF3FF;border-color:#006FFF}
+.ra[disabled]{background:#F9FAFB;border-color:#E8EAEF;color:#B8BCC8;cursor:not-allowed}
+.ra-reason{font-size:10.5px;color:#862E00;background:#FFF3BF;border:1px solid #FDB913;border-radius:3px;padding:0 5px;line-height:17px;white-space:nowrap}
+
+.badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:700}
+.b-yes{background:#D3F9D8;color:#2B8A3E}
+.b-no{background:#F1F3F5;color:#495057}
+.b-sched{background:#E7F5FF;color:#1864AB}
+.b-draft{background:#FFF9DB;color:#E67700}
+
+/* ---------- states ---------- */
+.state-strip{display:grid;grid-template-columns:1fr;gap:0}
+.state-block{padding:0}
+.state-head{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#FAFBFC;border-bottom:1px solid #E8EAEF;border-top:1px solid #DCDFE7}
+.state-head h3{margin:0;font-size:12px;font-weight:800}
+.state-head span{font-size:11px;color:#8A8F9E}
+.empty{padding:34px 16px;text-align:center}
+.empty .mark{width:30px;height:30px;border-radius:6px;border:1px solid #DCDFE7;display:inline-grid;place-items:center;color:#8A8F9E;margin-bottom:9px}
+.empty p{margin:0 0 11px;font-size:13px;color:#4A4F63;font-weight:600}
+@keyframes pulseA{0%,100%{opacity:.5}50%{opacity:1}}
+.sk{display:block;height:8px;border-radius:3px;background:#E9EAF0;animation:pulseA 1.5s ease-in-out infinite}
+.sk-btn{height:24px;border-radius:4px;background:#E9EAF0;animation:pulseA 1.5s ease-in-out infinite}
+
+/* ---------- form (screen 3) ---------- */
+.form-wrap{padding:12px 16px 18px;max-width:1120px}
+.fsec{border-top:1px solid #E8EAEF;padding:11px 0 13px;display:grid;grid-template-columns:168px 1fr;gap:16px}
+.fsec:first-of-type{border-top:0}
+.fsec-h h4{margin:0;font-size:12.5px;font-weight:800}
+.fsec-h p{margin:2px 0 0;font-size:11.5px;color:#8A8F9E;line-height:1.6}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+.f label{display:block;font-size:11px;font-weight:700;color:#4A4F63;margin-bottom:3px}
+.inp{height:32px;border:1px solid #D2D5DF;border-radius:4px;background:#FFFFFF;padding:0 8px;font-size:12.5px;display:flex;align-items:center;gap:6px;color:#11142A}
+.inp.focus{border-color:#006FFF;box-shadow:0 0 0 2px rgba(0,111,255,.18)}
+.inp .ph{color:#8A8F9E}
+.inp .cursor{width:1px;height:15px;background:#11142A;display:inline-block}
+.inp.off{background:#F9FAFB;color:#B8BCC8;border-color:#E8EAEF}
+.hint{font-size:10.5px;color:#8A8F9E;margin-top:3px}
+.picker{position:relative}
+.pop{
+  position:absolute;inset-inline-start:0;inset-inline-end:0;top:calc(100% + 3px);z-index:9;
+  background:#FFFFFF;border:1px solid #D2D5DF;border-radius:4px;box-shadow:0 6px 18px rgba(5,16,97,.13);overflow:hidden;
+}
+.pop-h{padding:5px 9px;font-size:10.5px;color:#8A8F9E;font-weight:700;border-bottom:1px solid #E8EAEF;background:#FAFBFC;display:flex;justify-content:space-between}
+.opt{padding:5px 9px;border-bottom:1px solid #F2F4F8;cursor:pointer}
+.opt:last-child{border-bottom:0}
+.opt.on{background:#EAF3FF;box-shadow:inset 2px 0 0 #006FFF}
+.opt .l1{font-size:12.5px;font-weight:700;color:#11142A}
+.opt .l1 .code{color:#006FFF;font-weight:800}
+.opt .l2{font-size:11px;color:#8A8F9E}
+.pop-f{padding:4px 9px;font-size:10.5px;color:#8A8F9E;background:#FAFBFC;border-top:1px solid #E8EAEF;display:flex;gap:10px}
+.token{height:24px;display:inline-flex;align-items:center;gap:6px;padding:0 5px 0 3px;border-radius:4px;background:#EAF3FF;border:1px solid #C7DEFF;color:#11142A;font-size:11.5px;font-weight:700}
+.token .code{color:#006FFF;font-weight:800}
+.token .x{width:16px;height:16px;border-radius:3px;display:grid;place-items:center;color:#4A4F63;cursor:pointer}
+.token .x:hover{background:#C7DEFF}
+details.tech{border:1px solid #E8EAEF;border-radius:4px;background:#FAFBFC;margin-top:2px}
+details.tech summary{list-style:none;cursor:pointer;padding:6px 9px;font-size:11.5px;font-weight:700;color:#4A4F63;display:flex;align-items:center;gap:6px}
+details.tech summary::-webkit-details-marker{display:none}
+details.tech .tech-body{padding:0 9px 8px;display:flex;align-items:center;gap:8px}
+.uuid{direction:ltr;font-family:"Segoe UI",Tahoma,monospace;font-size:11px;background:#FFFFFF;border:1px solid #E8EAEF;border-radius:3px;padding:3px 7px;color:#4A4F63;user-select:all}
+.cap{display:flex;gap:0;border:1px solid #E8EAEF;border-radius:4px;overflow:hidden;max-width:340px}
+.cap div{flex:1;padding:6px 10px;border-inline-start:1px solid #E8EAEF}
+.cap div:first-child{border-inline-start:0}
+.cap dt{font-size:10.5px;color:#8A8F9E;font-weight:700;margin:0}
+.cap dd{margin:0;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.3}
+.cap .free dd{color:#2B8A3E}
+.cap .res dd{color:#E67700}
+.fbar{position:sticky;bottom:0;background:#FFFFFF;border-top:1px solid #DCDFE7;padding:9px 16px;display:flex;align-items:center;gap:8px}
+.fbar .sp{flex:1}
+.fbar .note{font-size:11px;color:#8A8F9E}
+
+/* ---------- dark parity snippet ---------- */
+.dark{background:#030825;border-radius:8px;padding:0;overflow:hidden;border:1px solid #232C5E}
+.dark .dhead{background:#030825;color:#9AA1C0;padding:8px 12px;font-size:11px;font-weight:700;border-bottom:1px solid #232C5E}
+.dark table{color:#E6E9F5}
+.dark thead th{background:#0A1138;color:#9AA1C0;border-bottom:1px solid #232C5E}
+.dark tbody td{background:#030825;border-bottom:1px solid #232C5E;color:#E6E9F5}
+.dark tbody tr:hover td{background:#131C4A}
+.dark .ra{background:#0A1138;border-color:#232C5E;color:#E6E9F5}
+.dark .ra-blue{color:#FBC470;border-color:#5A4620}
+.dark .btn-gold{background:#FBC470;border-color:#FBC470;color:#1A1208}
+.dark .b-yes{background:#123722;color:#8CE0A6}
+.foot{max-width:1400px;margin:0 auto;padding:14px 24px 40px;color:#8A8F9E;font-size:11.5px}
+
+/* screens-reports-capacity additions */
+.workspace{display:grid;grid-template-columns:240px 1fr;min-height:0;height:100%}
+.rail{border-inline-end:1px solid #E8EAEF;background:#FAFBFC;overflow:auto;padding:8px}
+.rail h3{margin:4px 8px 8px;font-size:10.5px;font-weight:800;color:#8A8F9E;letter-spacing:.04em}
+.r-item{display:block;padding:8px 9px;border-radius:4px;margin-bottom:2px;text-decoration:none;color:inherit;border:1px solid transparent}
+.r-item:hover{background:#FFFFFF;border-color:#E8EAEF}
+.r-item.on{background:#EAF3FF;border-color:#C7DEFF;box-shadow:inset 2px 0 0 #006FFF}
+.r-item .t{font-size:12.5px;font-weight:700;color:#11142A}
+.r-item .d{font-size:11px;color:#8A8F9E;margin-top:2px;line-height:1.5}
+.r-item.locked{opacity:.85}
+.r-item.locked .t{color:#4A4F63}
+.r-lock{display:inline-block;margin-top:4px;font-size:10.5px;font-weight:700;color:#862E00;background:#FFF3BF;border:1px solid #FDB913;border-radius:3px;padding:1px 5px}
+.params{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:10px 16px;border-bottom:1px solid #E8EAEF;background:#FFFFFF}
+.params .f{min-width:140px}
+.params label{display:block;font-size:11px;font-weight:700;color:#4A4F63;margin-bottom:3px}
+.meta-run{padding:8px 16px;font-size:11.5px;color:#8A8F9E;display:flex;gap:14px;flex-wrap:wrap;border-bottom:1px solid #E8EAEF}
+.meta-run b{color:#4A4F63;font-weight:700}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 16px}
+.mcard{border:1px solid #E8EAEF;border-radius:4px;padding:8px 10px;background:#FFFFFF}
+.mcard dt{font-size:10.5px;color:#8A8F9E;font-weight:700;margin:0}
+.mcard dd{margin:2px 0 0;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
+.chart-box{margin:0 16px 12px;border:1px solid #E8EAEF;border-radius:4px;padding:10px 12px}
+.chart-box h4{margin:0 0 8px;font-size:12px;font-weight:800}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;font-size:11px;color:#4A4F63}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:4px;vertical-align:-1px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:110px;padding-top:4px}
+.bars .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end}
+.bars .stack{width:100%;display:flex;flex-direction:column-reverse;height:100%;justify-content:flex-start;gap:1px}
+.bars .seg{width:100%;border-radius:2px 2px 0 0}
+.bars .lbl{font-size:9.5px;color:#8A8F9E;font-weight:600}
+.suppressed{color:#862E00;background:#FFF3BF;border:1px solid #FDB913;border-radius:3px;padding:1px 5px;font-size:11px;font-weight:700}
+.footnote{padding:0 16px 12px;font-size:11px;color:#8A8F9E}
+.hc-main{position:relative;min-height:0}
+.util{display:flex;height:6px;border-radius:3px;overflow:hidden;background:#E8F1FF;min-width:72px}
+.util span{display:block;height:100%}
+.drawer{
+  position:absolute;inset-block:0;inset-inline-end:0;width:480px;z-index:8;
+  background:#FFFFFF;border-inline-start:1px solid #DCDFE7;
+  box-shadow:0 6px 24px rgba(5,16,97,.16);display:flex;flex-direction:column;
+}
+.d-head{padding:12px 14px;border-bottom:1px solid #E8EAEF;display:flex;align-items:flex-start;gap:10px}
+.d-head h3{margin:0;font-size:13px;font-weight:800}
+.d-head p{margin:2px 0 0;font-size:11.5px;color:#8A8F9E}
+.d-body{flex:1;overflow:auto;padding:0}
+.d-sec{padding:12px 14px;border-bottom:1px solid #E8EAEF}
+.d-sec h4{margin:0 0 8px;font-size:12px;font-weight:800}
+.d-entry{padding:7px 0;border-top:1px solid #F2F4F8}
+.d-entry:first-of-type{border-top:0}
+.d-entry .who{font-size:12.5px;font-weight:700}
+.d-entry .when{font-size:11px;color:#8A8F9E}
+.d-entry .why{font-size:12px;color:#4A4F63;margin-top:2px}
+.d-foot{padding:10px 14px;border-top:1px solid #DCDFE7;display:flex;gap:8px;background:#FFFFFF}
+tr.active-row td{background:#EAF3FF !important;box-shadow:inset 0 0 0 1px #C7DEFF}
+.tip{position:relative}
+.tip .tt{
+  position:absolute;bottom:calc(100% + 6px);inset-inline-start:50%;transform:translateX(50%);
+  background:#051061;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 7px;border-radius:4px;
+  white-space:nowrap;pointer-events:none;z-index:5
+}
+.dark .util{background:#0A4FCC}
+.dark .drawer{background:#0A1138;border-color:#232C5E;color:#E6E9F5}
+.dark .d-head,.dark .d-sec,.dark .d-foot{border-color:#232C5E}
+.dark .d-head p,.dark .d-entry .when{color:#9AA1C0}
+.dark .d-entry .why{color:#9AA1C0}
+.dark .d-entry{border-color:#232C5E}
+.dark tr.active-row td{background:#131C4A !important;box-shadow:inset 0 0 0 1px #232C5E}
+
+</style>
+</head>
+<body>
+
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-dash" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></symbol>
+  <symbol id="i-people" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.6"/><path d="M1.6 13.6c0-2.4 2-3.9 4.4-3.9s4.4 1.5 4.4 3.9"/><path d="M11 4.2a2.4 2.4 0 0 1 0 4.4M12.2 10.4c1.4.5 2.3 1.6 2.3 3.2"/></symbol>
+  <symbol id="i-event" viewBox="0 0 16 16"><rect x="2" y="3.4" width="12" height="10.6" rx="1.6"/><path d="M2 6.6h12M5.4 1.8v3M10.6 1.8v3"/></symbol>
+  <symbol id="i-org" viewBox="0 0 16 16"><rect x="6" y="1.6" width="4" height="3" rx="1"/><rect x="1.4" y="11" width="4" height="3" rx="1"/><rect x="10.6" y="11" width="4" height="3" rx="1"/><path d="M8 4.6v3.2M3.4 11V7.8h9.2V11"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 16 16"><path d="M2 12.2a6 6 0 1 1 12 0"/><path d="M8 12.2l3.1-3.4"/></symbol>
+  <symbol id="i-report" viewBox="0 0 16 16"><path d="M2 13.6h12"/><rect x="2.8" y="8" width="2.6" height="5.6"/><rect x="6.7" y="4.4" width="2.6" height="9.2"/><rect x="10.6" y="9.6" width="2.6" height="4"/></symbol>
+  <symbol id="i-import" viewBox="0 0 16 16"><path d="M8 2v8M5 7.2L8 10.2l3-3M2.4 13.6h11.2"/></symbol>
+  <symbol id="i-key" viewBox="0 0 16 16"><circle cx="5.4" cy="10.6" r="3"/><path d="M7.6 8.4l6.2-6.2M11.2 4.8l1.6 1.6"/></symbol>
+  <symbol id="i-audit" viewBox="0 0 16 16"><path d="M8 1.8l5.2 2v4.3c0 3.3-2.3 5.4-5.2 6.3-2.9-.9-5.2-3-5.2-6.3V3.8z"/><path d="M5.9 7.9l1.5 1.5 2.8-2.9"/></symbol>
+  <symbol id="i-ops" viewBox="0 0 16 16"><rect x="1.6" y="2.6" width="12.8" height="10.8" rx="1.6"/><path d="M4.6 6.4l2 2-2 2M8.6 11.4h3"/></symbol>
+  <symbol id="i-fix" viewBox="0 0 16 16"><rect x="3" y="1.8" width="8.6" height="12.4" rx="1.4"/><path d="M5.4 5.6h4M5.4 8.2h4M5.4 10.8h2.2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.4v2M8 12.6v2M1.4 8h2M12.6 8h2M3.3 3.3l1.5 1.5M11.2 11.2l1.5 1.5M12.7 3.3l-1.5 1.5M4.8 11.2l-1.5 1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.6"/><path d="M10.4 10.4L14 14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></symbol>
+  <symbol id="i-cols" viewBox="0 0 16 16"><rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.4"/><path d="M6.2 2.6v10.8M10.2 2.6v10.8"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.2v9.6M3.2 8h9.6"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 16 16"><path d="M11.2 2.2l2.6 2.6-8 8-3.4.8.8-3.4z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="8.6" height="8.6" rx="1.4"/><path d="M10.6 5.4V3.4a1.4 1.4 0 0 0-1.4-1.4H3.4A1.4 1.4 0 0 0 2 3.4v5.8a1.4 1.4 0 0 0 1.4 1.4h2"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.2l6 10.4H2z"/><path d="M8 6.4v3M8 11.1v.1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 16 16"><path d="M13.2 9.6A5.8 5.8 0 0 1 6.4 2.8a5.8 5.8 0 1 0 6.8 6.8z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 16 16"><path d="M1.8 3.2h12.4L9.4 8.6v4.4l-2.8 1.4V8.6z"/></symbol>
+
+  <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.2" y="7" width="9.6" height="7" rx="1.4"/><path d="M5.2 7V5.2a2.8 2.8 0 0 1 5.6 0V7"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 16 16"><path d="M1.6 8s2.4-4.4 6.4-4.4S14.4 8 14.4 8s-2.4 4.4-6.4 4.4S1.6 8 1.6 8z"/><circle cx="8" cy="8" r="2"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 16 16"><circle cx="8" cy="3.2" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="8" cy="12.8" r="1.1"/></symbol>
+</svg>
+
+
+<div class="doc">
+  <div class="kicker">صفحات کلیدی — جهت الف تأییدشده</div>
+  <h1>گزارش‌ها · ظرفیت و جذب</h1>
+  <p>همان زبان بصری کنسول متراکم روی دو سطح باقی‌مانده از قرارداد پذیرش استوری ۸.۱۰: فضای کار گزارش موضوعی، و هدکانت با کشوی وابسته‌به‌ردیف.</p>
+</div>
+
+<div class="mock">
+  <div class="mock-label">۱. گزارش‌ها / نیروی انسانی <span>کاتالوگ موضوعی · پارامتر · اجرا · سرکوب کوهورت کوچک</span></div>
+  
+<div class="frame">
+  <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="frame-url">app.divan.local/reports/workforce/composition</div></div>
+  <div class="app">
+    
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">د</span>دیوان</div>
+  <div class="spacer"></div>
+  <button class="top-btn" type="button"><svg class="ic"><use href="#i-moon"/></svg>تم</button>
+  <div class="top-user"><span class="avatar">ل</span>لیلا رضایی</div>
+</header>
+
+    <div class="body">
+      
+<aside class="side">
+  <div class="side-group">اصلی</div>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-dash"/></svg><span class="t">داشبورد</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-people"/></svg><span class="t">اطلاعات پرسنلی</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-event"/></svg><span class="t">رویدادهای پرسنلی</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-org"/></svg><span class="t">ساختار سازمان</span></a>
+  <a class="nav " href="#"><svg class="ic"><use href="#i-cap"/></svg><span class="t">ظرفیت و جذب</span></a>
+  <a class="nav on" href="#"><svg class="ic"><use href="#i-report"/></svg><span class="t">گزارش‌ها</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-import"/></svg><span class="t">ورود داده</span></a>
+  <div class="side-group">حاکمیت</div>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-key"/></svg><span class="t">دسترسی‌ها</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-audit"/></svg><span class="t">ممیزی</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-ops"/></svg><span class="t">عملیات</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-fix"/></svg><span class="t">اصلاح اطلاعات</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-gear"/></svg><span class="t">تنظیمات</span></a>
+</aside>
+
+<main class="main">
+  <div class="phead">
+    <div class="crumb">گزارش‌ها</div>
+    <div class="ptitle"><h2>گزارش‌ها</h2></div>
+    <p style="margin:4px 0 0;font-size:11.5px;color:#8A8F9E">کاتالوگ گزارش‌های تأییدشدهٔ راه‌اندازی — انتخاب بر اساس موضوع، سپس پارامتر و اجرا.</p>
+    <div class="tabs">
+      <a class="tab on" href="#">نیروی انسانی</a>
+      <a class="tab" href="#">سازمان</a>
+      <a class="tab" href="#">رویدادها</a>
+      <a class="tab" href="#">ظرفیت و جذب</a>
+      <a class="tab" href="#">ورود داده</a>
+    </div>
+  </div>
+  <div class="workspace">
+    <nav class="rail" aria-label="کاتالوگ گزارش">
+      <h3>کاتالوگ</h3>
+      <a class="r-item on" href="#"><div class="t">ترکیب نیروی انسانی</div><div class="d">توزیع همکاری، گرید و تیم در یک تاریخ مؤثر</div></a>
+      <a class="r-item" href="#"><div class="t">ورود و خروج دوره</div><div class="d">شروع و خاتمه در بازهٔ انتخابی</div></a>
+      <a class="r-item" href="#"><div class="t">همکاران فعلی بر تیم</div><div class="d">فهرست زنده‌ها با نقش سازمانی</div></a>
+      <a class="r-item" href="#"><div class="t">قراردادهای رو به انقضا</div><div class="d">پایان قرارداد در ۹۰ روز آینده</div></a>
+      <a class="r-item" href="#"><div class="t">تغییرات سطح در بازه</div><div class="d">ارتقا و تغییر گرید ثبت‌شده</div></a>
+      <a class="r-item locked" href="#"><div class="t">جبران خدمات خلاصه</div><div class="d">میانگین و پراکندگی جبران</div><span class="r-lock">نیازمند دسترسی: گزارش‌های جبران خدمات</span></a>
+    </nav>
+    <div>
+      <div class="params">
+        <div class="f"><label>تاریخ مؤثر</label><div class="inp">۱۴۰۵/۰۵/۰۹</div></div>
+        <div class="f" style="min-width:220px"><label>دامنهٔ سازمانی</label><div class="inp"><span class="token"><span class="code">UNIT-ENG</span> — واحد مهندسی<button class="x" type="button" aria-label="حذف">×</button></span></div></div>
+        <div class="f"><label>وضعیت همکاری</label><div class="inp">همکار فعلی<svg class="ic ic-sm" style="margin-inline-start:auto"><use href="#i-chev"/></svg></div></div>
+        <button class="btn btn-gold" type="button">اجرا</button>
+        <button class="btn btn-blue" type="button">خروجی اکسل</button>
+      </div>
+      <div class="meta-run"><span>تاریخ مؤثر: <b>۱۴۰۵/۰۵/۰۹</b></span><span>آخرین محاسبه: <b>۱۴۰۵/۰۵/۰۹ — ۰۹:۱۲</b></span><span>ردیف‌ها: <b>۲۴</b></span></div>
+      <div class="metrics">
+        <div class="mcard"><dt>کارکنان در دامنه</dt><dd>۱۸۶</dd></div>
+        <div class="mcard"><dt>تمام‌وقت</dt><dd>۱۵۲</dd></div>
+        <div class="mcard"><dt>پاره‌وقت</dt><dd>۲۲</dd></div>
+        <div class="mcard"><dt>قراردادی</dt><dd>۱۲</dd></div>
+      </div>
+      <div class="chart-box">
+        <h4>توزیع نوع همکاری به تفکیک تیم</h4>
+        <div class="legend">
+          <span><i style="background:#1B3BBB"></i>تمام‌وقت</span>
+          <span><i style="background:#0B8FA8"></i>پاره‌وقت</span>
+          <span><i style="background:#C2255C"></i>قراردادی</span>
+        </div>
+        <div class="bars" aria-hidden="true">
+          <div class="col"><div class="stack"><div class="seg" style="height:62%;background:#1B3BBB"></div><div class="seg" style="height:14%;background:#0B8FA8"></div><div class="seg" style="height:8%;background:#C2255C"></div></div><div class="lbl">توسعه</div></div>
+          <div class="col"><div class="stack"><div class="seg" style="height:48%;background:#1B3BBB"></div><div class="seg" style="height:10%;background:#0B8FA8"></div><div class="seg" style="height:6%;background:#C2255C"></div></div><div class="lbl">زیرساخت</div></div>
+          <div class="col"><div class="stack"><div class="seg" style="height:38%;background:#1B3BBB"></div><div class="seg" style="height:18%;background:#0B8FA8"></div><div class="seg" style="height:4%;background:#C2255C"></div></div><div class="lbl">محصول</div></div>
+          <div class="col"><div class="stack"><div class="seg" style="height:28%;background:#1B3BBB"></div><div class="seg" style="height:8%;background:#0B8FA8"></div><div class="seg" style="height:10%;background:#C2255C"></div></div><div class="lbl">مالی</div></div>
+          <div class="col"><div class="stack"><div class="seg" style="height:22%;background:#1B3BBB"></div><div class="seg" style="height:6%;background:#0B8FA8"></div><div class="seg" style="height:4%;background:#C2255C"></div></div><div class="lbl">جذب</div></div>
+        </div>
+      </div>
+      <div class="tbl-wrap" style="max-height:220px;margin:0 16px 8px;border:1px solid #E8EAEF;border-radius:4px">
+        <table>
+          <thead><tr><th>تیم</th><th class="num">تمام‌وقت</th><th class="num">پاره‌وقت</th><th class="num">قراردادی</th><th class="num">جمع</th></tr></thead>
+          <tbody>
+            <tr><td class="name">تیم توسعه محصول</td><td class="num">۴۲</td><td class="num">۶</td><td class="num">۳</td><td class="num">۵۱</td></tr>
+            <tr><td class="name">تیم زیرساخت</td><td class="num">۲۸</td><td class="num">۴</td><td class="num">۲</td><td class="num">۳۴</td></tr>
+            <tr><td class="name">تیم مالی</td><td class="num">۱۸</td><td class="num">۳</td><td class="num">۴</td><td class="num">۲۵</td></tr>
+            <tr><td class="name">تیم پشتیبانی منابع انسانی</td><td class="num">۹</td><td class="num">۲</td><td class="num"><span class="suppressed">داده قابل نمایش نیست.</span></td><td class="num">—</td></tr>
+            <tr><td class="name">تیم جذب و استخدام</td><td class="num">۱۱</td><td class="num">۱</td><td class="num">۱</td><td class="num">۱۳</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="footnote">کوهورت‌های خیلی کوچک به‌جای صفر، «داده قابل نمایش نیست.» می‌گیرند تا از استنتاج فردی جلوگیری شود.</p>
+    </div>
+  </div>
+</main>
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="mock">
+  <div class="mock-label">۲. ظرفیت و جذب / هدکانت <span>جدول واحد · کشوی معافیت و بازنویسی وابسته به ردیف</span></div>
+  
+<div class="frame">
+  <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="frame-url">app.divan.local/capacity/headcount?drawer=HC-1405-032</div></div>
+  <div class="app">
+    
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">د</span>دیوان</div>
+  <div class="spacer"></div>
+  <button class="top-btn" type="button"><svg class="ic"><use href="#i-moon"/></svg>تم</button>
+  <div class="top-user"><span class="avatar">ل</span>لیلا رضایی</div>
+</header>
+
+    <div class="body">
+      
+<aside class="side">
+  <div class="side-group">اصلی</div>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-dash"/></svg><span class="t">داشبورد</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-people"/></svg><span class="t">اطلاعات پرسنلی</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-event"/></svg><span class="t">رویدادهای پرسنلی</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-org"/></svg><span class="t">ساختار سازمان</span></a>
+  <a class="nav on" href="#"><svg class="ic"><use href="#i-cap"/></svg><span class="t">ظرفیت و جذب</span></a>
+  <a class="nav " href="#"><svg class="ic"><use href="#i-report"/></svg><span class="t">گزارش‌ها</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-import"/></svg><span class="t">ورود داده</span></a>
+  <div class="side-group">حاکمیت</div>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-key"/></svg><span class="t">دسترسی‌ها</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-audit"/></svg><span class="t">ممیزی</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-ops"/></svg><span class="t">عملیات</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-fix"/></svg><span class="t">اصلاح اطلاعات</span></a>
+  <a class="nav" href="#"><svg class="ic"><use href="#i-gear"/></svg><span class="t">تنظیمات</span></a>
+</aside>
+
+<main class="main hc-main">
+  <div class="phead">
+    <div class="crumb">ظرفیت و جذب</div>
+    <div class="ptitle"><h2>ظرفیت و جذب</h2><span class="count">۱۲ مجوز</span></div>
+    <p style="margin:4px 0 0;font-size:11.5px;color:#8A8F9E">تصویب ظرفیت تیم‌ها؛ معافیت و بازنویسی از دل همان ردیف در کشو باز می‌شود.</p>
+    <div class="tabs">
+      <a class="tab on" href="#">هدکانت</a>
+      <a class="tab" href="#">ایجاد</a>
+      <a class="tab" href="#">ورود گروهی</a>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button class="btn btn-gold" type="button"><svg class="ic"><use href="#i-plus"/></svg>ایجاد مجوز</button>
+    <div class="search"><svg class="ic"><use href="#i-search"/></svg>جست‌وجوی تیم…</div>
+    <span class="chip"><b>وضعیت:</b> فعال<button class="x" type="button" aria-label="حذف">×</button></span>
+    <div class="tb-spacer"></div>
+    <span class="tb-meta">۱۲ نتیجه</span>
+  </div>
+  <div class="tbl-wrap" style="max-height:420px">
+    <table>
+      <thead>
+        <tr>
+          <th class="c-id">کد</th>
+          <th>تیم</th>
+          <th class="num">مصوب</th>
+          <th class="num">مصرف</th>
+          <th class="num">رزرو</th>
+          <th class="num">آزاد</th>
+          <th>مصرف</th>
+          <th>وضعیت</th>
+          <th class="c-act">اقدامات</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="c-id num">HC-۱۴۰۵-۰۲۸</td>
+          <td class="name trunc-team">تیم جذب و استخدام</td>
+          <td class="num">۱۲</td><td class="num">۹</td><td class="num">۱</td><td class="num">۲</td>
+          <td><div class="util"><span style="width:75%;background:#0A4FCC"></span><span style="width:8%;background:#4D9BFF"></span></div></td>
+          <td><span class="badge b-yes">فعال</span></td>
+          <td class="c-act"><div class="rowacts tip"><button class="ra" type="button" aria-label="جزئیات"><svg class="ic ic-sm"><use href="#i-eye"/></svg></button><button class="ra" type="button" aria-label="ویرایش"><svg class="ic ic-sm"><use href="#i-pencil"/></svg></button><span class="tt">جزئیات مجوز</span></div></td>
+        </tr>
+        <tr class="active-row">
+          <td class="c-id num">HC-۱۴۰۵-۰۳۲</td>
+          <td class="name trunc-team">تیم توسعه محصول</td>
+          <td class="num">۴۸</td><td class="num">۴۱</td><td class="num">۴</td><td class="num">۳</td>
+          <td><div class="util"><span style="width:85%;background:#051061"></span><span style="width:8%;background:#0F7BFF"></span></div></td>
+          <td><span class="badge b-yes">فعال</span></td>
+          <td class="c-act"><div class="rowacts"><button class="ra ra-blue" type="button" aria-label="جزئیات"><svg class="ic ic-sm"><use href="#i-eye"/></svg></button><button class="ra" type="button" aria-label="ویرایش"><svg class="ic ic-sm"><use href="#i-pencil"/></svg></button></div></td>
+        </tr>
+        <tr>
+          <td class="c-id num">HC-۱۴۰۵-۰۳۵</td>
+          <td class="name trunc-team">تیم زیرساخت</td>
+          <td class="num">۳۰</td><td class="num">۲۶</td><td class="num">۲</td><td class="num">۲</td>
+          <td><div class="util"><span style="width:87%;background:#051061"></span><span style="width:7%;background:#0F7BFF"></span></div></td>
+          <td><span class="badge b-yes">فعال</span></td>
+          <td class="c-act"><div class="rowacts"><button class="ra" type="button" aria-label="جزئیات"><svg class="ic ic-sm"><use href="#i-eye"/></svg></button><button class="ra" type="button" aria-label="ویرایش"><svg class="ic ic-sm"><use href="#i-pencil"/></svg></button></div></td>
+        </tr>
+        <tr>
+          <td class="c-id num">HC-۱۴۰۵-۰۴۱</td>
+          <td class="name trunc-team">تیم مالی</td>
+          <td class="num">۱۸</td><td class="num">۱۵</td><td class="num">۰</td><td class="num">۳</td>
+          <td><div class="util"><span style="width:83%;background:#0A4FCC"></span></div></td>
+          <td><span class="badge b-yes">فعال</span></td>
+          <td class="c-act"><div class="rowacts"><button class="ra" type="button" aria-label="جزئیات"><svg class="ic ic-sm"><use href="#i-eye"/></svg></button><button class="ra" type="button" aria-label="ویرایش" disabled title="تا پایان محاسبه غیرفعال است"><svg class="ic ic-sm"><use href="#i-pencil"/></svg></button><span class="ra-reason">تا پایان محاسبه غیرفعال است</span></div></td>
+        </tr>
+        <tr>
+          <td class="c-id num">HC-۱۴۰۵-۰۴۴</td>
+          <td class="name trunc-team">تیم پشتیبانی منابع انسانی</td>
+          <td class="num">۱۴</td><td class="num">۱۱</td><td class="num">۱</td><td class="num">۲</td>
+          <td><div class="util"><span style="width:79%;background:#0A4FCC"></span><span style="width:7%;background:#4D9BFF"></span></div></td>
+          <td><span class="badge b-draft">پیش‌نویس</span></td>
+          <td class="c-act"><div class="rowacts"><button class="ra" type="button" aria-label="جزئیات"><svg class="ic ic-sm"><use href="#i-eye"/></svg></button><button class="ra" type="button" aria-label="ویرایش"><svg class="ic ic-sm"><use href="#i-pencil"/></svg></button></div></td>
+        </tr>
+        <tr>
+          <td class="c-id num">HC-۱۴۰۴-۱۱۲</td>
+          <td class="name trunc-team">تیم عملیات فروش</td>
+          <td class="num">۲۲</td><td class="num">۲۲</td><td class="num">۰</td><td class="num">۰</td>
+          <td><div class="util"><span style="width:100%;background:#051061"></span></div></td>
+          <td><span class="badge b-no">پر</span></td>
+          <td class="c-act"><div class="rowacts"><button class="ra" type="button" aria-label="جزئیات"><svg class="ic ic-sm"><use href="#i-eye"/></svg></button><button class="ra" type="button" aria-label="بیشتر"><svg class="ic ic-sm"><use href="#i-menu"/></svg></button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <aside class="drawer" aria-label="جزئیات مجوز">
+    <div class="d-head">
+      <div style="flex:1">
+        <h3>HC-۱۴۰۵-۰۳۲ — تیم توسعه محصول</h3>
+        <p>مجوز فعال · مصوب ۴۸ · آزاد ۳</p>
+      </div>
+      <button class="ra" type="button" aria-label="بستن"><svg class="ic ic-sm"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="d-body">
+      <section class="d-sec">
+        <h4>معافیت‌ها</h4>
+        <div class="d-entry"><div class="who">۱۰۰۸۸ — احمدی، نیما</div><div class="when">رضا کاظمی · ۱۴۰۵/۰۳/۱۲</div><div class="why">انتقال موقت پروژهٔ مشترک — خارج از پوشش تیم مقصد</div></div>
+        <div class="d-entry"><div class="who">۱۰۰۴۲ — کریمی، مهسا</div><div class="when">لیلا رضایی · ۱۴۰۵/۰۴/۰۱</div><div class="why">ماموریت کوتاه‌مدت بدون مصرف ظرفیت مقصد</div></div>
+      </section>
+      <section class="d-sec">
+        <h4>بازنویسی‌ها</h4>
+        <div class="d-entry"><div class="who">بازنویسی سقف رزرو · +۲</div><div class="when">رضا کاظمی · ۱۴۰۵/۰۵/۰۲ · <span class="badge" style="background:#FFF3BF;color:#862E00">بازنویسی</span></div><div class="why">استخدام فوری دو نقش حیاتی؛ تاریخ انقضا ۱۴۰۵/۰۶/۱۵</div></div>
+      </section>
+    </div>
+    <div class="d-foot">
+      <button class="btn" type="button">افزودن معافیت</button>
+      <button class="btn" type="button">ثبت بازنویسی</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" type="button">بستن</button>
+    </div>
+  </aside>
+</main>
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="mock" style="padding-bottom:28px">
+  <div class="mock-label">برابری تم تیره <span>هدر کشو + ردیف فعال + نوار مصرف</span></div>
+  <div class="dark" style="max-width:1280px">
+    <div class="dhead">نمونهٔ تم تیره — ظرفیت</div>
+    <div style="display:grid;grid-template-columns:1fr 480px">
+      <div style="padding:10px">
+        <table>
+          <thead><tr><th>کد</th><th>تیم</th><th>مصرف</th><th>اقدامات</th></tr></thead>
+          <tbody>
+            <tr class="active-row">
+              <td class="num">HC-۱۴۰۵-۰۳۲</td>
+              <td>تیم توسعه محصول</td>
+              <td><div class="util"><span style="width:85%;background:#8FBEFF"></span><span style="width:8%;background:#4D9BFF"></span></div></td>
+              <td><div class="rowacts"><button class="ra ra-blue" type="button"><svg class="ic ic-sm"><use href="#i-eye"/></svg></button><button class="ra" type="button"><svg class="ic ic-sm"><use href="#i-pencil"/></svg></button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="drawer" style="position:relative;width:auto;box-shadow:none;border:0;border-inline-start:1px solid #232C5E">
+        <div class="d-head"><div style="flex:1"><h3 style="color:#E6E9F5">HC-۱۴۰۵-۰۳۲ — تیم توسعه محصول</h3><p>مجوز فعال · مصوب ۴۸ · آزاد ۳</p></div><button class="ra" type="button"><svg class="ic ic-sm"><use href="#i-x"/></svg></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="foot">مرجع پذیرش استوری ۸.۱۰ — پالت نمودار قفل‌شده؛ طلایی فقط CTA؛ سبز و نارنجی در داده ممنوع.</div>
+</body>
+</html>

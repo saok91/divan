@@ -305,7 +305,7 @@ export function HeadcountExemptionPanel() {
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
+                    variant="rowAction"
                     disabled={busyId === row.id}
                     onClick={() => {
                       setBusyId(row.id);

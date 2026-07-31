@@ -82,7 +82,7 @@ function EnumMultiFilter({
       <PopoverTrigger asChild>
         <Button
           type="button"
-          variant="outline"
+          variant="tertiary"
           size="sm"
           className="h-filter-row-height min-h-[var(--filter-row-height)] w-full justify-between px-2 text-caption font-normal"
           aria-label={`فیلتر ${columnHeader}`}
@@ -426,7 +426,7 @@ export function GovernedDataTable<T>({
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="tertiary"
               size="sm"
               disabled={pageIndex <= 0}
               onClick={() => goToPage(pageIndex - 1)}
@@ -436,7 +436,7 @@ export function GovernedDataTable<T>({
             </Button>
             <Button
               type="button"
-              variant="outline"
+              variant="tertiary"
               size="sm"
               disabled={pageIndex >= totalPages - 1}
               onClick={() => goToPage(pageIndex + 1)}

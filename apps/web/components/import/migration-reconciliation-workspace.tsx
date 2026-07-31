@@ -354,7 +354,7 @@ export function MigrationReconciliationWorkspace({
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
-          variant="outline"
+          variant="tertiary"
           disabled={busy}
           onClick={() => void onCreate()}
         >
@@ -362,7 +362,7 @@ export function MigrationReconciliationWorkspace({
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant="tertiary"
           disabled={busy || !activeRunId}
           onClick={() => void onCompare()}
         >
@@ -370,7 +370,7 @@ export function MigrationReconciliationWorkspace({
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant="tertiary"
           disabled={busy || !activeRunId}
           onClick={() => void onAttestControls()}
         >
@@ -552,7 +552,7 @@ export function MigrationReconciliationWorkspace({
                       />
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="tertiary"
                         size="sm"
                         disabled={busy}
                         onClick={() => void onDisposition(d.id)}
@@ -583,7 +583,7 @@ export function MigrationReconciliationWorkspace({
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
-            variant="outline"
+            variant="tertiary"
             disabled={busy || !activeRunId}
             onClick={() => void onSign("migration_lead")}
           >
@@ -591,7 +591,7 @@ export function MigrationReconciliationWorkspace({
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="tertiary"
             disabled={busy || !activeRunId}
             onClick={() => void onSign("hr_data_owner")}
           >

@@ -359,7 +359,7 @@ export function ImportWizard() {
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
-            variant="primary"
+            variant={previewLoaded ? "tertiary" : "primary"}
             disabled={busy || !resolvedTemplateKey || !file || previewLoaded}
             onClick={() => void onUpload()}
           >
@@ -372,7 +372,7 @@ export function ImportWizard() {
               {!sheetOpen ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="tertiary"
                   disabled={busy}
                   onClick={() => setSheetOpen(true)}
                 >
@@ -381,7 +381,7 @@ export function ImportWizard() {
               ) : null}
               <Button
                 type="button"
-                variant="outline"
+                variant="tertiary"
                 disabled={busy}
                 onClick={() => void clearPreview()}
               >
@@ -392,7 +392,7 @@ export function ImportWizard() {
           {stagingBatchId && step === "approve" ? (
             <Button
               type="button"
-              variant="primary"
+              variant={sheetOpen ? "tertiary" : "primary"}
               disabled={busy}
               onClick={() => void onApprove()}
             >
@@ -403,7 +403,7 @@ export function ImportWizard() {
             <>
               <Button
                 type="button"
-                variant="primary"
+                variant={sheetOpen ? "tertiary" : "primary"}
                 disabled={busy || executeOpen}
                 onClick={() => {
                   // Single dialog depth: SensitiveConfirmationDialog only (no confirm Dialog).
@@ -416,7 +416,7 @@ export function ImportWizard() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="tertiary"
                 disabled={
                   busy || executeOpen || !reconProductionReady || !reconRunId
                 }
@@ -553,7 +553,7 @@ export function ImportWizard() {
           <SheetFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               disabled={busy}
               onClick={() => void clearPreview()}
             >
@@ -561,7 +561,7 @@ export function ImportWizard() {
             </Button>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               disabled={busy}
               onClick={() => setSheetOpen(false)}
             >
@@ -612,7 +612,7 @@ export function ImportWizard() {
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="tertiary"
                   disabled={
                     busy || executeOpen || !reconProductionReady || !reconRunId
                   }
@@ -647,7 +647,7 @@ export function ImportWizard() {
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => setConfirmOpen(false)}
             >
               {operationalCopy.importConfirmDismiss}

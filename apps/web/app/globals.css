@@ -31,6 +31,12 @@
   --muted-brand: #808184;
   --sidebar-active-background: rgba(255, 255, 255, 0.12);
 
+  /* UX-DR30 control contract (Story 8.1) — minimal tokens only */
+  --control-border: #d2d5df;
+  --disabled-surface: #f9fafb;
+  --disabled-foreground: #b8bcc8;
+  --hairline: #e8eaef;
+
   /* Banner tokens — DESIGN.md {stale-banner} / {break-glass-banner} */
   --stale-banner-background: #fff3bf;
   --stale-banner-foreground: #862e00;
@@ -97,6 +103,12 @@
   --muted-brand: #9e9ea0;
   --sidebar-active-background: rgba(255, 255, 255, 0.08);
 
+  /* UX-DR30 control contract (Story 8.1) — dark */
+  --control-border: #232c5e;
+  --disabled-surface: #0a1138;
+  --disabled-foreground: #9aa1c0;
+  --hairline: #232c5e;
+
   --stale-banner-background: #3d3200;
   --stale-banner-foreground: #ffe066;
   --stale-banner-border: #fbc470;
@@ -142,6 +154,10 @@
   --color-chrome-foreground: var(--chrome-foreground);
   --color-muted-brand: var(--muted-brand);
   --color-sidebar-active-background: var(--sidebar-active-background);
+  --color-control-border: var(--control-border);
+  --color-disabled-surface: var(--disabled-surface);
+  --color-disabled-foreground: var(--disabled-foreground);
+  --color-hairline: var(--hairline);
   --color-stale-banner-background: var(--stale-banner-background);
   --color-stale-banner-foreground: var(--stale-banner-foreground);
   --color-stale-banner-border: var(--stale-banner-border);

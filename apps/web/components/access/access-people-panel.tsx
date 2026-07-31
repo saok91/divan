@@ -304,27 +304,24 @@ export function AccessPeoplePanel() {
                 <div className="flex flex-wrap items-center gap-1">
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
+                    variant="rowAction"
+                    size="xs"
                     onClick={() => openRolesDialog(row)}
                   >
                     تخصیص نقش
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
+                    variant="rowAction"
+                    size="xs"
                     onClick={() => openScopesDialog(row)}
                   >
                     محدوده
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
+                    variant="rowAction"
+                    size="xs"
                     disabled={
                       setStatus.isPending || row.status === "active"
                     }
@@ -394,7 +391,7 @@ export function AccessPeoplePanel() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="tertiary"
                 disabled={updateLink.isPending}
                 onClick={() => {
                   setActionError(null);
@@ -431,7 +428,7 @@ export function AccessPeoplePanel() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="tertiary"
                 disabled={
                   setStatus.isPending || selected.status === "inactive"
                 }
@@ -594,7 +591,7 @@ export function AccessPeoplePanel() {
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => {
                 setAssignKind(null);
                 setDraftRoleIds([]);

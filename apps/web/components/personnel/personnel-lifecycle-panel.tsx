@@ -246,7 +246,7 @@ export function PersonnelLifecyclePanel() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="tertiary"
                 disabled={busy || !disposeReady}
                 onClick={(e) => openConfirm("dispose", e.currentTarget)}
               >
@@ -284,7 +284,7 @@ export function PersonnelLifecyclePanel() {
                       <Button
                         type="button"
                         size="sm"
-                        variant="outline"
+                        variant="tertiary"
                         disabled={busy}
                         onClick={(e) => {
                           setReleaseHoldId(h.id);
@@ -361,7 +361,7 @@ export function PersonnelLifecyclePanel() {
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => {
                 setConfirm(null);
                 restoreFocus();

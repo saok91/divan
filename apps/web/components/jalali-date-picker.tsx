@@ -378,7 +378,7 @@ export const JalaliDatePicker = React.forwardRef<
           <PopoverTrigger asChild>
             <Button
               type="button"
-              variant="outline"
+              variant="tertiary"
               size="icon"
               disabled={disabled}
               aria-label={`${ariaLabel} — باز کردن تقویم`}

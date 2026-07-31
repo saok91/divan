@@ -346,7 +346,7 @@ export function HeadcountApprovalPanel() {
                   {row.status === "draft" || row.status === "active" ? (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="rowAction"
                       size="sm"
                       disabled={busyId === row.id}
                       onClick={() => void runAction(row.id, "cancel")}

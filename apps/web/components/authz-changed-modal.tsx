@@ -125,7 +125,7 @@ export function AuthzChangedModal({
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="tertiary"
                 disabled={acking}
                 onClick={() => {
                   void acknowledgeAndRedirect({ saveDraft: false });

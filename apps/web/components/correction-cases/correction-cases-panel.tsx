@@ -504,8 +504,8 @@ export function CorrectionCasesPanel() {
           rowActions={(r) => (
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="rowAction"
+              size="xs"
               onClick={() => setSelectedId(r.id)}
             >
               {operationalCopy.correctionCaseDetail}
@@ -589,7 +589,7 @@ export function CorrectionCasesPanel() {
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
+                  variant="tertiary"
                   disabled={busy}
                   onClick={() =>
                     updateMutation.mutate({
@@ -607,7 +607,7 @@ export function CorrectionCasesPanel() {
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
+                  variant="tertiary"
                   disabled={busy}
                   onClick={() =>
                     updateMutation.mutate({
@@ -652,7 +652,7 @@ export function CorrectionCasesPanel() {
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
+                  variant="tertiary"
                   disabled={busy}
                   onClick={(e) => openDialog("link", e.currentTarget)}
                 >
@@ -663,7 +663,7 @@ export function CorrectionCasesPanel() {
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
+                  variant="tertiary"
                   disabled={busy}
                   onClick={(e) => openDialog("evidence", e.currentTarget)}
                 >
@@ -694,7 +694,7 @@ export function CorrectionCasesPanel() {
                           <Button
                             type="button"
                             size="sm"
-                            variant="ghost"
+                            variant="rowAction"
                             onClick={() =>
                               void downloadAttachment(a.id, "download")
                             }
@@ -704,7 +704,7 @@ export function CorrectionCasesPanel() {
                           <Button
                             type="button"
                             size="sm"
-                            variant="ghost"
+                            variant="rowAction"
                             onClick={() =>
                               void downloadAttachment(a.id, "preview")
                             }
@@ -835,7 +835,7 @@ export function CorrectionCasesPanel() {
               <DialogFooter>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => setDialog(null)}
                 >
                   {operationalCopy.correctionCaseCancel}
@@ -909,7 +909,7 @@ export function CorrectionCasesPanel() {
               <DialogFooter>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => setDialog(null)}
                 >
                   {operationalCopy.correctionCaseCancel}
@@ -949,7 +949,7 @@ export function CorrectionCasesPanel() {
               <DialogFooter>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => setDialog(null)}
                 >
                   {operationalCopy.correctionCaseCancel}
@@ -1030,7 +1030,7 @@ export function CorrectionCasesPanel() {
               <DialogFooter>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => setDialog(null)}
                 >
                   {operationalCopy.correctionCaseCancel}
@@ -1097,7 +1097,7 @@ export function CorrectionCasesPanel() {
               <DialogFooter>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => setDialog(null)}
                 >
                   {operationalCopy.correctionCaseCancel}

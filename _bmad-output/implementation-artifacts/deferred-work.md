@@ -672,3 +672,9 @@
 ## Deferred from: code review of 7-2-operations-health-without-hr-content.md (2026-07-27)
 
 - Ops/package selfchecks are mostly source greps ? do not execute unauthorized deny, live LDAP?red, or snapshot round-trip ? deferred, verification debt from Story 7.2 DoD/selfcheck scope
+
+## Deferred from: code review of 8-1-interaction-system-audit-control-contract.md (2026-07-31)
+
+- File-path ghost allowlists / brace-count `rowActions` heuristic / pagination classifier tied to exact `aria-label` — selfcheck approximation acceptable for 8.1; tighten to AST/usage-scoped guards in a later hardening pass
+- `destructive` uses hardcoded `text-white` with no `--destructive-foreground` token — wait for Story 8.2 token/spacing pass
+- `aria-disabled` without native `disabled` ignores `disabledReason` — no current Button call sites; extend when `aria-disabled` inert pattern appears

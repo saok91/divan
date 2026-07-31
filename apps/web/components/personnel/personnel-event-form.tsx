@@ -1633,7 +1633,7 @@ export function PersonnelEventForm({
           {draftId ? (
             <Button
               type="button"
-              variant="outline"
+              variant="destructive"
               disabled={deleteMut.isPending}
               onClick={() => void onDelete()}
             >
@@ -1716,7 +1716,7 @@ export function PersonnelEventForm({
                       {showCancel ? (
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="rowAction"
                           size="sm"
                           disabled={isMutationBlockedByAuthzChange}
                           onClick={() => openLifecycle("cancel", row.event.id)}
@@ -1727,7 +1727,7 @@ export function PersonnelEventForm({
                       {showReverse ? (
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="rowAction"
                           size="sm"
                           disabled={isMutationBlockedByAuthzChange}
                           onClick={() => openLifecycle("reverse", row.event.id)}
@@ -1738,7 +1738,7 @@ export function PersonnelEventForm({
                       {showCorrect ? (
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="rowAction"
                           size="sm"
                           disabled={isMutationBlockedByAuthzChange}
                           onClick={() => openLifecycle("correct", row.event.id)}

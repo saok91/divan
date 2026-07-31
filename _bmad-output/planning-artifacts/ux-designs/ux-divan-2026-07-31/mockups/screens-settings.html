@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>دیوان — تنظیمات · داده و نگه‌داشت</title>
+<style>
+/* ============================================================
+   DIRECTION A — «کنسول متراکم» (dense console)
+   رنگ‌های استفاده‌شده / HEX INVENTORY
+   ------------------------------------------------------------
+   BRAND (locked, shared across all directions)
+   #051061  navy — چرم ثابت: هدر و نوار کناری (light)
+   #030825  navy dark — چرم در تم تاریک
+   #FFFFFF  white — فورگراند چرم، سطح جدول
+   #FDB913  gold — دکمهٔ اصلی (CTA)
+   #1A1208  gold-foreground — متن روی طلایی
+   #FBC470  gold dark-theme — طلایی تم تاریک
+   #006FFF  blue — ساختار/ثانویه، حلقهٔ فوکوس
+   #808184  muted brand — متن خاموش برند
+
+   STATUS BADGE PAIRS (locked)
+   #E7F5FF / #1864AB   زمان‌بندی‌شده (scheduled)
+   #D3F9D8 / #2B8A3E   اثرگذار (effective)
+   #F1F3F5 / #495057   لغوشده (cancelled)
+   #FFF9DB / #E67700   پیش‌نویس (draft)
+   #FFF3BF / #862E00   بازنویسی (override)
+
+   STALE BANNER (locked)
+   #FFF3BF bg / #862E00 fg / #FDB913 border
+
+   DIRECTION-A NEUTRALS (this direction's own choice: hairlines, no boxes)
+   #F4F5F8  page backdrop پشت قاب‌های ماکت
+   #FFFFFF  surface — سطح اصلی محتوا
+   #FAFBFC  subtle surface — نوار ابزار و سرستون
+   #E8EAEF  hairline — خط جداکنندهٔ مویی بین ردیف‌ها
+   #DCDFE7  hairline strong — مرز نوار ابزار و سرستون
+   #D2D5DF  control border — مرز دکمه‌های اقدام ردیف
+   #11142A  text primary
+   #4A4F63  text secondary
+   #8A8F9E  text tertiary / placeholder
+   #F2F4F8  row hover
+   #EEF1F6  kbd chip bg
+   #E9EAF0  skeleton block
+   #EAF3FF  blue tint — پس‌زمینهٔ تراشهٔ فیلتر فعال
+   #C7DEFF  blue tint border
+   #F9FAFB  disabled surface
+   #B8BCC8  disabled text
+
+   DARK PARITY SNIPPET
+   #030825  dark chrome / صفحه
+   #0A1138  dark surface
+   #131C4A  dark row hover
+   #232C5E  dark border
+   #E6E9F5  dark text primary
+   #9AA1C0  dark text secondary
+   ============================================================ */
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:#F4F5F8;color:#11142A;
+  font-family:"Yekan Bakh Fa-En","Segoe UI",Tahoma,sans-serif;
+  font-size:13px;line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+.ic{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.ic-sm{width:13px;height:13px}
+
+/* ---------- document (rationale) ---------- */
+.doc{max-width:1400px;margin:0 auto;padding:28px 24px 8px}
+.doc h1{margin:0 0 6px;font-size:20px;font-weight:800;letter-spacing:-.01em}
+.doc .kicker{font-size:11px;font-weight:700;color:#006FFF;letter-spacing:.06em;margin-bottom:8px}
+.doc p{margin:0 0 14px;max-width:78ch;color:#4A4F63;font-size:13.5px;line-height:1.85}
+.spec{display:flex;flex-wrap:wrap;gap:0;border:1px solid #DCDFE7;background:#FFFFFF;border-radius:6px;overflow:hidden}
+.spec div{padding:9px 14px;border-inline-start:1px solid #E8EAEF;flex:1 1 auto;min-width:150px}
+.spec div:first-child{border-inline-start:0}
+.spec dt{font-size:10.5px;color:#8A8F9E;font-weight:700;letter-spacing:.04em;margin:0 0 2px}
+.spec dd{margin:0;font-size:12.5px;font-weight:600;color:#11142A}
+
+/* ---------- browser frame mock ---------- */
+.mock{max-width:1400px;margin:0 auto;padding:18px 24px 0;overflow-x:auto}
+.mock-label{font-size:11.5px;font-weight:700;color:#4A4F63;margin:0 0 7px;display:flex;align-items:center;gap:8px}
+.mock-label span{font-weight:500;color:#8A8F9E}
+.frame{width:1280px;border:1px solid #DCDFE7;border-radius:8px;overflow:hidden;background:#FFFFFF;box-shadow:0 1px 2px rgba(5,16,97,.05)}
+.frame-bar{height:32px;background:#FAFBFC;border-bottom:1px solid #E8EAEF;display:flex;align-items:center;gap:8px;padding:0 10px}
+.dot{width:8px;height:8px;border-radius:50%;background:#DCDFE7}
+.frame-url{margin-inline-start:8px;flex:1;height:19px;border-radius:4px;background:#FFFFFF;border:1px solid #E8EAEF;font-size:10.5px;color:#8A8F9E;display:flex;align-items:center;padding:0 8px;direction:ltr;justify-content:flex-start}
+
+/* ---------- app shell ---------- */
+.app{display:grid;grid-template-rows:56px 1fr;height:684px;background:#FFFFFF}
+.app-sm{height:auto}
+.topbar{background:#051061;color:#FFFFFF;display:flex;align-items:center;padding:0 14px;gap:12px}
+.brand{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;letter-spacing:.02em;min-width:212px}
+.brand-mark{width:22px;height:22px;border-radius:4px;background:#FDB913;color:#1A1208;display:grid;place-items:center;font-size:12px;font-weight:900}
+.topbar .spacer{flex:1}
+.top-btn{height:30px;padding:0 9px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:transparent;color:#FFFFFF;font:inherit;font-size:12px;display:flex;align-items:center;gap:6px}
+.top-user{display:flex;align-items:center;gap:7px;font-size:12px}
+.avatar{width:24px;height:24px;border-radius:50%;background:#006FFF;color:#FFFFFF;display:grid;place-items:center;font-size:11px;font-weight:700}
+.body{display:grid;grid-template-columns:240px 1fr;min-height:0}
+.body-collapsed{grid-template-columns:64px 1fr}
+.side{background:#051061;color:#FFFFFF;padding:8px 8px 12px;overflow:auto}
+.side-group{font-size:10px;color:rgba(255,255,255,.5);font-weight:700;letter-spacing:.06em;padding:10px 8px 5px}
+.nav{display:flex;align-items:center;gap:9px;height:30px;padding:0 8px;border-radius:4px;color:rgba(255,255,255,.78);font-size:12.5px;text-decoration:none;margin-bottom:1px}
+.nav:hover{background:rgba(255,255,255,.07);color:#FFFFFF}
+.nav.on{background:rgba(255,255,255,.13);color:#FFFFFF;font-weight:700;box-shadow:inset 2px 0 0 #FDB913}
+.nav .kb{margin-inline-start:auto;font-size:9.5px;color:rgba(255,255,255,.45);background:rgba(255,255,255,.08);border-color:transparent;font-family:inherit}
+.body-collapsed .nav{justify-content:center;padding:0}
+.body-collapsed .nav span.t,.body-collapsed .nav .kb,.body-collapsed .side-group{display:none}
+.main{min-width:0;overflow:auto;background:#FFFFFF}
+
+/* ---------- page header: typographic, no box ---------- */
+.phead{padding:12px 16px 0}
+.crumb{font-size:11px;color:#8A8F9E;margin-bottom:3px}
+.ptitle{display:flex;align-items:baseline;gap:10px}
+.ptitle h2{margin:0;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.ptitle .count{font-size:12px;color:#8A8F9E;font-weight:600}
+.tabs{display:flex;gap:2px;margin-top:8px;border-bottom:1px solid #E8EAEF}
+.tab{padding:0 10px;height:30px;display:flex;align-items:center;font-size:12.5px;color:#4A4F63;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+.tab.on{color:#11142A;font-weight:700;border-bottom-color:#051061}
+
+/* ---------- banner stack ---------- */
+.banners{padding:10px 16px 0}
+.banner{background:#FFF3BF;color:#862E00;border:1px solid #FDB913;border-radius:4px;padding:7px 10px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.7}
+.banner .bi{margin-top:2px}
+details.more{display:inline}
+details.more summary{display:inline;cursor:pointer;color:#862E00;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+details.more summary::-webkit-details-marker{display:none}
+details.more p{margin:5px 0 0;font-size:12px;color:#862E00;opacity:.92;max-width:82ch}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;align-items:center;gap:6px;padding:9px 16px;flex-wrap:wrap}
+.btn{height:28px;padding:0 10px;border-radius:6px;border:1px solid #D2D5DF;background:#FFFFFF;color:#11142A;font:inherit;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#F2F4F8}
+.btn-gold{height:32px;background:#FDB913;border-color:#FDB913;color:#1A1208;font-weight:800}
+.btn-blue{background:#006FFF;border-color:#006FFF;color:#FFFFFF;font-weight:700}
+.btn-ghost{border-color:transparent;background:transparent;color:#4A4F63}
+.btn[disabled]{background:#F9FAFB;border-color:#E8EAEF;color:#B8BCC8;cursor:not-allowed}
+.kb{font-size:10px;font-weight:700;color:#8A8F9E;background:#EEF1F6;border:1px solid #E8EAEF;border-radius:3px;padding:0 4px;line-height:15px;display:inline-block;min-width:16px;text-align:center}
+.btn .kb{background:rgba(0,0,0,.06);border-color:transparent}
+.search{height:28px;flex:0 1 240px;display:flex;align-items:center;gap:6px;border:1px solid #D2D5DF;border-radius:4px;padding:0 8px;color:#8A8F9E;font-size:12.5px;background:#FFFFFF}
+.chip{height:24px;display:inline-flex;align-items:center;gap:6px;padding:0 6px 0 4px;border-radius:4px;background:#EAF3FF;border:1px solid #C7DEFF;color:#1864AB;font-size:11.5px;font-weight:700}
+.chip b{font-weight:800}
+.chip .x{width:15px;height:15px;border-radius:3px;display:grid;place-items:center;color:#1864AB;cursor:pointer}
+.chip .x:hover{background:#C7DEFF}
+.tb-spacer{flex:1}
+.tb-meta{font-size:11.5px;color:#8A8F9E;font-weight:600}
+
+/* ---------- table: hairlines, no zebra, no card ---------- */
+.tbl-wrap{overflow:auto;border-top:1px solid #DCDFE7;max-height:352px}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+thead th{
+  position:sticky;top:0;z-index:3;background:#FAFBFC;color:#4A4F63;
+  font-size:10.5px;font-weight:800;letter-spacing:.03em;text-align:start;
+  height:28px;padding:0 6px;white-space:nowrap;border-bottom:1px solid #DCDFE7;
+}
+tbody td{height:32px;padding:0 6px;border-bottom:1px solid #E8EAEF;white-space:nowrap;background:#FFFFFF;vertical-align:middle}
+tbody tr:hover td{background:#F2F4F8}
+td.num,th.num{font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.name{font-weight:700;color:#11142A}
+.trunc{max-width:104px;overflow:hidden;text-overflow:ellipsis;display:block}
+.trunc-team{max-width:112px;overflow:hidden;text-overflow:ellipsis;display:block}
+tr.ended td{color:#8A8F9E}
+tr.ended .name{color:#4A4F63;font-weight:600}
+
+/* sticky identifier column at inline-start */
+th.c-id,td.c-id{position:sticky;inset-inline-start:0;z-index:2;box-shadow:inset -1px 0 0 #E8EAEF}
+thead th.c-id{z-index:4}
+/* sticky actions column at inline-end */
+th.c-act,td.c-act{position:sticky;inset-inline-end:0;z-index:2;box-shadow:inset 1px 0 0 #DCDFE7;padding-inline:6px}
+thead th.c-act{z-index:4}
+tr:hover td.c-id,tr:hover td.c-act{background:#F2F4F8}
+
+/* Direction A row-action affordance: compact OUTLINED icon+label, 24px, always bordered */
+.rowacts{display:flex;gap:3px;align-items:center}
+.ra{
+  height:24px;padding:0 5px;border-radius:4px;
+  border:1px solid #D2D5DF;background:#FFFFFF;color:#11142A;
+  font:inherit;font-size:10.5px;font-weight:700;
+  display:inline-flex;align-items:center;gap:3px;cursor:pointer;white-space:nowrap;
+}
+.ra .ic-sm{width:12px;height:12px}
+/* icon-only marker used inside the dense table when an action is blocked; full reason text lives in the states panel */
+.ra-flag{width:22px;height:22px;border-radius:4px;background:#FFF3BF;border:1px solid #FDB913;color:#862E00;display:inline-grid;place-items:center;flex:none}
+.ra:hover{background:#F2F4F8;border-color:#8A8F9E}
+.ra-blue{color:#006FFF;border-color:#C7DEFF}
+.ra-blue:hover{background:#EAF3FF;border-color:#006FFF}
+.ra[disabled]{background:#F9FAFB;border-color:#E8EAEF;color:#B8BCC8;cursor:not-allowed}
+.ra-reason{font-size:10.5px;color:#862E00;background:#FFF3BF;border:1px solid #FDB913;border-radius:3px;padding:0 5px;line-height:17px;white-space:nowrap}
+
+.badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:700}
+.b-yes{background:#D3F9D8;color:#2B8A3E}
+.b-no{background:#F1F3F5;color:#495057}
+.b-sched{background:#E7F5FF;color:#1864AB}
+.b-draft{background:#FFF9DB;color:#E67700}
+
+/* ---------- states ---------- */
+.state-strip{display:grid;grid-template-columns:1fr;gap:0}
+.state-block{padding:0}
+.state-head{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#FAFBFC;border-bottom:1px solid #E8EAEF;border-top:1px solid #DCDFE7}
+.state-head h3{margin:0;font-size:12px;font-weight:800}
+.state-head span{font-size:11px;color:#8A8F9E}
+.empty{padding:34px 16px;text-align:center}
+.empty .mark{width:30px;height:30px;border-radius:6px;border:1px solid #DCDFE7;display:inline-grid;place-items:center;color:#8A8F9E;margin-bottom:9px}
+.empty p{margin:0 0 11px;font-size:13px;color:#4A4F63;font-weight:600}
+@keyframes pulseA{0%,100%{opacity:.5}50%{opacity:1}}
+.sk{display:block;height:8px;border-radius:3px;background:#E9EAF0;animation:pulseA 1.5s ease-in-out infinite}
+.sk-btn{height:24px;border-radius:4px;background:#E9EAF0;animation:pulseA 1.5s ease-in-out infinite}
+
+/* ---------- form (screen 3) ---------- */
+.form-wrap{padding:12px 16px 18px;max-width:1120px}
+.fsec{border-top:1px solid #E8EAEF;padding:11px 0 13px;display:grid;grid-template-columns:168px 1fr;gap:16px}
+.fsec:first-of-type{border-top:0}
+.fsec-h h4{margin:0;font-size:12.5px;font-weight:800}
+.fsec-h p{margin:2px 0 0;font-size:11.5px;color:#8A8F9E;line-height:1.6}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+.f label{display:block;font-size:11px;font-weight:700;color:#4A4F63;margin-bottom:3px}
+.inp{height:32px;border:1px solid #D2D5DF;border-radius:4px;background:#FFFFFF;padding:0 8px;font-size:12.5px;display:flex;align-items:center;gap:6px;color:#11142A}
+.inp.focus{border-color:#006FFF;box-shadow:0 0 0 2px rgba(0,111,255,.18)}
+.inp .ph{color:#8A8F9E}
+.inp .cursor{width:1px;height:15px;background:#11142A;display:inline-block}
+.inp.off{background:#F9FAFB;color:#B8BCC8;border-color:#E8EAEF}
+.hint{font-size:10.5px;color:#8A8F9E;margin-top:3px}
+.picker{position:relative}
+.pop{
+  position:absolute;inset-inline-start:0;inset-inline-end:0;top:calc(100% + 3px);z-index:9;
+  background:#FFFFFF;border:1px solid #D2D5DF;border-radius:4px;box-shadow:0 6px 18px rgba(5,16,97,.13);overflow:hidden;
+}
+.pop-h{padding:5px 9px;font-size:10.5px;color:#8A8F9E;font-weight:700;border-bottom:1px solid #E8EAEF;background:#FAFBFC;display:flex;justify-content:space-between}
+.opt{padding:5px 9px;border-bottom:1px solid #F2F4F8;cursor:pointer}
+.opt:last-child{border-bottom:0}
+.opt.on{background:#EAF3FF;box-shadow:inset 2px 0 0 #006FFF}
+.opt .l1{font-size:12.5px;font-weight:700;color:#11142A}
+.opt .l1 .code{color:#006FFF;font-weight:800}
+.opt .l2{font-size:11px;color:#8A8F9E}
+.pop-f{padding:4px 9px;font-size:10.5px;color:#8A8F9E;background:#FAFBFC;border-top:1px solid #E8EAEF;display:flex;gap:10px}
+.token{height:24px;display:inline-flex;align-items:center;gap:6px;padding:0 5px 0 3px;border-radius:4px;background:#EAF3FF;border:1px solid #C7DEFF;color:#11142A;font-size:11.5px;font-weight:700}
+.token .code{color:#006FFF;font-weight:800}
+.token .x{width:16px;height:16px;border-radius:3px;display:grid;place-items:center;color:#4A4F63;cursor:pointer}
+.token .x:hover{background:#C7DEFF}
+details.tech{border:1px solid #E8EAEF;border-radius:4px;background:#FAFBFC;margin-top:2px}
+details.tech summary{list-style:none;cursor:pointer;padding:6px 9px;font-size:11.5px;font-weight:700;color:#4A4F63;display:flex;align-items:center;gap:6px}
+details.tech summary::-webkit-details-marker{display:none}
+details.tech .tech-body{padding:0 9px 8px;display:flex;align-items:center;gap:8px}
+.uuid{direction:ltr;font-family:"Segoe UI",Tahoma,monospace;font-size:11px;background:#FFFFFF;border:1px solid #E8EAEF;border-radius:3px;padding:3px 7px;color:#4A4F63;user-select:all}
+.cap{display:flex;gap:0;border:1px solid #E8EAEF;border-radius:4px;overflow:hidden;max-width:340px}
+.cap div{flex:1;padding:6px 10px;border-inline-start:1px solid #E8EAEF}
+.cap div:first-child{border-inline-start:0}
+.cap dt{font-size:10.5px;color:#8A8F9E;font-weight:700;margin:0}
+.cap dd{margin:0;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.3}
+.cap .free dd{color:#2B8A3E}
+.cap .res dd{color:#E67700}
+.fbar{position:sticky;bottom:0;background:#FFFFFF;border-top:1px solid #DCDFE7;padding:9px 16px;display:flex;align-items:center;gap:8px}
+.fbar .sp{flex:1}
+.fbar .note{font-size:11px;color:#8A8F9E}
+
+/* ---------- dark parity snippet ---------- */
+.dark{background:#030825;border-radius:8px;padding:0;overflow:hidden;border:1px solid #232C5E}
+.dark .dhead{background:#030825;color:#9AA1C0;padding:8px 12px;font-size:11px;font-weight:700;border-bottom:1px solid #232C5E}
+.dark table{color:#E6E9F5}
+.dark thead th{background:#0A1138;color:#9AA1C0;border-bottom:1px solid #232C5E}
+.dark tbody td{background:#030825;border-bottom:1px solid #232C5E;color:#E6E9F5}
+.dark tbody tr:hover td{background:#131C4A}
+.dark .ra{background:#0A1138;border-color:#232C5E;color:#E6E9F5}
+.dark .ra-blue{color:#FBC470;border-color:#5A4620}
+.dark .btn-gold{background:#FBC470;border-color:#FBC470;color:#1A1208}
+.dark .b-yes{background:#123722;color:#8CE0A6}
+.foot{max-width:1400px;margin:0 auto;padding:14px 24px 40px;color:#8A8F9E;font-size:11.5px}
+
+/* ============================================================
+   ADDITIONS FOR «تنظیمات» — settings-row component only.
+   New hex beyond the inventory:
+   #C92A2A  validation error fg (only place an error red exists)
+   #FFF5F5  validation error tint
+   #E09E00  gold hairline for the dirty marker dot
+   #5A4620  dark-theme gold hairline (already used by .dark .ra-blue)
+   ============================================================ */
+.pnote{margin:5px 0 0;font-size:12px;color:#4A4F63;line-height:1.75;max-width:104ch}
+.pnote .sub{color:#8A8F9E}
+
+/* settings-row: two columns — meaning at inline-start of the row, control at inline-end */
+.srow{display:grid;grid-template-columns:1fr 348px;gap:9px 18px;padding:11px 16px;border-bottom:1px solid #E8EAEF;align-items:start;background:#FFFFFF}
+.srow:hover{background:#F2F4F8}
+.srow-lock,.srow-lock:hover{background:#F9FAFB}
+.s-title{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.s-title h4{margin:0;font-size:13px;font-weight:800;color:#11142A}
+.s-desc{margin:3px 0 0;font-size:12px;color:#4A4F63;line-height:1.7;max-width:62ch}
+.s-meta{margin-top:5px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;font-size:11px;color:#8A8F9E}
+.s-meta b{font-weight:700;color:#4A4F63}
+.s-sep{width:3px;height:3px;border-radius:50%;background:#B8BCC8;display:inline-block}
+.s-ctl{display:flex;flex-direction:column;gap:3px}
+.s-line{display:flex;align-items:center;gap:6px}
+.s-line .inp{flex:1;min-width:0}
+.s-line .picker{flex:1;min-width:0}
+.s-unit{margin-inline-start:auto;font-size:11.5px;color:#8A8F9E;font-weight:700;white-space:nowrap}
+.s-tag{height:18px;display:inline-flex;align-items:center;gap:4px;padding:0 6px;border-radius:4px;font-size:10.5px;font-weight:800;background:#EAF3FF;color:#1864AB;border:1px solid #C7DEFF}
+.s-tag-lock{background:#F1F3F5;color:#495057;border-color:#DCDFE7}
+.s-tag-dirty{background:#FFF9DB;color:#E67700;border-color:#FDB913}
+/* read-only value renders as text on the muted surface, never as a greyed input */
+.s-static{min-height:32px;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;color:#11142A;padding:0 2px}
+.s-path{display:flex;gap:6px;align-items:flex-start;font-size:11px;color:#4A4F63;line-height:1.7}
+.s-path .ic-sm{margin-top:3px;color:#8A8F9E}
+.codeltr{direction:ltr;unicode-bidi:isolate;font-family:"Segoe UI",Tahoma,monospace;font-size:10.5px;background:#FFFFFF;border:1px solid #E8EAEF;border-radius:3px;padding:1px 5px;color:#4A4F63}
+.s-full{grid-column:1 / -1}
+.s-confirm{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:#FFFFFF;border:1px solid #DCDFE7;border-inline-start:3px solid #FDB913;border-radius:4px;padding:7px 9px}
+.s-diff{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;white-space:nowrap}
+.s-old{color:#8A8F9E;text-decoration:line-through}
+.s-new{color:#11142A;font-weight:800}
+.s-blast{flex:1 1 300px;display:flex;gap:6px;font-size:11.5px;color:#4A4F63;line-height:1.65}
+.s-blast .ic-sm{margin-top:2px;color:#8A8F9E;flex:none}
+.s-dot{width:7px;height:7px;border-radius:50%;background:#FDB913;border:1px solid #E09E00;flex:none}
+.inp.bad{border-color:#C92A2A;box-shadow:0 0 0 2px rgba(201,42,42,.13)}
+.err{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#C92A2A;background:#FFF5F5;border-radius:3px;padding:2px 5px;margin-top:2px}
+/* toggle: knob sits at inline-start when off, travels to inline-end when on */
+.tgl{width:38px;height:21px;border-radius:11px;background:#FFFFFF;border:1px solid #D2D5DF;position:relative;flex:none;cursor:pointer}
+.tgl i{position:absolute;top:2px;inset-inline-start:2px;width:15px;height:15px;border-radius:50%;background:#8A8F9E}
+.tgl.on{background:#006FFF;border-color:#006FFF}
+.tgl.on i{inset-inline-start:auto;inset-inline-end:2px;background:#FFFFFF}
+.tgl-lbl{font-size:12px;font-weight:700;color:#11142A}
+/* tooltip for the 24px icon-only row actions; .on renders it open for the mock */
+.tip{position:relative;display:inline-flex}
+.tip .tip-b{position:absolute;top:calc(100% + 5px);inset-inline-end:0;background:#11142A;color:#FFFFFF;font-size:10.5px;font-weight:600;line-height:1.5;padding:4px 7px;border-radius:4px;white-space:nowrap;opacity:0;pointer-events:none;z-index:8}
+.tip:hover .tip-b,.tip.on .tip-b{opacity:1}
+
+/* ---------- governed-change dialog ---------- */
+.dlg{width:540px;background:#FFFFFF;border:1px solid #DCDFE7;border-radius:8px;box-shadow:0 10px 30px rgba(5,16,97,.14);overflow:hidden}
+.dlg-h{padding:11px 14px;border-bottom:1px solid #E8EAEF;display:flex;align-items:center;gap:8px}
+.dlg-h h3{margin:0;font-size:14px;font-weight:800}
+.dlg-h .x{margin-inline-start:auto;color:#8A8F9E;cursor:pointer}
+.dlg-b{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.dlg-param{font-size:12.5px;color:#4A4F63}
+.dlg-param b{font-weight:800;color:#11142A;font-size:13px}
+.vs{display:grid;grid-template-columns:1fr 20px 1fr;align-items:center;gap:9px}
+.vbox{border:1px solid #E8EAEF;border-radius:4px;padding:6px 9px;background:#FAFBFC}
+.vbox dt{margin:0;font-size:10.5px;color:#8A8F9E;font-weight:700}
+.vbox dd{margin:0;font-size:15px;font-weight:800;color:#4A4F63;line-height:1.4}
+.vbox.next{background:#FFFFFF;border-color:#FDB913}
+.vbox.next dd{color:#11142A}
+.vs-arrow{color:#8A8F9E;justify-self:center;transform:rotate(90deg)}
+.ta{min-height:58px;border:1px solid #D2D5DF;border-radius:4px;padding:6px 8px;font-size:12.5px;color:#8A8F9E;background:#FFFFFF;line-height:1.7}
+.ta.focus{border-color:#006FFF;box-shadow:0 0 0 2px rgba(0,111,255,.18)}
+.audit-note{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;color:#4A4F63;background:#F2F4F8;border-radius:4px;padding:7px 9px;line-height:1.65}
+.audit-note .ic-sm{margin-top:2px;color:#8A8F9E;flex:none}
+.dlg-f{padding:9px 14px;border-top:1px solid #DCDFE7;background:#FAFBFC;display:flex;align-items:center;gap:8px}
+.dlg-f .sp{flex:1}
+
+/* ---------- dark parity for settings rows ---------- */
+.dark .srow{background:#030825;border-bottom-color:#232C5E}
+.dark .srow:hover{background:#131C4A}
+.dark .srow-lock,.dark .srow-lock:hover{background:#0A1138}
+.dark .s-title h4,.dark .s-static,.dark .tgl-lbl{color:#E6E9F5}
+.dark .s-desc,.dark .s-meta,.dark .s-path,.dark .s-unit,.dark .hint{color:#9AA1C0}
+.dark .s-meta b{color:#E6E9F5}
+.dark .s-path .ic-sm{color:#9AA1C0}
+.dark .inp{background:#0A1138;border-color:#232C5E;color:#E6E9F5}
+.dark .s-tag-lock{background:#131C4A;color:#9AA1C0;border-color:#232C5E}
+.dark .codeltr{background:#131C4A;border-color:#232C5E;color:#9AA1C0}
+.dark .tip .tip-b{background:#131C4A;color:#E6E9F5;border:1px solid #232C5E}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-dash" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></symbol>
+  <symbol id="i-people" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.6"/><path d="M1.6 13.6c0-2.4 2-3.9 4.4-3.9s4.4 1.5 4.4 3.9"/><path d="M11 4.2a2.4 2.4 0 0 1 0 4.4M12.2 10.4c1.4.5 2.3 1.6 2.3 3.2"/></symbol>
+  <symbol id="i-event" viewBox="0 0 16 16"><rect x="2" y="3.4" width="12" height="10.6" rx="1.6"/><path d="M2 6.6h12M5.4 1.8v3M10.6 1.8v3"/></symbol>
+  <symbol id="i-org" viewBox="0 0 16 16"><rect x="6" y="1.6" width="4" height="3" rx="1"/><rect x="1.4" y="11" width="4" height="3" rx="1"/><rect x="10.6" y="11" width="4" height="3" rx="1"/><path d="M8 4.6v3.2M3.4 11V7.8h9.2V11"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 16 16"><path d="M2 12.2a6 6 0 1 1 12 0"/><path d="M8 12.2l3.1-3.4"/></symbol>
+  <symbol id="i-report" viewBox="0 0 16 16"><path d="M2 13.6h12"/><rect x="2.8" y="8" width="2.6" height="5.6"/><rect x="6.7" y="4.4" width="2.6" height="9.2"/><rect x="10.6" y="9.6" width="2.6" height="4"/></symbol>
+  <symbol id="i-import" viewBox="0 0 16 16"><path d="M8 2v8M5 7.2L8 10.2l3-3M2.4 13.6h11.2"/></symbol>
+  <symbol id="i-key" viewBox="0 0 16 16"><circle cx="5.4" cy="10.6" r="3"/><path d="M7.6 8.4l6.2-6.2M11.2 4.8l1.6 1.6"/></symbol>
+  <symbol id="i-audit" viewBox="0 0 16 16"><path d="M8 1.8l5.2 2v4.3c0 3.3-2.3 5.4-5.2 6.3-2.9-.9-5.2-3-5.2-6.3V3.8z"/><path d="M5.9 7.9l1.5 1.5 2.8-2.9"/></symbol>
+  <symbol id="i-ops" viewBox="0 0 16 16"><rect x="1.6" y="2.6" width="12.8" height="10.8" rx="1.6"/><path d="M4.6 6.4l2 2-2 2M8.6 11.4h3"/></symbol>
+  <symbol id="i-fix" viewBox="0 0 16 16"><rect x="3" y="1.8" width="8.6" height="12.4" rx="1.4"/><path d="M5.4 5.6h4M5.4 8.2h4M5.4 10.8h2.2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.4v2M8 12.6v2M1.4 8h2M12.6 8h2M3.3 3.3l1.5 1.5M11.2 11.2l1.5 1.5M12.7 3.3l-1.5 1.5M4.8 11.2l-1.5 1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.6"/><path d="M10.4 10.4L14 14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></symbol>
+  <symbol id="i-cols" viewBox="0 0 16 16"><rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.4"/><path d="M6.2 2.6v10.8M10.2 2.6v10.8"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.2v9.6M3.2 8h9.6"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 16 16"><path d="M11.2 2.2l2.6 2.6-8 8-3.4.8.8-3.4z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="8.6" height="8.6" rx="1.4"/><path d="M10.6 5.4V3.4a1.4 1.4 0 0 0-1.4-1.4H3.4A1.4 1.4 0 0 0 2 3.4v5.8a1.4 1.4 0 0 0 1.4 1.4h2"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.2l6 10.4H2z"/><path d="M8 6.4v3M8 11.1v.1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 16 16"><path d="M13.2 9.6A5.8 5.8 0 0 1 6.4 2.8a5.8 5.8 0 1 0 6.8 6.8z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 16 16"><path d="M1.8 3.2h12.4L9.4 8.6v4.4l-2.8 1.4V8.6z"/></symbol>
+  <!-- افزوده برای صفحهٔ تنظیمات -->
+  <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.2" y="7" width="9.6" height="7" rx="1.4"/><path d="M5.4 7V5.2a2.6 2.6 0 0 1 5.2 0V7"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 16 16"><path d="M3.2 7.6h6.6a3.4 3.4 0 1 1 0 6.8H6.4"/><path d="M5.8 4.4L3.2 7.6l2.6 3.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.4v3.8M8 5.1v.1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.4l3.4 3.4L13 5"/></symbol>
+</svg>
+
+<div class="doc">
+  <p class="kicker">دیوان · جهت «کنسول متراکم» · صفحهٔ تنظیمات</p>
+  <h1>تنظیمات — زبانهٔ «داده و نگه‌داشت»</h1>
+  <p>
+    این صفحه، پارامترهای سطح‌برنامه را به‌صورت «ردیف تنظیم» نشان می‌دهد: در سمت راست هر ردیف معنا و مسئولیت پارامتر
+    (عنوان، شرح عملیاتی، منبع مقدار، پیش‌فرض و آخرین تغییر) و در سمت چپ همان ردیف، کنترل ویرایش. هیچ نوار ذخیرهٔ سراسری
+    وجود ندارد؛ هر پارامتر جداگانه و با ثبت ممیزی اعمال می‌شود تا دامنهٔ اثر هر تغییر روشن بماند.
+  </p>
+  <div class="spec">
+    <div><dt>مؤلفه</dt><dd>settings-row</dd></div>
+    <div><dt>حالت‌ها</dt><dd>عدد · انتخاب · کلید · ویرایش‌نشده/دست‌خورده · نامعتبر · فقط‌خواندنی · دامنه‌دار</dd></div>
+    <div><dt>اقدام ردیف</dt><dd>دکمهٔ ۲۴px فقط‌آیکن با راهنمای شناور</dd></div>
+    <div><dt>CTA طلایی</dt><dd>حداکثر یکی در هر ناحیه</dd></div>
+    <div><dt>تم تاریک</dt><dd>هم‌ترازی کامل ردیف تنظیم</dd></div>
+  </div>
+</div>
+
+<div class="mock">
+  <p class="mock-label">صفحهٔ تنظیمات — زبانهٔ «داده و نگه‌داشت» <span>۱۲۸۰×۶۸۴ · RTL</span></p>
+  <div class="frame">
+    <div class="frame-bar">
+      <i class="dot"></i><i class="dot"></i><i class="dot"></i>
+      <div class="frame-url">divan.local/settings/data-retention</div>
+    </div>
+    <div class="app">
+      <div class="topbar">
+        <div class="brand"><span class="brand-mark">د</span> دیوان</div>
+        <div class="spacer"></div>
+        <button class="top-btn"><svg class="ic"><use href="#i-search"/></svg> جستجوی سراسری <span class="kb">Ctrl K</span></button>
+        <button class="top-btn"><svg class="ic"><use href="#i-moon"/></svg></button>
+        <div class="top-user"><span class="avatar">ر ک</span> رضا کاظمی <span style="color:rgba(255,255,255,.55)">· مدیر سامانه</span></div>
+      </div>
+      <div class="body">
+        <nav class="side">
+          <div class="side-group">سامانه</div>
+          <a class="nav"><svg class="ic"><use href="#i-dash"/></svg><span class="t">داشبورد</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-people"/></svg><span class="t">اطلاعات پرسنلی</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-event"/></svg><span class="t">رویدادهای پرسنلی</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-org"/></svg><span class="t">ساختار سازمان</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-cap"/></svg><span class="t">ظرفیت و جذب</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-report"/></svg><span class="t">گزارش‌ها</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-import"/></svg><span class="t">ورود داده</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-key"/></svg><span class="t">دسترسی‌ها</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-audit"/></svg><span class="t">ممیزی</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-ops"/></svg><span class="t">عملیات</span></a>
+          <a class="nav"><svg class="ic"><use href="#i-fix"/></svg><span class="t">اصلاح اطلاعات</span></a>
+          <a class="nav on"><svg class="ic"><use href="#i-gear"/></svg><span class="t">تنظیمات</span></a>
+        </nav>
+        <main class="main">
+          <div class="phead">
+            <div class="crumb">سامانه ‹ تنظیمات</div>
+            <div class="ptitle"><h2>تنظیمات</h2><span class="count">۷ پارامتر در این زبانه</span></div>
+            <p class="pnote">
+              پارامترهای سطح‌برنامه اینجا اداره می‌شوند: مقادیری که رفتار نگه‌داشت، خروجی‌ها، ظرفیت و نشست را برای همهٔ کاربران تعیین می‌کنند.
+              <span class="sub">هر مدیر فقط دامنه‌هایی را می‌بیند که مالک آن است؛ پارامترهای بیرون از دامنهٔ شما در فهرست ظاهر نمی‌شوند.</span>
+            </p>
+            <div class="tabs">
+              <a class="tab">عمومی و نمایش</a>
+              <a class="tab on">داده و نگه‌داشت</a>
+              <a class="tab">ورود و خروجی</a>
+              <a class="tab">ظرفیت و جذب</a>
+              <a class="tab">دسترسی و نشست</a>
+              <a class="tab">ممیزی و یکپارچگی</a>
+              <a class="tab">زیرساخت</a>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <div class="search"><svg class="ic"><use href="#i-search"/></svg> جستجو در پارامترها…</div>
+            <span class="chip"><b>وضعیت:</b> تغییریافته از پیش‌فرض <i class="x"><svg class="ic-sm ic"><use href="#i-x"/></svg></i></span>
+            <button class="btn"><svg class="ic"><use href="#i-audit"/></svg> تاریخچهٔ تغییر پارامترها</button>
+            <div class="tb-spacer"></div>
+            <span class="tb-meta">۲ تغییر اعمال‌نشده · دامنهٔ شما: داده، نگه‌داشت، ممیزی</span>
+          </div>
+
+          <div class="state-head"><h3>نگه‌داشت و قالب داده</h3><span>مقادیر ذخیره‌شده در پایگاه پیکربندی — بلافاصله پس از اعمال اثرگذارند</span></div>
+
+          <!-- ۱ — عددی قابل ویرایش -->
+          <section class="srow">
+            <div>
+              <div class="s-title"><h4>مدت نگه‌داشت سوابق ممیزی</h4></div>
+              <p class="s-desc">تعیین می‌کند رکوردهای ممیزی چند روز پس از ثبت، جست‌وجوپذیر بمانند. پس از پایان این مدت، پاک‌سازی شبانه آن‌ها را از جدول فعال خارج می‌کند و در گزارش‌های ممیزی دیده نمی‌شوند.</p>
+              <div class="s-meta">
+                <span>منبع: <b>مقدار ذخیره‌شده</b></span><i class="s-sep"></i>
+                <span>پیش‌فرض: <b>۳۶۵ روز</b></span><i class="s-sep"></i>
+                <span>آخرین تغییر: <b>رضا کاظمی</b> — ۱۴۰۵/۰۵/۰۸ ۱۴:۲۲</span>
+              </div>
+            </div>
+            <div class="s-ctl">
+              <div class="s-line">
+                <div class="inp"><span>۵۴۰</span><span class="s-unit">روز</span></div>
+                <div class="rowacts">
+                  <span class="tip on">
+                    <button class="ra" aria-label="بازگشت به پیش‌فرض"><svg class="ic-sm ic"><use href="#i-undo"/></svg></button>
+                    <span class="tip-b">بازگشت به پیش‌فرض (۳۶۵ روز)</span>
+                  </span>
+                  <span class="tip">
+                    <button class="ra" aria-label="تاریخچهٔ این پارامتر"><svg class="ic-sm ic"><use href="#i-audit"/></svg></button>
+                    <span class="tip-b">تاریخچهٔ این پارامتر</span>
+                  </span>
+                </div>
+              </div>
+              <div class="hint">مقدار مجاز: ۹۰ تا ۳۶۵۰ روز · گام ۱ روز</div>
+            </div>
+          </section>
+
+          <!-- ۲ — انتخابی قابل ویرایش -->
+          <section class="srow">
+            <div>
+              <div class="s-title"><h4>قالب پیش‌فرض تاریخ در خروجی‌ها</h4></div>
+              <p class="s-desc">قالبی که ستون‌های تاریخ هنگام تولید خروجی CSV و PDF با آن نوشته می‌شوند. نمایش تاریخ در صفحه‌ها تغییر نمی‌کند؛ فقط فایل‌های تولیدشده از این پس این قالب را می‌گیرند.</p>
+              <div class="s-meta">
+                <span>منبع: <b>پیش‌فرض سامانه</b></span><i class="s-sep"></i>
+                <span>پیش‌فرض: <b>شمسی کوتاه</b></span><i class="s-sep"></i>
+                <span>آخرین تغییر: <b>—</b> (تاکنون تغییر نکرده)</span>
+              </div>
+            </div>
+            <div class="s-ctl">
+              <div class="s-line">
+                <div class="picker">
+                  <div class="inp focus"><span>شمسی کوتاه — ۱۴۰۵/۰۵/۰۸</span><span class="s-unit"><svg class="ic ic-sm"><use href="#i-chev"/></svg></span></div>
+                  <div class="pop">
+                    <div class="pop-h"><span>قالب تاریخ</span><span>۳ گزینه</span></div>
+                    <div class="opt on"><div class="l1">شمسی کوتاه <span class="code">۱۴۰۵/۰۵/۰۸</span></div><div class="l2">فشرده‌ترین حالت؛ مناسب جدول‌های پرستون</div></div>
+                    <div class="opt"><div class="l1">شمسی بلند <span class="code">۸ مرداد ۱۴۰۵</span></div><div class="l2">خوانا برای گزارش‌های چاپی</div></div>
+                    <div class="opt"><div class="l1">شمسی مرتب‌شدنی <span class="code">۱۴۰۵-۰۵-۰۸</span></div><div class="l2">برای مرتب‌سازی متنی در صفحه‌گسترده</div></div>
+                    <div class="pop-f"><span>Enter انتخاب</span><span>Esc بستن</span></div>
+                  </div>
+                </div>
+                <div class="rowacts">
+                  <span class="tip"><button class="ra" aria-label="تاریخچهٔ این پارامتر"><svg class="ic-sm ic"><use href="#i-audit"/></svg></button><span class="tip-b">تاریخچهٔ این پارامتر</span></span>
+                </div>
+              </div>
+              <div class="hint">در حال حاضر با پیش‌فرض یکسان است</div>
+            </div>
+          </section>
+
+          <!-- ۳ — کلید قابل ویرایش -->
+          <section class="srow" style="margin-top:96px">
+            <div>
+              <div class="s-title"><h4>نمایش هشدار انقضای رزرو ظرفیت</h4></div>
+              <p class="s-desc">وقتی روشن باشد، در صفحهٔ ظرفیت و جذب برای رزروهایی که کمتر از هفت روز تا انقضا دارند نشان هشدار نمایش داده می‌شود. خودِ رزرو با خاموش‌کردن این کلید منقضی‌نشده باقی می‌ماند؛ فقط نشانه دیده نمی‌شود.</p>
+              <div class="s-meta">
+                <span>منبع: <b>مقدار ذخیره‌شده</b></span><i class="s-sep"></i>
+                <span>پیش‌فرض: <b>روشن</b></span><i class="s-sep"></i>
+                <span>آخرین تغییر: <b>مریم صادقی</b> — ۱۴۰۵/۰۴/۲۱ ۰۹:۴۰</span>
+              </div>
+            </div>
+            <div class="s-ctl">
+              <div class="s-line">
+                <span class="tgl on"><i></i></span>
+                <span class="tgl-lbl">روشن</span>
+                <div class="rowacts" style="margin-inline-start:auto">
+                  <span class="tip"><button class="ra" aria-label="تاریخچهٔ این پارامتر"><svg class="ic-sm ic"><use href="#i-audit"/></svg></button><span class="tip-b">تاریخچهٔ این پارامتر</span></span>
+                </div>
+              </div>
+              <div class="hint">تغییر این کلید بلافاصله ذخیره و در ممیزی ثبت می‌شود</div>
+            </div>
+          </section>
+
+          <!-- ۴ — ردیف دست‌خورده / اعمال‌نشده -->
+          <section class="srow">
+            <div>
+              <div class="s-title">
+                <h4>مهلت نگه‌داشت پیش‌نویس رویدادهای ثبت‌نشده</h4>
+                <span class="s-tag s-tag-dirty"><i class="s-dot"></i> اعمال‌نشده</span>
+              </div>
+              <p class="s-desc">تعداد روزهایی که یک پیش‌نویس رویداد پرسنلی بدون ثبت نهایی باقی می‌ماند. پس از این مدت پیش‌نویس به‌طور خودکار لغو می‌شود و کاربر باید آن را از نو بسازد.</p>
+              <div class="s-meta">
+                <span>منبع: <b>مقدار ذخیره‌شده</b></span><i class="s-sep"></i>
+                <span>پیش‌فرض: <b>۱۴ روز</b></span><i class="s-sep"></i>
+                <span>آخرین تغییر: <b>رضا کاظمی</b> — ۱۴۰۵/۰۳/۱۲ ۱۱:۰۵</span>
+              </div>
+            </div>
+            <div class="s-ctl">
+              <div class="s-line">
+                <div class="inp focus"><span>۳۰</span><span class="cursor"></span><span class="s-unit">روز</span></div>
+                <div class="rowacts">
+                  <span class="tip"><button class="ra" aria-label="بازگشت به پیش‌فرض"><svg class="ic-sm ic"><use href="#i-undo"/></svg></button><span class="tip-b">بازگشت به پیش‌فرض (۱۴ روز)</span></span>
+                </div>
+              </div>
+              <div class="hint">مقدار مجاز: ۳ تا ۹۰ روز</div>
+            </div>
+            <div class="s-full s-confirm">
+              <span class="s-diff"><span class="s-old">۱۴ روز</span><svg class="ic ic-sm" style="transform:rotate(90deg);color:#8A8F9E"><use href="#i-chev"/></svg><span class="s-new">۳۰ روز</span></span>
+              <span class="s-blast"><svg class="ic ic-sm"><use href="#i-info"/></svg> این تغییر بر محاسبهٔ وضعیت جاری اثر می‌گذارد؛ رکوردهای موجود دوباره ارزیابی نمی‌شوند.</span>
+              <button class="btn btn-ghost">انصراف</button>
+              <button class="btn btn-gold">اعمال تغییر</button>
+            </div>
+          </section>
+
+          <!-- ۵ — ورودی نامعتبر -->
+          <section class="srow">
+            <div>
+              <div class="s-title"><h4>مدت نگه‌داشت فایل‌های ورودی پردازش‌شده</h4></div>
+              <p class="s-desc">فایل‌های بارگذاری‌شده در «ورود داده» پس از این مدت از فضای ذخیره‌سازی حذف می‌شوند. گزارش نتیجهٔ پردازش باقی می‌ماند، اما فایل اصلی دیگر قابل دریافت نیست.</p>
+              <div class="s-meta">
+                <span>منبع: <b>مقدار ذخیره‌شده</b></span><i class="s-sep"></i>
+                <span>پیش‌فرض: <b>۱۸۰ روز</b></span><i class="s-sep"></i>
+                <span>آخرین تغییر: <b>مریم صادقی</b> — ۱۴۰۵/۰۲/۰۳ ۱۶:۳۱</span>
+              </div>
+            </div>
+            <div class="s-ctl">
+              <div class="s-line">
+                <div class="inp bad"><span>۴۵</span><span class="cursor"></span><span class="s-unit">روز</span></div>
+                <div class="rowacts">
+                  <span class="tip"><button class="ra" aria-label="بازگشت به پیش‌فرض"><svg class="ic-sm ic"><use href="#i-undo"/></svg></button><span class="tip-b">بازگشت به پیش‌فرض (۱۸۰ روز)</span></span>
+                </div>
+              </div>
+              <div class="err"><svg class="ic ic-sm"><use href="#i-warn"/></svg> مقدار باید بین ۹۰ و ۳۶۵۰ روز باشد.</div>
+            </div>
+            <div class="s-full s-confirm" style="border-inline-start-color:#DCDFE7">
+              <span class="s-diff"><span class="s-old">۱۸۰ روز</span><svg class="ic ic-sm" style="transform:rotate(90deg);color:#8A8F9E"><use href="#i-chev"/></svg><span class="s-new" style="color:#8A8F9E">—</span></span>
+              <span class="s-blast"><svg class="ic ic-sm"><use href="#i-info"/></svg> تا اصلاح مقدار، امکان اعمال وجود ندارد؛ مقدار فعلی دست‌نخورده باقی می‌ماند.</span>
+              <button class="btn btn-ghost">انصراف</button>
+              <button class="btn" disabled>اعمال تغییر</button>
+            </div>
+          </section>
+
+          <div class="state-head"><h3>کنترل‌شده در زیرساخت</h3><span>خواندنی در برنامه — مسیر تغییر بیرون از این صفحه است</span></div>
+
+          <!-- ۶ — فقط‌خواندنی -->
+          <section class="srow srow-lock">
+            <div>
+              <div class="s-title">
+                <h4>مهلت نشست بی‌کاربری</h4>
+                <span class="s-tag s-tag-lock"><svg class="ic ic-sm"><use href="#i-lock"/></svg> کنترل‌شده در استقرار</span>
+              </div>
+              <p class="s-desc">پس از این مدت بی‌کاربری، نشست کاربر بسته می‌شود و ورود دوباره لازم است. این مقدار هنگام راه‌اندازی سرویس از محیط خوانده می‌شود تا در همهٔ نمونه‌های برنامه یکسان بماند.</p>
+              <div class="s-meta">
+                <span>منبع: <b>متغیر محیطی</b></span><i class="s-sep"></i>
+                <span class="codeltr">DIVAN_SESSION_IDLE_MINUTES</span><i class="s-sep"></i>
+                <span>مقدار در استقرار جاری از ۱۴۰۵/۰۱/۱۵</span>
+              </div>
+            </div>
+            <div class="s-ctl">
+              <div class="s-static"><svg class="ic"><use href="#i-lock"/></svg> ۳۰ <span class="s-unit" style="margin-inline-start:0">دقیقه</span></div>
+              <p class="s-path"><svg class="ic ic-sm"><use href="#i-info"/></svg> فقط با استقرار قابل تغییر است. برای تغییر، متغیر محیطی را در پیکربندی استقرار به‌روزرسانی و سرویس را دوباره راه‌اندازی کنید.</p>
+            </div>
+          </section>
+
+          <div class="state-head"><h3>دامنهٔ مدیر سامانه</h3><span>این بخش فقط برای نقش «مدیر سامانه» نمایش داده می‌شود</span></div>
+
+          <!-- ۷ — دامنه‌دار -->
+          <section class="srow">
+            <div>
+              <div class="s-title">
+                <h4>حالت فقط‌افزودنی برای سوابق ممیزی</h4>
+                <span class="s-tag"><svg class="ic ic-sm"><use href="#i-key"/></svg> فقط مدیر سامانه</span>
+              </div>
+              <p class="s-desc">وقتی روشن باشد، هیچ مسیری در برنامه اجازهٔ حذف یا بازنویسی رکورد ممیزی ندارد و پاک‌سازی دوره‌ای فقط رکوردهای خارج از مدت نگه‌داشت را بایگانی می‌کند.</p>
+              <div class="s-meta">
+                <span>منبع: <b>مقدار ذخیره‌شده</b></span><i class="s-sep"></i>
+                <span>پیش‌فرض: <b>روشن</b></span><i class="s-sep"></i>
+                <span>آخرین تغییر: <b>رضا کاظمی</b> — ۱۴۰۴/۱۲/۱۹ ۰۸:۱۲</span>
+              </div>
+              <p class="s-path" style="margin-top:5px"><svg class="ic ic-sm"><use href="#i-key"/></svg> این ردیف در دامنهٔ «مدیر سامانه» است؛ مدیران دامنه‌ای آن را در فهرست خود نمی‌بینند و تغییرش از حساب آن‌ها ممکن نیست.</p>
+            </div>
+            <div class="s-ctl">
+              <div class="s-line">
+                <span class="tgl on"><i></i></span>
+                <span class="tgl-lbl">روشن</span>
+                <div class="rowacts" style="margin-inline-start:auto">
+                  <span class="tip"><button class="ra" aria-label="تاریخچهٔ این پارامتر"><svg class="ic-sm ic"><use href="#i-audit"/></svg></button><span class="tip-b">تاریخچهٔ این پارامتر</span></span>
+                </div>
+              </div>
+              <div class="hint">خاموش‌کردن این کلید نیازمند تأیید با دلیل است</div>
+            </div>
+          </section>
+
+          <div class="fbar">
+            <span class="note">هر پارامتر جداگانه اعمال می‌شود؛ نوار ذخیرهٔ سراسری وجود ندارد.</span>
+            <div class="sp"></div>
+            <button class="btn btn-ghost"><svg class="ic"><use href="#i-audit"/></svg> مشاهده در ممیزی</button>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mock">
+  <p class="mock-label">گفت‌وگوی تأیید تغییر کنترل‌شده <span>پس از «اعمال تغییر» روی ردیف دست‌خورده</span></p>
+  <div class="dlg">
+    <div class="dlg-h">
+      <svg class="ic"><use href="#i-gear"/></svg>
+      <h3>تأیید تغییر پارامتر</h3>
+      <span class="x"><svg class="ic"><use href="#i-x"/></svg></span>
+    </div>
+    <div class="dlg-b">
+      <p class="dlg-param" style="margin:0">پارامتر: <b>مهلت نگه‌داشت پیش‌نویس رویدادهای ثبت‌نشده</b><br><span style="font-size:11px;color:#8A8F9E">داده و نگه‌داشت · دامنهٔ نگه‌داشت</span></p>
+      <div class="vs">
+        <dl class="vbox"><dt>مقدار فعلی</dt><dd>۱۴ روز</dd></dl>
+        <svg class="ic vs-arrow"><use href="#i-chev"/></svg>
+        <dl class="vbox next"><dt>مقدار جدید</dt><dd>۳۰ روز</dd></dl>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4A4F63;margin-bottom:3px">دلیل تغییر <span style="color:#8A8F9E;font-weight:600">(الزامی)</span></label>
+        <div class="ta focus"><span>مطابق مصوبهٔ کمیتهٔ داده — مهلت پیش‌نویس برای واحدهای پرحجم به یک ماه افزایش می‌یابد.</span><span class="cursor"></span></div>
+        <div class="hint">حداقل ۱۰ نویسه · این متن در سابقهٔ ممیزی عیناً ذخیره می‌شود</div>
+      </div>
+      <p class="s-blast" style="margin:0"><svg class="ic ic-sm"><use href="#i-info"/></svg> این تغییر بر محاسبهٔ وضعیت جاری اثر می‌گذارد؛ رکوردهای موجود دوباره ارزیابی نمی‌شوند.</p>
+      <div class="audit-note"><svg class="ic ic-sm"><use href="#i-audit"/></svg> این تغییر در ممیزی ثبت می‌شود. نام شما، زمان دقیق، مقدار پیشین و مقدار جدید همراه با همین دلیل نگه‌داری خواهد شد.</div>
+    </div>
+    <div class="dlg-f">
+      <span class="note" style="font-size:11px;color:#8A8F9E">اعمال بلافاصله انجام می‌شود</span>
+      <div class="sp"></div>
+      <button class="btn btn-ghost">انصراف</button>
+      <button class="btn btn-gold">اعمال تغییر</button>
+    </div>
+  </div>
+</div>
+
+<div class="mock">
+  <p class="mock-label">هم‌ترازی تم تاریک <span>ردیف قابل ویرایش و ردیف فقط‌خواندنی</span></p>
+  <div class="dark" style="width:760px">
+    <div class="dhead">تنظیمات · داده و نگه‌داشت — تم تاریک</div>
+    <section class="srow">
+      <div>
+        <div class="s-title"><h4>مدت نگه‌داشت سوابق ممیزی</h4></div>
+        <p class="s-desc">تعیین می‌کند رکوردهای ممیزی چند روز پس از ثبت، جست‌وجوپذیر بمانند.</p>
+        <div class="s-meta"><span>منبع: <b>مقدار ذخیره‌شده</b></span><i class="s-sep"></i><span>پیش‌فرض: <b>۳۶۵ روز</b></span><i class="s-sep"></i><span>آخرین تغییر: <b>رضا کاظمی</b> — ۱۴۰۵/۰۵/۰۸ ۱۴:۲۲</span></div>
+      </div>
+      <div class="s-ctl">
+        <div class="s-line">
+          <div class="inp"><span>۵۴۰</span><span class="s-unit">روز</span></div>
+          <div class="rowacts">
+            <span class="tip"><button class="ra" aria-label="بازگشت به پیش‌فرض"><svg class="ic-sm ic"><use href="#i-undo"/></svg></button><span class="tip-b">بازگشت به پیش‌فرض (۳۶۵ روز)</span></span>
+            <span class="tip"><button class="ra" aria-label="تاریخچهٔ این پارامتر"><svg class="ic-sm ic"><use href="#i-audit"/></svg></button><span class="tip-b">تاریخچهٔ این پارامتر</span></span>
+          </div>
+        </div>
+        <div class="hint">مقدار مجاز: ۹۰ تا ۳۶۵۰ روز</div>
+      </div>
+    </section>
+    <section class="srow srow-lock" style="border-bottom:0">
+      <div>
+        <div class="s-title"><h4>مهلت نشست بی‌کاربری</h4><span class="s-tag s-tag-lock"><svg class="ic ic-sm"><use href="#i-lock"/></svg> کنترل‌شده در استقرار</span></div>
+        <div class="s-meta"><span>منبع: <b>متغیر محیطی</b></span><i class="s-sep"></i><span class="codeltr">DIVAN_SESSION_IDLE_MINUTES</span></div>
+      </div>
+      <div class="s-ctl">
+        <div class="s-static"><svg class="ic"><use href="#i-lock"/></svg> ۳۰ <span class="s-unit" style="margin-inline-start:0">دقیقه</span></div>
+        <p class="s-path"><svg class="ic ic-sm"><use href="#i-info"/></svg> فقط با استقرار قابل تغییر است.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="foot">
+  دیوان · ماکت ایستا برای صفحهٔ «تنظیمات» در جهت «کنسول متراکم». بدون جاوااسکریپت، بدون منبع بیرونی.
+  حالت‌های تعاملی (باز بودن فهرست انتخاب و راهنمای شناور) برای مستندسازی به‌صورت ثابت نمایش داده شده‌اند.
+</div>
+
+</body>
+</html>

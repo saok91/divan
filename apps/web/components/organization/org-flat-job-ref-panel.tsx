@@ -407,8 +407,8 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
             <div className="flex gap-1">
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
+                variant="rowAction"
+                size="xs"
                 onClick={() => openEdit(row)}
               >
                 ویرایش
@@ -416,8 +416,8 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
               {row.active ? (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="rowAction"
+                  size="xs"
                   disabled={busyId === row.id}
                   onClick={() => openDeactivate(row)}
                 >
@@ -426,8 +426,8 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
               ) : (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="rowAction"
+                  size="xs"
                   disabled={busyId === row.id}
                   onClick={() => {
                     setFormError(null);
@@ -499,7 +499,7 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
             <DialogFooter className="gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   resetForm();
                   setModal(null);
@@ -561,7 +561,7 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
             <DialogFooter className="gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   resetForm();
                   setModal(null);
@@ -611,7 +611,7 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
           <DialogFooter className="gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => {
                 resetForm();
                 setModal(null);
