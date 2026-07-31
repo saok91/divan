@@ -709,3 +709,9 @@
 - `<details>` inside `role="alert"` assertive region on stale recalc banner — pre-existing banner a11y pattern; disclosure required by Story 8.9 AC; revisit live-region composition in 8.10 a11y gate
 - Profile stacks `RecalcPendingMark` `aria-live="polite"` with sibling `role="alert"` for the same freshness block — pre-existing stacking; consolidate announcements in a11y pass
 - Duplicate `getCurrentState` query in `PersonRecalcSubjectChrome` vs profile/form hosts — optimization only; share query cache/props when form chrome is refined
+
+## Deferred from: code review of 8-10-design-qa-consistency-accessibility-gate.md (2026-07-31)
+
+- Contrast asserts hardcode hex instead of parsing `globals.css` ? pre-existing mirrored-token pattern; full CSS sync parse out of gate scope
+- Expand AA asserts to tertiary-on-subtle / non-canvas panel backgrounds ? beyond current a11y-floor canvas pairs; revisit if parity probes fail on panels
+- Checklist Form layout automated proof overstated vs suite (no dedicated form selfcheck) ? residual layout-system / event-form path coverage gap

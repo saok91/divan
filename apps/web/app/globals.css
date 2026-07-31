@@ -45,7 +45,8 @@
   --hairline-strong: #dcdfe7;
   --text-primary: #11142a;
   --text-secondary: #4a4f63;
-  --text-tertiary: #8a8f9e;
+  /* Nudged #8a8f9e → #6b7080 for WCAG AA ≥4.5:1 on white (Story 8.10) */
+  --text-tertiary: #6b7080;
   --row-hover: #f2f4f8;
   --selection-tint: #eaf3ff;
   --selection-tint-border: #c7deff;
@@ -71,13 +72,15 @@
   --status-badge-scheduled-bg: #e7f5ff;
   --status-badge-scheduled-fg: #1864ab;
   --status-badge-effective-bg: #d3f9d8;
-  --status-badge-effective-fg: #2b8a3e;
+  /* Nudged #2b8a3e → #1f7a32 for AA on badge bg (Story 8.10) */
+  --status-badge-effective-fg: #1f7a32;
   --status-badge-cancelled-bg: #f1f3f5;
   --status-badge-cancelled-fg: #495057;
   --status-badge-reversed-bg: #f1f3f5;
   --status-badge-reversed-fg: #495057;
   --status-badge-draft-bg: #fff9db;
-  --status-badge-draft-fg: #e67700;
+  /* Nudged #e67700 → #a85700 for AA on badge bg (Story 8.10) */
+  --status-badge-draft-fg: #a85700;
   --status-badge-override-bg: #fff3bf;
   --status-badge-override-fg: #862e00;
 
@@ -148,7 +151,8 @@
   --hairline-strong: #232c5e;
   --text-primary: #e6e9f5;
   --text-secondary: #9aa1c0;
-  --text-tertiary: #6e7594;
+  /* Nudged #6e7594 → #8a91b0 for WCAG AA ≥4.5:1 on surface-dark (Story 8.10) */
+  --text-tertiary: #8a91b0;
   --row-hover: #131c4a;
   --selection-tint: #152456;
   --selection-tint-border: #3a4a8a;

@@ -1,6 +1,8 @@
 /**
- * Self-check: secondary button contrast + operational copy invariants + viewport gate.
- * Run: pnpm --filter @divan/web exec tsx lib/a11y-floor.selfcheck.ts
+ * Self-check: WCAG AA contrast floor + operational copy + viewport gate.
+ * Run: pnpm --filter @divan/web selfcheck:a11y-floor
+ *
+ * Body 13px and column-header 10.5px are normal text → minimum 4.5:1 (WCAG 2.2 SC 1.4.3).
  */
 import assert from "node:assert/strict";
 
@@ -34,18 +36,106 @@ function contrastRatio(foreground: string, background: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+function assertAA(
+  label: string,
+  foreground: string,
+  background: string,
+  minimum = 4.5,
+): void {
+  const ratio = contrastRatio(foreground, background);
+  assert.ok(
+    ratio >= minimum,
+    `${label}: ${foreground} on ${background} = ${ratio.toFixed(2)} (need ≥${minimum})`,
+  );
+}
+
 /** Nudged DESIGN primary pairs used by secondary buttons in globals.css */
 const LIGHT_PRIMARY = "#006dff";
 const DARK_PRIMARY = "#1e6fe0";
 
-assert.ok(
-  contrastRatio("#ffffff", LIGHT_PRIMARY) >= 4.5,
-  `light secondary contrast ${contrastRatio("#ffffff", LIGHT_PRIMARY)}`,
-);
-assert.ok(
-  contrastRatio("#ffffff", DARK_PRIMARY) >= 4.5,
-  `dark secondary contrast ${contrastRatio("#ffffff", DARK_PRIMARY)}`,
-);
+assertAA("light secondary CTA", "#ffffff", LIGHT_PRIMARY);
+assertAA("dark secondary CTA", "#ffffff", DARK_PRIMARY);
+
+// --- Body 13px / column-header 10.5px token pairs (both themes) ---
+const LIGHT_SURFACE = "#ffffff";
+const LIGHT_SUBTLE = "#fafbfc";
+const DARK_SURFACE = "#0a1138";
+const DARK_SUBTLE = "#0d1542";
+
+assertAA("light body primary", "#11142a", LIGHT_SURFACE);
+assertAA("light body secondary", "#4a4f63", LIGHT_SURFACE);
+assertAA("light tertiary", "#6b7080", LIGHT_SURFACE);
+assertAA("light column-header", "#4a4f63", LIGHT_SUBTLE);
+
+assertAA("dark body primary", "#e6e9f5", DARK_SURFACE);
+assertAA("dark body secondary", "#9aa1c0", DARK_SURFACE);
+assertAA("dark tertiary", "#8a91b0", DARK_SURFACE);
+assertAA("dark column-header", "#9aa1c0", DARK_SUBTLE);
+
+// --- Status badges ---
+assertAA("light badge scheduled", "#1864ab", "#e7f5ff");
+assertAA("light badge effective", "#1f7a32", "#d3f9d8");
+assertAA("light badge cancelled", "#495057", "#f1f3f5");
+assertAA("light badge reversed", "#495057", "#f1f3f5");
+assertAA("light badge draft", "#a85700", "#fff9db");
+assertAA("light badge override", "#862e00", "#fff3bf");
+
+assertAA("dark badge scheduled", "#a5d8ff", "#1a3a5c");
+assertAA("dark badge effective", "#8ce99a", "#1b3d2f");
+assertAA("dark badge cancelled", "#ced4da", "#2e2e32");
+assertAA("dark badge reversed", "#ced4da", "#2e2e32");
+assertAA("dark badge draft", "#ffe066", "#3d3200");
+assertAA("dark badge override", "#ffb3d1", "#3d1a2e");
+
+// --- Banners ---
+assertAA("light stale banner", "#862e00", "#fff3bf");
+assertAA("light break-glass banner", "#1864ab", "#e7f5ff");
+assertAA("dark stale banner", "#ffe066", "#3d3200");
+assertAA("dark break-glass banner", "#a5d8ff", "#1a3a5c");
+
+// --- Chart categorical on canvas (DESIGN 8.10-A1 cyan nudge) ---
+const CHART_LIGHT = ["#1B3BBB", "#087A90", "#C2255C", "#7048E8", "#495057"] as const;
+const CHART_DARK = ["#6C8CFF", "#3BC9DB", "#F06595", "#A98BFF", "#ADB5BD"] as const;
+
+for (const [i, hex] of CHART_LIGHT.entries()) {
+  assertAA(`light chart series ${i + 1}`, hex, LIGHT_SURFACE);
+}
+for (const [i, hex] of CHART_DARK.entries()) {
+  assertAA(`dark chart series ${i + 1}`, hex, DARK_SURFACE);
+}
+
+// CTA rule: never use brand gold `#FDB913` as text on dark canvas (policy ban).
+// Accent-on-accent-foreground is the correct pattern; gold-as-fill on light is OK.
+const BRAND_GOLD = "#fdb913";
+const DARK_FG_TOKENS = [
+  "#e6e9f5",
+  "#9aa1c0",
+  "#8a91b0",
+  "#a5d8ff",
+  "#8ce99a",
+  "#ced4da",
+  "#ffe066",
+  "#ffb3d1",
+  "#6c8cff",
+  "#3bc9db",
+  "#f06595",
+  "#a98bff",
+  "#adb5bd",
+] as const;
+for (const fg of DARK_FG_TOKENS) {
+  assert.notEqual(
+    fg.toLowerCase(),
+    BRAND_GOLD,
+    `dark fg token ${fg} must not be brand gold text on dark canvas`,
+  );
+}
+// Dark theme accent fill is warmer `#fbc470`, not brand gold-as-text.
+assert.notEqual("#fbc470".toLowerCase(), BRAND_GOLD);
+assert.notEqual("#1a1208".toLowerCase(), BRAND_GOLD);
+assertAA("light accent fill + accent-fg (CTA pattern)", "#1a1208", BRAND_GOLD);
+assertAA("dark accent fill + accent-fg (CTA pattern)", "#1a1208", "#fbc470");
+// Disabled / incidental pairs: WCAG SC 1.4.3 exempts inactive UI components —
+// --disabled-foreground on --disabled-surface is not asserted here.
 
 assert.equal(operationalCopy.accessDeniedTitle, "دسترسی ندارید.");
 assert.equal(

@@ -212,7 +212,7 @@ components:
     typography: '{caption}'
     radius: '3px'
   chart:
-    categorical: '#1B3BBB, #0B8FA8, #C2255C, #7048E8, #495057'
+    categorical: '#1B3BBB, #087A90, #C2255C, #7048E8, #495057'
     categorical-dark: '#6C8CFF, #3BC9DB, #F06595, #A98BFF, #ADB5BD'
     sequential: '#E8F1FF, #C2DBFF, #8FBEFF, #4D9BFF, #0F7BFF, #0A4FCC, #051061'
     gridline: '{colors.hairline}'
@@ -260,7 +260,7 @@ Status badge pairs, `stale-banner`, and `break-glass-banner` are inherited uncha
 
 Charts use the distinct multi-hue categorical palette `{chart.categorical}` (dark canvas: `{chart.categorical-dark}`), because most Divan charts carry four or more series and stepped blues stop separating at the 4px stroke widths a twelve-month trend actually renders at.
 
-Three bands are deliberately absent from that palette, and must stay absent: **green** reads as «اعمال‌شده», **orange/amber** collides with «پیش‌نویس», «بازنویسی», and the gold CTA, and mid-blue was pushed to indigo `#1B3BBB` to clear «زمان‌بندی‌شده» `#1864AB`. Adding a "nice" green or orange series later re-breaks the status vocabulary across the whole product.
+Three bands are deliberately absent from that palette, and must stay absent: **green** reads as «اعمال‌شده», **orange/amber** collides with «پیش‌نویس», «بازنویسی», and the gold CTA, and mid-blue was pushed to indigo `#1B3BBB` to clear «زمان‌بندی‌شده» `#1864AB`. Adding a "nice" green or orange series later re-breaks the status vocabulary across the whole product. Story 8.10 nudged the light cyan series from `#0B8FA8` to `#087A90` so every categorical swatch meets ≥4.5:1 on the white canvas without introducing green/orange bands.
 
 Single-measure ramps and heat scales use the single-hue `{chart.sequential}`, where ordering is the meaning and hue variety would be noise.
 

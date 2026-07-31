@@ -897,7 +897,7 @@ export function GovernedDataTable<T>({
                             ? "w-[1%] whitespace-nowrap"
                             : undefined,
                           column.cellOverflow === "wrap"
-                            ? "whitespace-normal align-top"
+                            ? "whitespace-normal align-middle"
                             : undefined,
                         )}
                         onClick={

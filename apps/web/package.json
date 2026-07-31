@@ -32,7 +32,9 @@
     "selfcheck:leave-guard": "tsx components/leave-guard/leave-guard-algorithm.selfcheck.ts",
     "selfcheck:row-actions": "tsx lib/row-actions.selfcheck.ts",
     "selfcheck:feedback": "tsx lib/feedback.selfcheck.ts",
-    "selfcheck:operational-copy": "tsx lib/operational-copy.selfcheck.ts"
+    "selfcheck:operational-copy": "tsx lib/operational-copy.selfcheck.ts",
+    "selfcheck:a11y-floor": "tsx lib/a11y-floor.selfcheck.ts",
+    "selfcheck:design-qa": "tsx lib/design-qa.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",

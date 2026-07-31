@@ -271,9 +271,9 @@ Guard: `pnpm --filter @divan/web selfcheck:control-contract`
 - Full operational-copy overhaul  
 - Remaining `disabled` Buttons **without** `disabledReason` (only pagination + touched sites migrated in 8.1)  
 
-### Deferred — Story **8.10**
+### Deferred — Story **8.10** → **closed 2026-07-31**
 
-- Mockup QA / consistency / a11y gate — do **not** claim FR-58 / LG-6 production-complete from 8.1 alone  
+- Mockup QA / consistency / a11y gate — evidence: `pnpm --filter @divan/web selfcheck:design-qa` + matrix/probes artifacts under `apps/web/lib/design-qa*`. Wave consistency floor for Epic 8 met; Epic 9/10 incomplete surfaces recorded as spine amendments (not silent pass).
 
 ---
 
