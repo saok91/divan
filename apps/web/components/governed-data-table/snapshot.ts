@@ -14,6 +14,44 @@ export function visibleColumns<T>(
 }
 
 /**
+ * Sticky identifier / actions / synthetic `__actions` cannot be hidden by the operator.
+ * Permission-omitted columns are already gone before this runs.
+ */
+export function isColumnHideable<T>(column: GovernedColumn<T>): boolean {
+  if (column.id === "__actions") return false;
+  if (column.sticky === "identifier" || column.sticky === "actions") {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Apply operator column-visibility prefs after permission omit.
+ * Non-hideable columns always remain.
+ */
+export function applyOperatorVisibility<T>(
+  columns: readonly GovernedColumn<T>[],
+  hiddenColumnIds: readonly string[],
+): GovernedColumn<T>[] {
+  if (hiddenColumnIds.length === 0) return [...columns];
+  const hidden = new Set(hiddenColumnIds);
+  return columns.filter((column) => {
+    if (!isColumnHideable(column)) return true;
+    return !hidden.has(column.id);
+  });
+}
+
+/**
+ * Permission-visible columns for the visibility UI (includes hideable + sticky).
+ * Does not apply operator hide — those stay listed as unchecked.
+ */
+export function permissionVisibleColumns<T>(
+  columns: readonly GovernedColumn<T>[],
+): GovernedColumn<T>[] {
+  return dedupeStickyColumns(visibleColumns(columns));
+}
+
+/**
  * Keep at most one sticky identifier and one sticky actions column
  * (first wins). Spec: "at most one of each".
  */
@@ -35,12 +73,17 @@ export function dedupeStickyColumns<T>(
   });
 }
 
-/** Drop filter keys that are not among currently visible columns. */
+/** Drop filter keys that are not among currently displayable columns. */
 export function scrubFilters<T>(
   filters: TableFilters,
   columns: readonly GovernedColumn<T>[],
+  hiddenColumnIds: readonly string[] = [],
 ): TableFilters {
-  const allowed = new Set(visibleColumns(columns).map((c) => c.id));
+  const allowed = new Set(
+    applyOperatorVisibility(visibleColumns(columns), hiddenColumnIds).map(
+      (c) => c.id,
+    ),
+  );
   const next: TableFilters = {};
   for (const [key, value] of Object.entries(filters)) {
     if (allowed.has(key)) next[key] = value;
@@ -48,14 +91,38 @@ export function scrubFilters<T>(
   return next;
 }
 
-/** Drop sort when the sort column is omitted / not visible. */
+/** Drop sort when the sort column is omitted / operator-hidden. */
 export function scrubSort<T>(
   sort: SortState,
   columns: readonly GovernedColumn<T>[],
+  hiddenColumnIds: readonly string[] = [],
 ): SortState {
   if (sort === null) return null;
-  const visible = visibleColumns(columns);
+  const visible = applyOperatorVisibility(
+    visibleColumns(columns),
+    hiddenColumnIds,
+  );
   return visible.some((c) => c.id === sort.columnId) ? sort : null;
+}
+
+/** Sanitize operator hide set: never hide sticky id/actions/`__actions`. */
+export function sanitizeHiddenColumnIds<T>(
+  hiddenColumnIds: readonly string[],
+  columns: readonly GovernedColumn<T>[],
+): string[] {
+  const byId = new Map(columns.map((c) => [c.id, c]));
+  const seen = new Set<string>();
+  const next: string[] = [];
+  for (const id of hiddenColumnIds) {
+    if (seen.has(id)) continue;
+    const column = byId.get(id);
+    if (!column) continue;
+    if (!isColumnHideable(column)) continue;
+    if (column.permitted === false) continue;
+    seen.add(id);
+    next.push(id);
+  }
+  return next;
 }
 
 export function sanitizePageSize(pageSize: number): number {
@@ -104,9 +171,13 @@ export function applyFilters<T>(
   rows: readonly T[],
   columns: readonly GovernedColumn<T>[],
   filters: TableFilters,
+  hiddenColumnIds: readonly string[] = [],
 ): T[] {
-  const visible = visibleColumns(columns);
-  const active = scrubFilters(filters, visible);
+  const visible = applyOperatorVisibility(
+    visibleColumns(columns),
+    hiddenColumnIds,
+  );
+  const active = scrubFilters(filters, columns, hiddenColumnIds);
 
   return rows.filter((row) =>
     visible.every((column) => {
@@ -150,13 +221,17 @@ export function applySort<T>(
   columns: readonly GovernedColumn<T>[],
   sort: SortState,
   getRowId: (row: T) => string,
+  hiddenColumnIds: readonly string[] = [],
 ): T[] {
   const sorted = [...rows];
-  const activeSort = scrubSort(sort, columns);
+  const activeSort = scrubSort(sort, columns, hiddenColumnIds);
   const column =
     activeSort === null
       ? undefined
-      : visibleColumns(columns).find((c) => c.id === activeSort.columnId);
+      : applyOperatorVisibility(
+          visibleColumns(columns),
+          hiddenColumnIds,
+        ).find((c) => c.id === activeSort.columnId);
 
   sorted.sort((a, b) => {
     if (column && activeSort) {
@@ -289,12 +364,30 @@ export function computeSnapshot<T>(input: {
   pageIndex: number;
   pageSize: number;
   getRowId: (row: T) => string;
+  /** Operator-hidden column ids (after permission omit). */
+  hiddenColumnIds?: readonly string[];
 }): SnapshotResult<T> {
-  const visible = dedupeStickyColumns(visibleColumns(input.columns));
-  const activeFilters = scrubFilters(input.filters, visible);
-  const activeSort = scrubSort(input.sort, visible);
-  const filtered = applyFilters(input.rows, visible, activeFilters);
-  const sorted = applySort(filtered, visible, activeSort, input.getRowId);
+  const hiddenColumnIds = sanitizeHiddenColumnIds(
+    input.hiddenColumnIds ?? [],
+    input.columns,
+  );
+  const permitted = dedupeStickyColumns(visibleColumns(input.columns));
+  const visible = applyOperatorVisibility(permitted, hiddenColumnIds);
+  const activeFilters = scrubFilters(input.filters, input.columns, hiddenColumnIds);
+  const activeSort = scrubSort(input.sort, input.columns, hiddenColumnIds);
+  const filtered = applyFilters(
+    input.rows,
+    input.columns,
+    activeFilters,
+    hiddenColumnIds,
+  );
+  const sorted = applySort(
+    filtered,
+    input.columns,
+    activeSort,
+    input.getRowId,
+    hiddenColumnIds,
+  );
   const identity = snapshotIdentity(activeFilters, activeSort);
   const total = sorted.length;
   const pages = pageCount(total, input.pageSize);

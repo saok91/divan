@@ -211,6 +211,8 @@ export function AccessPeoplePanel() {
         filter: "enum",
         enumOptions: roleEnumOptions,
         cell: (r) => joinPersianList(r.accessRoleCodes),
+        cellOverflow: "wrap",
+        maxWidthClass: "max-w-[14rem]",
       },
       {
         id: "scopes",
@@ -218,6 +220,8 @@ export function AccessPeoplePanel() {
         accessor: (r) => r.organizationalScopeLabels.join("، "),
         filter: "text",
         cell: (r) => joinPersianList(r.organizationalScopeLabels),
+        cellOverflow: "wrap",
+        maxWidthClass: "max-w-[16rem]",
       },
       {
         id: "status",
@@ -288,9 +292,9 @@ export function AccessPeoplePanel() {
             </AccessStatusMessage>
           ) : null}
 
-          <div className="[&_[data-slot=table]]:min-w-[64rem]">
-            <GovernedDataTable
+          <GovernedDataTable
               aria-label="جدول افراد و دسترسی"
+              preferencesKey="access-people"
               columns={columns}
               rows={rows}
               getRowId={(row) => row.accountId}
@@ -339,7 +343,6 @@ export function AccessPeoplePanel() {
                 </div>
               )}
             />
-          </div>
         </div>
       )}
 

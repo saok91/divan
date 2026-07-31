@@ -558,6 +558,7 @@ export function CorrectionCasesPanel() {
       ) : (
         <GovernedDataTable
           aria-label={operationalCopy.correctionCaseHeading}
+          preferencesKey="correction-cases"
           columns={COLUMNS}
           rows={rows}
           getRowId={(r) => r.id}

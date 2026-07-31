@@ -2,6 +2,13 @@ import type * as React from "react";
 
 export type FilterKind = "text" | "enum";
 
+export type CellOverflow = "truncate" | "wrap";
+
+export type TableDensity = "dense" | "comfortable";
+
+/** Default row density — aligned with CSS token `--table-row-dense` (32px). */
+export const GOVERNED_TABLE_DEFAULT_DENSITY: TableDensity = "dense";
+
 export type GovernedColumn<T> = {
   id: string;
   header: string;
@@ -12,6 +19,10 @@ export type GovernedColumn<T> = {
   sticky?: "identifier" | "actions";
   permitted?: boolean;
   cell?: (row: T) => React.ReactNode;
+  /** Tailwind max-width class for cell content (e.g. "max-w-[16rem]"). */
+  maxWidthClass?: string;
+  /** Default `"truncate"`. Long-text columns may use `"wrap"`. */
+  cellOverflow?: CellOverflow;
 };
 
 export type GovernedDataTableProps<T> = {
@@ -26,6 +37,13 @@ export type GovernedDataTableProps<T> = {
   /** Override empty-state copy (default: operationalCopy.emptySearch). */
   emptyMessage?: string;
   "aria-label": string;
+  /**
+   * Session-prefs bucket key (with account id). Required for density /
+   * column-visibility persistence across in-session navigation.
+   */
+  preferencesKey?: string;
+  /** Default row density when no session prefs exist. Defaults to `"dense"` (32px). */
+  defaultDensity?: TableDensity;
 };
 
 export type FilterValue = string | string[];

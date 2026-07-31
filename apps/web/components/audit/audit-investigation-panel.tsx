@@ -794,9 +794,9 @@ export function AuditInvestigationPanel() {
         </div>
       </form>
 
-      <div className="[&_[data-slot=table]]:min-w-[72rem]">
-        <GovernedDataTable
+      <GovernedDataTable
           aria-label="نتایج تحقیق ممیزی"
+          preferencesKey="audit-investigation"
           columns={COLUMNS}
           rows={searchQuery.isLoading || searchQuery.isError ? [] : rows}
           getRowId={(row) => row.id}
@@ -819,7 +819,6 @@ export function AuditInvestigationPanel() {
             </Button>
           )}
         />
-      </div>
 
       {searchQuery.data?.hasMore ? (
         <p className="text-caption text-muted-foreground" role="status">

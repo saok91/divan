@@ -388,6 +388,7 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
       ) : (
         <GovernedDataTable
           aria-label={`جدول ${label}`}
+          preferencesKey={`org-flat-${concept}`}
           columns={columns}
           rows={rows}
           getRowId={(r) => r.id}

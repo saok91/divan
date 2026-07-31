@@ -1,16 +1,22 @@
 /**
- * Pure snapshot helpers for governed-data-table (Story 4b.4).
+ * Pure snapshot helpers for governed-data-table (Story 4b.4 + 8.6).
  * Run: pnpm --filter @divan/web selfcheck:governed-table
  */
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   applyFilters,
+  applyOperatorVisibility,
   applySort,
   computeSnapshot,
   cycleSort,
+  isColumnHideable,
   normalizeDefaultFilters,
   paginate,
+  sanitizeHiddenColumnIds,
   sanitizePageSize,
   scrubFilters,
   scrubSort,
@@ -18,6 +24,7 @@ import {
   visibleColumns,
 } from "./snapshot";
 import type { GovernedColumn, TableFilters } from "./types";
+import { GOVERNED_TABLE_DEFAULT_DENSITY } from "./types";
 
 type Row = {
   id: string;
@@ -243,5 +250,106 @@ assert.deepEqual(
 // --- enum string filter value accepted ---
 const enumString = applyFilters(rows, columns, { team: "ops" });
 assert.equal(enumString.length, 2);
+
+// --- Story 8.6: operator visibility scrub ---
+assert.equal(isColumnHideable(columns[0]!), false); // sticky identifier
+assert.equal(isColumnHideable(columns[1]!), true); // name
+assert.deepEqual(
+  sanitizeHiddenColumnIds(["id", "name", "__actions", "salary"], columns),
+  ["name"],
+);
+
+const operatorVisible = applyOperatorVisibility(visibleColumns(columns), [
+  "name",
+]);
+assert.ok(!operatorVisible.some((c) => c.id === "name"));
+assert.ok(operatorVisible.some((c) => c.id === "id"));
+
+const scrubHidden = scrubFilters(
+  { name: "علی", status: ["active"] },
+  columns,
+  ["name"],
+);
+assert.deepEqual(scrubHidden, { status: ["active"] });
+assert.ok(!("name" in scrubHidden));
+
+assert.equal(
+  scrubSort({ columnId: "name", direction: "asc" }, columns, ["name"]),
+  null,
+);
+
+const snapHidden = computeSnapshot({
+  rows,
+  columns,
+  filters: { name: "علی", status: ["active"] },
+  sort: { columnId: "name", direction: "asc" },
+  pageIndex: 0,
+  pageSize: 10,
+  getRowId,
+  hiddenColumnIds: ["name"],
+});
+assert.ok(!snapHidden.visible.some((c) => c.id === "name"));
+assert.ok(!snapHidden.visible.some((c) => c.id === "salary"));
+assert.equal(snapHidden.sort, null);
+assert.ok(!("name" in snapHidden.activeFilters));
+// Hiding must not resurrect permitted:false
+assert.ok(!snapHidden.visible.some((c) => c.permitted === false));
+
+// Sticky / actions never enter sanitized hide set
+const withActions: GovernedColumn<Row>[] = [
+  ...columns,
+  {
+    id: "__actions",
+    header: "اقدامات",
+    accessor: () => "",
+    sticky: "actions",
+  },
+];
+assert.deepEqual(
+  sanitizeHiddenColumnIds(["id", "__actions", "team"], withActions),
+  ["team"],
+);
+assert.deepEqual(
+  sanitizeHiddenColumnIds(["team", "team", "name"], columns),
+  ["team", "name"],
+);
+
+// Density default constant === dense
+assert.equal(GOVERNED_TABLE_DEFAULT_DENSITY, "dense");
+
+// --- AST: no forced rem min-widths on table wrappers under apps/web ---
+const here = path.dirname(fileURLToPath(import.meta.url));
+const webRoot = path.resolve(here, "../..");
+
+function walkTsx(dir: string, out: string[] = []): string[] {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (
+      entry.name === "node_modules" ||
+      entry.name === ".next" ||
+      entry.name === "dist"
+    ) {
+      continue;
+    }
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkTsx(full, out);
+    else if (/\.(tsx|ts|jsx|js|css)$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
+
+const forcedMinW =
+  /min-w-\[(?:48|64|72)rem\]|\[&_\[data-slot=table\]\]:min-w-/;
+const offenders: string[] = [];
+for (const file of walkTsx(webRoot)) {
+  const src = fs.readFileSync(file, "utf8");
+  if (forcedMinW.test(src)) {
+    offenders.push(path.relative(webRoot, file));
+  }
+}
+assert.deepEqual(
+  offenders,
+  [],
+  `forced table min-width wrappers must be removed:\n${offenders.join("\n")}`,
+);
 
 console.log("governed-data-table.selfcheck: ok");

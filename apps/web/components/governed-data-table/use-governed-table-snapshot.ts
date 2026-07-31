@@ -26,22 +26,34 @@ export type UseGovernedTableSnapshotArgs<T> = {
   getRowId: (row: T) => string;
   sectionDefaultFilters: Record<string, string | string[]>;
   pageSize?: number;
+  /** Operator-hidden column ids (session prefs). */
+  hiddenColumnIds?: readonly string[];
 };
 
 function scrubTextDrafts<T>(
   drafts: Record<string, string>,
   columns: readonly GovernedColumn<T>[],
+  hiddenColumnIds: readonly string[],
 ): Record<string, string> {
   const allowed = new Set(
     columns
-      .filter((c) => c.permitted !== false && c.filter === "text")
+      .filter(
+        (c) =>
+          c.permitted !== false &&
+          c.filter === "text" &&
+          !hiddenColumnIds.includes(c.id),
+      )
       .map((c) => c.id),
   );
-  const next: Record<string, string> = {};
+  const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(drafts)) {
-    if (allowed.has(key)) next[key] = value;
+    if (allowed.has(key)) result[key] = value;
   }
-  return next;
+  return result;
+}
+
+function hiddenKey(ids: readonly string[]): string {
+  return [...ids].sort().join(",");
 }
 
 export function useGovernedTableSnapshot<T>({
@@ -50,6 +62,7 @@ export function useGovernedTableSnapshot<T>({
   getRowId,
   sectionDefaultFilters,
   pageSize = 25,
+  hiddenColumnIds = [],
 }: UseGovernedTableSnapshotArgs<T>) {
   const [filters, setFilters] = React.useState<TableFilters>(() =>
     normalizeDefaultFilters(sectionDefaultFilters, columns),
@@ -68,24 +81,33 @@ export function useGovernedTableSnapshot<T>({
   const [pageIndex, setPageIndex] = React.useState(0);
 
   const visibilityKey = columnsVisibilityKey(columns);
+  const operatorHideKey = hiddenKey(hiddenColumnIds);
+  const combinedVisibilityKey = `${visibilityKey}#${operatorHideKey}`;
+
   const textColumnKey = React.useMemo(
     () =>
       columns
-        .filter((c) => c.filter === "text" && c.permitted !== false)
+        .filter(
+          (c) =>
+            c.filter === "text" &&
+            c.permitted !== false &&
+            !hiddenColumnIds.includes(c.id),
+        )
         .map((c) => c.id)
         .join("|"),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable key from column meta
-    [visibilityKey],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable key from column meta + hide set
+    [combinedVisibilityKey],
   );
 
-  // Mid-session omit: adjust state during render when column visibility changes.
-  const [trackedVisibilityKey, setTrackedVisibilityKey] =
-    React.useState(visibilityKey);
-  if (trackedVisibilityKey !== visibilityKey) {
-    setTrackedVisibilityKey(visibilityKey);
-    setFilters((prev) => scrubFilters(prev, columns));
-    setSort((prev) => scrubSort(prev, columns));
-    setTextDrafts((prev) => scrubTextDrafts(prev, columns));
+  // Mid-session omit / operator hide: adjust state during render when visibility changes.
+  const [trackedVisibilityKey, setTrackedVisibilityKey] = React.useState(
+    combinedVisibilityKey,
+  );
+  if (trackedVisibilityKey !== combinedVisibilityKey) {
+    setTrackedVisibilityKey(combinedVisibilityKey);
+    setFilters((prev) => scrubFilters(prev, columns, hiddenColumnIds));
+    setSort((prev) => scrubSort(prev, columns, hiddenColumnIds));
+    setTextDrafts((prev) => scrubTextDrafts(prev, columns, hiddenColumnIds));
   }
 
   const snapshot = React.useMemo(
@@ -98,8 +120,9 @@ export function useGovernedTableSnapshot<T>({
         pageIndex,
         pageSize,
         getRowId,
+        hiddenColumnIds,
       }),
-    [rows, columns, filters, sort, pageIndex, pageSize, getRowId],
+    [rows, columns, filters, sort, pageIndex, pageSize, getRowId, operatorHideKey],
   );
 
   // Filter/sort identity change (including omit scrub) → page 1.
@@ -121,6 +144,7 @@ export function useGovernedTableSnapshot<T>({
           const column = columns.find((c) => c.id === key);
           if (!column || column.filter !== "text") continue;
           if (column.permitted === false) continue;
+          if (hiddenColumnIds.includes(key)) continue;
           if (next[key] !== draft) {
             next[key] = draft;
             changed = true;

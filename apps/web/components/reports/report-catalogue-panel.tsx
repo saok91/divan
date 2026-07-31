@@ -276,9 +276,9 @@ export function ReportCataloguePanel() {
       !empty &&
       !unavailable &&
       columns.length > 0 ? (
-        <div className="[&_[data-slot=table]]:min-w-[48rem]">
-          <GovernedDataTable
+        <GovernedDataTable
             aria-label={runQuery.data.titleFa}
+            preferencesKey={`report-catalogue-${selectedKey ?? runQuery.data.titleFa}`}
             columns={columns}
             rows={tableRows}
             getRowId={(row) => row.id}
@@ -335,7 +335,6 @@ export function ReportCataloguePanel() {
                 : undefined
             }
           />
-        </div>
       ) : null}
 
       {runQuery.data &&

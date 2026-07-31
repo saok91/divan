@@ -66,7 +66,8 @@ export function ImportPreviewTable({
       cell: (row) => (
         <div
           className={cn(
-            "-mx-3 flex min-h-[var(--table-row-compact)] items-center px-3",
+            "-mx-3 flex items-center self-stretch px-3",
+            "min-h-[var(--table-row-dense)] group-data-[density=comfortable]:min-h-[var(--table-row-comfortable)]",
             severityRowClass(row.severity),
           )}
         >
@@ -87,7 +88,8 @@ export function ImportPreviewTable({
         cell: (row) => (
           <div
             className={cn(
-              "-mx-3 flex min-h-[var(--table-row-compact)] items-center px-3",
+              "-mx-3 flex items-center self-stretch px-3",
+              "min-h-[var(--table-row-dense)] group-data-[density=comfortable]:min-h-[var(--table-row-comfortable)]",
               severityRowClass(row.severity),
             )}
           >
@@ -108,6 +110,7 @@ export function ImportPreviewTable({
         getRowId={(row) => row.rowId}
         sectionDefaultFilters={{}}
         pageSize={25}
+        preferencesKey="import-preview"
         aria-label={ariaLabel}
       />
 

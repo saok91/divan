@@ -1,3 +1,8 @@
+## Deferred from: code review of 8-6-governed-table-readability-upgrade.md (2026-07-31)
+
+- ResizeObserver ungarded if constructor missing in TruncatedCell layout effect ? modern client browsers assumed; add guard only if non-RO targets appear.
+- Selfcheck AST min-width ban is pattern-narrow (`48|64|72rem`) and scans full `apps/web` tree ? acceptable regression guard for this story; broaden/perf later if needed.
+
 ## Deferred from: code review of 8-5-remaining-uuid-inputs-retrofit.md (2026-07-31)
 
 - Per-row `person.getById` / `listEntitlements` fan-out on correction-case and audit result tables ? presentation hydrate without batched DTO; optimize later if list volume hurts.

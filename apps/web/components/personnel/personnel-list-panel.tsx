@@ -65,6 +65,8 @@ function buildColumns(
       accessor: (r) => r.team,
       filter: "text",
       sortable: true,
+      cellOverflow: "wrap",
+      maxWidthClass: "max-w-[14rem]",
     },
     {
       id: "role",
@@ -78,6 +80,8 @@ function buildColumns(
       accessor: (r) => r.jobTitle,
       filter: "text",
       sortable: true,
+      cellOverflow: "wrap",
+      maxWidthClass: "max-w-[14rem]",
     },
     {
       id: "ladder",
@@ -301,9 +305,9 @@ export function PersonnelListPanel() {
         </p>
       ) : null}
 
-      <div className="[&_[data-slot=table]]:min-w-[72rem]">
-        <GovernedDataTable
+      <GovernedDataTable
           aria-label="فهرست پرسنل"
+          preferencesKey="personnel-list"
           columns={columns}
           rows={tableRows}
           getRowId={(row) => row.id}
@@ -358,7 +362,6 @@ export function PersonnelListPanel() {
             </div>
           )}
         />
-      </div>
 
       {!suppressed && totalInSnapshot != null && totalInSnapshot > pageSize ? (
         <nav

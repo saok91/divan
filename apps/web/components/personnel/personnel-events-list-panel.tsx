@@ -118,9 +118,9 @@ export function PersonnelEventsListPanel() {
       <header className="sr-only">
         <h2 id="personnel-events-list-heading">رویدادها</h2>
       </header>
-      <div className="[&_[data-slot=table]]:min-w-[48rem]">
-        <GovernedDataTable
+      <GovernedDataTable
           aria-label="فهرست رویدادهای پرسنلی"
+          preferencesKey="personnel-events-list"
           columns={COLUMNS}
           rows={FIXTURE_EVENTS}
           getRowId={(r) => r.id}
@@ -138,7 +138,6 @@ export function PersonnelEventsListPanel() {
             </div>
           }
         />
-      </div>
     </section>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, Columns3Icon, Rows3Icon } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,33 +20,178 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { operationalCopy } from "@/lib/operational-copy";
 import { formatPersianInteger, toPersianDigits } from "@/lib/persian-digits";
+import {
+  readTablePreferences,
+  writeTablePreferences,
+  type TablePreferences,
+} from "@/lib/table-preferences-storage";
 import { cn } from "@/lib/utils";
 
-import type { GovernedColumn, GovernedDataTableProps } from "./types";
+import {
+  isColumnHideable,
+  permissionVisibleColumns,
+  sanitizeHiddenColumnIds,
+} from "./snapshot";
+import type { GovernedColumn, GovernedDataTableProps, TableDensity } from "./types";
+import { GOVERNED_TABLE_DEFAULT_DENSITY } from "./types";
 import { useGovernedTableSnapshot } from "./use-governed-table-snapshot";
 
-function stickyClass(sticky: GovernedColumn<unknown>["sticky"] | undefined) {
+const DEFAULT_MAX_WIDTH = "max-w-[16rem]";
+
+function stickySeparatorClass(
+  sticky: GovernedColumn<unknown>["sticky"] | undefined,
+  scrolled: boolean,
+): string | undefined {
+  if (!scrolled) return undefined;
   if (sticky === "identifier") {
-    return "sticky start-0 z-10 bg-background group-hover:bg-muted/50 group-data-[focused=true]:bg-muted/60";
+    return "shadow-[inset_-1px_0_0_var(--hairline)]";
   }
   if (sticky === "actions") {
-    return "sticky end-0 z-20 bg-background group-hover:bg-muted/50 group-data-[focused=true]:bg-muted/60";
+    return "shadow-[inset_1px_0_0_var(--hairline-strong)]";
+  }
+  return undefined;
+}
+
+function stickyBodyClass(
+  sticky: GovernedColumn<unknown>["sticky"] | undefined,
+  scrolled: boolean,
+) {
+  if (sticky === "identifier") {
+    return cn(
+      "sticky start-0 z-10 bg-background group-hover:bg-muted/50 group-data-[focused=true]:bg-muted/60",
+      stickySeparatorClass(sticky, scrolled),
+    );
+  }
+  if (sticky === "actions") {
+    return cn(
+      "sticky end-0 z-20 bg-background group-hover:bg-muted/50 group-data-[focused=true]:bg-muted/60",
+      stickySeparatorClass(sticky, scrolled),
+    );
   }
   return undefined;
 }
 
 function stickyHeadClass(
   sticky: GovernedColumn<unknown>["sticky"] | undefined,
+  scrolled: boolean,
 ) {
   if (sticky === "identifier") {
-    return "sticky start-0 z-10 bg-muted";
+    return cn(
+      "sticky start-0 z-10 bg-surface-subtle",
+      stickySeparatorClass(sticky, scrolled),
+    );
   }
   if (sticky === "actions") {
-    return "sticky end-0 z-20 bg-muted";
+    return cn(
+      "sticky end-0 z-20 bg-surface-subtle",
+      stickySeparatorClass(sticky, scrolled),
+    );
   }
   return undefined;
+}
+
+function densityRowClass(density: TableDensity): string {
+  if (density === "comfortable") {
+    return "h-table-row-comfortable min-h-[var(--table-row-comfortable)]";
+  }
+  return "h-table-row-dense min-h-[var(--table-row-dense)]";
+}
+
+function resolveMaxWidthClass<T>(column: GovernedColumn<T>): string | undefined {
+  if (column.maxWidthClass) return column.maxWidthClass;
+  // Sticky identifiers stay content-sized unless the caller opts into a max.
+  if (column.sticky === "identifier") return undefined;
+  return DEFAULT_MAX_WIDTH;
+}
+
+function TruncatedCell({
+  fullText,
+  maxWidthClass,
+}: {
+  fullText: string;
+  maxWidthClass?: string;
+}) {
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const [overflowing, setOverflowing] = React.useState(false);
+
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => {
+      setOverflowing(el.scrollWidth > el.clientWidth + 1);
+    };
+    check();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fullText]);
+
+  const trigger = (
+    <span
+      ref={ref}
+      tabIndex={overflowing && fullText ? 0 : undefined}
+      className={cn(
+        "block truncate outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        maxWidthClass,
+      )}
+      aria-label={overflowing && fullText ? fullText : undefined}
+    >
+      {fullText}
+    </span>
+  );
+
+  if (!fullText || !overflowing) {
+    return trigger;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent
+        sideOffset={6}
+        className="max-w-[min(90vw,40rem)] whitespace-pre-wrap break-words rounded-sm bg-chrome px-2 py-1 text-caption text-chrome-foreground [&_svg]:bg-chrome [&_svg]:fill-chrome"
+      >
+        {fullText}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function renderCellContent<T>(column: GovernedColumn<T>, row: T) {
+  if (column.sticky === "actions" || column.id === "__actions") {
+    return column.cell ? column.cell(row) : String(column.accessor(row) ?? "");
+  }
+
+  const fullText = String(column.accessor(row) ?? "");
+  const overflow = column.cellOverflow ?? "truncate";
+  const maxWidthClass = resolveMaxWidthClass(column);
+
+  if (overflow === "wrap") {
+    return (
+      <div className={cn("whitespace-normal break-words", maxWidthClass)}>
+        {column.cell ? column.cell(row) : fullText}
+      </div>
+    );
+  }
+
+  // Custom cell renderers own their chrome (complex trees, tint bars, disclosures).
+  // Auto truncate+tooltip applies only to plain accessor text.
+  if (column.cell) {
+    return (
+      <div className={cn("min-w-0", maxWidthClass)}>{column.cell(row)}</div>
+    );
+  }
+
+  return <TruncatedCell fullText={fullText} maxWidthClass={maxWidthClass} />;
 }
 
 function EnumMultiFilter({
@@ -59,7 +205,6 @@ function EnumMultiFilter({
   selected: string[];
   onChange: (next: string[]) => void;
 }) {
-  // Prune stale selections not present in current options.
   const optionsKey = options.map((o) => o.value).join("\0");
   const selectedKey = selected.join("\0");
   React.useEffect(() => {
@@ -126,6 +271,96 @@ function EnumMultiFilter({
   );
 }
 
+function TableChromeControls<T>({
+  columns,
+  density,
+  hiddenColumnIds,
+  onDensityChange,
+  onHiddenChange,
+}: {
+  columns: GovernedColumn<T>[];
+  density: TableDensity;
+  hiddenColumnIds: string[];
+  onDensityChange: (next: TableDensity) => void;
+  onHiddenChange: (next: string[]) => void;
+}) {
+  const hideable = columns.filter((c) => isColumnHideable(c));
+  const hiddenSet = new Set(hiddenColumnIds);
+  const nextDensity: TableDensity =
+    density === "dense" ? "comfortable" : "dense";
+  const densityLabel = density === "dense" ? "فشرده" : "راحت";
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        type="button"
+        variant="tertiary"
+        size="sm"
+        aria-label={`تراکم ردیف: ${densityLabel}. برای تغییر به ${nextDensity === "dense" ? "فشرده" : "راحت"} فعال کنید`}
+        aria-pressed={density === "comfortable"}
+        onClick={() => onDensityChange(nextDensity)}
+      >
+        <Rows3Icon className="size-3.5" aria-hidden="true" />
+        {densityLabel}
+      </Button>
+
+      {hideable.length > 0 ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="tertiary"
+              size="sm"
+              aria-label="نمایش ستون‌ها"
+            >
+              <Columns3Icon className="size-3.5" aria-hidden="true" />
+              ستون‌ها
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-2">
+            <div
+              className="max-h-60 space-y-1 overflow-y-auto"
+              role="group"
+              aria-label="نمایش ستون‌ها"
+            >
+              {hideable.map((column) => {
+                const visible = !hiddenSet.has(column.id);
+                return (
+                  <label
+                    key={column.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-body-medium hover:bg-muted"
+                  >
+                    <Checkbox
+                      checked={visible}
+                      onCheckedChange={(state) => {
+                        const show = state === true;
+                        if (show) {
+                          onHiddenChange(
+                            hiddenColumnIds.filter((id) => id !== column.id),
+                          );
+                        } else {
+                          onHiddenChange(
+                            sanitizeHiddenColumnIds(
+                              [...hiddenColumnIds, column.id],
+                              columns,
+                            ),
+                          );
+                        }
+                      }}
+                      aria-label={column.header}
+                    />
+                    <span>{column.header}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+      ) : null}
+    </div>
+  );
+}
+
 export function GovernedDataTable<T>({
   columns,
   rows,
@@ -137,9 +372,82 @@ export function GovernedDataTable<T>({
   exportSlot,
   emptyMessage,
   "aria-label": ariaLabel,
+  preferencesKey,
+  defaultDensity = GOVERNED_TABLE_DEFAULT_DENSITY,
 }: GovernedDataTableProps<T>) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [scrollTabbable, setScrollTabbable] = React.useState(false);
+  const [horizontallyScrolled, setHorizontallyScrolled] = React.useState(false);
+  const { data: session, status: sessionStatus } = useSession();
+  const accountId = session?.user?.accountId ?? "anon";
+  const sessionReady = sessionStatus !== "loading";
+
+  const [prefs, setPrefs] = React.useState<TablePreferences>(() => ({
+    density: defaultDensity,
+    hiddenColumnIds: [],
+  }));
+  const prefsRef = React.useRef(prefs);
+  prefsRef.current = prefs;
+  const [prefsHydrated, setPrefsHydrated] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!preferencesKey) {
+      setPrefs({
+        density: defaultDensity,
+        hiddenColumnIds: [],
+      });
+      setPrefsHydrated(true);
+      return;
+    }
+    // Wait for session resolution so we do not read/write the anon bucket first.
+    if (!sessionReady) return;
+    // Wait for a real column set so sanitize does not wipe stored hides.
+    if (columns.length === 0) return;
+
+    const stored = readTablePreferences(accountId, preferencesKey);
+    setPrefs({
+      density: stored?.density ?? defaultDensity,
+      hiddenColumnIds: sanitizeHiddenColumnIds(
+        stored?.hiddenColumnIds ?? [],
+        columns,
+      ),
+    });
+    setPrefsHydrated(true);
+    // Hydrate once per account/table key; column set changes sanitize via effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId, preferencesKey, defaultDensity, sessionReady, columns.length]);
+
+  React.useEffect(() => {
+    if (!prefsHydrated) return;
+    setPrefs((prev) => {
+      const sanitized = sanitizeHiddenColumnIds(prev.hiddenColumnIds, columns);
+      if (
+        sanitized.length === prev.hiddenColumnIds.length &&
+        sanitized.every((id, i) => id === prev.hiddenColumnIds[i])
+      ) {
+        return prev;
+      }
+      const next = { ...prev, hiddenColumnIds: sanitized };
+      if (preferencesKey && sessionReady) {
+        writeTablePreferences(accountId, preferencesKey, next);
+      }
+      return next;
+    });
+  }, [columns, prefsHydrated, preferencesKey, accountId, sessionReady]);
+
+  const persistPrefs = React.useCallback(
+    (patch: Partial<TablePreferences>) => {
+      const next = { ...prefsRef.current, ...patch };
+      setPrefs(next);
+      if (preferencesKey && sessionReady) {
+        writeTablePreferences(accountId, preferencesKey, next);
+      }
+    },
+    [accountId, preferencesKey, sessionReady],
+  );
+
+  const hiddenColumnIds = prefs.hiddenColumnIds;
+  const density = prefs.density;
 
   const {
     snapshot,
@@ -158,6 +466,7 @@ export function GovernedDataTable<T>({
     getRowId,
     sectionDefaultFilters,
     pageSize,
+    hiddenColumnIds,
   });
 
   const focusScopeKey = `${identity}:${pageIndex}`;
@@ -185,7 +494,7 @@ export function GovernedDataTable<T>({
     if (rowActions) {
       if (cols.some((c) => c.sticky === "actions")) {
         throw new Error(
-          "GovernedDataTable: do not pass sticky:\"actions\" on a column when rowActions is also provided",
+          'GovernedDataTable: do not pass sticky:"actions" on a column when rowActions is also provided',
         );
       }
       cols.push({
@@ -199,22 +508,30 @@ export function GovernedDataTable<T>({
     return cols;
   }, [snapshot.visible, rowActions]);
 
+  const visibilityUiColumns = React.useMemo(
+    () => permissionVisibleColumns(columns),
+    [columns],
+  );
+
   React.useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const update = () => {
       setScrollTabbable(el.scrollWidth > el.clientWidth + 1);
+      setHorizontallyScrolled(Math.abs(el.scrollLeft) > 1);
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
+    el.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
     return () => {
       ro.disconnect();
+      el.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [displayColumns, snapshot.pageRows]);
+  }, [displayColumns, snapshot.pageRows, density]);
 
   const hasFilterRow = displayColumns.some(
     (c) => c.filter === "text" || c.filter === "enum",
@@ -246,207 +563,242 @@ export function GovernedDataTable<T>({
 
   const totalPages = snapshot.pageCount;
   const empty = snapshot.total === 0;
+  const rowHeightClass = densityRowClass(density);
 
   return (
-    <div className="w-full space-y-3">
-      {(toolbar || exportSlot) && (
+    <TooltipProvider delayDuration={300}>
+      <div className="w-full space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1">{toolbar}</div>
-          {exportSlot ? <div className="shrink-0">{exportSlot}</div> : null}
-        </div>
-      )}
-
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
-        {liveMessage}
-      </div>
-
-      <p className="text-caption text-muted-foreground" aria-hidden="true">
-        {formatPersianInteger(snapshot.total)} نتیجه
-      </p>
-
-      <Table
-        aria-label={ariaLabel}
-        className="w-full"
-        containerClassName="w-full"
-        containerProps={{
-          ref: scrollRef,
-          tabIndex: scrollTabbable ? 0 : undefined,
-          className: cn(
-            "relative w-full overflow-x-auto rounded-md border border-border",
-            scrollTabbable &&
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          ),
-        }}
-      >
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            {displayColumns.map((column) => {
-              const isSorted = sort?.columnId === column.id;
-              const ariaSort = column.sortable
-                ? isSorted
-                  ? sort!.direction === "asc"
-                    ? "ascending"
-                    : "descending"
-                  : "none"
-                : undefined;
-
-              return (
-                <TableHead
-                  key={column.id}
-                  className={cn(
-                    "bg-muted text-caption font-medium",
-                    stickyHeadClass(column.sticky),
-                  )}
-                  aria-sort={ariaSort}
-                >
-                  {column.sortable ? (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded-sm text-caption outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      onClick={() => toggleSort(column.id)}
-                    >
-                      {column.header}
-                      {isSorted ? (
-                        <span aria-hidden="true">
-                          {sort!.direction === "asc" ? "↑" : "↓"}
-                        </span>
-                      ) : null}
-                    </button>
-                  ) : (
-                    column.header
-                  )}
-                </TableHead>
-              );
-            })}
-          </TableRow>
-
-          {hasFilterRow ? (
-            <TableRow className="hover:bg-transparent">
-              {displayColumns.map((column) => (
-                <TableHead
-                  key={`filter-${column.id}`}
-                  className={cn(
-                    "h-filter-row-height min-h-[var(--filter-row-height)] bg-background p-1",
-                    column.sticky === "identifier" &&
-                      "sticky start-0 z-10 bg-background",
-                    column.sticky === "actions" &&
-                      "sticky end-0 z-20 bg-background",
-                  )}
-                >
-                  {column.filter === "text" ? (
-                    <Input
-                      value={String(getFilterValue(column) ?? "")}
-                      onChange={(e) => setTextFilter(column.id, e.target.value)}
-                      aria-label={`فیلتر ${column.header}`}
-                      className="h-filter-row-height min-h-[var(--filter-row-height)] text-caption"
-                    />
-                  ) : column.filter === "enum" && column.enumOptions ? (
-                    <EnumMultiFilter
-                      columnHeader={column.header}
-                      options={column.enumOptions}
-                      selected={
-                        Array.isArray(getFilterValue(column))
-                          ? (getFilterValue(column) as string[])
-                          : []
-                      }
-                      onChange={(next) => setEnumFilter(column.id, next)}
-                    />
-                  ) : null}
-                </TableHead>
-              ))}
-            </TableRow>
-          ) : null}
-        </TableHeader>
-
-        <TableBody>
-          {empty ? (
-            <TableRow className="hover:bg-transparent">
-              <TableCell
-                colSpan={Math.max(displayColumns.length, 1)}
-                className="h-32 text-center"
-              >
-                <div className="flex flex-col items-center gap-3 py-4">
-                  <p className="text-body-medium">
-                    {emptyMessage ?? operationalCopy.emptySearch}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={clearToSectionDefaults}
-                  >
-                    {operationalCopy.clearFilters}
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : (
-            snapshot.pageRows.map((row, index) => {
-              const rowId = getRowId(row);
-              return (
-                <TableRow
-                  key={rowId}
-                  tabIndex={0}
-                  data-focused={focusedRowIndex === index ? "true" : undefined}
-                  className={cn(
-                    "group h-table-row-compact min-h-[var(--table-row-compact)] outline-none focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                  )}
-                  onFocus={() => setFocusedRowIndex(index)}
-                  onKeyDown={(e) => onRowKeyDown(e, index)}
-                >
-                  {displayColumns.map((column) => (
-                    <TableCell
-                      key={`${rowId}-${column.id}`}
-                      className={cn(
-                        "h-table-row-compact min-h-[var(--table-row-compact)] py-0",
-                        stickyClass(column.sticky),
-                      )}
-                    >
-                      {column.cell
-                        ? column.cell(row)
-                        : String(column.accessor(row) ?? "")}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
-
-      {!empty ? (
-        <nav
-          className="flex flex-wrap items-center justify-between gap-2"
-          aria-label="صفحه‌بندی جدول"
-        >
-          <p className="text-caption text-muted-foreground">
-            صفحه {toPersianDigits(pageIndex + 1)} از{" "}
-            {toPersianDigits(totalPages)}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="tertiary"
-              size="sm"
-              disabled={pageIndex <= 0}
-              onClick={() => goToPage(pageIndex - 1)}
-              aria-label="صفحه قبل"
-            >
-              قبلی
-            </Button>
-            <Button
-              type="button"
-              variant="tertiary"
-              size="sm"
-              disabled={pageIndex >= totalPages - 1}
-              onClick={() => goToPage(pageIndex + 1)}
-              aria-label="صفحه بعد"
-            >
-              بعدی
-            </Button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <TableChromeControls
+              columns={visibilityUiColumns}
+              density={density}
+              hiddenColumnIds={hiddenColumnIds}
+              onDensityChange={(next) => persistPrefs({ density: next })}
+              onHiddenChange={(next) =>
+                persistPrefs({ hiddenColumnIds: next })
+              }
+            />
+            {exportSlot ? <div className="shrink-0">{exportSlot}</div> : null}
           </div>
-        </nav>
-      ) : null}
-    </div>
+        </div>
+
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {liveMessage}
+        </div>
+
+        <p className="text-caption text-muted-foreground" aria-hidden="true">
+          {formatPersianInteger(snapshot.total)} نتیجه
+        </p>
+
+        <Table
+          aria-label={ariaLabel}
+          className="w-full"
+          containerClassName="w-full"
+          containerProps={{
+            ref: scrollRef,
+            tabIndex: scrollTabbable ? 0 : undefined,
+            className: cn(
+              "relative w-full overflow-x-auto rounded-md border border-border",
+              scrollTabbable &&
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            ),
+          }}
+        >
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              {displayColumns.map((column) => {
+                const isSorted = sort?.columnId === column.id;
+                const ariaSort = column.sortable
+                  ? isSorted
+                    ? sort!.direction === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                  : undefined;
+                const headMax = resolveMaxWidthClass(column);
+
+                return (
+                  <TableHead
+                    key={column.id}
+                    className={cn(
+                      "h-table-header-height min-h-[var(--table-header-height)] whitespace-nowrap bg-surface-subtle text-column-header",
+                      stickyHeadClass(column.sticky, horizontallyScrolled),
+                      headMax,
+                      headMax && "truncate",
+                    )}
+                    aria-sort={ariaSort}
+                  >
+                    {column.sortable ? (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded-sm text-column-header outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        onClick={() => toggleSort(column.id)}
+                      >
+                        {column.header}
+                        {isSorted ? (
+                          <span aria-hidden="true">
+                            {sort!.direction === "asc" ? "↑" : "↓"}
+                          </span>
+                        ) : null}
+                      </button>
+                    ) : (
+                      column.header
+                    )}
+                  </TableHead>
+                );
+              })}
+            </TableRow>
+
+            {hasFilterRow ? (
+              <TableRow className="hover:bg-transparent">
+                {displayColumns.map((column) => (
+                  <TableHead
+                    key={`filter-${column.id}`}
+                    className={cn(
+                      "h-filter-row-height min-h-[var(--filter-row-height)] bg-background p-1",
+                      column.sticky === "identifier" &&
+                        cn(
+                          "sticky start-0 z-10 bg-background",
+                          stickySeparatorClass(
+                            "identifier",
+                            horizontallyScrolled,
+                          ),
+                        ),
+                      column.sticky === "actions" &&
+                        cn(
+                          "sticky end-0 z-20 bg-background",
+                          stickySeparatorClass("actions", horizontallyScrolled),
+                        ),
+                    )}
+                  >
+                    {column.filter === "text" ? (
+                      <Input
+                        value={String(getFilterValue(column) ?? "")}
+                        onChange={(e) =>
+                          setTextFilter(column.id, e.target.value)
+                        }
+                        aria-label={`فیلتر ${column.header}`}
+                        className="h-filter-row-height min-h-[var(--filter-row-height)] text-caption"
+                      />
+                    ) : column.filter === "enum" && column.enumOptions ? (
+                      <EnumMultiFilter
+                        columnHeader={column.header}
+                        options={column.enumOptions}
+                        selected={
+                          Array.isArray(getFilterValue(column))
+                            ? (getFilterValue(column) as string[])
+                            : []
+                        }
+                        onChange={(next) => setEnumFilter(column.id, next)}
+                      />
+                    ) : null}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ) : null}
+          </TableHeader>
+
+          <TableBody>
+            {empty ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell
+                  colSpan={Math.max(displayColumns.length, 1)}
+                  className="h-32 text-center"
+                >
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <p className="text-body-medium">
+                      {emptyMessage ?? operationalCopy.emptySearch}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={clearToSectionDefaults}
+                    >
+                      {operationalCopy.clearFilters}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              snapshot.pageRows.map((row, index) => {
+                const rowId = getRowId(row);
+                return (
+                  <TableRow
+                    key={rowId}
+                    tabIndex={0}
+                    data-focused={
+                      focusedRowIndex === index ? "true" : undefined
+                    }
+                    data-density={density}
+                    className={cn(
+                      "group outline-none focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                      rowHeightClass,
+                    )}
+                    onFocus={() => setFocusedRowIndex(index)}
+                    onKeyDown={(e) => onRowKeyDown(e, index)}
+                  >
+                    {displayColumns.map((column) => (
+                      <TableCell
+                        key={`${rowId}-${column.id}`}
+                        className={cn(
+                          "py-0",
+                          rowHeightClass,
+                          stickyBodyClass(
+                            column.sticky,
+                            horizontallyScrolled,
+                          ),
+                          column.cellOverflow === "wrap"
+                            ? "whitespace-normal align-top"
+                            : undefined,
+                        )}
+                      >
+                        {renderCellContent(column, row)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+
+        {!empty ? (
+          <nav
+            className="flex flex-wrap items-center justify-between gap-2"
+            aria-label="صفحه‌بندی جدول"
+          >
+            <p className="text-caption text-muted-foreground">
+              صفحه {toPersianDigits(pageIndex + 1)} از{" "}
+              {toPersianDigits(totalPages)}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="tertiary"
+                size="sm"
+                disabled={pageIndex <= 0}
+                onClick={() => goToPage(pageIndex - 1)}
+                aria-label="صفحه قبل"
+              >
+                قبلی
+              </Button>
+              <Button
+                type="button"
+                variant="tertiary"
+                size="sm"
+                disabled={pageIndex >= totalPages - 1}
+                onClick={() => goToPage(pageIndex + 1)}
+                aria-label="صفحه بعد"
+              >
+                بعدی
+              </Button>
+            </div>
+          </nav>
+        ) : null}
+      </div>
+    </TooltipProvider>
   );
 }
