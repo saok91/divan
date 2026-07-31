@@ -2,8 +2,12 @@
 
 import * as React from "react";
 
+import {
+  EntityPicker,
+  createOrgUnitSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { JalaliDatePicker, type JalaliDatePickerHandle } from "@/components/jalali-date-picker";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -25,8 +29,9 @@ const VIEW_SEMANTICS_LABEL_FA: Record<
 export function HistoricalOrgHeadcountForeshadow() {
   const formId = React.useId();
   const asOfPickerRef = React.useRef<JalaliDatePickerHandle>(null);
-  const [teamId, setTeamId] = React.useState("");
+  const [team, setTeam] = React.useState<EntityPickerValue>(null);
   const [asOf, setAsOf] = React.useState<string | undefined>(undefined);
+  const orgUnitSearch = React.useMemo(() => createOrgUnitSearch(), []);
   const [submitted, setSubmitted] = React.useState<{
     asOf: string;
     teamId?: string;
@@ -61,7 +66,7 @@ export function HistoricalOrgHeadcountForeshadow() {
             ? committed.value?.trim()
             : asOf?.trim();
           if (!asOfValue) return;
-          const tid = teamId.trim();
+          const tid = team?.id?.trim() ?? "";
           setSubmitted({
             asOf: asOfValue,
             teamId: tid.length > 0 ? tid : undefined,
@@ -83,15 +88,15 @@ export function HistoricalOrgHeadcountForeshadow() {
         </div>
         <div className="min-w-[16rem] flex-1 space-y-1.5">
           <label htmlFor={`${formId}-team`} className="text-label">
-            شناسه تیم (اختیاری)
+            تیم (اختیاری)
           </label>
-          <Input
+          <EntityPicker
             id={`${formId}-team`}
-            value={teamId}
-            onChange={(e) => setTeamId(e.target.value)}
-            dir="ltr"
-            autoComplete="off"
-            placeholder="UUID — خالی = همه تیم‌ها"
+            search={orgUnitSearch}
+            value={team}
+            onValueChange={setTeam}
+            scopeNoteFa="خالی = همه تیم‌ها"
+            placeholder="کد یا نام تیم…"
           />
         </div>
         <button

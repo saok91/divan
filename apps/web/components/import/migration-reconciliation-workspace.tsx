@@ -8,6 +8,11 @@
 
 import * as React from "react";
 
+import {
+  EntityPicker,
+  createAccountSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { Button } from "@/components/ui/button";
 import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
@@ -29,8 +34,8 @@ type Props = {
 type DispositionDraft = {
   discrepancyId: string;
   rationale: string;
-  owner: string;
-  independentApprover: string;
+  owner: EntityPickerValue;
+  independentApprover: EntityPickerValue;
   scope: string;
   risk: string;
   compensatingControl: string;
@@ -96,6 +101,7 @@ export function MigrationReconciliationWorkspace({
   const [controlDraft, setControlDraft] = React.useState("");
   const [dispositionDraft, setDispositionDraft] =
     React.useState<DispositionDraft | null>(null);
+  const accountSearch = React.useMemo(() => createAccountSearch(), []);
 
   React.useEffect(() => {
     setSelectedRunId(null);
@@ -244,8 +250,8 @@ export function MigrationReconciliationWorkspace({
           : {
               discrepancyId,
               rationale: "",
-              owner: "",
-              independentApprover: "",
+              owner: null,
+              independentApprover: null,
               scope: "",
               risk: "",
               compensatingControl: "",
@@ -258,10 +264,12 @@ export function MigrationReconciliationWorkspace({
   async function onDisposition(discrepancyId: string) {
     if (!activeRunId || !dispositionDraft) return;
     if (dispositionDraft.discrepancyId !== discrepancyId) return;
+    const ownerId = dispositionDraft.owner?.id?.trim() ?? "";
+    const approverId = dispositionDraft.independentApprover?.id?.trim() ?? "";
     if (
-      !dispositionDraft.owner.trim() ||
+      !ownerId ||
       !dispositionDraft.rationale.trim() ||
-      !dispositionDraft.independentApprover.trim() ||
+      !approverId ||
       !dispositionDraft.scope.trim() ||
       !dispositionDraft.risk.trim() ||
       !dispositionDraft.compensatingControl.trim() ||
@@ -281,9 +289,9 @@ export function MigrationReconciliationWorkspace({
         status: "waived",
         dispositionCode: "waive_with_fr55",
         dispositionRationaleFa: dispositionDraft.rationale,
-        ownerAccountId: dispositionDraft.owner,
+        ownerAccountId: ownerId,
         waiver: {
-          independentApprover: dispositionDraft.independentApprover.trim(),
+          independentApprover: approverId,
           scope: dispositionDraft.scope.trim(),
           risk: dispositionDraft.risk.trim(),
           compensatingControl: dispositionDraft.compensatingControl.trim(),
@@ -480,15 +488,21 @@ export function MigrationReconciliationWorkspace({
                   </p>
                   {d.status === "open" ? (
                     <div className="flex flex-wrap items-end gap-2">
-                      <input
-                        className="rounded-md border border-border bg-background px-2 py-1"
-                        placeholder={operationalCopy.reconOwnerPlaceholder}
-                        dir="ltr"
-                        value={draft?.owner ?? ""}
-                        onChange={(e) =>
-                          patchDisposition(d.id, { owner: e.target.value })
-                        }
-                      />
+                      <div className="min-w-[14rem] space-y-1">
+                        <span className="text-muted-foreground">
+                          {operationalCopy.reconOwnerPlaceholder}
+                        </span>
+                        <EntityPicker
+                          id={`recon-owner-${d.id}`}
+                          search={accountSearch}
+                          value={draft?.owner ?? null}
+                          onValueChange={(next) =>
+                            patchDisposition(d.id, { owner: next })
+                          }
+                          placeholder={operationalCopy.reconOwnerPlaceholder}
+                          scopeNoteFa="جستجو با نام کاربری یا نام نمایشی"
+                        />
+                      </div>
                       <input
                         className="min-w-[10rem] flex-1 rounded-md border border-border bg-background px-2 py-1"
                         placeholder={operationalCopy.reconRationalePlaceholder}
@@ -497,19 +511,25 @@ export function MigrationReconciliationWorkspace({
                           patchDisposition(d.id, { rationale: e.target.value })
                         }
                       />
-                      <input
-                        className="rounded-md border border-border bg-background px-2 py-1"
-                        placeholder={
-                          operationalCopy.reconIndependentApproverPlaceholder
-                        }
-                        dir="ltr"
-                        value={draft?.independentApprover ?? ""}
-                        onChange={(e) =>
-                          patchDisposition(d.id, {
-                            independentApprover: e.target.value,
-                          })
-                        }
-                      />
+                      <div className="min-w-[14rem] space-y-1">
+                        <span className="text-muted-foreground">
+                          {operationalCopy.reconIndependentApproverPlaceholder}
+                        </span>
+                        <EntityPicker
+                          id={`recon-approver-${d.id}`}
+                          search={accountSearch}
+                          value={draft?.independentApprover ?? null}
+                          onValueChange={(next) =>
+                            patchDisposition(d.id, {
+                              independentApprover: next,
+                            })
+                          }
+                          placeholder={
+                            operationalCopy.reconIndependentApproverPlaceholder
+                          }
+                          scopeNoteFa="جستجو با نام کاربری یا نام نمایشی"
+                        />
+                      </div>
                       <input
                         className="rounded-md border border-border bg-background px-2 py-1"
                         placeholder={operationalCopy.reconWaiverScopePlaceholder}

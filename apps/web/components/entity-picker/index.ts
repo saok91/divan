@@ -27,4 +27,6 @@ export {
   createAccountSearch,
   createEmploymentSearch,
   createPrimaryAssignmentSearch,
+  createHoldSearch,
+  createDisposalRunSearch,
 } from "./resolvers";

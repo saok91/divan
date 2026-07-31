@@ -2,9 +2,14 @@
 
 import * as React from "react";
 
-import { operationalCopy } from "@/lib/operational-copy";
-import { toPersianDigits } from "@/lib/persian-digits";
-import { api } from "@/lib/trpc/client";
+import {
+  EntityPicker,
+  EntityToken,
+  TechnicalDetailDisclosure,
+  createOrgUnitSearch,
+  createPersonSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,13 +21,71 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { operationalCopy } from "@/lib/operational-copy";
+import { toPersianDigits } from "@/lib/persian-digits";
+import { api } from "@/lib/trpc/client";
 
 type ConfirmKind = "place" | "release" | "dispose" | null;
 
 type ScopeKind = "person" | "element_category" | "artifact" | "org_scope";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function ScopeIdentity({
+  scopeKind,
+  scopeRef,
+}: {
+  scopeKind: string;
+  scopeRef: string;
+}) {
+  const personQ = api.person.getById.useQuery(
+    { id: scopeRef },
+    { enabled: scopeKind === "person" && Boolean(scopeRef), retry: false },
+  );
+  const orgQ = api.organization.get.useQuery(
+    { id: scopeRef },
+    { enabled: scopeKind === "org_scope" && Boolean(scopeRef), retry: false },
+  );
+
+  if (scopeKind === "person" && personQ.data) {
+    const code = personQ.data.personnelCode?.trim() || "";
+    const name =
+      `${personQ.data.givenName ?? ""} ${personQ.data.familyName ?? ""}`.trim() ||
+      code ||
+      "پرسنل";
+    return (
+      <span>
+        person: {code ? `${toPersianDigits(code)} — ` : ""}
+        {name}
+      </span>
+    );
+  }
+  if (scopeKind === "org_scope" && orgQ.data) {
+    return (
+      <span>
+        org_scope: {orgQ.data.code} — {orgQ.data.nameFa}
+      </span>
+    );
+  }
+  if (scopeKind === "person" || scopeKind === "org_scope") {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <span>{scopeKind}:</span>
+        <TechnicalDetailDisclosure
+          value={scopeRef}
+          valueLabelFa="شناسهٔ فنی محدوده"
+        />
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span>{scopeKind}:</span>
+      <TechnicalDetailDisclosure
+        value={scopeRef}
+        valueLabelFa="شناسهٔ فنی محدوده"
+      />
+    </span>
+  );
+}
 
 /**
  * Legal hold + disposal panel — preferred surface under dictionary Admin
@@ -35,19 +98,32 @@ export function PersonnelLifecyclePanel() {
   const runsQuery = api.retention.listRuns.useQuery();
 
   const [scopeKind, setScopeKind] = React.useState<ScopeKind>("person");
-  const [scopeRef, setScopeRef] = React.useState("");
+  const [scopeEntity, setScopeEntity] = React.useState<EntityPickerValue>(null);
+  const [scopeRefRaw, setScopeRefRaw] = React.useState("");
   const [reason, setReason] = React.useState("");
-  const [disposePersonIdsRaw, setDisposePersonIdsRaw] = React.useState("");
+  const [disposePersons, setDisposePersons] = React.useState<
+    NonNullable<EntityPickerValue>[]
+  >([]);
+  const [disposeAdd, setDisposeAdd] = React.useState<EntityPickerValue>(null);
   const [releaseHoldId, setReleaseHoldId] = React.useState<string | null>(null);
   const [confirm, setConfirm] = React.useState<ConfirmKind>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const confirmTriggerRef = React.useRef<HTMLElement | null>(null);
 
+  const personSearch = React.useMemo(() => createPersonSearch(), []);
+  const orgUnitSearch = React.useMemo(() => createOrgUnitSearch(), []);
+
+  const scopeRef =
+    scopeKind === "person" || scopeKind === "org_scope"
+      ? (scopeEntity?.id?.trim() ?? "")
+      : scopeRefRaw.trim();
+
   const placeMutation = api.retention.placeHold.useMutation({
     onSuccess: async () => {
       setActionError(null);
       setReason("");
-      setScopeRef("");
+      setScopeEntity(null);
+      setScopeRefRaw("");
       setConfirm(null);
       await utils.retention.listHolds.invalidate();
       restoreFocus();
@@ -77,6 +153,11 @@ export function PersonnelLifecyclePanel() {
   const disposeMutation = api.retention.runDisposal.useMutation({
     onSuccess: async () => {
       setActionError(null);
+      setReason("");
+      setScopeEntity(null);
+      setScopeRefRaw("");
+      setDisposePersons([]);
+      setDisposeAdd(null);
       setConfirm(null);
       await Promise.all([
         utils.retention.listRuns.invalidate(),
@@ -100,17 +181,12 @@ export function PersonnelLifecyclePanel() {
     setConfirm(kind);
   }
 
-  const parsedDisposePersonIds = React.useMemo(() => {
-    return disposePersonIdsRaw
-      .split(/[\s,;]+/)
-      .map((s) => s.trim())
-      .filter((s) => UUID_RE.test(s));
-  }, [disposePersonIdsRaw]);
+  const parsedDisposePersonIds = disposePersons.map((p) => p.id);
 
   const needsDisposeSubjects =
     scopeKind === "element_category" || scopeKind === "org_scope";
   const disposeReady =
-    Boolean(scopeRef.trim()) &&
+    Boolean(scopeRef) &&
     Boolean(reason.trim()) &&
     (!needsDisposeSubjects || parsedDisposePersonIds.length > 0);
 
@@ -180,7 +256,13 @@ export function PersonnelLifecyclePanel() {
                   id={`${formId}-scope-kind`}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={scopeKind}
-                  onChange={(e) => setScopeKind(e.target.value as ScopeKind)}
+                  onChange={(e) => {
+                    setScopeKind(e.target.value as ScopeKind);
+                    setScopeEntity(null);
+                    setScopeRefRaw("");
+                    setDisposePersons([]);
+                    setDisposeAdd(null);
+                  }}
                 >
                   <option value="person">person</option>
                   <option value="artifact">artifact</option>
@@ -188,19 +270,50 @@ export function PersonnelLifecyclePanel() {
                   <option value="org_scope">org_scope</option>
                 </select>
               </label>
-              <label
-                className="block space-y-1.5 text-caption"
-                htmlFor={`${formId}-scope-ref`}
-              >
-                {operationalCopy.lifecycleScopeRef}
-                <Input
-                  id={`${formId}-scope-ref`}
-                  value={scopeRef}
-                  onChange={(e) => setScopeRef(e.target.value)}
-                  dir="ltr"
-                  autoComplete="off"
-                />
-              </label>
+              <div className="block space-y-1.5 text-caption">
+                <span id={`${formId}-scope-ref-label`}>
+                  {scopeKind === "person"
+                    ? "فرد"
+                    : scopeKind === "org_scope"
+                      ? "واحد سازمانی"
+                      : operationalCopy.lifecycleScopeRef}
+                </span>
+                {scopeKind === "person" ? (
+                  <EntityPicker
+                    id={`${formId}-scope-ref`}
+                    search={personSearch}
+                    value={scopeEntity}
+                    onValueChange={setScopeEntity}
+                    scopeNoteFa="جستجو با کد پرسنلی یا نام"
+                    placeholder="کد یا نام پرسنل…"
+                    aria-labelledby={`${formId}-scope-ref-label`}
+                  />
+                ) : scopeKind === "org_scope" ? (
+                  <EntityPicker
+                    id={`${formId}-scope-ref`}
+                    search={orgUnitSearch}
+                    value={scopeEntity}
+                    onValueChange={setScopeEntity}
+                    scopeNoteFa="واحدهای سازمانی قابل‌مشاهده"
+                    placeholder="کد یا نام واحد…"
+                    aria-labelledby={`${formId}-scope-ref-label`}
+                  />
+                ) : (
+                  <Input
+                    id={`${formId}-scope-ref`}
+                    value={scopeRefRaw}
+                    onChange={(e) => setScopeRefRaw(e.target.value)}
+                    dir="ltr"
+                    autoComplete="off"
+                    aria-labelledby={`${formId}-scope-ref-label`}
+                    placeholder={
+                      scopeKind === "artifact"
+                        ? "شناسهٔ فنی خروجی"
+                        : "مرجع دستهٔ عنصر"
+                    }
+                  />
+                )}
+              </div>
               <label
                 className="block space-y-1.5 text-caption sm:col-span-2"
                 htmlFor={`${formId}-reason`}
@@ -214,17 +327,39 @@ export function PersonnelLifecyclePanel() {
                 />
               </label>
               {needsDisposeSubjects ? (
-                <label
-                  className="block space-y-1.5 text-caption sm:col-span-2"
-                  htmlFor={`${formId}-dispose-persons`}
-                >
-                  {operationalCopy.lifecyclePersonId}
-                  <Input
+                <div className="block space-y-1.5 text-caption sm:col-span-2">
+                  <span id={`${formId}-dispose-persons-label`}>
+                    {operationalCopy.lifecyclePersonId}
+                  </span>
+                  {disposePersons.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {disposePersons.map((p) => (
+                        <EntityToken
+                          key={p.id}
+                          option={p}
+                          clearLabelFa="حذف از فهرست"
+                          onClear={() =>
+                            setDisposePersons((prev) =>
+                              prev.filter((x) => x.id !== p.id),
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  <EntityPicker
                     id={`${formId}-dispose-persons`}
-                    value={disposePersonIdsRaw}
-                    onChange={(e) => setDisposePersonIdsRaw(e.target.value)}
-                    dir="ltr"
-                    autoComplete="off"
+                    search={personSearch}
+                    value={disposeAdd}
+                    onValueChange={(next) => {
+                      if (next && !disposePersons.some((p) => p.id === next.id)) {
+                        setDisposePersons((prev) => [...prev, next]);
+                      }
+                      setDisposeAdd(null);
+                    }}
+                    scopeNoteFa="افزودن فرد به فهرست حذف"
+                    placeholder="کد یا نام پرسنل…"
+                    aria-labelledby={`${formId}-dispose-persons-label`}
                     aria-describedby={`${formId}-dispose-persons-hint`}
                   />
                   <span
@@ -233,13 +368,13 @@ export function PersonnelLifecyclePanel() {
                   >
                     {operationalCopy.lifecycleDisposeSubjectsRequired}
                   </span>
-                </label>
+                </div>
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                disabled={busy || !scopeRef.trim() || !reason.trim()}
+                disabled={busy || !scopeRef || !reason.trim()}
                 onClick={(e) => openConfirm("place", e.currentTarget)}
               >
                 {operationalCopy.lifecyclePlaceHold}
@@ -271,8 +406,11 @@ export function PersonnelLifecyclePanel() {
                     key={h.id}
                     className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
                   >
-                    <span>
-                      {h.scopeKind}:{h.scopeRef}
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      <ScopeIdentity
+                        scopeKind={h.scopeKind}
+                        scopeRef={h.scopeRef}
+                      />
                       {" · "}
                       {h.status === "active"
                         ? operationalCopy.lifecycleStatusActive
@@ -312,14 +450,21 @@ export function PersonnelLifecyclePanel() {
             {runsQuery.data && runsQuery.data.runs.length > 0 ? (
               <ul className="divide-y divide-border border border-border text-caption">
                 {runsQuery.data.runs.map((r) => (
-                  <li key={r.id} className="px-3 py-2">
-                    <span dir="ltr">{r.id.slice(0, 8)}</span>
-                    {" · "}
-                    {r.status}
-                    {" · "}
-                    {toPersianDigits(r.startedAt.slice(0, 10))}
-                    {" · "}
-                    {r.scopeKind}:{r.scopeRef}
+                  <li key={r.id} className="space-y-1 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span>{r.status}</span>
+                      {" · "}
+                      {toPersianDigits(r.startedAt.slice(0, 10))}
+                      {" · "}
+                      <ScopeIdentity
+                        scopeKind={r.scopeKind}
+                        scopeRef={r.scopeRef}
+                      />
+                    </div>
+                    <TechnicalDetailDisclosure
+                      value={r.id}
+                      valueLabelFa="شناسهٔ فنی اجرای حذف"
+                    />
                   </li>
                 ))}
               </ul>
@@ -377,7 +522,7 @@ export function PersonnelLifecyclePanel() {
                 if (confirm === "place") {
                   placeMutation.mutate({
                     scopeKind,
-                    scopeRef: scopeRef.trim(),
+                    scopeRef,
                     reason: reason.trim(),
                   });
                 } else if (confirm === "release" && releaseHoldId) {
@@ -385,22 +530,18 @@ export function PersonnelLifecyclePanel() {
                 } else if (confirm === "dispose") {
                   disposeMutation.mutate({
                     scopeKind,
-                    scopeRef: scopeRef.trim(),
+                    scopeRef,
                     reason: reason.trim(),
                     personIds:
                       scopeKind === "person"
-                        ? [scopeRef.trim()]
+                        ? [scopeRef]
                         : needsDisposeSubjects
                           ? parsedDisposePersonIds
                           : undefined,
                     artifactIds:
-                      scopeKind === "artifact"
-                        ? [scopeRef.trim()]
-                        : undefined,
+                      scopeKind === "artifact" ? [scopeRef] : undefined,
                     elementCategory:
-                      scopeKind === "element_category"
-                        ? scopeRef.trim()
-                        : undefined,
+                      scopeKind === "element_category" ? scopeRef : undefined,
                   });
                 }
               }}

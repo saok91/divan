@@ -8,6 +8,14 @@
 
 import * as React from "react";
 
+import {
+  EntityPicker,
+  TechnicalDetailDisclosure,
+  createDisposalRunSearch,
+  createHoldSearch,
+  createPersonSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import { Button } from "@/components/ui/button";
@@ -25,6 +33,56 @@ import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
+
+function PersonIdentityCell({ personId }: { personId: string }) {
+  const q = api.person.getById.useQuery(
+    { id: personId },
+    { enabled: Boolean(personId), retry: false },
+  );
+  if (q.isLoading) {
+    return <span className="text-caption text-muted-foreground">…</span>;
+  }
+  if (q.data) {
+    const code = q.data.personnelCode?.trim() || "";
+    const name =
+      `${q.data.givenName ?? ""} ${q.data.familyName ?? ""}`.trim() || code || "پرسنل";
+    return (
+      <span className="text-caption">
+        {code ? (
+          <span className="text-identifier text-primary" dir="ltr">
+            {toPersianDigits(code)}
+          </span>
+        ) : null}
+        {code ? " — " : null}
+        {name}
+      </span>
+    );
+  }
+  return (
+    <TechnicalDetailDisclosure
+      value={personId}
+      valueLabelFa="شناسهٔ فنی فرد"
+    />
+  );
+}
+
+function OutcomeLinkTarget({
+  linkType,
+  targetId,
+}: {
+  linkType: string;
+  targetId: string;
+}) {
+  if (linkType === "personnel_correction") {
+    return <PersonIdentityCell personId={targetId} />;
+  }
+  return (
+    <TechnicalDetailDisclosure
+      value={targetId}
+      valueLabelFa={`شناسهٔ فنی ${linkTypeLabel(linkType)}`}
+    />
+  );
+}
 
 type CaseRow = {
   id: string;
@@ -162,11 +220,7 @@ const COLUMNS: GovernedColumn<CaseRow>[] = [
     id: "personId",
     header: operationalCopy.correctionCasePersonId,
     accessor: (r) => r.personId,
-    cell: (r) => (
-      <span className="font-mono text-caption">
-        {toPersianDigits(r.personId.slice(0, 8))}…
-      </span>
-    ),
+    cell: (r) => <PersonIdentityCell personId={r.personId} />,
   },
 ];
 
@@ -181,7 +235,7 @@ export function CorrectionCasesPanel() {
 
   const [requestRef, setRequestRef] = React.useState("");
   const [authority, setAuthority] = React.useState("");
-  const [personId, setPersonId] = React.useState("");
+  const [person, setPerson] = React.useState<EntityPickerValue>(null);
   const [deadlineLocal, setDeadlineLocal] = React.useState("");
   const [decision, setDecision] = React.useState<
     "approved" | "rejected" | "constrained"
@@ -199,12 +253,25 @@ export function CorrectionCasesPanel() {
     | "decision_publication"
   >("decision_publication");
   const [linkTarget, setLinkTarget] = React.useState("");
+  const [linkEntity, setLinkEntity] = React.useState<EntityPickerValue>(null);
   const [uploadName, setUploadName] = React.useState("");
   const [uploadB64, setUploadB64] = React.useState("");
   const [evidenceKind, setEvidenceKind] = React.useState<
     "request" | "response" | "internal" | "other"
   >("request");
   const [evidenceUri, setEvidenceUri] = React.useState("");
+
+  const personSearch = React.useMemo(() => createPersonSearch(), []);
+  const holdSearch = React.useMemo(() => createHoldSearch(), []);
+  const disposalRunSearch = React.useMemo(() => createDisposalRunSearch(), []);
+  const linkUsesPersonPicker = linkType === "personnel_correction";
+  const linkUsesHoldPicker = linkType === "hold";
+  const linkUsesDisposalPicker = linkType === "disposal_run";
+  const linkUsesBusinessPicker =
+    linkUsesPersonPicker || linkUsesHoldPicker || linkUsesDisposalPicker;
+  const resolvedLinkTarget = linkUsesBusinessPicker
+    ? (linkEntity?.id?.trim() ?? "")
+    : linkTarget.trim();
 
   const listQuery = api.correctionCase.list.useQuery({
     breachedOnly: breachedOnly || undefined,
@@ -221,7 +288,7 @@ export function CorrectionCasesPanel() {
       setDialog(null);
       setRequestRef("");
       setAuthority("");
-      setPersonId("");
+      setPerson(null);
       setDeadlineLocal("");
       setSelectedId(res.case.id);
       await utils.correctionCase.list.invalidate();
@@ -281,6 +348,7 @@ export function CorrectionCasesPanel() {
       setActionError(null);
       setDialog(null);
       setLinkTarget("");
+      setLinkEntity(null);
       await utils.correctionCase.get.invalidate();
       restoreFocus();
     },
@@ -551,8 +619,11 @@ export function CorrectionCasesPanel() {
                 <dt className="text-caption text-muted-foreground">
                   {operationalCopy.correctionCaseOwner}
                 </dt>
-                <dd className="font-mono text-caption">
-                  {detailQuery.data.case.ownerAccountId}
+                <dd>
+                  <TechnicalDetailDisclosure
+                    value={detailQuery.data.case.ownerAccountId}
+                    valueLabelFa="شناسهٔ فنی مالک پرونده"
+                  />
                 </dd>
               </div>
               <div>
@@ -747,10 +818,13 @@ export function CorrectionCasesPanel() {
               ) : (
                 <ul className="space-y-1 text-caption">
                   {detailQuery.data.outcomeLinks.map((l) => (
-                    <li key={l.id}>
-                      {linkTypeLabel(l.linkType)}:{" "}
-                      {toPersianDigits(l.targetId)}
-                      {l.note ? ` — ${l.note}` : ""}
+                    <li key={l.id} className="flex flex-wrap items-center gap-2">
+                      <span>{linkTypeLabel(l.linkType)}:</span>
+                      <OutcomeLinkTarget
+                        linkType={l.linkType}
+                        targetId={l.targetId}
+                      />
+                      {l.note ? <span>— {l.note}</span> : null}
                     </li>
                   ))}
                 </ul>
@@ -812,10 +886,14 @@ export function CorrectionCasesPanel() {
                 </label>
                 <label className="block space-y-1 text-caption">
                   {operationalCopy.correctionCasePersonId}
-                  <Input
-                    value={personId}
-                    onChange={(e) => setPersonId(e.target.value)}
-                    dir="ltr"
+                  <EntityPicker
+                    id={`${formId}-open-person`}
+                    search={personSearch}
+                    value={person}
+                    onValueChange={setPerson}
+                    scopeNoteFa="جستجو با کد پرسنلی یا نام"
+                    placeholder="کد یا نام پرسنل…"
+                    aria-required
                   />
                 </label>
                 <label className="block space-y-1 text-caption">
@@ -841,14 +919,14 @@ export function CorrectionCasesPanel() {
                     busy ||
                     !requestRef.trim() ||
                     !authority.trim() ||
-                    !personId.trim() ||
+                    !(person?.id?.trim()) ||
                     !deadlineLocal
                   }
                   onClick={() =>
                     openMutation.mutate({
                       requestReference: requestRef.trim(),
                       authorityVerifiedBy: authority.trim(),
-                      personId: personId.trim(),
+                      personId: person!.id.trim(),
                       deadlineAt: new Date(deadlineLocal),
                     })
                   }
@@ -981,11 +1059,11 @@ export function CorrectionCasesPanel() {
                   <select
                     className="w-full rounded border border-border bg-background px-2 py-2"
                     value={linkType}
-                    onChange={(e) =>
-                      setLinkType(
-                        e.target.value as typeof linkType,
-                      )
-                    }
+                    onChange={(e) => {
+                      setLinkType(e.target.value as typeof linkType);
+                      setLinkEntity(null);
+                      setLinkTarget("");
+                    }}
                   >
                     <option value="decision_publication">
                       {operationalCopy.correctionCaseLinkDecisionPublication}
@@ -1014,12 +1092,57 @@ export function CorrectionCasesPanel() {
                   </select>
                 </label>
                 <label className="block space-y-1 text-caption">
-                  شناسه هدف
-                  <Input
-                    value={linkTarget}
-                    onChange={(e) => setLinkTarget(e.target.value)}
-                    dir="ltr"
-                  />
+                  {linkUsesPersonPicker
+                    ? "هدف (فرد)"
+                    : linkUsesHoldPicker
+                      ? "هدف (نگهداری قانونی)"
+                      : linkUsesDisposalPicker
+                        ? "هدف (اجرای حذف)"
+                        : "مرجع فنی هدف"}
+                  {linkUsesPersonPicker ? (
+                    <EntityPicker
+                      id={`${formId}-link-person`}
+                      search={personSearch}
+                      value={linkEntity}
+                      onValueChange={setLinkEntity}
+                      scopeNoteFa="جستجو با کد پرسنلی یا نام"
+                      placeholder="کد یا نام پرسنل…"
+                    />
+                  ) : linkUsesHoldPicker ? (
+                    <EntityPicker
+                      id={`${formId}-link-hold`}
+                      search={holdSearch}
+                      value={linkEntity}
+                      onValueChange={setLinkEntity}
+                      scopeNoteFa="نگهداری‌های قابل‌مشاهده"
+                      placeholder="محدوده یا دلیل نگهداری…"
+                    />
+                  ) : linkUsesDisposalPicker ? (
+                    <EntityPicker
+                      id={`${formId}-link-disposal`}
+                      search={disposalRunSearch}
+                      value={linkEntity}
+                      onValueChange={setLinkEntity}
+                      scopeNoteFa="اجراهای حذف قابل‌مشاهده"
+                      placeholder="محدوده یا وضعیت اجرا…"
+                    />
+                  ) : (
+                    <>
+                      <Input
+                        value={linkTarget}
+                        onChange={(e) => setLinkTarget(e.target.value)}
+                        dir="ltr"
+                        placeholder="شناسهٔ همبستگی / مرجع فنی"
+                        aria-describedby={`${formId}-link-tech-hint`}
+                      />
+                      <span
+                        id={`${formId}-link-tech-hint`}
+                        className="block text-muted-foreground"
+                      >
+                        برای انواع بدون انتخابگر کسب‌وکار — فقط همبستگی پشتیبانی
+                      </span>
+                    </>
+                  )}
                 </label>
               </div>
               <DialogFooter>
@@ -1032,12 +1155,12 @@ export function CorrectionCasesPanel() {
                 </Button>
                 <Button
                   type="button"
-                  disabled={busy || !linkTarget.trim() || !selectedId}
+                  disabled={busy || !resolvedLinkTarget || !selectedId}
                   onClick={() =>
                     linkMutation.mutate({
                       caseId: selectedId!,
                       linkType,
-                      targetId: linkTarget.trim(),
+                      targetId: resolvedLinkTarget,
                     })
                   }
                 >

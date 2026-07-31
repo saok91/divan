@@ -1,3 +1,8 @@
+## Deferred from: code review of 8-5-remaining-uuid-inputs-retrofit.md (2026-07-31)
+
+- Per-row `person.getById` / `listEntitlements` fan-out on correction-case and audit result tables ? presentation hydrate without batched DTO; optimize later if list volume hurts.
+- Account identity hydrate via `accessAdmin.listEntitlements` (admin-bound) ? same PopulationPort / 8.3 `createAccountSearch` constraint; non-admin audit viewers still see technical disclosure.
+
 ## Deferred from: code review of 8-4-personnel-event-form-identifier-first-retrofit.md (2026-07-31)
 
 - Unused hydrate helpers in `personnel-event-entity-helpers.ts` (`hydrateOrgUnitValue`, job/ladder/grade/role/seniority/PA) ? not wired; snapshot restore uses `fromEntitySnap` only. Cleanup or wire later if draft rehydrate from bare UUIDs is needed.

@@ -3,11 +3,16 @@
 import * as React from "react";
 
 import {
+  EntityPicker,
+  createOrgUnitSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
+import {
   JalaliDatePicker,
   type JalaliDatePickerHandle,
 } from "@/components/jalali-date-picker";
-import { Input } from "@/components/ui/input";
 import { operationalCopy } from "@/lib/operational-copy";
+import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
 export type ReportFilterState = {
@@ -24,9 +29,6 @@ export type ReportFiltersProps = {
   disabled?: boolean;
 };
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 /**
  * Shared org + time/as-of + Effective-Date range filters for report runs.
  * Applying re-queries the active report via one filter identity object.
@@ -42,7 +44,11 @@ export function ReportFilters({
   const rangeStartRef = React.useRef<JalaliDatePickerHandle>(null);
   const rangeEndRef = React.useRef<JalaliDatePickerHandle>(null);
 
-  const [teamId, setTeamId] = React.useState(value.teamId);
+  const [team, setTeam] = React.useState<EntityPickerValue>(
+    value.teamId
+      ? { id: value.teamId, code: "", labelFa: "تیم فیلتر" }
+      : null,
+  );
   const [evaluationMode, setEvaluationMode] = React.useState(
     value.evaluationMode,
   );
@@ -50,6 +56,43 @@ export function ReportFilters({
   const [rangeStart, setRangeStart] = React.useState(value.rangeStart);
   const [rangeEnd, setRangeEnd] = React.useState(value.rangeEnd);
   const [formError, setFormError] = React.useState<string | null>(null);
+
+  const orgUnitSearch = React.useMemo(() => createOrgUnitSearch(), []);
+  const parentTeamId = value.teamId.trim();
+  const teamHydrate = api.organization.get.useQuery(
+    { id: parentTeamId },
+    { enabled: Boolean(parentTeamId), retry: false },
+  );
+
+  React.useEffect(() => {
+    if (!parentTeamId) {
+      setTeam(null);
+      return;
+    }
+    setTeam((prev) =>
+      prev?.id === parentTeamId
+        ? prev
+        : { id: parentTeamId, code: "", labelFa: "تیم فیلتر" },
+    );
+  }, [parentTeamId]);
+
+  React.useEffect(() => {
+    if (
+      !parentTeamId ||
+      !teamHydrate.data ||
+      teamHydrate.data.id !== parentTeamId
+    ) {
+      return;
+    }
+    setTeam((prev) => {
+      if (prev?.id !== parentTeamId) return prev;
+      return {
+        id: teamHydrate.data.id,
+        code: teamHydrate.data.code,
+        labelFa: teamHydrate.data.nameFa,
+      };
+    });
+  }, [parentTeamId, teamHydrate.data]);
 
   return (
     <form
@@ -95,14 +138,8 @@ export function ReportFilters({
           return;
         }
 
-        const teamTrim = teamId.trim();
-        if (teamTrim && !UUID_RE.test(teamTrim)) {
-          setFormError(operationalCopy.reportFilterInvalid);
-          return;
-        }
-
         onApply({
-          teamId: teamTrim,
+          teamId: team?.id?.trim() ?? "",
           evaluationMode,
           asOfDate:
             evaluationMode === "as_of"
@@ -182,16 +219,16 @@ export function ReportFilters({
 
       <div className="min-w-[16rem] flex-1 space-y-1.5">
         <label htmlFor={`${formId}-team`} className="text-label">
-          شناسه تیم (اختیاری)
+          تیم (اختیاری)
         </label>
-        <Input
+        <EntityPicker
           id={`${formId}-team`}
-          value={teamId}
+          search={orgUnitSearch}
+          value={team}
+          onValueChange={setTeam}
           disabled={disabled}
-          onChange={(e) => setTeamId(e.target.value)}
-          dir="ltr"
-          autoComplete="off"
-          placeholder="UUID — برای اعضای تیم الزامی"
+          scopeNoteFa="واحدهای سازمانی قابل‌مشاهده — برای اعضای تیم الزامی"
+          placeholder="کد یا نام تیم…"
         />
         <p className="text-caption text-muted-foreground">
           {operationalCopy.reportTeamFilterHint}

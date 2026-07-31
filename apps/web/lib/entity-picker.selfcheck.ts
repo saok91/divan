@@ -225,4 +225,119 @@ assert.match(resolvers, /createPrimaryAssignmentSearch/, "PA dependent resolver"
 assert.match(resolvers, /createHeadcountApprovalSearch/, "approval resolver");
 assert.match(resolvers, /createAccountSearch/, "account resolver");
 
+// 8.5: remaining admin/analysis surfaces wire EntityPicker; no free-text UUID entry
+const surfaceInventory: { rel: string; label: string; allowTechnicalInput?: boolean }[] = [
+  { rel: "components/dashboard/dashboard-filters.tsx", label: "dashboard-filters" },
+  { rel: "components/reports/report-filters.tsx", label: "report-filters" },
+  {
+    rel: "components/organization/historical-org-headcount-foreshadow.tsx",
+    label: "historical-org-headcount-foreshadow",
+  },
+  {
+    rel: "components/personnel/current-person-state-foreshadow.tsx",
+    label: "current-person-state-foreshadow",
+  },
+  { rel: "components/headcount/exemption-panel.tsx", label: "exemption-panel" },
+  { rel: "components/headcount/override-panel.tsx", label: "override-panel" },
+  {
+    rel: "components/correction-cases/correction-cases-panel.tsx",
+    label: "correction-cases-panel",
+  },
+  {
+    rel: "components/personnel/personnel-lifecycle-panel.tsx",
+    label: "personnel-lifecycle-panel",
+    allowTechnicalInput: true,
+  },
+  {
+    rel: "components/audit/audit-investigation-panel.tsx",
+    label: "audit-investigation-panel",
+    allowTechnicalInput: true,
+  },
+  {
+    rel: "components/import/migration-reconciliation-workspace.tsx",
+    label: "migration-reconciliation-workspace",
+  },
+  {
+    rel: "components/operations/launch-artifact-panel.tsx",
+    label: "launch-artifact-panel",
+  },
+];
+
+for (const surface of surfaceInventory) {
+  assert.ok(exists(surface.rel), `${surface.label} must exist`);
+  const src = read(surface.rel);
+  assert.match(
+    src,
+    /EntityPicker/,
+    `${surface.label} must consume EntityPicker (8.5)`,
+  );
+  assert.match(
+    src,
+    /from ["']@\/components\/entity-picker["']/,
+    `${surface.label} must import from entity-picker barrel`,
+  );
+  assert.doesNotMatch(
+    src,
+    /شناسه تیم[\s\S]{0,160}<Input/,
+    `${surface.label}: no «شناسه تیم»+Input UUID entry (heuristic)`,
+  );
+  assert.doesNotMatch(
+    src,
+    /شناسه فرد[\s\S]{0,160}<Input/,
+    `${surface.label}: no «شناسه فرد»+Input UUID entry (heuristic)`,
+  );
+  if (!surface.allowTechnicalInput) {
+    assert.doesNotMatch(
+      src,
+      /placeholder=["']UUID/,
+      `${surface.label}: no placeholder="UUID…" free-text entry (heuristic)`,
+    );
+  }
+}
+
+const reportFilters = read("components/reports/report-filters.tsx");
+assert.doesNotMatch(
+  reportFilters,
+  /UUID_RE/,
+  "report-filters must drop free-text UUID_RE gate after picker",
+);
+
+const auditPanel = read("components/audit/audit-investigation-panel.tsx");
+assert.match(
+  auditPanel,
+  /جستجو با شناسهٔ فنی/,
+  "audit must expose secondary technical-id path",
+);
+assert.match(
+  auditPanel,
+  /useLeaveGuardRegistration/,
+  "audit leave-guard registration must remain",
+);
+assert.match(
+  auditPanel,
+  /createAccountSearch/,
+  "audit actor default must use createAccountSearch",
+);
+
+const exemptionPanel = read("components/headcount/exemption-panel.tsx");
+assert.match(
+  exemptionPanel,
+  /useEntityPickerCascade|createPrimaryAssignmentSearch/,
+  "exemption must cascade person → primary assignment",
+);
+
+const lifecyclePanel = read("components/personnel/personnel-lifecycle-panel.tsx");
+assert.match(
+  lifecyclePanel,
+  /EntityToken/,
+  "lifecycle disposal multi-person must use EntityToken list",
+);
+
+const foreshadow = read("components/personnel/current-person-state-foreshadow.tsx");
+assert.doesNotMatch(
+  foreshadow,
+  /\.slice\(0,\s*8\)/,
+  "person foreshadow must not use truncated UUID as primary identity",
+);
+
 console.log("entity-picker selfcheck: ok");

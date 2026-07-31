@@ -2,8 +2,12 @@
 
 import * as React from "react";
 
+import {
+  EntityPicker,
+  createOrgUnitSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
 import { api } from "@/lib/trpc/client";
@@ -74,9 +78,11 @@ export function HeadcountOverridePanel() {
   const formId = React.useId();
   const [statusFilter, setStatusFilter] = React.useState<string>("active");
   const [ruleFilter, setRuleFilter] = React.useState<string>("");
-  const [teamFilter, setTeamFilter] = React.useState("");
+  const [teamFilter, setTeamFilter] = React.useState<EntityPickerValue>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [formError, setFormError] = React.useState<string | null>(null);
+
+  const orgUnitSearch = React.useMemo(() => createOrgUnitSearch(), []);
 
   const listQuery = api.headcount.listOverrides.useQuery({
     status:
@@ -87,7 +93,7 @@ export function HeadcountOverridePanel() {
       ruleFilter === ""
         ? undefined
         : (ruleFilter as "shortage" | "validity" | "job_title" | "seniority"),
-    teamId: teamFilter.trim() || undefined,
+    teamId: teamFilter?.id?.trim() || undefined,
   });
 
   const voidMutation = api.headcount.voidOverride.useMutation({
@@ -145,13 +151,15 @@ export function HeadcountOverridePanel() {
           </select>
         </label>
         <label className="space-y-1 text-sm">
-          <span id={`${formId}-team`}>شناسه تیم</span>
-          <Input
-            aria-labelledby={`${formId}-team`}
+          <span id={`${formId}-team`}>تیم</span>
+          <EntityPicker
+            id={`${formId}-team`}
+            search={orgUnitSearch}
             value={teamFilter}
-            onChange={(e) => setTeamFilter(e.target.value)}
-            autoComplete="off"
-            dir="ltr"
+            onValueChange={setTeamFilter}
+            scopeNoteFa="خالی = همه تیم‌ها"
+            placeholder="کد یا نام تیم…"
+            aria-labelledby={`${formId}-team`}
           />
         </label>
       </div>

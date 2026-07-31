@@ -2,9 +2,14 @@
 
 import * as React from "react";
 
+import {
+  EntityPicker,
+  TechnicalDetailDisclosure,
+  createPersonSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { JalaliDatePicker, type JalaliDatePickerHandle } from "@/components/jalali-date-picker";
 import { StatusBadge } from "@/components/personnel/status-badge";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -26,12 +31,14 @@ const VIEW_SEMANTICS_LABEL_FA: Record<
 export function CurrentPersonStateForeshadow() {
   const formId = React.useId();
   const asOfPickerRef = React.useRef<JalaliDatePickerHandle>(null);
-  const [personId, setPersonId] = React.useState("");
+  const [person, setPerson] = React.useState<EntityPickerValue>(null);
   const [asOf, setAsOf] = React.useState<string | undefined>(undefined);
   const [submitted, setSubmitted] = React.useState<{
     personId: string;
     asOf?: string;
   } | null>(null);
+
+  const personSearch = React.useMemo(() => createPersonSearch(), []);
 
   const query = api.person.getCurrentState.useQuery(
     {
@@ -39,6 +46,12 @@ export function CurrentPersonStateForeshadow() {
       asOf: submitted?.asOf,
     },
     { enabled: Boolean(submitted?.personId) },
+  );
+
+  const teamId = query.data?.ok === true ? query.data.teamMembership?.teamId : undefined;
+  const teamQuery = api.organization.get.useQuery(
+    { id: teamId ?? "" },
+    { enabled: Boolean(teamId) },
   );
 
   return (
@@ -59,7 +72,7 @@ export function CurrentPersonStateForeshadow() {
         className="flex flex-wrap items-end gap-3"
         onSubmit={(e) => {
           e.preventDefault();
-          const id = personId.trim();
+          const id = person?.id?.trim() ?? "";
           if (id.length === 0) {
             setSubmitted(null);
             return;
@@ -78,15 +91,16 @@ export function CurrentPersonStateForeshadow() {
       >
         <div className="min-w-[16rem] flex-1 space-y-1.5">
           <label htmlFor={`${formId}-person`} className="text-label">
-            شناسه فرد
+            فرد
           </label>
-          <Input
+          <EntityPicker
             id={`${formId}-person`}
-            value={personId}
-            onChange={(e) => setPersonId(e.target.value)}
-            dir="ltr"
-            autoComplete="off"
-            placeholder="UUID"
+            search={personSearch}
+            value={person}
+            onValueChange={setPerson}
+            scopeNoteFa="جستجو با کد پرسنلی یا نام"
+            placeholder="کد یا نام پرسنل…"
+            aria-required
           />
         </div>
         <div className="min-w-[14rem] space-y-1.5">
@@ -163,18 +177,38 @@ export function CurrentPersonStateForeshadow() {
               ) : null}
             </p>
           ) : null}
-          <p>
-            <span className="text-muted-foreground">اشتغال فعال: </span>
-            {query.data.employment
-              ? toPersianDigits(query.data.employment.id.slice(0, 8))
-              : "—"}
-          </p>
-          <p>
-            <span className="text-muted-foreground">تیم اصلی: </span>
-            {query.data.teamMembership
-              ? toPersianDigits(query.data.teamMembership.teamId.slice(0, 8))
-              : "—"}
-          </p>
+          <div className="space-y-1">
+            <p>
+              <span className="text-muted-foreground">اشتغال فعال: </span>
+              {query.data.employment
+                ? query.data.employment.collaborationType?.trim() || "اشتغال"
+                : "—"}
+            </p>
+            {query.data.employment ? (
+              <TechnicalDetailDisclosure
+                value={query.data.employment.id}
+                valueLabelFa="شناسهٔ فنی اشتغال"
+              />
+            ) : null}
+          </div>
+          <div className="space-y-1">
+            <p>
+              <span className="text-muted-foreground">تیم اصلی: </span>
+              {query.data.teamMembership
+                ? teamQuery.isError || (teamQuery.isFetched && !teamQuery.data)
+                  ? "—"
+                  : teamQuery.data
+                    ? `${teamQuery.data.code} — ${teamQuery.data.nameFa}`
+                    : "در حال بارگذاری…"
+                : "—"}
+            </p>
+            {query.data.teamMembership ? (
+              <TechnicalDetailDisclosure
+                value={query.data.teamMembership.teamId}
+                valueLabelFa="شناسهٔ فنی تیم"
+              />
+            ) : null}
+          </div>
           {query.data.viewSemantics === "planned" &&
           query.data.plannedChangesThroughAsOf.length > 0 ? (
             <ul className="space-y-2" aria-label="تغییرات برنامه‌ریزی‌شده تا تاریخ مبنا">

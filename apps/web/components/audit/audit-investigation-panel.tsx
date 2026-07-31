@@ -8,6 +8,14 @@
 
 import * as React from "react";
 
+import {
+  EntityPicker,
+  TechnicalDetailDisclosure,
+  createAccountSearch,
+  createOrgUnitSearch,
+  createPersonSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import {
@@ -47,10 +55,12 @@ type AuditRow = {
 };
 
 type DraftFilters = {
-  actorAccountId: string;
+  actor: EntityPickerValue;
+  actorTechnicalId: string;
   operation: string;
   entityType: string;
-  entityId: string;
+  entity: EntityPickerValue;
+  entityTechnicalId: string;
   result: "" | "allow" | "deny";
   correlationId: string;
   eventClass: "" | "access" | "business";
@@ -59,16 +69,26 @@ type DraftFilters = {
 };
 
 const EMPTY_DRAFT: DraftFilters = {
-  actorAccountId: "",
+  actor: null,
+  actorTechnicalId: "",
   operation: "",
   entityType: "",
-  entityId: "",
+  entity: null,
+  entityTechnicalId: "",
   result: "",
   correlationId: "",
   eventClass: "",
   fromGregorian: undefined,
   toGregorian: undefined,
 };
+
+function resolveActorId(draft: DraftFilters): string {
+  return draft.actor?.id?.trim() || draft.actorTechnicalId.trim() || "";
+}
+
+function resolveEntityId(draft: DraftFilters): string {
+  return draft.entity?.id?.trim() || draft.entityTechnicalId.trim() || "";
+}
 
 function draftToInput(draft: DraftFilters) {
   const fromIso = draft.fromGregorian
@@ -78,10 +98,10 @@ function draftToInput(draft: DraftFilters) {
     ? gregorianDateTimePartsToIso({ date: draft.toGregorian, time: "23:59" })
     : null;
   return {
-    actorAccountId: draft.actorAccountId.trim() || undefined,
+    actorAccountId: resolveActorId(draft) || undefined,
     operation: draft.operation.trim() || undefined,
     entityType: draft.entityType.trim() || undefined,
-    entityId: draft.entityId.trim() || undefined,
+    entityId: resolveEntityId(draft) || undefined,
     result: draft.result || undefined,
     correlationId: draft.correlationId.trim() || undefined,
     eventClass: draft.eventClass || undefined,
@@ -91,6 +111,162 @@ function draftToInput(draft: DraftFilters) {
       ? new Date(new Date(toIso).getTime() + 59_000 + 999)
       : undefined,
   };
+}
+
+function entityTypeImpliesPicker(entityType: string): "person" | "account" | "org" | null {
+  const t = entityType.trim().toLowerCase();
+  if (!t) return null;
+  if (t === "پرسنل") return "person";
+  const tokens = t.split(/[^a-z0-9_\u0600-\u06ff]+/).filter(Boolean);
+  if (
+    tokens.includes("person") ||
+    tokens.includes("personnel") ||
+    tokens.includes("پرسنل")
+  ) {
+    return "person";
+  }
+  if (
+    tokens.includes("account") ||
+    tokens.includes("user") ||
+    tokens.includes("حساب")
+  ) {
+    return "account";
+  }
+  if (
+    tokens.includes("org") ||
+    tokens.includes("org_unit") ||
+    tokens.includes("organization") ||
+    tokens.includes("team") ||
+    tokens.includes("unit") ||
+    tokens.includes("تیم")
+  ) {
+    return "org";
+  }
+  return null;
+}
+
+function AuditActorCell({ accountId }: { accountId: string | null }) {
+  const entitlements = api.accessAdmin.listEntitlements.useQuery(undefined, {
+    enabled: Boolean(accountId),
+    retry: false,
+  });
+  if (!accountId) return <>—</>;
+  if (entitlements.isLoading || (entitlements.isFetching && !entitlements.data)) {
+    return <span className="text-caption text-muted-foreground">…</span>;
+  }
+  const row = entitlements.data?.find((r) => r.accountId === accountId);
+  if (row) {
+    return (
+      <span className="text-caption">
+        <span className="text-identifier text-primary" dir="ltr">
+          {row.username}
+        </span>
+        {" — "}
+        {row.displayName}
+      </span>
+    );
+  }
+  return (
+    <TechnicalDetailDisclosure
+      value={accountId}
+      valueLabelFa="شناسهٔ فنی بازیگر"
+    />
+  );
+}
+
+function AuditEntityCell({
+  entityType,
+  entityId,
+}: {
+  entityType: string | null;
+  entityId: string | null;
+}) {
+  const kind = entityTypeImpliesPicker(entityType ?? "");
+  const personQ = api.person.getById.useQuery(
+    { id: entityId ?? "" },
+    { enabled: kind === "person" && Boolean(entityId), retry: false },
+  );
+  const orgQ = api.organization.get.useQuery(
+    { id: entityId ?? "" },
+    { enabled: kind === "org" && Boolean(entityId), retry: false },
+  );
+  const entitlements = api.accessAdmin.listEntitlements.useQuery(undefined, {
+    enabled: kind === "account" && Boolean(entityId),
+    retry: false,
+  });
+
+  if (!entityId && !entityType) return <>—</>;
+
+  if (kind === "person" && entityId && (personQ.isLoading || (personQ.isFetching && !personQ.data))) {
+    return <span className="text-caption text-muted-foreground">…</span>;
+  }
+  if (kind === "org" && entityId && (orgQ.isLoading || (orgQ.isFetching && !orgQ.data))) {
+    return <span className="text-caption text-muted-foreground">…</span>;
+  }
+  if (
+    kind === "account" &&
+    entityId &&
+    (entitlements.isLoading || (entitlements.isFetching && !entitlements.data))
+  ) {
+    return <span className="text-caption text-muted-foreground">…</span>;
+  }
+
+  if (kind === "person" && personQ.data) {
+    const code = personQ.data.personnelCode?.trim() || "";
+    const name =
+      `${personQ.data.givenName ?? ""} ${personQ.data.familyName ?? ""}`.trim() ||
+      code ||
+      "پرسنل";
+    return (
+      <span className="text-caption">
+        {entityType ? `${entityType} / ` : null}
+        {code ? (
+          <span className="text-identifier text-primary" dir="ltr">
+            {toPersianDigits(code)}
+          </span>
+        ) : null}
+        {code ? " — " : null}
+        {name}
+      </span>
+    );
+  }
+  if (kind === "org" && orgQ.data) {
+    return (
+      <span className="text-caption">
+        {entityType ? `${entityType} / ` : null}
+        {orgQ.data.code} — {orgQ.data.nameFa}
+      </span>
+    );
+  }
+  if (kind === "account" && entitlements.data) {
+    const row = entitlements.data.find((r) => r.accountId === entityId);
+    if (row) {
+      return (
+        <span className="text-caption">
+          {entityType ? `${entityType} / ` : null}
+          <span className="text-identifier text-primary" dir="ltr">
+            {row.username}
+          </span>
+          {" — "}
+          {row.displayName}
+        </span>
+      );
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2 text-caption">
+      {entityType ? <span>{entityType}</span> : null}
+      {entityId ? (
+        <TechnicalDetailDisclosure
+          value={entityId}
+          valueLabelFa="شناسهٔ فنی موجودیت"
+        />
+      ) : (
+        "—"
+      )}
+    </span>
+  );
 }
 
 function trpcErrorMessage(err: unknown, fallback: string): string {
@@ -130,14 +306,7 @@ const COLUMNS: GovernedColumn<AuditRow>[] = [
     header: "بازیگر",
     accessor: (r) => r.actorAccountId ?? "",
     filter: "text",
-    cell: (r) =>
-      r.actorAccountId ? (
-        <span className="text-tabular" dir="ltr">
-          {toPersianDigits(r.actorAccountId)}
-        </span>
-      ) : (
-        "—"
-      ),
+    cell: (r) => <AuditActorCell accountId={r.actorAccountId} />,
   },
   {
     id: "operation",
@@ -151,16 +320,9 @@ const COLUMNS: GovernedColumn<AuditRow>[] = [
     header: "موجودیت",
     accessor: (r) =>
       [r.entityType, r.entityId].filter(Boolean).join(" / ") || "",
-    cell: (r) => {
-      const label = [r.entityType, r.entityId].filter(Boolean).join(" / ");
-      return label ? (
-        <span className="text-tabular" dir="ltr">
-          {toPersianDigits(label)}
-        </span>
-      ) : (
-        "—"
-      );
-    },
+    cell: (r) => (
+      <AuditEntityCell entityType={r.entityType} entityId={r.entityId} />
+    ),
   },
   {
     id: "scopeSummary",
@@ -209,6 +371,19 @@ export function AuditInvestigationPanel() {
   const [artifactError, setArtifactError] = React.useState<string | null>(null);
   const [custodyAck, setCustodyAck] = React.useState(false);
   const [recipient, setRecipient] = React.useState("");
+
+  const accountSearch = React.useMemo(() => createAccountSearch(), []);
+  const personSearch = React.useMemo(() => createPersonSearch(), []);
+  const orgUnitSearch = React.useMemo(() => createOrgUnitSearch(), []);
+  const entityPickerKind = entityTypeImpliesPicker(draft.entityType);
+  const entitySearch =
+    entityPickerKind === "person"
+      ? personSearch
+      : entityPickerKind === "account"
+        ? accountSearch
+        : entityPickerKind === "org"
+          ? orgUnitSearch
+          : null;
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(applied);
 
@@ -413,16 +588,50 @@ export function AuditInvestigationPanel() {
         onSubmit={applyFilters}
         aria-label="فیلترهای تحقیق ممیزی"
       >
-        <label className="block space-y-1.5 text-caption" htmlFor="audit-filter-actor">
-          {operationalCopy.auditFilterActor}
-          <Input
+        <div className="block space-y-1.5 text-caption md:col-span-1">
+          <span id="audit-filter-actor-label">
+            {operationalCopy.auditFilterActor}
+          </span>
+          <EntityPicker
             id="audit-filter-actor"
-            value={draft.actorAccountId}
-            onChange={(e) => updateDraft("actorAccountId", e.target.value)}
-            dir="ltr"
-            autoComplete="off"
+            search={accountSearch}
+            value={draft.actor}
+            onValueChange={(next) => {
+              setDraft((prev) => ({
+                ...prev,
+                actor: next,
+                actorTechnicalId: next ? "" : prev.actorTechnicalId,
+              }));
+            }}
+            scopeNoteFa="جستجو با نام کاربری یا نام نمایشی"
+            placeholder="حساب…"
+            aria-labelledby="audit-filter-actor-label"
           />
-        </label>
+          <details className="rounded border border-border/50 px-2 py-1">
+            <summary className="cursor-pointer text-muted-foreground">
+              جستجو با شناسهٔ فنی
+            </summary>
+            <p className="mt-1 text-muted-foreground" id="audit-actor-tech-hint">
+              مسیر پشتیبانی برای همبستگی با شناسهٔ داخلی حساب — پیش‌فرض انتخابگر است.
+            </p>
+            <Input
+              id="audit-filter-actor-tech"
+              className="mt-1"
+              value={draft.actorTechnicalId}
+              onChange={(e) =>
+                setDraft((prev) => ({
+                  ...prev,
+                  actorTechnicalId: e.target.value,
+                  actor: e.target.value.trim() ? null : prev.actor,
+                }))
+              }
+              dir="ltr"
+              autoComplete="off"
+              placeholder="UUID حساب"
+              aria-describedby="audit-actor-tech-hint"
+            />
+          </details>
+        </div>
         <label
           className="block space-y-1.5 text-caption"
           htmlFor="audit-filter-operation"
@@ -444,24 +653,69 @@ export function AuditInvestigationPanel() {
           <Input
             id="audit-filter-entity-type"
             value={draft.entityType}
-            onChange={(e) => updateDraft("entityType", e.target.value)}
+            onChange={(e) => {
+              setDraft((prev) => ({
+                ...prev,
+                entityType: e.target.value,
+                entity: null,
+                entityTechnicalId: "",
+              }));
+            }}
             dir="ltr"
             autoComplete="off"
           />
         </label>
-        <label
-          className="block space-y-1.5 text-caption"
-          htmlFor="audit-filter-entity-id"
-        >
-          {operationalCopy.auditFilterEntityId}
-          <Input
-            id="audit-filter-entity-id"
-            value={draft.entityId}
-            onChange={(e) => updateDraft("entityId", e.target.value)}
-            dir="ltr"
-            autoComplete="off"
-          />
-        </label>
+        <div className="block space-y-1.5 text-caption">
+          <span id="audit-filter-entity-label">
+            {operationalCopy.auditFilterEntityId}
+          </span>
+          {entitySearch ? (
+            <EntityPicker
+              id="audit-filter-entity-id"
+              search={entitySearch}
+              value={draft.entity}
+              onValueChange={(next) => {
+                setDraft((prev) => ({
+                  ...prev,
+                  entity: next,
+                  entityTechnicalId: next ? "" : prev.entityTechnicalId,
+                }));
+              }}
+              scopeNoteFa="بر اساس نوع موجودیت"
+              placeholder="کد یا نام…"
+              aria-labelledby="audit-filter-entity-label"
+            />
+          ) : (
+            <p className="text-muted-foreground">
+              برای انتخابگر کسب‌وکار، نوع موجودیت را person / account / org وارد کنید؛
+              در غیر این صورت از مسیر فنی زیر استفاده کنید.
+            </p>
+          )}
+          <details className="rounded border border-border/50 px-2 py-1">
+            <summary className="cursor-pointer text-muted-foreground">
+              جستجو با شناسهٔ فنی
+            </summary>
+            <p className="mt-1 text-muted-foreground" id="audit-entity-tech-hint">
+              مسیر پشتیبانی برای همبستگی با شناسهٔ داخلی موجودیت.
+            </p>
+            <Input
+              id="audit-filter-entity-tech"
+              className="mt-1"
+              value={draft.entityTechnicalId}
+              onChange={(e) =>
+                setDraft((prev) => ({
+                  ...prev,
+                  entityTechnicalId: e.target.value,
+                  entity: e.target.value.trim() ? null : prev.entity,
+                }))
+              }
+              dir="ltr"
+              autoComplete="off"
+              placeholder="UUID موجودیت"
+              aria-describedby="audit-entity-tech-hint"
+            />
+          </details>
+        </div>
         <label
           className="block space-y-1.5 text-caption"
           htmlFor="audit-filter-result"
@@ -607,10 +861,8 @@ export function AuditInvestigationPanel() {
               </div>
               <div>
                 <dt className="text-caption text-muted-foreground">بازیگر</dt>
-                <dd className="text-tabular" dir="ltr">
-                  {detail.actorAccountId
-                    ? toPersianDigits(detail.actorAccountId)
-                    : "—"}
+                <dd>
+                  <AuditActorCell accountId={detail.actorAccountId} />
                 </dd>
               </div>
               <div>
@@ -619,10 +871,11 @@ export function AuditInvestigationPanel() {
               </div>
               <div>
                 <dt className="text-caption text-muted-foreground">موجودیت</dt>
-                <dd dir="ltr">
-                  {[detail.entityType, detail.entityId]
-                    .filter(Boolean)
-                    .join(" / ") || "—"}
+                <dd>
+                  <AuditEntityCell
+                    entityType={detail.entityType}
+                    entityId={detail.entityId}
+                  />
                 </dd>
               </div>
               <div>

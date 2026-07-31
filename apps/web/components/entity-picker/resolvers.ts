@@ -359,3 +359,57 @@ export function createPrimaryAssignmentSearch(
     }
   };
 }
+
+/** retention.listHolds — empty query lists inventory; FR-33 scoped via procedure. */
+export function createHoldSearch(): EntityPickerSearchFn {
+  return async (normalizedQuery) => {
+    try {
+      const { holds } = await vanillaApi.retention.listHolds.query();
+      const q = normalizeDigitsForMatch(normalizedQuery);
+      return holds
+        .map((h) => ({
+          id: h.id,
+          code: h.scopeKind,
+          labelFa: `${h.scopeKind} · ${h.scopeRef}`,
+          secondaryFa: `${h.status} · ${h.reason}`,
+        }))
+        .filter((opt) => {
+          if (!q) return true;
+          return (
+            normalizeDigitsForMatch(opt.id).includes(q) ||
+            normalizeDigitsForMatch(opt.labelFa).includes(q) ||
+            normalizeDigitsForMatch(opt.secondaryFa ?? "").includes(q)
+          );
+        });
+    } catch {
+      return [];
+    }
+  };
+}
+
+/** retention.listRuns — empty query lists inventory; FR-33 scoped via procedure. */
+export function createDisposalRunSearch(): EntityPickerSearchFn {
+  return async (normalizedQuery) => {
+    try {
+      const { runs } = await vanillaApi.retention.listRuns.query();
+      const q = normalizeDigitsForMatch(normalizedQuery);
+      return runs
+        .map((r) => ({
+          id: r.id,
+          code: r.scopeKind,
+          labelFa: `${r.scopeKind} · ${r.scopeRef}`,
+          secondaryFa: `${r.status} · ${r.startedAt.slice(0, 10)}`,
+        }))
+        .filter((opt) => {
+          if (!q) return true;
+          return (
+            normalizeDigitsForMatch(opt.id).includes(q) ||
+            normalizeDigitsForMatch(opt.labelFa).includes(q) ||
+            normalizeDigitsForMatch(opt.secondaryFa ?? "").includes(q)
+          );
+        });
+    } catch {
+      return [];
+    }
+  };
+}

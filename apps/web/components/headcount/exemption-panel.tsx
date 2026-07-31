@@ -2,12 +2,19 @@
 
 import * as React from "react";
 
+import {
+  EntityPicker,
+  TechnicalDetailDisclosure,
+  createPersonSearch,
+  createPrimaryAssignmentSearch,
+  useEntityPickerCascade,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
-import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
@@ -76,8 +83,9 @@ function StatusMessage({
 export function HeadcountExemptionPanel() {
   const formId = React.useId();
   const [policyCode, setPolicyCode] = React.useState("");
-  const [primaryAssignmentId, setPrimaryAssignmentId] = React.useState("");
-  const [personId, setPersonId] = React.useState("");
+  const [person, setPerson] = React.useState<EntityPickerValue>(null);
+  const [primaryAssignment, setPrimaryAssignment] =
+    React.useState<EntityPickerValue>(null);
   const [reason, setReason] = React.useState("");
   const [reportingTreatment, setReportingTreatment] = React.useState<
     "exclude_from_used" | "count_as_used_exempt" | "other"
@@ -89,6 +97,16 @@ export function HeadcountExemptionPanel() {
   const [formError, setFormError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
+  const personSearch = React.useMemo(() => createPersonSearch(), []);
+  const primaryAssignmentSearch = React.useMemo(
+    () => createPrimaryAssignmentSearch(person?.id ?? null),
+    [person?.id],
+  );
+  const primaryAssignmentCascade = useEntityPickerCascade(person, "فرد", {
+    value: primaryAssignment,
+    onValueChange: setPrimaryAssignment,
+  });
+
   const utils = api.useUtils();
   const listQuery = api.headcount.listExemptions.useQuery(undefined);
 
@@ -96,8 +114,8 @@ export function HeadcountExemptionPanel() {
     onSuccess: async () => {
       setFormError(null);
       setPolicyCode("");
-      setPrimaryAssignmentId("");
-      setPersonId("");
+      setPerson(null);
+      setPrimaryAssignment(null);
       setReason("");
       setValidityStart(undefined);
       setValidityEnd(undefined);
@@ -131,10 +149,12 @@ export function HeadcountExemptionPanel() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    const personId = person?.id?.trim() ?? "";
+    const primaryAssignmentId = primaryAssignment?.id?.trim() ?? "";
     if (
       !policyCode.trim() ||
-      !primaryAssignmentId.trim() ||
-      !personId.trim() ||
+      !primaryAssignmentId ||
+      !personId ||
       !reason.trim() ||
       !validityStart ||
       !validityEnd
@@ -144,8 +164,8 @@ export function HeadcountExemptionPanel() {
     }
     createMutation.mutate({
       policyCode: policyCode.trim(),
-      primaryAssignmentId: primaryAssignmentId.trim(),
-      personId: personId.trim(),
+      primaryAssignmentId,
+      personId,
       reason: reason.trim(),
       validityStart,
       validityEndExclusive: validityEnd,
@@ -179,23 +199,34 @@ export function HeadcountExemptionPanel() {
           />
         </label>
         <label className="space-y-1 text-sm">
-          <span id={`${formId}-primary`}>شناسه انتصاب اصلی</span>
-          <Input
-            aria-labelledby={`${formId}-primary`}
-            value={primaryAssignmentId}
-            onChange={(e) => setPrimaryAssignmentId(e.target.value)}
-            autoComplete="off"
-            dir="ltr"
+          <span id={`${formId}-person`}>فرد</span>
+          <EntityPicker
+            id={`${formId}-person`}
+            search={personSearch}
+            value={person}
+            onValueChange={(next) => {
+              setPerson(next);
+              setPrimaryAssignment(null);
+            }}
+            scopeNoteFa="جستجو با کد پرسنلی یا نام"
+            placeholder="کد یا نام پرسنل…"
+            aria-labelledby={`${formId}-person`}
+            aria-required
           />
         </label>
         <label className="space-y-1 text-sm">
-          <span id={`${formId}-person`}>شناسه فرد</span>
-          <Input
-            aria-labelledby={`${formId}-person`}
-            value={personId}
-            onChange={(e) => setPersonId(e.target.value)}
-            autoComplete="off"
-            dir="ltr"
+          <span id={`${formId}-primary`}>انتصاب اصلی</span>
+          <EntityPicker
+            id={`${formId}-primary`}
+            search={primaryAssignmentSearch}
+            value={primaryAssignmentCascade.value}
+            onValueChange={primaryAssignmentCascade.onValueChange}
+            disabled={primaryAssignmentCascade.disabled}
+            disabledReasonFa={primaryAssignmentCascade.disabledReasonFa}
+            scopeNoteFa="انتصاب‌های اصلی فرد انتخاب‌شده"
+            placeholder="کد یا عنوان انتصاب…"
+            aria-labelledby={`${formId}-primary`}
+            aria-required
           />
         </label>
         <label className="space-y-1 text-sm">
@@ -283,9 +314,13 @@ export function HeadcountExemptionPanel() {
                 {formatJalaliDisplayFromGregorian(row.validityStart)} →{" "}
                 {formatJalaliDisplayFromGregorian(row.validityEndExclusive)}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
-                Primary: {row.primaryAssignmentId}
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xs text-muted-foreground">انتصاب اصلی</p>
+                <TechnicalDetailDisclosure
+                  value={row.primaryAssignmentId}
+                  valueLabelFa="شناسهٔ فنی انتصاب اصلی"
+                />
+              </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {row.status === "draft" ? (
                   <Button
@@ -320,12 +355,6 @@ export function HeadcountExemptionPanel() {
           ))}
         </ul>
       )}
-
-      {listQuery.data?.length ? (
-        <p className="text-xs text-muted-foreground" role="status">
-          تعداد: {toPersianDigits(String(listQuery.data.length))}
-        </p>
-      ) : null}
     </section>
   );
 }

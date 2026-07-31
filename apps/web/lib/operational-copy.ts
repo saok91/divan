@@ -40,10 +40,10 @@ export const operationalCopy = {
   auditEvidenceNotFound: "شواهد ممیزی یافت نشد.",
   auditOpenExportArtifact: "باز کردن خروجی مدیریت‌شده",
   auditOpenReview: "باز کردن بازبینی مستقل",
-  auditFilterActor: "شناسه بازیگر",
+  auditFilterActor: "بازیگر",
   auditFilterOperation: "عملیات",
   auditFilterEntityType: "نوع موجودیت",
-  auditFilterEntityId: "شناسه موجودیت",
+  auditFilterEntityId: "موجودیت",
   auditFilterResult: "نتیجه",
   auditFilterCorrelation: "همبستگی",
   auditFilterEventClass: "کلاس رویداد",
@@ -87,7 +87,7 @@ export const operationalCopy = {
    * PopulationPort ∩ InferenceBulk cohort (Story 5.4 review decision).
    */
   dashboardTeamFilterHint:
-    "شناسه تیم فقط روی کارت‌های سازمان و ظرفیت اعمال می‌شود؛ افراد فعال و روند روی محدودهٔ دسترسی جمعیت است.",
+    "فیلتر تیم فقط روی کارت‌های سازمان و ظرفیت اعمال می‌شود؛ افراد فعال و روند روی محدودهٔ دسترسی جمعیت است.",
 
   /** Report load / filter failures (Story 5.5) — never reuse accessDenied for infra. */
   reportLoadError: "بارگذاری گزارش ممکن نشد.",
@@ -99,7 +99,7 @@ export const operationalCopy = {
   reportExportStubHint:
     "خروجی حاکمیتی فعال است؛ از پنل خروجی برای دریافت فایل استفاده کنید.",
   reportTeamFilterHint:
-    "شناسه تیم جمعیت گزارش‌های فرد/رویداد را قطع می‌کند؛ برای سازمان، اعضای تیم و ظرفیت هم اعمال می‌شود.",
+    "فیلتر تیم جمعیت گزارش‌های فرد/رویداد را قطع می‌کند؛ برای سازمان، اعضای تیم و ظرفیت هم اعمال می‌شود.",
 
   /** Governed export artifact panel (Story 6.5 / UX-DR17 / FR-41 / FR-52). */
   exportLoadError: "آماده‌سازی خروجی ممکن نشد.",
@@ -238,9 +238,9 @@ export const operationalCopy = {
   reconDiscrepanciesTitle: "مغایرت‌ها",
   reconDispositionAction: "ثبت معافیت FR-۵۵",
   reconOwnerRequired: "مالک مغایرت الزامی است.",
-  reconOwnerPlaceholder: "شناسه حساب مالک",
+  reconOwnerPlaceholder: "حساب مالک…",
   reconRationalePlaceholder: "توجیه معافیت",
-  reconIndependentApproverPlaceholder: "شناسه تأییدکننده مستقل",
+  reconIndependentApproverPlaceholder: "تأییدکننده مستقل…",
   reconWaiverScopePlaceholder: "دامنه معافیت",
   reconWaiverRiskPlaceholder: "ریسک باقیمانده",
   reconWaiverControlPlaceholder: "کنترل جبرانی",
@@ -465,12 +465,12 @@ export const operationalCopy = {
   lifecycleConfirmRunDisposal:
     "حذف در محدودهٔ مشخص اجرا شود؟ مقادیر عملیاتی و خروجی‌های مدیریت‌شده پاک یا ناشناس می‌شوند.",
   lifecycleScopeKind: "نوع محدوده",
-  lifecycleScopeRef: "شناسه محدوده",
+  lifecycleScopeRef: "مرجع محدوده",
   lifecycleReason: "دلیل",
-  lifecyclePersonId: "شناسه فرد (برای حذف دسته/سازمان الزامی)",
+  lifecyclePersonId: "افراد مشمول حذف (برای محدودهٔ دسته/سازمان الزامی)",
   lifecycleArtifactId: "شناسه خروجی (اختیاری)",
   lifecycleDisposeSubjectsRequired:
-    "برای حذف با محدودهٔ دسته یا سازمان، حداقل یک شناسهٔ فرد لازم است.",
+    "برای حذف با محدودهٔ دسته یا سازمان، حداقل یک فرد لازم است.",
   lifecycleListDisposalLimited:
     "برخی ردیف‌ها پس از حذف/ناشناس‌سازی محدود شده‌اند؛ مقدار قبلی بازسازی نمی‌شود.",
   lifecycleStatusActive: "فعال",
@@ -538,7 +538,7 @@ export const operationalCopy = {
   correctionCaseConfirmClose: "پرونده با شواهد بستن بسته شود؟",
   correctionCaseRequestRef: "مرجع درخواست",
   correctionCaseAuthority: "تأیید مرجع/اختیار",
-  correctionCasePersonId: "شناسه فرد",
+  correctionCasePersonId: "فرد",
   correctionCaseOwner: "مالک پرونده",
   correctionCaseDeadline: "مهلت",
   correctionCaseStatus: "وضعیت",

@@ -8,6 +8,11 @@
 
 import * as React from "react";
 
+import {
+  EntityPicker,
+  createAccountSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
@@ -137,14 +142,16 @@ export function LaunchArtifactPanel() {
     kind: "version" | "rebaseline";
     id: string;
   } | null>(null);
-  const [independentApprover, setIndependentApprover] = React.useState("");
+  const [independentApprover, setIndependentApprover] =
+    React.useState<EntityPickerValue>(null);
+  const accountSearch = React.useMemo(() => createAccountSearch(), []);
 
   const approveVersion = api.launchArtifact.approveVersion.useMutation({
     onSuccess: async () => {
       await utils.launchArtifact.listVersions.invalidate();
       await utils.launchArtifact.listArtifacts.invalidate();
       setConfirmApprove(null);
-      setIndependentApprover("");
+      setIndependentApprover(null);
     },
   });
   const approveRebaseline = api.launchArtifact.approveRebaseline.useMutation({
@@ -152,7 +159,7 @@ export function LaunchArtifactPanel() {
       await utils.launchArtifact.listRebaselines.invalidate();
       await utils.launchArtifact.listArtifacts.invalidate();
       setConfirmApprove(null);
-      setIndependentApprover("");
+      setIndependentApprover(null);
     },
   });
 
@@ -181,7 +188,7 @@ export function LaunchArtifactPanel() {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setConfirmApprove(null);
-        setIndependentApprover("");
+        setIndependentApprover(null);
       }
     }
     if (confirmApprove) window.addEventListener("keydown", onKey);
@@ -595,7 +602,7 @@ export function LaunchArtifactPanel() {
         aria-labelledby="launch-confirm-title"
         onClose={() => {
           setConfirmApprove(null);
-          setIndependentApprover("");
+          setIndependentApprover(null);
         }}
       >
         <h3 id="launch-confirm-title" className="text-body font-medium">
@@ -607,12 +614,17 @@ export function LaunchArtifactPanel() {
         {confirmApprove?.kind === "rebaseline" ? (
           <label className="mt-3 block text-caption">
             {operationalCopy.launchArtifactFieldApprover}
-            <input
-              className="mt-1 w-full rounded border border-border px-2 py-1"
-              value={independentApprover}
-              onChange={(e) => setIndependentApprover(e.target.value)}
-              required
-            />
+            <div className="mt-1">
+              <EntityPicker
+                id="launch-rebaseline-approver"
+                search={accountSearch}
+                value={independentApprover}
+                onValueChange={setIndependentApprover}
+                placeholder="حساب تأییدکننده…"
+                scopeNoteFa="جستجو با نام کاربری یا نام نمایشی"
+                aria-required
+              />
+            </div>
           </label>
         ) : null}
         {confirmError ? (
@@ -627,7 +639,7 @@ export function LaunchArtifactPanel() {
             disabled={confirmPending}
             onClick={() => {
               setConfirmApprove(null);
-              setIndependentApprover("");
+              setIndependentApprover(null);
             }}
           >
             {operationalCopy.launchArtifactConfirmCancel}
@@ -638,7 +650,7 @@ export function LaunchArtifactPanel() {
             disabled={
               confirmPending ||
               (confirmApprove?.kind === "rebaseline" &&
-                !independentApprover.trim())
+                !(independentApprover?.id?.trim()))
             }
             onClick={() => {
               if (!confirmApprove || confirmPending) return;
@@ -647,7 +659,7 @@ export function LaunchArtifactPanel() {
               } else {
                 approveRebaseline.mutate({
                   rebaselineId: confirmApprove.id,
-                  independentApproverAccountId: independentApprover.trim(),
+                  independentApproverAccountId: independentApprover!.id.trim(),
                 });
               }
             }}
@@ -676,23 +688,30 @@ function WaiverForm(props: {
   }) => void;
 }) {
   const [artifactId, setArtifactId] = React.useState("AR-DATA");
-  const [owner, setOwner] = React.useState("");
-  const [approver, setApprover] = React.useState("");
+  const [owner, setOwner] = React.useState<EntityPickerValue>(null);
+  const [approver, setApprover] = React.useState<EntityPickerValue>(null);
   const [scope, setScope] = React.useState("");
   const [risk, setRisk] = React.useState("");
   const [compensating, setCompensating] = React.useState("");
   const [expiry, setExpiry] = React.useState("");
   const [gate, setGate] = React.useState("");
+  const [localError, setLocalError] = React.useState<string | null>(null);
+  const accountSearch = React.useMemo(() => createAccountSearch(), []);
 
   return (
     <form
       className="space-y-3 border border-border p-3"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!owner?.id?.trim() || !approver?.id?.trim()) {
+          setLocalError("مالک و تأییدکنندهٔ مستقل را انتخاب کنید.");
+          return;
+        }
+        setLocalError(null);
         props.onSubmit({
           artifactId: artifactId as "AR-ACCESS",
-          ownerAccountId: owner,
-          independentApproverAccountId: approver,
+          ownerAccountId: owner.id.trim(),
+          independentApproverAccountId: approver.id.trim(),
           scope,
           risk,
           compensatingControls: compensating,
@@ -716,21 +735,31 @@ function WaiverForm(props: {
       </label>
       <label className="block text-caption">
         {operationalCopy.launchArtifactFieldOwner}
-        <input
-          className="mt-1 w-full rounded border border-border px-2 py-1"
-          value={owner}
-          onChange={(e) => setOwner(e.target.value)}
-          required
-        />
+        <div className="mt-1">
+          <EntityPicker
+            id="launch-waiver-owner"
+            search={accountSearch}
+            value={owner}
+            onValueChange={setOwner}
+            placeholder="حساب مالک…"
+            scopeNoteFa="جستجو با نام کاربری یا نام نمایشی"
+            aria-required
+          />
+        </div>
       </label>
       <label className="block text-caption">
         {operationalCopy.launchArtifactFieldApprover}
-        <input
-          className="mt-1 w-full rounded border border-border px-2 py-1"
-          value={approver}
-          onChange={(e) => setApprover(e.target.value)}
-          required
-        />
+        <div className="mt-1">
+          <EntityPicker
+            id="launch-waiver-approver"
+            search={accountSearch}
+            value={approver}
+            onValueChange={setApprover}
+            placeholder="تأییدکننده مستقل…"
+            scopeNoteFa="جستجو با نام کاربری یا نام نمایشی"
+            aria-required
+          />
+        </div>
       </label>
       <label className="block text-caption">
         {operationalCopy.launchArtifactFieldScope}
@@ -787,9 +816,9 @@ function WaiverForm(props: {
           placeholder="optional"
         />
       </label>
-      {props.error ? (
+      {localError || props.error ? (
         <p role="alert" className="text-body text-destructive">
-          {props.error}
+          {localError ?? props.error}
         </p>
       ) : null}
       <div className="flex gap-2">
@@ -871,19 +900,26 @@ function ResolveConflictForm(props: {
   }) => void;
 }) {
   const [versions, setVersions] = React.useState("");
-  const [joint, setJoint] = React.useState("");
+  const [joint, setJoint] = React.useState<EntityPickerValue>(null);
+  const [localError, setLocalError] = React.useState<string | null>(null);
+  const accountSearch = React.useMemo(() => createAccountSearch(), []);
   return (
     <form
       className="space-y-2 border border-border p-2"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!joint?.id?.trim()) {
+          setLocalError("تأییدکننده مشترک را انتخاب کنید.");
+          return;
+        }
+        setLocalError(null);
         const resolutionVersionIds = versions
           .split(/[,\s]+/)
           .map((s) => s.trim())
           .filter(Boolean);
         props.onSubmit({
           resolutionVersionIds,
-          jointApproverAccountId: joint.trim(),
+          jointApproverAccountId: joint.id.trim(),
         });
       }}
     >
@@ -899,16 +935,21 @@ function ResolveConflictForm(props: {
       </label>
       <label className="block text-caption">
         {operationalCopy.launchArtifactFieldJointApprover}
-        <input
-          className="mt-1 w-full rounded border border-border px-2 py-1"
-          value={joint}
-          onChange={(e) => setJoint(e.target.value)}
-          required
-        />
+        <div className="mt-1">
+          <EntityPicker
+            id="launch-conflict-joint"
+            search={accountSearch}
+            value={joint}
+            onValueChange={setJoint}
+            placeholder="تأییدکننده مشترک…"
+            scopeNoteFa="جستجو با نام کاربری یا نام نمایشی"
+            aria-required
+          />
+        </div>
       </label>
-      {props.error ? (
+      {localError || props.error ? (
         <p role="alert" className="text-body text-destructive">
-          {props.error}
+          {localError ?? props.error}
         </p>
       ) : null}
       <div className="flex gap-2">
