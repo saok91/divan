@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-31T23:35:00+03:30
+# last_updated: 2026-07-31T23:55:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,13 +41,13 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-31T23:40:00+03:30
+last_updated: 2026-07-31T23:55:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
-# Story 8.10 → done 2026-07-31 (design-QA gate + code-review patches)
+# Epic 8 retrospective → done 2026-07-31 (experience foundation closed; Epic 9 prep encodes)
 
 development_status:
   epic-1: done
@@ -137,7 +137,7 @@ development_status:
   7-8-authoritative-evaluation-snapshot-integrity: done
   epic-7-retrospective: done
 
-  epic-8: in-progress
+  epic-8: done
   8-1-interaction-system-audit-control-contract: done
   8-2-visual-design-language-layout-system: done
   8-3-entity-picker-primitive-code-resolvers: done
@@ -148,7 +148,7 @@ development_status:
   8-8-feedback-loading-motion-system: done
   8-9-self-explaining-state-operational-copy: done
   8-10-design-qa-consistency-accessibility-gate: done
-  epic-8-retrospective: optional
+  epic-8-retrospective: done
 
   epic-9: backlog
   9-1-sample-workbook-generation-template-catalogue: backlog
@@ -500,12 +500,55 @@ action_items:
   - epic: 7
     action: "Prefer Vitest/ephemeral isolation + deeper UI selfchecks when next quality opportunity lands"
     owner: "Amelia"
-    status: open
+    status: in-progress
+    note: "Epic 8 deepened UI selfchecks (design-qa orchestrator); Vitest/ephemeral isolation still unpaid"
   - epic: 7
     action: "Keep AR-* fail-closed; do not invent freeze numbers in post-MVP work"
     owner: "Mary + John"
-    status: open
+    status: done
+    resolved_in: "Epic 8 Gates 8.1–8.10 held fail-closed (presentation-only); succeeded by Epic 8 AR fail-closed for Epic 9"
   - epic: 7
     action: "Carry forward still-open Epic 2/3/4/4b/5/6 items: InferenceBulkPort ops; sticky break-glass; PopulationPort cutover; ensure*Schema migrations-only; BOM tooling; export/attachment streaming"
     owner: "Winston / Amelia+Sally / Paige+Winston"
+    status: open
+  - epic: 8
+    action: "Mark epic-8 done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-8-retro-2026-07-31.md + sprint-status epic-8/epic-8-retrospective"
+  - epic: 8
+    action: "Encode into Story 9.1+ create-story: mandatory selfcheck:design-qa; amendment rows are work-to-close; first-touch require EntityPicker / RowActionButton / FeedbackMessage"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 8
+    action: "Publish UX alignment honesty note for Epic 9 kickoff: foundation pass vs 8.10-A3 amendments vs residual hotspots"
+    owner: "Paige + Sally + Mary"
+    status: open
+  - epic: 8
+    action: "Close FeedbackMessage / PendingSurface adoption on panels touched in Epic 9"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 8
+    action: "Migrate residual 8.2 typography hotspots when next touching those panels"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 8
+    action: "Implement personnel-events list rowActions per 8.7 deferral in Story 9.6"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 8
+    action: "Prefer batched identity DTOs when expanding correction/audit-style lists (retire per-row hydrate fan-out)"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 8
+    action: "Revisit Button forwardRef if Tooltip/overflow focus bugs reproduce on new row actions"
+    owner: "Amelia"
+    status: open
+  - epic: 8
+    action: "Keep AR-* fail-closed; do not invent freeze numbers; Epic 9 remains presentation/IA over unchanged domain rules"
+    owner: "Mary + John"
+    status: open
+  - epic: 8
+    action: "Carry forward still-open Epic 7 production-honesty and security items (SoD, list IDOR, AD-6, Baseline projector, PopulationPort, mutation IDOR, Vitest, leave-guard logout, person-create dedupe, enforcement-matrix DoD, honesty boundary doc)"
+    owner: "Winston / Amelia+Sally / Paige+Winston / Mary"
     status: open
