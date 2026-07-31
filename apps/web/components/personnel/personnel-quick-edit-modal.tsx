@@ -354,7 +354,9 @@ export function PersonnelQuickEditModal({
               باز کردن پروفایل کامل
             </a>
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" variant="primary" disabled={busy}>
+              <Button type="submit" variant="primary" disabled={busy}
+            disabledReason={operationalCopy.actionPending}
+          >
                 {busy ? "در حال ذخیره…" : "ذخیره"}
               </Button>
               <Button
@@ -362,7 +364,9 @@ export function PersonnelQuickEditModal({
                 variant="ghost"
                 disabled={busy}
                 onClick={requestCloseOrGuard}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 انصراف
               </Button>
             </div>

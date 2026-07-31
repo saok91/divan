@@ -31,7 +31,7 @@ export default async function CorrectionCasesPage() {
           </span>
         }
         title="پرونده‌های اصلاح"
-        purpose="درخواست‌های اصلاح دادهٔ موضوع خارجی."
+        purpose="پیگیری درخواست‌های شفافیت و اصلاح دادهٔ موضوع خارجی برای تیم حاکمیت داده."
       />
       <div className="px-content-padding-inline pb-6">
         <CorrectionCasesPanel />

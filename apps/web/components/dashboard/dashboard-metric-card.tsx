@@ -62,8 +62,12 @@ export function DashboardMetricCard({
     );
   } else if (outcome === "pending") {
     body = (
-      <p role="status" aria-live="polite" className="text-body text-muted-foreground">
-        {messageFa || operationalCopy.dashboardPending}
+      <p
+        role="status"
+        aria-live="polite"
+        className="text-body text-text-tertiary"
+      >
+        {messageFa || operationalCopy.figureRecalculating}
       </p>
     );
   } else if (outcome === "error") {

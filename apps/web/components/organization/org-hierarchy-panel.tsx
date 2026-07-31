@@ -432,7 +432,9 @@ export function OrgHierarchyPanel() {
                   : undefined
               }
               onClick={() => openCreate(selectedNode)}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               افزودن
             </Button>
           }
@@ -615,7 +617,9 @@ export function OrgHierarchyPanel() {
               >
                 انصراف
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" disabled={createMutation.isPending}
+            disabledReason={operationalCopy.actionPending}
+          >
                 {createMutation.isPending ? "در حال ثبت…" : "ایجاد"}
               </Button>
             </DialogFooter>
@@ -714,7 +718,9 @@ export function OrgHierarchyPanel() {
                 disabled={
                   updateIdentity.isPending || reparentMutation.isPending
                 }
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 ذخیره
               </Button>
             </DialogFooter>
@@ -798,7 +804,9 @@ export function OrgHierarchyPanel() {
                   endDateExclusive: deactivateEnd,
                 });
               }}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               تأیید غیرفعال‌سازی
             </Button>
           </DialogFooter>

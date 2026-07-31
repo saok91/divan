@@ -28,7 +28,7 @@ export default async function PersonnelTabsLayout({
     <SurfaceSectionTabsLayout
       surface={SURFACE}
       tabs={tabs}
-      purpose="جستجو، افزودن و مدیریت اطلاعات افراد."
+      purpose="جستجو و مدیریت هویت افراد برای اپراتورهای منابع انسانی در محدودهٔ دسترسی."
     >
       {children}
     </SurfaceSectionTabsLayout>

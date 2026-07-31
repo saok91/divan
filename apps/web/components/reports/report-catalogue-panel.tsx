@@ -162,7 +162,8 @@ export function ReportCataloguePanel() {
       runQuery.data?.messageFa ??
       operationalCopy.reportImportBatchUnavailable;
   } else if (pending) {
-    statusMessage = runQuery.data?.messageFa ?? operationalCopy.reportPending;
+    statusMessage =
+      runQuery.data?.messageFa ?? operationalCopy.figureRecalculating;
   } else if (errorOutcome) {
     statusMessage =
       runQuery.data?.messageFa ?? operationalCopy.reportLoadError;
@@ -231,6 +232,14 @@ export function ReportCataloguePanel() {
                   role="radio"
                   aria-checked={selected}
                   disabled={fetching}
+                  title={
+                    fetching ? operationalCopy.reportCatalogueBusy : undefined
+                  }
+                  aria-description={
+                    fetching
+                      ? operationalCopy.reportCatalogueBusy
+                      : undefined
+                  }
                   onClick={() => setSelectedKey(r.key)}
                   className={cn(
                     "w-full rounded-md border px-3 py-2 text-start text-body",
@@ -265,7 +274,11 @@ export function ReportCataloguePanel() {
         <p
           className={cn(
             "text-body",
-            errorOutcome ? "text-destructive" : "text-muted-foreground",
+            errorOutcome
+              ? "text-destructive"
+              : pending
+                ? "text-text-tertiary"
+                : "text-muted-foreground",
           )}
           role="status"
         >
@@ -277,6 +290,7 @@ export function ReportCataloguePanel() {
       !suppressed &&
       !empty &&
       !unavailable &&
+      !pending &&
       columns.length > 0 ? (
         <GovernedDataTable
             aria-label={runQuery.data.titleFa}

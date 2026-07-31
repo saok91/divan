@@ -365,7 +365,9 @@ export function MigrationReconciliationWorkspace({
           variant="tertiary"
           disabled={busy}
           onClick={() => void onCreate()}
-        >
+        
+            disabledReason={operationalCopy.actionPending}
+          >
           {operationalCopy.reconCreateRun}
         </Button>
         <Button
@@ -373,7 +375,14 @@ export function MigrationReconciliationWorkspace({
           variant="tertiary"
           disabled={busy || !activeRunId}
           onClick={() => void onCompare()}
-        >
+          disabledReason={
+            busy
+              ? operationalCopy.actionPending
+              : !activeRunId
+                ? operationalCopy.selectReconRun
+                : undefined
+          }
+          >
           {operationalCopy.reconCompare}
         </Button>
         <Button
@@ -381,7 +390,14 @@ export function MigrationReconciliationWorkspace({
           variant="tertiary"
           disabled={busy || !activeRunId}
           onClick={() => void onAttestControls()}
-        >
+          disabledReason={
+            busy
+              ? operationalCopy.actionPending
+              : !activeRunId
+                ? operationalCopy.selectReconRun
+                : undefined
+          }
+          >
           {operationalCopy.reconAttestControls}
         </Button>
       </div>
@@ -576,7 +592,9 @@ export function MigrationReconciliationWorkspace({
                         size="sm"
                         disabled={busy}
                         onClick={() => void onDisposition(d.id)}
-                      >
+                      
+            disabledReason={operationalCopy.actionPending}
+          >
                         {operationalCopy.reconDispositionAction}
                       </Button>
                     </div>
@@ -606,6 +624,13 @@ export function MigrationReconciliationWorkspace({
             variant="tertiary"
             disabled={busy || !activeRunId}
             onClick={() => void onSign("migration_lead")}
+            disabledReason={
+              busy
+                ? operationalCopy.actionPending
+                : !activeRunId
+                  ? operationalCopy.selectReconRun
+                  : undefined
+            }
           >
             {operationalCopy.reconSignMigrationLead}
           </Button>
@@ -614,6 +639,13 @@ export function MigrationReconciliationWorkspace({
             variant="tertiary"
             disabled={busy || !activeRunId}
             onClick={() => void onSign("hr_data_owner")}
+            disabledReason={
+              busy
+                ? operationalCopy.actionPending
+                : !activeRunId
+                  ? operationalCopy.selectReconRun
+                  : undefined
+            }
           >
             {operationalCopy.reconSignHrDataOwner}
           </Button>

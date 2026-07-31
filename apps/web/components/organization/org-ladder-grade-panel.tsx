@@ -551,7 +551,9 @@ export function OrgLadderGradePanel() {
                   resetForm();
                   setModal("create-grade");
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 افزودن گرید
               </Button>
             </>
@@ -657,7 +659,9 @@ export function OrgLadderGradePanel() {
               >
                 انصراف
               </Button>
-              <Button type="submit" disabled={createLadder.isPending}>
+              <Button type="submit" disabled={createLadder.isPending}
+            disabledReason={operationalCopy.actionPending}
+          >
                 ایجاد
               </Button>
             </DialogFooter>
@@ -748,7 +752,9 @@ export function OrgLadderGradePanel() {
               >
                 انصراف
               </Button>
-              <Button type="submit" disabled={createGrade.isPending}>
+              <Button type="submit" disabled={createGrade.isPending}
+            disabledReason={operationalCopy.actionPending}
+          >
                 ایجاد
               </Button>
             </DialogFooter>
@@ -826,7 +832,9 @@ export function OrgLadderGradePanel() {
               >
                 انصراف
               </Button>
-              <Button type="submit" disabled={editSaving}>
+              <Button type="submit" disabled={editSaving}
+            disabledReason={operationalCopy.actionPending}
+          >
                 ذخیره
               </Button>
             </DialogFooter>
@@ -918,7 +926,9 @@ export function OrgLadderGradePanel() {
                   deactivateGrade.mutate(payload);
                 }
               }}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               تأیید غیرفعال‌سازی
             </Button>
           </DialogFooter>

@@ -211,6 +211,9 @@ export function ExportArtifactPanel({
         size="sm"
         className={className}
         disabled={!canOpen}
+        disabledReason={
+          !canOpen ? operationalCopy.exportDenied : undefined
+        }
         onClick={() => setOpen(true)}
       >
         {operationalCopy.exportOpenPanel}
@@ -257,6 +260,13 @@ export function ExportArtifactPanel({
                   type="button"
                   variant="primary"
                   disabled={busy || !source}
+                  disabledReason={
+                    busy
+                      ? operationalCopy.actionPending
+                      : !source
+                        ? operationalCopy.exportSelectSource
+                        : undefined
+                  }
                   onClick={() => void handleGenerate()}
                 >
                   {busy
@@ -376,11 +386,25 @@ export function ExportArtifactPanel({
           </div>
 
           <DialogFooter className="gap-2 sm:justify-start">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => handleOpenChange(false)}
+              disabled={busy}
+              disabledReason={operationalCopy.actionPending}
+            >
+              {operationalCopy.exportClose}
+            </Button>
             {panel ? (
               <Button
                 type="button"
                 variant="secondary"
                 disabled={!downloadEnabled}
+                disabledReason={
+                  !downloadEnabled
+                    ? operationalCopy.exportDownloadDisabledReason
+                    : undefined
+                }
                 title={
                   !downloadEnabled
                     ? operationalCopy.exportDownloadDisabledReason
@@ -393,14 +417,6 @@ export function ExportArtifactPanel({
                 {operationalCopy.exportDownload}
               </Button>
             ) : null}
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => handleOpenChange(false)}
-              disabled={busy}
-            >
-              {operationalCopy.exportClose}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

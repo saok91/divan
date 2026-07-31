@@ -1,5 +1,7 @@
 "use client";
 
+import { operationalCopy } from "@/lib/operational-copy";
+
 import { useId, useState } from "react";
 
 import { AccessSection } from "@/components/access/access-section";
@@ -158,6 +160,8 @@ export function AccessRolesPanel({
             type="submit"
             variant="secondary"
             disabled={createPermissionSet.isPending}
+          
+            disabledReason={operationalCopy.actionPending}
           >
             افزودن مجموعه
           </Button>
@@ -255,6 +259,8 @@ export function AccessRolesPanel({
             type="submit"
             variant="secondary"
             disabled={createRole.isPending}
+          
+            disabledReason={operationalCopy.actionPending}
           >
             درخواست ایجاد نقش
           </Button>

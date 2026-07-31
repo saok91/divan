@@ -1,5 +1,7 @@
 "use client";
 
+import { operationalCopy } from "@/lib/operational-copy";
+
 import * as React from "react";
 
 import {
@@ -278,6 +280,8 @@ export function HeadcountExemptionPanel() {
             type="submit"
             disabled={createMutation.isPending}
             aria-busy={createMutation.isPending}
+          
+            disabledReason={operationalCopy.actionPending}
           >
             ثبت پیش‌نویس معافیت
           </Button>
@@ -334,7 +338,9 @@ export function HeadcountExemptionPanel() {
                       setBusyId(row.id);
                       activateMutation.mutate({ id: row.id });
                     }}
-                  >
+                  
+            disabledReason={operationalCopy.actionPending}
+          >
                     فعال‌سازی
                   </Button>
                 ) : null}

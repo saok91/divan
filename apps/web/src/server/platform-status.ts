@@ -30,10 +30,12 @@ export const platformStatusRouter = createTRPCRouter({
       return signal;
     } catch {
       // Fail closed: unknown freshness → block gold CTAs (never silent clear).
+      // N is unknown — do not invent 0 (misleading «برای ۰ فرد»).
       return {
         recalculationPending: true,
         blockingStale: true,
         stalePendingUntil: "00:00",
+        affectedPersonCount: null,
       };
     }
   }),

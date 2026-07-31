@@ -34,6 +34,10 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { SectionTabs } from "@/components/section-tabs";
 import { TableSkeleton } from "@/components/governed-data-table";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
+import { usePlatformStatus } from "@/components/platform-status-provider";
+import { StaleRecalcBanner } from "@/components/stale-recalc-banner";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
@@ -52,6 +56,46 @@ import { toastBackground } from "@/components/ui/toast";
 import { operationalCopy } from "@/lib/operational-copy";
 
 import { EntityPickerGalleryDemos } from "./entity-picker-demos";
+
+function GalleryStaleBannerDemo() {
+  const {
+    setRecalculationPending,
+    setAffectedPersonCount,
+    recalculationPending,
+  } = usePlatformStatus();
+
+  return (
+    <div className="space-y-2 rounded-sm border border-hairline p-2">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setAffectedPersonCount(3);
+            setRecalculationPending(true);
+          }}
+        >
+          فعال‌سازی بنر نمونه
+        </Button>
+        <Button
+          type="button"
+          variant="tertiary"
+          size="sm"
+          onClick={() => {
+            setRecalculationPending(false);
+            setAffectedPersonCount(0);
+          }}
+          disabled={!recalculationPending}
+          disabledReason="بنر نمونه فعال نیست."
+        >
+          خاموش کردن
+        </Button>
+      </div>
+      <StaleRecalcBanner />
+    </div>
+  );
+}
 /**
  * Dev-only living reference for layout primitives (Story 8.2).
  * Gated out of production builds.
@@ -299,6 +343,56 @@ export default function DevGalleryPage() {
       </section>
 
       <EntityPickerGalleryDemos />
+
+      <section
+        className="space-y-4 px-content-padding-inline"
+        aria-labelledby="gallery-operational-copy"
+      >
+        <h2 id="gallery-operational-copy" className="text-heading-sm">
+          Self-explaining state &amp; operational copy (Story 8.9)
+        </h2>
+        <p className="text-caption text-text-secondary">
+          Recalc banner disclosure, empty taxonomy, glossary, muted figure,
+          disabled-with-reason.
+        </p>
+
+        <div className="space-y-2">
+          <p className="text-field-label">Stale recalc banner (force via provider)</p>
+          <GalleryStaleBannerDemo />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-field-label">Empty taxonomy</p>
+          <EmptyState kind="noDataYet" noDataYetBodyFa={operationalCopy.personListEmpty} />
+          <EmptyState kind="filtered" onAction={() => undefined} />
+          <EmptyState kind="notPermitted" />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-field-label">Glossary term</p>
+          <GlossaryTerm termKey="currentState" />
+          <GlossaryTerm termKey="breakGlass" />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-field-label">Muted pending figure</p>
+          <p className="text-body text-text-tertiary" role="status">
+            {operationalCopy.figureRecalculating}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-field-label">Disabled with reason</p>
+          <Button
+            type="button"
+            variant="primary"
+            disabled
+            disabledReason={operationalCopy.staleGoldCtaHint}
+          >
+            نهایی‌سازی
+          </Button>
+        </div>
+      </section>
 
       <section
         className="space-y-4 px-content-padding-inline"

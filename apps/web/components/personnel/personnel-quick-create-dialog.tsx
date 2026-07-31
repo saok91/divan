@@ -343,7 +343,9 @@ export function PersonnelQuickCreateDialog({
           </div>
 
           <DialogFooter className="gap-2 sm:justify-start">
-            <Button type="submit" variant="primary" disabled={busy}>
+            <Button type="submit" variant="primary" disabled={busy}
+            disabledReason={operationalCopy.actionPending}
+          >
               {busy ? "در حال ایجاد…" : "ایجاد"}
             </Button>
             <Button
@@ -362,7 +364,9 @@ export function PersonnelQuickCreateDialog({
                 reset();
                 onOpenChange(false);
               }}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               انصراف
             </Button>
           </DialogFooter>

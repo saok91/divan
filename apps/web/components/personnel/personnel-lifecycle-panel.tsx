@@ -376,6 +376,13 @@ export function PersonnelLifecyclePanel() {
                 type="button"
                 disabled={busy || !scopeRef || !reason.trim()}
                 onClick={(e) => openConfirm("place", e.currentTarget)}
+                disabledReason={
+                  busy
+                    ? operationalCopy.actionPending
+                    : !scopeRef || !reason.trim()
+                      ? operationalCopy.formIncomplete
+                      : undefined
+                }
               >
                 {operationalCopy.lifecyclePlaceHold}
               </Button>
@@ -384,6 +391,13 @@ export function PersonnelLifecyclePanel() {
                 variant="tertiary"
                 disabled={busy || !disposeReady}
                 onClick={(e) => openConfirm("dispose", e.currentTarget)}
+                disabledReason={
+                  busy
+                    ? operationalCopy.actionPending
+                    : !disposeReady
+                      ? operationalCopy.disposeNotReady
+                      : undefined
+                }
               >
                 {operationalCopy.lifecycleRunDisposal}
               </Button>
@@ -428,7 +442,9 @@ export function PersonnelLifecyclePanel() {
                           setReleaseHoldId(h.id);
                           openConfirm("release", e.currentTarget);
                         }}
-                      >
+                      
+            disabledReason={operationalCopy.actionPending}
+          >
                         {operationalCopy.lifecycleReleaseHold}
                       </Button>
                     ) : null}
@@ -545,7 +561,9 @@ export function PersonnelLifecyclePanel() {
                   });
                 }
               }}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               {operationalCopy.lifecycleConfirm}
             </Button>
           </DialogFooter>

@@ -94,7 +94,9 @@ export function LoginForm() {
           variant="primary"
           className="w-full"
           disabled={pending}
-        >
+        
+            disabledReason={operationalCopy.actionPending}
+          >
           {pending ? "در حال ورود…" : "ورود"}
         </Button>
       </form>

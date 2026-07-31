@@ -310,7 +310,9 @@ export function EntitlementGrantsPanel({
                           { onError: captureError },
                         );
                       }}
-                    >
+                    
+            disabledReason={operationalCopy.actionPending}
+          >
                       تأیید
                     </Button>
                   ) : null}
@@ -327,7 +329,9 @@ export function EntitlementGrantsPanel({
                           { onError: captureError },
                         );
                       }}
-                    >
+                    
+            disabledReason={operationalCopy.actionPending}
+          >
                       فعال‌سازی
                     </Button>
                   ) : null}
@@ -344,7 +348,9 @@ export function EntitlementGrantsPanel({
                           { onError: captureError },
                         );
                       }}
-                    >
+                    
+            disabledReason={operationalCopy.actionPending}
+          >
                       رد
                     </Button>
                   ) : null}
@@ -361,7 +367,9 @@ export function EntitlementGrantsPanel({
                           { onError: captureError },
                         );
                       }}
-                    >
+                    
+            disabledReason={operationalCopy.actionPending}
+          >
                       لغو
                     </Button>
                   ) : null}
@@ -529,7 +537,9 @@ export function EntitlementGrantsPanel({
             />
           </div>
         </div>
-        <Button type="submit" disabled={requestGrant.isPending}>
+        <Button type="submit" disabled={requestGrant.isPending}
+            disabledReason={operationalCopy.actionPending}
+          >
           ثبت درخواست
         </Button>
       </form>

@@ -57,9 +57,19 @@ assert.equal(
   "اتصال به سامانه هویت برقرار نیست.",
 );
 assert.equal(
-  staleRecalcMessage("۰۹:۱۴"),
-  "داده به‌روز نیست — تا ۰۹:۱۴ محاسبه نشده.",
+  staleRecalcMessage(3),
+  "محاسبهٔ وضعیت جاری برای ۳ فرد هنوز کامل نشده — نهایی‌سازی رویداد و خروجی گرفتن برای این افراد موقتاً غیرفعال است. معمولاً چند دقیقه طول می‌کشد.",
 );
+assert.doesNotMatch(
+  staleRecalcMessage(3),
+  /تا\s*[۰-۹0-9]{1,2}:[۰-۹0-9]{2}/,
+  "staleRecalcMessage must not embed a clock deadline",
+);
+assert.equal(
+  operationalCopy.figureRecalculating,
+  "در حال محاسبه — عدد ممکن است تغییر کند.",
+);
+assert.equal(operationalCopy.staleRecalcDisclosureSummary, "توضیح بیشتر");
 
 // 200% zoom on large display: outer stays large, inner shrinks → no gate
 assert.equal(

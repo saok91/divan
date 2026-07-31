@@ -1,5 +1,7 @@
 "use client";
 
+import { operationalCopy } from "@/lib/operational-copy";
+
 import { useId, useState } from "react";
 
 import { AccessSection } from "@/components/access/access-section";
@@ -95,7 +97,9 @@ export function AccessScopesPanel() {
                       { onError: captureError },
                     );
                   }}
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {scope.active ? "غیرفعال‌سازی" : "فعال‌سازی"}
                 </Button>
               </li>
@@ -131,6 +135,8 @@ export function AccessScopesPanel() {
             type="submit"
             variant="secondary"
             disabled={createScope.isPending}
+          
+            disabledReason={operationalCopy.actionPending}
           >
             درخواست ایجاد محدوده
           </Button>

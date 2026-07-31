@@ -1,5 +1,7 @@
 "use client";
 
+import { operationalCopy } from "@/lib/operational-copy";
+
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
@@ -30,6 +32,7 @@ import {
   useLeaveGuardOptional,
   useLeaveGuardRegistration,
 } from "@/components/leave-guard";
+import { PersonRecalcSubjectChrome } from "@/components/personnel/person-recalc-subject-chrome";
 import {
   employmentIdForPrimaryAssignment,
   entityId,
@@ -1176,10 +1179,13 @@ export function PersonnelEventForm({
             />
           </FormField>
           {person ? (
-            <TechnicalDetailDisclosure
-              value={person.id}
-              valueLabelFa="شناسهٔ فنی فرد"
-            />
+            <>
+              <PersonRecalcSubjectChrome personId={person.id} />
+              <TechnicalDetailDisclosure
+                value={person.id}
+                valueLabelFa="شناسهٔ فنی فرد"
+              />
+            </>
           ) : null}
           <FormField
             label={
@@ -2069,6 +2075,8 @@ export function PersonnelEventForm({
             type="submit"
             variant="secondary"
             disabled={createMut.isPending || updateMut.isPending}
+          
+            disabledReason={operationalCopy.actionPending}
           >
             ذخیره پیش‌نویس
           </Button>
@@ -2078,7 +2086,9 @@ export function PersonnelEventForm({
               variant="destructive"
               disabled={deleteMut.isPending}
               onClick={() => void onDelete()}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               حذف پیش‌نویس
             </Button>
           ) : null}
@@ -2089,6 +2099,13 @@ export function PersonnelEventForm({
             onClick={() => {
               setConfirmOpen(true);
             }}
+            disabledReason={
+              !draftId
+                ? operationalCopy.noDraftToFinalize
+                : isFinalizeBlockedByAuthzChange
+                  ? operationalCopy.authzChangedFinalizeBlocked
+                  : undefined
+            }
           >
             نهایی‌سازی
           </Button>

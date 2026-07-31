@@ -1,5 +1,7 @@
 "use client";
 
+import { operationalCopy } from "@/lib/operational-copy";
+
 import * as React from "react";
 
 import {
@@ -209,7 +211,9 @@ export function HeadcountOverridePanel() {
                       setBusyId(row.id);
                       voidMutation.mutate({ id: row.id });
                     }}
-                  >
+                  
+            disabledReason={operationalCopy.actionPending}
+          >
                     ابطال
                   </Button>
                 </div>

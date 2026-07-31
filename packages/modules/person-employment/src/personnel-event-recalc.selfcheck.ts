@@ -120,6 +120,10 @@ async function main() {
 
     const signal = await getPlatformRecalcSignal(pool);
     assert.equal(signal.recalculationPending, true);
+    assert.ok(
+      signal.affectedPersonCount != null && signal.affectedPersonCount >= 1,
+      "affectedPersonCount counts pending persons",
+    );
 
     const draftB = await createDraft(
       {

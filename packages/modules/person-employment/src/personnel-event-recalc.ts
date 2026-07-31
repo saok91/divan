@@ -55,8 +55,17 @@ export type PlatformRecalcSignal = {
   recalculationPending: boolean;
   /** failed or stale — never serve as current (blocking). */
   blockingStale: boolean;
-  /** Sample pending-until clock for banner copy (HH:mm). */
+  /**
+   * Ops/debug sample from MAX(updated_at) — never render as a UI deadline.
+   * Kept for diagnostics only (Story 8.9).
+   */
   stalePendingUntil: string;
+  /**
+   * Distinct persons in recalculation_status with status in
+   * (pending, failed, stale) — banner copy N (Story 8.9).
+   * `null` = unknown (fail-closed / query error) — never invent a count.
+   */
+  affectedPersonCount: number | null;
 };
 
 /** Queryable surface shared by Pool and PoolClient. */
@@ -285,6 +294,7 @@ export async function getPlatformRecalcSignal(
     has_pending: boolean;
     has_blocking: boolean;
     latest: Date | null;
+    affected_person_count: string | number;
   }>(
     `SELECT
        EXISTS (
@@ -296,13 +306,25 @@ export async function getPlatformRecalcSignal(
        (
          SELECT MAX(updated_at) FROM recalculation_status
          WHERE status IN ('pending', 'failed', 'stale')
-       ) AS latest`,
+       ) AS latest,
+       (
+         SELECT COUNT(DISTINCT person_id)::int FROM recalculation_status
+         WHERE status IN ('pending', 'failed', 'stale')
+       ) AS affected_person_count`,
   );
   const row = result.rows[0];
   const recalculationPending = Boolean(row?.has_pending);
   const blockingStale = Boolean(row?.has_blocking);
   const stalePendingUntil = formatPendingUntil(row?.latest ?? new Date());
-  return { recalculationPending, blockingStale, stalePendingUntil };
+  const affectedPersonCount = Number(row?.affected_person_count ?? 0);
+  return {
+    recalculationPending,
+    blockingStale,
+    stalePendingUntil,
+    affectedPersonCount: Number.isFinite(affectedPersonCount)
+      ? affectedPersonCount
+      : 0,
+  };
 }
 
 /** Count-only recalc aggregate for ops dashboard — never returns personId. */

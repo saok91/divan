@@ -372,21 +372,6 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
         <p role="alert" className="text-body text-destructive">
           {operationalCopy.jobRefListError}
         </p>
-      ) : rows.length === 0 ? (
-        <div className="space-y-3">
-          <p role="status" className="text-body text-muted-foreground">
-            {EMPTY_COPY[concept]}
-          </p>
-          <Button
-            type="button"
-            onClick={() => {
-              resetForm();
-              setModal("create");
-            }}
-          >
-            افزودن
-          </Button>
-        </div>
       ) : (
         <GovernedDataTable
           aria-label={`جدول ${label}`}
@@ -395,6 +380,14 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
           rows={rows}
           getRowId={(r) => r.id}
           sectionDefaultFilters={FLAT_REF_SECTION_DEFAULT_FILTERS}
+          emptyMessage={EMPTY_COPY[concept]}
+          emptyAction={{
+            labelFa: "افزودن",
+            onClick: () => {
+              resetForm();
+              setModal("create");
+            },
+          }}
           toolbar={
             <Button
               type="button"
@@ -506,7 +499,9 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
               >
                 انصراف
               </Button>
-              <Button type="submit" disabled={creating}>
+              <Button type="submit" disabled={creating}
+            disabledReason={operationalCopy.actionPending}
+          >
                 ایجاد
               </Button>
             </DialogFooter>
@@ -569,7 +564,9 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
               >
                 انصراف
               </Button>
-              <Button type="submit" disabled={editSaving}>
+              <Button type="submit" disabled={editSaving}
+            disabledReason={operationalCopy.actionPending}
+          >
                 ذخیره
               </Button>
             </DialogFooter>
@@ -637,7 +634,9 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
                   deactivateJobTitle.mutate(payload);
                 else deactivateSeniority.mutate(payload);
               }}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               تأیید غیرفعال‌سازی
             </Button>
           </DialogFooter>

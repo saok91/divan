@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { JalaliDateTimePicker } from "@/components/jalali-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,6 +153,10 @@ export function BreakGlassPanel({
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap gap-2">
+        <GlossaryTerm termKey="breakGlass" />
+        <GlossaryTerm termKey="organizationalScope" />
+      </div>
       {actionError ? (
         <StatusMessage kind="error">{actionError}</StatusMessage>
       ) : null}
@@ -247,7 +252,9 @@ export function BreakGlassPanel({
           />
         </div>
         <div className="flex items-end">
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" disabled={busy}
+            disabledReason={operationalCopy.actionPending}
+          >
             ثبت درخواست اضطراری
           </Button>
         </div>
@@ -296,6 +303,13 @@ export function BreakGlassPanel({
                           { onError: captureError },
                         )
                       }
+                      disabledReason={
+                        busy
+                          ? operationalCopy.actionPending
+                          : g.requesterAccountId === currentAccountId
+                            ? operationalCopy.breakGlassSelfApproveDenied
+                            : undefined
+                      }
                     >
                       تأیید
                     </Button>
@@ -311,7 +325,9 @@ export function BreakGlassPanel({
                           { onError: captureError },
                         )
                       }
-                    >
+                    
+            disabledReason={operationalCopy.actionPending}
+          >
                       فعال‌سازی
                     </Button>
                   ) : null}
@@ -329,6 +345,14 @@ export function BreakGlassPanel({
                           { grantId: g.id },
                           { onError: captureError },
                         )
+                      }
+                      disabledReason={
+                        busy
+                          ? operationalCopy.actionPending
+                          : g.requesterAccountId === currentAccountId ||
+                              g.subjectAccountId === currentAccountId
+                            ? operationalCopy.breakGlassSelfWaiveDenied
+                            : undefined
                       }
                     >
                       رد
@@ -348,7 +372,9 @@ export function BreakGlassPanel({
                           { onError: captureError },
                         )
                       }
-                    >
+                    
+            disabledReason={operationalCopy.actionPending}
+          >
                       لغو
                     </Button>
                   ) : null}
@@ -387,7 +413,9 @@ export function BreakGlassPanel({
                       { onError: captureError },
                     )
                   }
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.breakGlassReviewAction}
                 </Button>
               </li>

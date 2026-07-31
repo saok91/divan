@@ -31,7 +31,7 @@ export default async function AuditPage() {
           </span>
         }
         title="ممیزی"
-        purpose="جست‌وجو و بررسی ردپای حاکمیتی."
+        purpose="تحقیق شواهد ممیزی برای بازبین مستقل — فیلتر، جزئیات و شواهد."
       />
       <div className="px-content-padding-inline pb-6">
         <AuditInvestigationPanel />

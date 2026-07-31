@@ -11,7 +11,7 @@ export default function HeadcountTabsLayout({
   return (
     <SurfaceSectionTabsLayout
       surface={SURFACE}
-      purpose="ظرفیت، ایجاد درخواست و ورود گروهی هدکانت."
+      purpose="مدیریت ظرفیت، رزرو و درخواست هدکانت برای برنامه‌ریزان نیروی کار."
     >
       {children}
     </SurfaceSectionTabsLayout>

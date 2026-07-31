@@ -120,7 +120,9 @@ export function AuthzChangedModal({
                 onClick={() => {
                   void acknowledgeAndRedirect({ saveDraft: true });
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 {operationalCopy.authzChangedSaveDraft}
               </Button>
               <Button
@@ -130,7 +132,9 @@ export function AuthzChangedModal({
                 onClick={() => {
                   void acknowledgeAndRedirect({ saveDraft: false });
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 {operationalCopy.authzChangedDiscard}
               </Button>
             </>
@@ -140,7 +144,9 @@ export function AuthzChangedModal({
               variant="primary"
               disabled={acking}
               onClick={() => void acknowledgeAndRedirect({ saveDraft: false })}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               {operationalCopy.authzChangedAcknowledge}
             </Button>
           )}

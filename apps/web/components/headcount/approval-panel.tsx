@@ -1,7 +1,10 @@
 "use client";
 
+import { operationalCopy } from "@/lib/operational-copy";
+
 import * as React from "react";
 
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -177,13 +180,17 @@ export function HeadcountApprovalPanel() {
 
   return (
     <section className="space-y-6" aria-labelledby={`${formId}-heading`}>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <h2 id={`${formId}-heading`} className="text-title">
           مجوزهای ظرفیت
         </h2>
         <p className="text-body text-muted-foreground">
           ایجاد، فعال‌سازی و لغو مجوز ظرفیت (سقف مجاز مصرف و رزرو).
         </p>
+        <div className="flex flex-wrap gap-2">
+          <GlossaryTerm termKey="headcount" />
+          <GlossaryTerm termKey="reservation" />
+        </div>
       </div>
 
       <form
@@ -287,6 +294,8 @@ export function HeadcountApprovalPanel() {
             type="submit"
             disabled={createMutation.isPending}
             className="min-w-32"
+          
+            disabledReason={operationalCopy.actionPending}
           >
             {createMutation.isPending ? "در حال ثبت…" : "ایجاد پیش‌نویس"}
           </Button>
@@ -341,7 +350,9 @@ export function HeadcountApprovalPanel() {
                       size="sm"
                       disabled={busyId === row.id}
                       onClick={() => void runAction(row.id, "activate")}
-                    >
+                    
+            disabledReason={operationalCopy.actionPending}
+          >
                       فعال‌سازی
                     </Button>
                   ) : null}

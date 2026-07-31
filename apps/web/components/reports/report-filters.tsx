@@ -238,6 +238,10 @@ export function ReportFilters({
       <button
         type="submit"
         disabled={disabled}
+        title={disabled ? operationalCopy.reportCatalogueBusy : undefined}
+        aria-description={
+          disabled ? operationalCopy.reportCatalogueBusy : undefined
+        }
         className={cn(
           "inline-flex h-10 items-center justify-center rounded-md px-4",
           "bg-primary text-primary-foreground text-label",

@@ -1,5 +1,7 @@
 "use client";
 
+import { operationalCopy } from "@/lib/operational-copy";
+
 import * as React from "react";
 
 import { SensitiveConfirmationDialog } from "@/components/personnel/sensitive-confirmation-dialog";
@@ -112,6 +114,7 @@ export function PersonnelEventLifecycleControls({
             size="sm"
             disabled={isMutationBlockedByAuthzChange}
             onClick={() => openLifecycle("cancel")}
+            disabledReason={operationalCopy.authzChangedFinalizeBlocked}
           >
             لغو
           </Button>
@@ -123,6 +126,7 @@ export function PersonnelEventLifecycleControls({
             size="sm"
             disabled={isMutationBlockedByAuthzChange}
             onClick={() => openLifecycle("reverse")}
+            disabledReason={operationalCopy.authzChangedFinalizeBlocked}
           >
             بازگشت
           </Button>
@@ -134,6 +138,7 @@ export function PersonnelEventLifecycleControls({
             size="sm"
             disabled={isMutationBlockedByAuthzChange}
             onClick={() => openLifecycle("correct")}
+            disabledReason={operationalCopy.authzChangedFinalizeBlocked}
           >
             اصلاح
           </Button>

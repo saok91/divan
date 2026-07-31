@@ -254,7 +254,9 @@ export function PersonnelAddPanel() {
             </p>
           ) : null}
 
-          <Button type="submit" variant="primary" disabled={busy}>
+          <Button type="submit" variant="primary" disabled={busy}
+            disabledReason={operationalCopy.actionPending}
+          >
             {busy ? "در حال ایجاد…" : "ایجاد پرسنل"}
           </Button>
         </form>

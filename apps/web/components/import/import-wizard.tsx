@@ -370,6 +370,15 @@ export function ImportWizard() {
             variant={previewLoaded ? "tertiary" : "primary"}
             disabled={busy || !resolvedTemplateKey || !file || previewLoaded}
             onClick={() => void onUpload()}
+            disabledReason={
+              busy
+                ? operationalCopy.actionPending
+                : previewLoaded
+                  ? operationalCopy.importPreviewAlreadyLoaded
+                  : !resolvedTemplateKey || !file
+                    ? operationalCopy.importUploadPrerequisites
+                    : undefined
+            }
           >
             {uploadMutation.isPending
               ? operationalCopy.importStepValidate
@@ -383,7 +392,9 @@ export function ImportWizard() {
                   variant="tertiary"
                   disabled={busy}
                   onClick={() => setSheetOpen(true)}
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.importReopenPreview}
                 </Button>
               ) : null}
@@ -392,7 +403,9 @@ export function ImportWizard() {
                 variant="tertiary"
                 disabled={busy}
                 onClick={() => void clearPreview()}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 {operationalCopy.importCancelPreview}
               </Button>
             </>
@@ -403,7 +416,9 @@ export function ImportWizard() {
               variant={sheetOpen ? "tertiary" : "primary"}
               disabled={busy}
               onClick={() => void onApprove()}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               {operationalCopy.importApproveAction}
             </Button>
           ) : null}
@@ -419,7 +434,9 @@ export function ImportWizard() {
                   setExecuteTier("trial");
                   setExecuteOpen(true);
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 {operationalCopy.reconTrialExecuteOnly}
               </Button>
               <Button
@@ -433,6 +450,15 @@ export function ImportWizard() {
                   setExecuteTier("production");
                   setExecuteOpen(true);
                 }}
+                disabledReason={
+                  busy
+                    ? operationalCopy.actionPending
+                    : executeOpen
+                      ? operationalCopy.actionPending
+                      : !reconProductionReady || !reconRunId
+                        ? operationalCopy.importReconRequired
+                        : undefined
+                }
               >
                 {operationalCopy.reconProductionExecute}
               </Button>
@@ -564,7 +590,9 @@ export function ImportWizard() {
               variant="ghost"
               disabled={busy}
               onClick={() => void clearPreview()}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               {operationalCopy.importCancelPreview}
             </Button>
             <Button
@@ -572,7 +600,9 @@ export function ImportWizard() {
               variant="ghost"
               disabled={busy}
               onClick={() => setSheetOpen(false)}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               {operationalCopy.importClosePreview}
             </Button>
             {preview?.status !== "confirmed-draft" ? (
@@ -590,7 +620,9 @@ export function ImportWizard() {
                   setExecuteOpen(false);
                   setConfirmOpen(true);
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 {operationalCopy.importConfirmDraft}
               </Button>
             ) : null}
@@ -600,7 +632,9 @@ export function ImportWizard() {
                 variant="primary"
                 disabled={busy}
                 onClick={() => void onApprove()}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 {operationalCopy.importApproveAction}
               </Button>
             ) : null}
@@ -615,7 +649,9 @@ export function ImportWizard() {
                     setExecuteTier("trial");
                     setExecuteOpen(true);
                   }}
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.reconTrialExecuteOnly}
                 </Button>
                 <Button
@@ -629,6 +665,15 @@ export function ImportWizard() {
                     setExecuteTier("production");
                     setExecuteOpen(true);
                   }}
+                  disabledReason={
+                    busy
+                      ? operationalCopy.actionPending
+                      : executeOpen
+                        ? operationalCopy.actionPending
+                        : !reconProductionReady || !reconRunId
+                          ? operationalCopy.importReconRequired
+                          : undefined
+                  }
                 >
                   {operationalCopy.reconProductionExecute}
                 </Button>
@@ -665,7 +710,9 @@ export function ImportWizard() {
               variant="primary"
               disabled={busy}
               onClick={() => void onConfirmDraft()}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               {operationalCopy.importConfirmDraft}
             </Button>
           </DialogFooter>

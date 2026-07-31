@@ -11,7 +11,7 @@ export default function AccessTabsLayout({
   return (
     <SurfaceSectionTabsLayout
       surface={SURFACE}
-      purpose="اعطای دسترسی، نقش‌ها، محدوده‌ها و دسترسی اضطراری."
+      purpose="مدیریت اعطای نقش، محدودهٔ سازمانی و دسترسی اضطراری برای ادمین دسترسی."
     >
       {children}
     </SurfaceSectionTabsLayout>

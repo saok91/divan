@@ -5,6 +5,7 @@ import * as React from "react";
 import { EventTimelineRow } from "@/components/personnel/event-timeline-row";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { operationalCopy } from "@/lib/operational-copy";
 import {
   TIMELINE_EMPTY_COPY_FA,
   TIMELINE_LOAD_MORE_LABEL_FA,
@@ -167,6 +168,7 @@ export function PersonnelEventTimeline({ personId }: PersonnelEventTimelineProps
           variant="tertiary"
           size="sm"
           disabled={timelineQuery.isFetching}
+          disabledReason={operationalCopy.actionPending}
           onClick={() =>
             setLimit((prev) =>
               Math.min(prev + TIMELINE_PAGE_SIZE, TIMELINE_MAX_LIMIT),

@@ -1,5 +1,7 @@
 "use client";
 
+import { operationalCopy } from "@/lib/operational-copy";
+
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -72,6 +74,16 @@ export function SensitiveConfirmationDialog({
     }
   }, [open, reasonRequired, reasonId]);
 
+  const confirmDisabledReason =
+    blockedReason?.trim() ||
+    (busy
+      ? operationalCopy.actionPending
+      : reasonMissing
+        ? operationalCopy.confirmReasonRequired
+        : confirmDisabled
+          ? operationalCopy.staleGoldCtaHint
+          : undefined);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -117,6 +129,7 @@ export function SensitiveConfirmationDialog({
             variant="ghost"
             disabled={busy}
             onClick={() => onOpenChange(false)}
+            disabledReason={operationalCopy.actionPending}
           >
             {cancelLabel}
           </Button>
@@ -129,6 +142,7 @@ export function SensitiveConfirmationDialog({
             onClick={() => {
               void onConfirm();
             }}
+            disabledReason={confirmDisabledReason}
           >
             {confirmLabel}
           </Button>

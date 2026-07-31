@@ -3,6 +3,8 @@
  * Fact + next step; no emoji; no ceremonial success. Persian-only UI.
  */
 
+import { toPersianDigits } from "./persian-digits";
+
 export const operationalCopy = {
   /** UX-DR18 deep-link deny — exact string. */
   accessDeniedTitle: "دسترسی ندارید.",
@@ -81,7 +83,7 @@ export const operationalCopy = {
   /** Dashboard load / filter failures — never reuse accessDenied for infra. */
   dashboardLoadError: "بارگذاری داشبورد ممکن نشد.",
   dashboardFilterInvalid: "تاریخ یا بازهٔ فیلتر نامعتبر است.",
-  dashboardPending: "در حال به‌روزرسانی داده‌های مشتق…",
+  dashboardPending: "در حال محاسبه — عدد ممکن است تغییر کند.",
   /**
    * Team filter applies to org/HC cards only — population cards stay on
    * PopulationPort ∩ InferenceBulk cohort (Story 5.4 review decision).
@@ -92,7 +94,7 @@ export const operationalCopy = {
   /** Report load / filter failures (Story 5.5) — never reuse accessDenied for infra. */
   reportLoadError: "بارگذاری گزارش ممکن نشد.",
   reportFilterInvalid: "تاریخ یا بازهٔ فیلتر گزارش نامعتبر است.",
-  reportPending: "در حال به‌روزرسانی داده‌های مشتق…",
+  reportPending: "در حال محاسبه — عدد ممکن است تغییر کند.",
   reportImportBatchUnavailable:
     "گزارش نتیجه دسته‌های واردسازی پس از Epic ۶ (مهاجرت) فعال می‌شود؛ دادهٔ واردسازی هنوز در دسترس نیست.",
   /** @deprecated Story 6.5 — kept for reference; live export uses export* keys. */
@@ -358,6 +360,45 @@ export const operationalCopy = {
 
   staleGoldCtaHint:
     "تا به‌روز شدن داده، نهایی‌سازی و خروجی غیرفعال است.",
+
+  /**
+   * Recalc banner disclosure (Story 8.9 / Direction A) — no clock deadline.
+   */
+  staleRecalcDisclosureSummary: "توضیح بیشتر",
+  staleRecalcDisclosureBody:
+    "پس از هر رویداد پرسنلی، وضعیت جاری فرد دوباره محاسبه می‌شود. تا پایان محاسبه، ردیف‌های علامت‌خورده فقط خواندنی هستند و در خروجی اکسل نمی‌آیند. اگر بیش از ۱۵ دقیقه طول کشید، از «عملیات ← صف محاسبه» وضعیت را ببینید.",
+
+  /**
+   * Banner when N is unknown (fail-closed / signal error) — no invented count.
+   */
+  staleRecalcUnknownScope:
+    "محاسبهٔ وضعیت جاری هنوز کامل نشده — نهایی‌سازی رویداد و خروجی گرفتن موقتاً غیرفعال است. معمولاً چند دقیقه طول می‌کشد.",
+
+  /**
+   * Pending/muted figures (Story 8.9 / UX-DR32) — exact string.
+   * Prefer over soft dashboardPending/reportPending for displayed figures.
+   */
+  figureRecalculating: "در حال محاسبه — عدد ممکن است تغییر کند.",
+  /** Compact in-row mark — same voice family as figureRecalculating. */
+  figureRecalculatingCompact: "در حال محاسبه",
+
+  /** Disabled-reason helpers (honest cause, not always actionPending). */
+  confirmReasonRequired: "دلیل تأیید را وارد کنید.",
+  formIncomplete: "موارد الزامی را کامل کنید.",
+  exportSelectSource: "منبع خروجی را انتخاب کنید.",
+  breakGlassSelfApproveDenied: "تأیید درخواست خودتان مجاز نیست.",
+  breakGlassSelfWaiveDenied:
+    "رد درخواست برای درخواست‌کننده یا موضوع همان حساب مجاز نیست.",
+  tableChromeLoading: "جدول در حال بارگذاری است.",
+  reportCatalogueBusy: "در حال بارگذاری گزارش…",
+  disposeNotReady: "شرایط خاتمه هنوز برقرار نیست.",
+  selectReconRun: "یک اجرای تطبیق را انتخاب کنید.",
+  noDraftToFinalize: "پیش‌نویسی برای نهایی‌سازی نیست.",
+  artifactLoadFailed: "بارگذاری سند ممکن نشد.",
+  publicationSnapshotRequired: "اسنپ‌شات بازبینی‌شده لازم است.",
+  importUploadPrerequisites: "قالب و پرونده را انتخاب کنید.",
+  importPreviewAlreadyLoaded: "پیش‌نمایش بارگذاری شده؛ ابتدا لغو کنید.",
+  importReconRequired: "تطبیق تولید هنوز آماده نیست.",
 
   /** Person identity (Story 3.1). */
   personListLoading: "در حال بارگذاری فهرست پرسنل…",
@@ -697,11 +738,22 @@ export const operationalCopy = {
 } as const;
 
 /**
- * Stale/recalc banner — Voice pattern: fact + time + next step.
- * `pendingUntilLabel` should already use Persian digits (e.g. ۰۹:۱۴).
+ * Stale/recalc banner — fact + scope (N) + consequence + expectation (Story 8.9).
+ * Never embed a clock deadline. `N` rendered with Persian digits.
+ * `null`/`undefined`/NaN → unknown-scope copy (no invented «۰ فرد»).
  */
-export function staleRecalcMessage(pendingUntilLabel: string): string {
-  return `داده به‌روز نیست — تا ${pendingUntilLabel} محاسبه نشده.`;
+export function staleRecalcMessage(
+  affectedPersonCount: number | null | undefined,
+): string {
+  if (
+    affectedPersonCount == null ||
+    !Number.isFinite(affectedPersonCount)
+  ) {
+    return operationalCopy.staleRecalcUnknownScope;
+  }
+  const n = Math.max(0, Math.trunc(affectedPersonCount));
+  const nFa = toPersianDigits(String(n));
+  return `محاسبهٔ وضعیت جاری برای ${nFa} فرد هنوز کامل نشده — نهایی‌سازی رویداد و خروجی گرفتن برای این افراد موقتاً غیرفعال است. معمولاً چند دقیقه طول می‌کشد.`;
 }
 
 /**

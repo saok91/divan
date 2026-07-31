@@ -17,8 +17,12 @@ export type PlatformStatus = {
   recalculationPending: boolean;
   /** Blocking stale derived state — disables gold finalize/export/report CTAs. */
   blockingStale: boolean;
-  /** Sample pending-until clock for operational copy (HH:mm, Latin digits ok). */
+  /**
+   * Ops/debug sample clock — never render as a UI deadline (Story 8.9).
+   */
   stalePendingUntil: string;
+  /** Distinct persons pending/failed/stale — banner N; null = unknown. */
+  affectedPersonCount: number | null;
   breakGlass: BreakGlassGrant;
   /**
    * Mid-session authz change (Story 2.6) — distinct from stale-banner (FR-45).
@@ -36,6 +40,7 @@ type PlatformStatusContextValue = PlatformStatus & {
   setRecalculationPending: (value: boolean) => void;
   setBlockingStale: (value: boolean) => void;
   setStalePendingUntil: (value: string) => void;
+  setAffectedPersonCount: (value: number | null) => void;
   setBreakGlass: (value: BreakGlassGrant) => void;
   setAuthzChanged: (value: boolean) => void;
   clearAuthzChanged: () => void;
@@ -69,6 +74,7 @@ const DEFAULT_STATUS: PlatformStatus = {
   recalculationPending: false,
   blockingStale: false,
   stalePendingUntil: "09:14",
+  affectedPersonCount: 0,
   breakGlass: { active: false, expiresAt: null },
   authzChanged: false,
   demoDraftOpen: false,
@@ -123,6 +129,7 @@ export function PlatformStatusProvider({
   const serverRecalcPending = recalcQuery.data?.recalculationPending === true;
   const serverBlockingStale = recalcQuery.data?.blockingStale === true;
   const serverStalePendingUntil = recalcQuery.data?.stalePendingUntil;
+  const serverAffectedPersonCount = recalcQuery.data?.affectedPersonCount;
 
   // Local/demo toggles OR with server — server is source of truth for production pending.
   const [recalculationPendingLocal, setRecalculationPending] = React.useState(
@@ -134,6 +141,9 @@ export function PlatformStatusProvider({
   const [stalePendingUntil, setStalePendingUntil] = React.useState(
     initial?.stalePendingUntil ?? DEFAULT_STATUS.stalePendingUntil,
   );
+  const [affectedPersonCountLocal, setAffectedPersonCount] = React.useState(
+    initial?.affectedPersonCount ?? DEFAULT_STATUS.affectedPersonCount,
+  );
 
   React.useEffect(() => {
     if (serverStalePendingUntil) {
@@ -141,9 +151,26 @@ export function PlatformStatusProvider({
     }
   }, [serverStalePendingUntil]);
 
+  React.useEffect(() => {
+    if (serverAffectedPersonCount === null) {
+      setAffectedPersonCount(null);
+      return;
+    }
+    if (typeof serverAffectedPersonCount === "number") {
+      setAffectedPersonCount(serverAffectedPersonCount);
+    }
+  }, [serverAffectedPersonCount]);
+
   const recalculationPending =
     serverRecalcPending || recalculationPendingLocal;
   const blockingStale = serverBlockingStale || blockingStaleLocal;
+  // Gallery demo owns N while local pending is on; otherwise prefer server
+  // (including null = unknown). Never Math.max — leftover demo N must not inflate.
+  const affectedPersonCount: number | null = recalculationPendingLocal
+    ? affectedPersonCountLocal
+    : serverAffectedPersonCount !== undefined
+      ? serverAffectedPersonCount
+      : affectedPersonCountLocal;
 
   const [breakGlassOverride, setBreakGlassOverride] =
     React.useState<BreakGlassGrant | null>(null);
@@ -244,6 +271,7 @@ export function PlatformStatusProvider({
       recalculationPending,
       blockingStale,
       stalePendingUntil,
+      affectedPersonCount,
       breakGlass,
       authzChanged,
       demoDraftOpen,
@@ -251,6 +279,7 @@ export function PlatformStatusProvider({
       setRecalculationPending,
       setBlockingStale,
       setStalePendingUntil,
+      setAffectedPersonCount,
       setBreakGlass,
       setAuthzChanged,
       clearAuthzChanged,
@@ -267,6 +296,7 @@ export function PlatformStatusProvider({
       recalculationPending,
       blockingStale,
       stalePendingUntil,
+      affectedPersonCount,
       breakGlass,
       authzChanged,
       demoDraftOpen,

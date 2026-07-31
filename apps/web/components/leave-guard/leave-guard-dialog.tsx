@@ -92,6 +92,8 @@ export function LeaveGuardDialog() {
             onClick={() => {
               void resolvePending("stay");
             }}
+          
+            disabledReason={operationalCopy.actionPending}
           >
             {operationalCopy.leaveGuardStay}
           </Button>
@@ -102,6 +104,8 @@ export function LeaveGuardDialog() {
             onClick={() => {
               void resolvePending("discard");
             }}
+          
+            disabledReason={operationalCopy.actionPending}
           >
             {operationalCopy.authzChangedDiscard}
           </Button>
@@ -113,7 +117,9 @@ export function LeaveGuardDialog() {
               onClick={() => {
                 void resolvePending("save");
               }}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               {saveLabel}
             </Button>
           ) : null}

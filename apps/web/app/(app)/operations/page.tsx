@@ -35,7 +35,7 @@ export default async function OperationsPage() {
           </span>
         }
         title="عملیات"
-        purpose="سلامت پلتفرم، ثبت artifact راه‌اندازی، و صداقت snapshot ارزیابی."
+        purpose="مانیتورینگ سلامت سرویس و صف بازمحاسبه برای SysAdmin — بدون محتوای HR."
       />
       <div className="space-y-10 px-content-padding-inline pb-6">
         <OperationsHealthPanel />

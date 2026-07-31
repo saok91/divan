@@ -45,8 +45,20 @@ export type GovernedDataTableProps<T> = {
    */
   rowActivateLabel?: string;
   exportSlot?: React.ReactNode;
-  /** Override empty-state copy (default: operationalCopy.emptySearch). */
+  /** Override empty-state copy (default depends on emptyKind / filters). */
   emptyMessage?: string;
+  /**
+   * Empty taxonomy (Story 8.9). When omitted:
+   * - filters active → filtered
+   * - else → noDataYet
+   * Callers should pass `notPermitted` instead of rendering the table when denied.
+   */
+  emptyKind?: "noDataYet" | "filtered" | "notPermitted";
+  /** Optional CTA for empty state (defaults: clear filters for filtered). */
+  emptyAction?: {
+    labelFa: string;
+    onClick: () => void;
+  };
   /**
    * Cold-load / initial query loading. Shows content-shaped skeleton rows
    * (density + column rhythm). Does not replace an in-session surface that

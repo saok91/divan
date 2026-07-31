@@ -3,6 +3,8 @@
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import { useLeaveGuardOptional } from "@/components/leave-guard";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
+import { RecalcPendingMark } from "@/components/personnel/recalc-pending-mark";
 import {
   StatusBadge,
   type StatusBadgeKind,
@@ -15,6 +17,8 @@ type EventFixtureRow = {
   eventType: string;
   effectiveDate: string;
   status: StatusBadgeKind;
+  /** Demo mark for Story 8.9 — fixture only. */
+  recalcPending?: boolean;
 };
 
 const FIXTURE_EVENTS: EventFixtureRow[] = [
@@ -31,6 +35,7 @@ const FIXTURE_EVENTS: EventFixtureRow[] = [
     eventType: "انتقال",
     effectiveDate: "۱۴۰۴/۰۲/۰۱",
     status: "Draft",
+    recalcPending: true,
   },
   {
     id: "ev-003",
@@ -63,6 +68,12 @@ const COLUMNS: GovernedColumn<EventFixtureRow>[] = [
     sticky: "identifier",
     filter: "text",
     sortable: true,
+    cell: (r) => (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <span>{r.personLabel}</span>
+        {r.recalcPending ? <RecalcPendingMark compact /> : null}
+      </span>
+    ),
   },
   {
     id: "eventType",
@@ -97,6 +108,7 @@ const SECTION_DEFAULTS: Record<string, string | string[]> = {};
 
 /**
  * رویدادها scaffold table — fixture only; no org-wide list API (Story 4b.7).
+ * Story 8.9: one fixture row proves in-place recalc mark on a governed table.
  */
 export function PersonnelEventsListPanel() {
   const leaveGuard = useLeaveGuardOptional();
@@ -115,29 +127,35 @@ export function PersonnelEventsListPanel() {
       className="space-y-3"
       aria-labelledby="personnel-events-list-heading"
     >
-      <header className="sr-only">
-        <h2 id="personnel-events-list-heading">رویدادها</h2>
+      <header className="flex flex-wrap items-center gap-2">
+        <h2 id="personnel-events-list-heading" className="sr-only">
+          رویدادها
+        </h2>
+        <GlossaryTerm termKey="personnelEvent" />
+        <GlossaryTerm termKey="draft" />
+        <GlossaryTerm termKey="finalize" />
       </header>
       <GovernedDataTable
-          aria-label="فهرست رویدادهای پرسنلی"
-          preferencesKey="personnel-events-list"
-          columns={COLUMNS}
-          rows={FIXTURE_EVENTS}
-          getRowId={(r) => r.id}
-          sectionDefaultFilters={SECTION_DEFAULTS}
-          pageSize={25}
-          toolbar={
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="primary" onClick={goRegister}>
-                ثبت رویداد
-              </Button>
-              <p className="text-caption text-muted-foreground">
-                دادهٔ نمونه برای پوستهٔ بخش؛ فهرست کامل رویدادها بعداً تکمیل
-                می‌شود.
-              </p>
-            </div>
-          }
-        />
+        aria-label="فهرست رویدادهای پرسنلی"
+        preferencesKey="personnel-events-list"
+        columns={COLUMNS}
+        rows={FIXTURE_EVENTS}
+        getRowId={(r) => r.id}
+        sectionDefaultFilters={SECTION_DEFAULTS}
+        pageSize={25}
+        emptyMessage="رویداد پرسنلی ثبت نشده. می‌توانید یک رویداد ایجاد کنید."
+        toolbar={
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="primary" onClick={goRegister}>
+              ثبت رویداد
+            </Button>
+            <p className="text-caption text-muted-foreground">
+              دادهٔ نمونه برای پوستهٔ بخش؛ فهرست کامل رویدادها بعداً تکمیل
+              می‌شود.
+            </p>
+          </div>
+        }
+      />
     </section>
   );
 }

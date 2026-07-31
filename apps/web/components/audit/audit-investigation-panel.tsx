@@ -942,6 +942,13 @@ export function AuditInvestigationPanel() {
                       getArtifactQuery.isError
                     }
                     onClick={() => void openExportArtifact()}
+                    disabledReason={
+                      getArtifactQuery.isError
+                        ? operationalCopy.artifactLoadFailed
+                        : artifactBusy || getArtifactQuery.isLoading
+                          ? operationalCopy.actionPending
+                          : undefined
+                    }
                   >
                     {operationalCopy.auditOpenExportArtifact}
                   </Button>
@@ -954,7 +961,9 @@ export function AuditInvestigationPanel() {
                   size="sm"
                   disabled={assertReview.isPending}
                   onClick={() => void openIndependentReview()}
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.auditOpenReview}
                 </Button>
               ) : null}

@@ -11,7 +11,7 @@ export default function OrganizationTabsLayout({
   return (
     <SurfaceSectionTabsLayout
       surface={SURFACE}
-      purpose="سلسله‌مراتب، نقش‌ها و مرجع‌های شغلی سازمان."
+      purpose="نگهداری سلسله‌مراتب و مراجع شغلی سازمان برای ادمین دادهٔ سازمانی."
     >
       {children}
     </SurfaceSectionTabsLayout>

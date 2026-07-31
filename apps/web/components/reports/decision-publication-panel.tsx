@@ -150,6 +150,17 @@ export function DecisionPublicationPanel({
             }
             aria-label={operationalCopy.publicationPublishCta}
             onClick={() => setConfirmOpen(true)}
+            disabledReason={
+              publishMutation.isPending
+                ? operationalCopy.actionPending
+                : isGoldCtaBlocked
+                  ? operationalCopy.staleGoldCtaHint
+                  : !reviewedSnapshotHash
+                    ? operationalCopy.publicationSnapshotRequired
+                    : !canPublish
+                      ? operationalCopy.accessDeniedTitle
+                      : undefined
+            }
           >
             {operationalCopy.publicationPublishCta}
           </Button>
@@ -327,7 +338,9 @@ export function DecisionPublicationPanel({
                     fieldIds: [...fieldIds],
                   });
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 {operationalCopy.publicationConfirmProceed}
               </Button>
             </div>

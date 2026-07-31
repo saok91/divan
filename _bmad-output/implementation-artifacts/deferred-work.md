@@ -703,3 +703,9 @@
 - File-path ghost allowlists / brace-count `rowActions` heuristic / pagination classifier tied to exact `aria-label` — selfcheck approximation acceptable for 8.1; tighten to AST/usage-scoped guards in a later hardening pass
 - `destructive` uses hardcoded `text-white` with no `--destructive-foreground` token — wait for Story 8.2 token/spacing pass
 - `aria-disabled` without native `disabled` ignores `disabledReason` — no current Button call sites; extend when `aria-disabled` inert pattern appears
+
+## Deferred from: code review of 8-9-self-explaining-state-operational-copy.md (2026-07-31)
+
+- `<details>` inside `role="alert"` assertive region on stale recalc banner â€” pre-existing banner a11y pattern; disclosure required by Story 8.9 AC; revisit live-region composition in 8.10 a11y gate
+- Profile stacks `RecalcPendingMark` `aria-live="polite"` with sibling `role="alert"` for the same freshness block â€” pre-existing stacking; consolidate announcements in a11y pass
+- Duplicate `getCurrentState` query in `PersonRecalcSubjectChrome` vs profile/form hosts â€” optimization only; share query cache/props when form chrome is refined

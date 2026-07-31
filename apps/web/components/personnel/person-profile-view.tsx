@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { PersonProfileSensitivityIcon } from "@/components/personnel/person-profile-sensitivity-icon";
 import { PersonnelEventTimeline } from "@/components/personnel/personnel-event-timeline";
+import { RecalcPendingMark } from "@/components/personnel/recalc-pending-mark";
 import { StatusBadge } from "@/components/personnel/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toPersianDigits } from "@/lib/persian-digits";
@@ -185,11 +186,24 @@ export function PersonProfileView({ personId }: PersonProfileViewProps) {
   }
 
   if (state.ok === false) {
+    const isRecalcBlock =
+      state.code === "RECALCULATION_PENDING" ||
+      state.code === "RECALCULATION_FAILED" ||
+      state.code === "RECALCULATION_STALE";
     return (
       <div className="space-y-4">
-        <p role="alert" className="text-body text-destructive">
-          {state.messageFa}
-        </p>
+        {isRecalcBlock ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <RecalcPendingMark />
+            <p role="alert" className="text-body text-text-tertiary">
+              {state.messageFa}
+            </p>
+          </div>
+        ) : (
+          <p role="alert" className="text-body text-destructive">
+            {state.messageFa}
+          </p>
+        )}
         <div className="pointer-events-none opacity-50" aria-disabled="true">
           <ProfileSkeleton />
         </div>

@@ -31,7 +31,8 @@
     "selfcheck:entity-picker": "tsx lib/entity-picker.selfcheck.ts",
     "selfcheck:leave-guard": "tsx components/leave-guard/leave-guard-algorithm.selfcheck.ts",
     "selfcheck:row-actions": "tsx lib/row-actions.selfcheck.ts",
-    "selfcheck:feedback": "tsx lib/feedback.selfcheck.ts"
+    "selfcheck:feedback": "tsx lib/feedback.selfcheck.ts",
+    "selfcheck:operational-copy": "tsx lib/operational-copy.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",

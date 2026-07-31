@@ -537,6 +537,8 @@ export function CorrectionCasesPanel() {
             size="sm"
             disabled={busy}
             onClick={(e) => openDialog("open", e.currentTarget)}
+          
+            disabledReason={operationalCopy.actionPending}
           >
             {operationalCopy.correctionCaseOpen}
           </Button>
@@ -552,10 +554,6 @@ export function CorrectionCasesPanel() {
       ) : loadError ? (
         <p className="text-body text-destructive" role="alert">
           {loadError}
-        </p>
-      ) : rows.length === 0 ? (
-        <p className="text-body text-muted-foreground">
-          {operationalCopy.correctionCaseEmpty}
         </p>
       ) : (
         <GovernedDataTable
@@ -663,7 +661,9 @@ export function CorrectionCasesPanel() {
                       toStatus: "in_progress",
                     })
                   }
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseStatusInProgress}
                 </Button>
               ) : null}
@@ -681,7 +681,9 @@ export function CorrectionCasesPanel() {
                       toStatus: "pending_decision",
                     })
                   }
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseStatusPendingDecision}
                 </Button>
               ) : null}
@@ -694,7 +696,9 @@ export function CorrectionCasesPanel() {
                   size="sm"
                   disabled={busy}
                   onClick={(e) => openDialog("decide", e.currentTarget)}
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseDecide}
                 </Button>
               ) : null}
@@ -707,7 +711,9 @@ export function CorrectionCasesPanel() {
                   size="sm"
                   disabled={busy}
                   onClick={(e) => openDialog("close", e.currentTarget)}
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseClose}
                 </Button>
               ) : null}
@@ -721,7 +727,9 @@ export function CorrectionCasesPanel() {
                   variant="tertiary"
                   disabled={busy}
                   onClick={(e) => openDialog("link", e.currentTarget)}
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseLinkOutcome}
                 </Button>
               ) : null}
@@ -732,7 +740,9 @@ export function CorrectionCasesPanel() {
                   variant="tertiary"
                   disabled={busy}
                   onClick={(e) => openDialog("evidence", e.currentTarget)}
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseAddEvidence}
                 </Button>
               ) : null}
@@ -796,7 +806,9 @@ export function CorrectionCasesPanel() {
                         contentBase64: uploadB64,
                       })
                     }
-                  >
+                  
+            disabledReason={operationalCopy.actionPending}
+          >
                     {operationalCopy.correctionCaseUpload}
                   </Button>
                 </div>
@@ -924,7 +936,9 @@ export function CorrectionCasesPanel() {
                       deadlineAt: new Date(deadlineLocal),
                     })
                   }
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseConfirm}
                 </Button>
               </DialogFooter>
@@ -991,7 +1005,9 @@ export function CorrectionCasesPanel() {
                       decisionReason: decisionReason.trim(),
                     })
                   }
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseConfirm}
                 </Button>
               </DialogFooter>
@@ -1030,7 +1046,9 @@ export function CorrectionCasesPanel() {
                       closureEvidence: { note: closureNote.trim() },
                     })
                   }
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseConfirm}
                 </Button>
               </DialogFooter>
@@ -1157,7 +1175,9 @@ export function CorrectionCasesPanel() {
                       targetId: resolvedLinkTarget,
                     })
                   }
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseConfirm}
                 </Button>
               </DialogFooter>
@@ -1224,7 +1244,9 @@ export function CorrectionCasesPanel() {
                       uriOrRef: evidenceUri.trim(),
                     })
                   }
-                >
+                
+            disabledReason={operationalCopy.actionPending}
+          >
                   {operationalCopy.correctionCaseConfirm}
                 </Button>
               </DialogFooter>

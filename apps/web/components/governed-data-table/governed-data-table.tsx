@@ -27,6 +27,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { operationalCopy } from "@/lib/operational-copy";
+import { emptyStateCopy } from "@/lib/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { formatPersianInteger, toPersianDigits } from "@/lib/persian-digits";
 import {
   readTablePreferences,
@@ -305,6 +307,7 @@ function TableChromeControls<T>({
         aria-label={`تراکم ردیف: ${densityLabel}. برای تغییر به ${nextDensity === "dense" ? "فشرده" : "راحت"} فعال کنید`}
         aria-pressed={density === "comfortable"}
         disabled={disabled}
+        disabledReason={operationalCopy.tableChromeLoading}
         onClick={() => onDensityChange(nextDensity)}
       >
         <Rows3Icon className="size-3.5" aria-hidden="true" />
@@ -320,6 +323,7 @@ function TableChromeControls<T>({
               size="sm"
               aria-label="نمایش ستون‌ها"
               disabled={disabled}
+              disabledReason={operationalCopy.tableChromeLoading}
             >
               <Columns3Icon className="size-3.5" aria-hidden="true" />
               ستون‌ها
@@ -381,6 +385,8 @@ export function GovernedDataTable<T>({
   rowActivateLabel = "باز کردن رکورد",
   exportSlot,
   emptyMessage,
+  emptyKind: emptyKindProp,
+  emptyAction,
   loading = false,
   loadingRowCount = 8,
   "aria-label": ariaLabel,
@@ -603,6 +609,42 @@ export function GovernedDataTable<T>({
 
   const totalPages = snapshot.pageCount;
   const empty = !loading && snapshot.total === 0;
+  const filtersDifferFromDefaults = React.useMemo(() => {
+    const defaults = Object.entries(sectionDefaultFilters);
+    const active = snapshot.activeFilters;
+    for (const [key, value] of Object.entries(active)) {
+      const def = sectionDefaultFilters[key];
+      if (def === undefined) {
+        if (typeof value === "string" && value.trim() !== "") return true;
+        if (Array.isArray(value) && value.length > 0) return true;
+        continue;
+      }
+      if (JSON.stringify(value) !== JSON.stringify(def)) return true;
+    }
+    for (const [key] of defaults) {
+      if (!(key in active)) {
+        const def = sectionDefaultFilters[key];
+        if (typeof def === "string" && def.trim() !== "") return true;
+        if (Array.isArray(def) && def.length > 0) return true;
+      }
+    }
+    return false;
+  }, [sectionDefaultFilters, snapshot.activeFilters]);
+
+  const resolvedEmptyKind =
+    emptyKindProp ??
+    (filtersDifferFromDefaults ? "filtered" : "noDataYet");
+  const resolvedEmptyCopy = emptyStateCopy(resolvedEmptyKind, {
+    noDataYetBodyFa: emptyMessage,
+  });
+  const resolvedEmptyAction =
+    emptyAction ??
+    (resolvedEmptyKind === "filtered"
+      ? {
+          labelFa: operationalCopy.clearFilters,
+          onClick: clearToSectionDefaults,
+        }
+      : undefined);
   const rowHeightClass = densityRowClass(density);
 
   return (
@@ -690,6 +732,14 @@ export function GovernedDataTable<T>({
                         type="button"
                         className="inline-flex items-center gap-1 rounded-sm text-column-header outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                         disabled={loading}
+                        title={
+                          loading ? operationalCopy.tableChromeLoading : undefined
+                        }
+                        aria-description={
+                          loading
+                            ? operationalCopy.tableChromeLoading
+                            : undefined
+                        }
                         onClick={() => toggleSort(column.id)}
                       >
                         {column.header}
@@ -780,19 +830,29 @@ export function GovernedDataTable<T>({
                   colSpan={Math.max(displayColumns.length, 1)}
                   className="h-32 text-center"
                 >
-                  <div className="flex flex-col items-center gap-3 py-4">
-                    <p className="text-body-medium">
-                      {emptyMessage ?? operationalCopy.emptySearch}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={clearToSectionDefaults}
-                    >
-                      {operationalCopy.clearFilters}
-                    </Button>
-                  </div>
+                  <EmptyState
+                    kind={resolvedEmptyKind}
+                    messageFa={
+                      resolvedEmptyKind === "filtered"
+                        ? undefined
+                        : emptyMessage
+                    }
+                    noDataYetBodyFa={
+                      resolvedEmptyKind === "noDataYet"
+                        ? (emptyMessage ?? resolvedEmptyCopy.bodyFa)
+                        : undefined
+                    }
+                    onAction={
+                      resolvedEmptyAction
+                        ? resolvedEmptyAction.onClick
+                        : undefined
+                    }
+                    noDataYetActionFa={
+                      resolvedEmptyKind === "noDataYet"
+                        ? resolvedEmptyAction?.labelFa
+                        : undefined
+                    }
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -874,6 +934,9 @@ export function GovernedDataTable<T>({
                 variant="tertiary"
                 size="sm"
                 disabled={pageIndex <= 0}
+                disabledReason={
+                  pageIndex <= 0 ? "اولین صفحه هستید." : undefined
+                }
                 onClick={() => goToPage(pageIndex - 1)}
                 aria-label="صفحه قبل"
               >
@@ -884,6 +947,11 @@ export function GovernedDataTable<T>({
                 variant="tertiary"
                 size="sm"
                 disabled={pageIndex >= totalPages - 1}
+                disabledReason={
+                  pageIndex >= totalPages - 1
+                    ? "آخرین صفحه هستید."
+                    : undefined
+                }
                 onClick={() => goToPage(pageIndex + 1)}
                 aria-label="صفحه بعد"
               >

@@ -390,7 +390,9 @@ export function AccessPeoplePanel() {
                 type="submit"
                 variant="secondary"
                 disabled={updateLink.isPending}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 ذخیره پیوند
               </Button>
               <Button
@@ -410,7 +412,9 @@ export function AccessPeoplePanel() {
                     },
                   );
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 حذف پیوند
               </Button>
             </form>
@@ -427,7 +431,9 @@ export function AccessPeoplePanel() {
                     { onError: captureError },
                   );
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 فعال‌سازی
               </Button>
               <Button
@@ -443,7 +449,9 @@ export function AccessPeoplePanel() {
                     { onError: captureError },
                   );
                 }}
-              >
+              
+            disabledReason={operationalCopy.actionPending}
+          >
                 غیرفعال‌سازی
               </Button>
             </div>
@@ -647,7 +655,9 @@ export function AccessPeoplePanel() {
                   );
                 }
               }}
-            >
+            
+            disabledReason={operationalCopy.actionPending}
+          >
               ذخیره تخصیص
             </Button>
           </DialogFooter>

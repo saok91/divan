@@ -13,7 +13,7 @@ export default function PersonnelEventsTabsLayout({
   return (
     <SurfaceSectionTabsLayout
       surface={SURFACE}
-      purpose="ثبت، پیش‌نویس و نهایی‌سازی رویدادهای پرسنلی."
+      purpose="ثبت و نهایی‌سازی رویدادهای پرسنلی توسط اپراتور HR — پیش‌نویس تا قطعی‌سازی."
     >
       {children}
     </SurfaceSectionTabsLayout>
