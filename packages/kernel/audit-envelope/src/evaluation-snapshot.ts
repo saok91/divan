@@ -56,7 +56,11 @@ function isExpired(
 }
 
 function isPool(db: EvaluationSnapshotDb): db is Pool {
-  return typeof (db as Pool).connect === "function";
+  // PoolClient also exposes connect(); discriminate via release() (client-only).
+  return (
+    typeof (db as Pool).connect === "function" &&
+    typeof (db as { release?: unknown }).release !== "function"
+  );
 }
 
 async function runOnQueryable<T>(

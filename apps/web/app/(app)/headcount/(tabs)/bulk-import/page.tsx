@@ -6,10 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { assertPageAccess } from "@/lib/assert-page-access";
 import { operationalCopy } from "@/lib/operational-copy";
 
-/**
- * ورود گروهی (ظرفیت) — catalogue/sample substrate (Story 9.1).
- * Full five-step bulk flow arrives in Story 9.2.
- */
+/** ورود گروهی (ظرفیت) — shared five-step day-to-day bulk flow (Story 9.2). */
 export default async function HeadcountBulkImportPage() {
   const session = await auth();
   if (!session?.user?.accountId || !session.user.coarseRole) {
@@ -24,7 +21,7 @@ export default async function HeadcountBulkImportPage() {
         purpose={operationalCopy.importBulkCatalogueHint}
       />
       <div className="px-content-padding-inline pb-6">
-        <BulkImportCatalogueHost />
+        <BulkImportCatalogueHost section="headcount" />
       </div>
     </div>
   );

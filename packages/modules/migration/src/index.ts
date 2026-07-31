@@ -155,9 +155,18 @@ export {
   executeImportBatch,
   rollbackImportStaging,
   stagingRowsReadOnly,
+  performAtomicCutover,
+  mapCutoverCounts,
   type ExecuteBatchResult,
   type ExecuteBatchOptions,
+  type CutoverClaimStatus,
 } from "./execute-batch";
+
+export {
+  commitDayToDayBulk,
+  type DayToDayBulkCommitOptions,
+  type DayToDayBulkCommitResult,
+} from "./commit-day-to-day-bulk";
 
 export {
   SEED_MIGRATION_SOD,

@@ -173,8 +173,30 @@ export const operationalCopy = {
     "برای استفاده از این قالب، مجوز «{permission}» لازم است.",
   importSampleClassificationFa: "نمونهٔ قالب واردسازی — غیرحساس عملیاتی",
   importSampleDownloadError: "دانلود قالب نمونه ممکن نشد.",
+  /** Day-to-day bulk purpose — distinguishes from `/import` migration wizard. */
   importBulkCatalogueHint:
-    "فهرست قالب و دانلود نمونه اینجاست؛ جریان پنج‌مرحله‌ای ورود گروهی در داستان ۹٫۲ تکمیل می‌شود. ویزارد پیشرفتهٔ مهاجرت در «ورود داده» است.",
+    "ورود گروهی روزمره برای ایجاد چند رکورد با همان مجوزی که ایجاد تکی دارد. ویزارد پیشرفتهٔ مهاجرت (هفت‌مرحله‌ای با تأیید/اجرا و تطبیق) در «ورود داده» است — این مسیر همان نیست.",
+  /** Five-step bulk labels (Story 9.2) — distinct from migration seven-step. */
+  bulkStepTemplate: "قالب",
+  bulkStepUpload: "آپلود",
+  bulkStepPreview: "پیش‌نمایش و خطاها",
+  bulkStepConfirm: "تأیید",
+  bulkStepResult: "نتیجه",
+  bulkFlowPurpose:
+    "جریان پنج‌مرحله‌ای ورود گروهی روزمره: قالب، آپلود، پیش‌نمایش و خطاها، تأیید، نتیجه. مسیر مهاجرت پیشرفته در «ورود داده» است.",
+  bulkContinueToUpload: "ادامه به آپلود",
+  bulkContinueToConfirm: "ادامه به تأیید",
+  bulkConfirmHint:
+    "تأیید، دستهٔ بدون خطای ساختاری را اتمی ثبت می‌کند؛ بدون نیاز به مجوزهای تأیید/اجرای مهاجرت.",
+  bulkConfirmAction: "تأیید و ثبت گروهی",
+  bulkCommitSuccess: "ثبت گروهی انجام شد.",
+  bulkCommitFailed: "ثبت گروهی ممکن نشد.",
+  bulkPreviewHasErrors:
+    "تا رفع خطاهای پیش‌نمایش نمی‌توان تأیید کرد.",
+  bulkResultCreated: "ایجادشده",
+  bulkResultUpdated: "به‌روزرسانی‌شده",
+  bulkResultRejected: "ردشده",
+  bulkStartOver: "شروع مجدد",
   importPreviewTitle: "پیش‌نمایش واردسازی",
   importNoTemplates: "قالب واردسازی ثبت نشده.",
   importErrorsLabel: "خطا",

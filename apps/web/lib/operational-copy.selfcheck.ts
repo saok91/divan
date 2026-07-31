@@ -95,6 +95,23 @@ assert.doesNotMatch(
 assert.ok(Object.keys(uiGlossary).length >= 8);
 assert.ok(Object.keys(uiGlossary).length <= 15);
 
+// Story 9.2 — day-to-day bulk five-step labels + dual-entry distinction
+assert.equal(operationalCopy.bulkStepTemplate, "قالب");
+assert.equal(operationalCopy.bulkStepUpload, "آپلود");
+assert.equal(operationalCopy.bulkStepPreview, "پیش‌نمایش و خطاها");
+assert.equal(operationalCopy.bulkStepConfirm, "تأیید");
+assert.equal(operationalCopy.bulkStepResult, "نتیجه");
+assert.ok(operationalCopy.importBulkCatalogueHint.includes("ورود داده"));
+assert.doesNotMatch(
+  operationalCopy.importBulkCatalogueHint,
+  /داستان ۹٫۲/,
+  "9.2 deferral hint must be removed from bulk purpose copy",
+);
+assert.ok(operationalCopy.importBulkDayHint.includes("ورود گروهی"));
+assert.ok(operationalCopy.bulkResultCreated.length > 0);
+assert.ok(operationalCopy.bulkResultUpdated.length > 0);
+assert.ok(operationalCopy.bulkResultRejected.length > 0);
+
 // --- Disabled reason scan (Button call sites under components) ---
 function walkTsx(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

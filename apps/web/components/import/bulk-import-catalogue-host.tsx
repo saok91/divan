@@ -1,8 +1,12 @@
 "use client";
 
-import { TemplateCatalogue } from "@/components/import/template-catalogue";
+import { SharedBulkEntryFlow } from "@/components/import/shared-bulk-entry-flow";
 
-/** Client host for bulk-entry template catalogue (Story 9.1 substrate). */
-export function BulkImportCatalogueHost() {
-  return <TemplateCatalogue variant="bulk" />;
+/** Client host for shared five-step day-to-day bulk entry (Story 9.2). */
+export function BulkImportCatalogueHost({
+  section,
+}: {
+  section?: "personnel" | "personnel-events" | "headcount";
+}) {
+  return <SharedBulkEntryFlow section={section} />;
 }

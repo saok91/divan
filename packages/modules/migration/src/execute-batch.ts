@@ -86,6 +86,10 @@ export type ExecuteBatchResult = {
   evidence: ImportBatchEvidence;
   /** True when a prior successful cutover was returned (idempotent). */
   idempotentReplay: boolean;
+  /** Row outcome counts (FR-38 / Story 9.2). */
+  created: number;
+  updated: number;
+  rejected: number;
 };
 
 export type ExecuteBatchOptions = {
@@ -104,6 +108,28 @@ export type ExecuteBatchOptions = {
   /** UUID of signed reconciliation_run linked to this batch. */
   reconciliationRunId?: string | null;
 };
+
+/** Status the TX claims from before moving to executing. */
+export type CutoverClaimStatus = "approved" | "confirmed-draft";
+
+/**
+ * Map evidence + row outcome ids → operator counts.
+ * Success path is all-or-nothing → rejected = 0.
+ * Idempotent replay: updated = total record ids − created persons.
+ */
+export function mapCutoverCounts(opts: {
+  createdPersonCount: number;
+  recordIdsLength: number;
+  rejected?: number;
+}): { created: number; updated: number; rejected: number } {
+  const created = opts.createdPersonCount;
+  const updated = Math.max(0, opts.recordIdsLength - created);
+  return {
+    created,
+    updated,
+    rejected: opts.rejected ?? 0,
+  };
+}
 
 function rowToCreatePersonInput(values: Record<string, string>): CreatePersonInput {
   const input: CreatePersonInput = {
@@ -407,89 +433,41 @@ async function cutoverRowsInTx(
   return { createdPersonIds, matchedPersonIds, eventIds };
 }
 
-/**
- * Execute approved staging batch: revalidate, mutex, atomic cutover, evidence.
- * Repeat of successful batch returns prior evidence (idempotent — no duplicate events).
- * Failed batches require a new upload/approve cycle after staging drop
- * (review Decision #3 + AC #4).
- */
-export async function executeImportBatch(
-  pool: Pool,
-  opts: ExecuteBatchOptions,
-): Promise<ExecuteBatchResult> {
-  await assertMigrationExecutePermission(opts.permissionHolder);
-
-  const batch = await getStagingBatch(pool, opts.batchId);
-
-  // Idempotent replay of successful cutover
-  if (batch.status === "cutover-complete") {
-    const prior = await getLatestBatchEvidence(pool, batch.id);
-    if (prior && prior.status === "cutover-complete") {
-      return { batch, evidence: prior, idempotentReplay: true };
-    }
-    throw new MigrationError(
-      "IDEMPOTENCY_CONFLICT",
-      "دسته قطعی‌سازی‌شده است اما مدرک اجرا یافت نشد.",
-    );
-  }
-
-  if (batch.status === "executing") {
-    throw new MigrationError(
-      "CONCURRENT_BATCH",
-      formatConcurrentBatchMessage({
-        ownerDisplayName: batch.ownerDisplayName || batch.executedBy || "",
-        correlationId: batch.correlationId,
-      }),
-      {
-        ownerDisplayName: batch.ownerDisplayName || batch.executedBy || "",
-        correlationId: batch.correlationId,
-      },
-    );
-  }
-
-  if (batch.status === "failed") {
-    throw new MigrationError(
-      "BATCH_NOT_APPROVED",
-      "دسته ناموفق است و ردیف‌های موقت پاک شده‌اند؛ بارگذاری و تأیید جدید لازم است.",
-    );
-  }
-
-  if (batch.status !== "approved") {
-    if (batch.status === "confirmed-draft") {
-      throw new MigrationError(
-        "BATCH_NOT_APPROVED",
-        "دسته هنوز تأیید نشده است.",
-      );
-    }
-    throw new MigrationError(
-      "BATCH_NOT_APPROVED",
-      "وضعیت دسته برای اجرا معتبر نیست.",
-    );
-  }
-
-  if (!batch.approvedBy) {
-    throw new MigrationError(
-      "BATCH_NOT_APPROVED",
-      "دسته هنوز تأیید نشده است.",
-    );
-  }
-
-  assertApproveExecuteSegregation({
-    approvedByAccountId: batch.approvedBy,
-    executorAccountId: opts.executorAccountId,
-    segregationOn: opts.segregationOn,
+function countsFromEvidence(evidence: ImportBatchEvidence): {
+  created: number;
+  updated: number;
+  rejected: number;
+} {
+  return mapCutoverCounts({
+    createdPersonCount: evidence.counts.createdPersonCount,
+    recordIdsLength: evidence.createdRecordIds.length,
+    rejected:
+      evidence.status === "failed" || evidence.status === "rolled-back"
+        ? evidence.counts.errorCount
+        : 0,
   });
+}
 
-  const tier = opts.cutoverTier ?? "trial";
-  if (tier === "production") {
-    // Verify persisted signed reconciliation — never unlock on free-string token.
-    // source=migration remains audit metadata only (not an authz unlock).
-    await assertProductionReconciliationGate(pool, {
-      batchId: opts.batchId,
-      reconciliationRunId: opts.reconciliationRunId,
-    });
-  }
-
+/**
+ * Shared atomic cutover body (mutex → Baseline append → evidence).
+ * Used by migration SoD execute and day-to-day bulk commit (Story 9.2).
+ */
+export async function performAtomicCutover(
+  pool: Pool,
+  opts: {
+    batch: StagingBatchRecord;
+    claimFromStatus: CutoverClaimStatus;
+    executorAccountId: string;
+    executorDisplayName: string;
+  },
+): Promise<{
+  batch: StagingBatchRecord;
+  evidence: ImportBatchEvidence;
+  createdPersonIds: string[];
+  matchedPersonIds: string[];
+  eventIds: string[];
+}> {
+  const { batch } = opts;
   const issues = revalidateStagingBatch(batch);
   const errors = issues.filter((i) => i.severity === "error");
   if (errors.length > 0) {
@@ -502,9 +480,6 @@ export async function executeImportBatch(
   await revalidateAuthoritativeReferences(batch);
 
   const overlapKeys = buildOverlapKeys(batch.rows);
-  const executorDisplay =
-    opts.executorDisplayName?.trim() || opts.executorAccountId;
-
   let evalSnapId: string | null = null;
   let evalSnapFingerprint: string | null = null;
 
@@ -512,9 +487,9 @@ export async function executeImportBatch(
     const result = await withTransaction(pool, async (client) => {
       const claimed = await client.query(
         `SELECT id FROM migration_staging.import_batch
-         WHERE id = $1::uuid AND status = 'approved'
+         WHERE id = $1::uuid AND status = $2
          FOR UPDATE`,
-        [batch.id],
+        [batch.id, opts.claimFromStatus],
       );
       if ((claimed.rowCount ?? 0) === 0) {
         throw new MigrationError(
@@ -540,7 +515,7 @@ export async function executeImportBatch(
         holder: {
           batchId: batch.id,
           ownerAccountId: opts.executorAccountId,
-          ownerDisplayName: executorDisplay,
+          ownerDisplayName: opts.executorDisplayName,
           correlationId: batch.correlationId,
         },
       });
@@ -639,7 +614,9 @@ export async function executeImportBatch(
     return {
       batch: updated,
       evidence: result.evidence,
-      idempotentReplay: false,
+      createdPersonIds: result.createdPersonIds,
+      matchedPersonIds: result.matchedPersonIds,
+      eventIds: result.eventIds,
     };
   } catch (err) {
     // Pre-cutover / mid-cutover abort before COMMIT → TX rolled back by withTransaction
@@ -710,6 +687,114 @@ export async function executeImportBatch(
       "اجرای دسته ناموفق بود؛ وضعیت تولید تغییر نکرد.",
     );
   }
+}
+
+/**
+ * Execute approved staging batch: revalidate, mutex, atomic cutover, evidence.
+ * Repeat of successful batch returns prior evidence (idempotent — no duplicate events).
+ * Failed batches require a new upload/approve cycle after staging drop
+ * (review Decision #3 + AC #4).
+ */
+export async function executeImportBatch(
+  pool: Pool,
+  opts: ExecuteBatchOptions,
+): Promise<ExecuteBatchResult> {
+  await assertMigrationExecutePermission(opts.permissionHolder);
+
+  const batch = await getStagingBatch(pool, opts.batchId);
+
+  // Idempotent replay of successful cutover
+  if (batch.status === "cutover-complete") {
+    const prior = await getLatestBatchEvidence(pool, batch.id);
+    if (prior && prior.status === "cutover-complete") {
+      return {
+        batch,
+        evidence: prior,
+        idempotentReplay: true,
+        ...countsFromEvidence(prior),
+      };
+    }
+    throw new MigrationError(
+      "IDEMPOTENCY_CONFLICT",
+      "دسته قطعی‌سازی‌شده است اما مدرک اجرا یافت نشد.",
+    );
+  }
+
+  if (batch.status === "executing") {
+    throw new MigrationError(
+      "CONCURRENT_BATCH",
+      formatConcurrentBatchMessage({
+        ownerDisplayName: batch.ownerDisplayName || batch.executedBy || "",
+        correlationId: batch.correlationId,
+      }),
+      {
+        ownerDisplayName: batch.ownerDisplayName || batch.executedBy || "",
+        correlationId: batch.correlationId,
+      },
+    );
+  }
+
+  if (batch.status === "failed") {
+    throw new MigrationError(
+      "BATCH_NOT_APPROVED",
+      "دسته ناموفق است و ردیف‌های موقت پاک شده‌اند؛ بارگذاری و تأیید جدید لازم است.",
+    );
+  }
+
+  if (batch.status !== "approved") {
+    if (batch.status === "confirmed-draft") {
+      throw new MigrationError(
+        "BATCH_NOT_APPROVED",
+        "دسته هنوز تأیید نشده است.",
+      );
+    }
+    throw new MigrationError(
+      "BATCH_NOT_APPROVED",
+      "وضعیت دسته برای اجرا معتبر نیست.",
+    );
+  }
+
+  if (!batch.approvedBy) {
+    throw new MigrationError(
+      "BATCH_NOT_APPROVED",
+      "دسته هنوز تأیید نشده است.",
+    );
+  }
+
+  assertApproveExecuteSegregation({
+    approvedByAccountId: batch.approvedBy,
+    executorAccountId: opts.executorAccountId,
+    segregationOn: opts.segregationOn,
+  });
+
+  const tier = opts.cutoverTier ?? "trial";
+  if (tier === "production") {
+    // Verify persisted signed reconciliation — never unlock on free-string token.
+    // source=migration remains audit metadata only (not an authz unlock).
+    await assertProductionReconciliationGate(pool, {
+      batchId: opts.batchId,
+      reconciliationRunId: opts.reconciliationRunId,
+    });
+  }
+
+  const executorDisplay =
+    opts.executorDisplayName?.trim() || opts.executorAccountId;
+
+  const result = await performAtomicCutover(pool, {
+    batch,
+    claimFromStatus: "approved",
+    executorAccountId: opts.executorAccountId,
+    executorDisplayName: executorDisplay,
+  });
+
+  return {
+    batch: result.batch,
+    evidence: result.evidence,
+    idempotentReplay: false,
+    created: result.createdPersonIds.length,
+    updated: result.matchedPersonIds.length,
+    rejected: 0,
+  };
 }
 
 /**

@@ -26,6 +26,11 @@ export type ImportIssue = {
   columnCaptionFa: string;
   severity: ImportIssueSeverity;
   messageFa: string;
+  /**
+   * Subject business code when present on the row (e.g. personnelCode).
+   * Never an internal UUID — FR-57 / UX-DR35.
+   */
+  subjectBusinessCode?: string;
 };
 
 /** Same shape as personnel codes — business identifiers, never UUIDs. */
@@ -76,6 +81,7 @@ function pushIssue(
     columnCaptionFa: string;
     severity: ImportIssueSeverity;
     messageFa: string;
+    subjectBusinessCode?: string;
   },
 ): void {
   issues.push({
@@ -84,6 +90,9 @@ function pushIssue(
     columnCaptionFa: args.columnCaptionFa,
     severity: args.severity,
     messageFa: args.messageFa,
+    ...(args.subjectBusinessCode
+      ? { subjectBusinessCode: args.subjectBusinessCode }
+      : {}),
   });
 }
 
@@ -386,16 +395,38 @@ export function validateImportMatrix(parsed: ParsedImportMatrix): ImportIssue[] 
         columnCaptionFa: captionFor(template, "personnelCode"),
         severity: "warning",
         messageFa: `کد پرسنلی «${code}» در چند ردیف تکرار شده (${rowList.join("، ")}).`,
+        subjectBusinessCode: looksLikeInternalId(code) ? undefined : code,
       });
     }
+  }
+
+  // Attach subject business code (personnelCode) when present — never UUID.
+  const codeByRow = new Map<number, string>();
+  for (let i = 0; i < rows.length; i++) {
+    const rowNum = sourceRowNumbers[i] ?? i + 2;
+    const raw = (rows[i]!.personnelCode ?? "").trim();
+    if (raw && !looksLikeInternalId(raw)) {
+      codeByRow.set(rowNum, raw);
+    }
+  }
+  for (const issue of issues) {
+    if (issue.subjectBusinessCode) continue;
+    const code = codeByRow.get(issue.row);
+    if (code) issue.subjectBusinessCode = code;
   }
 
   return issues;
 }
 
-/** Operator cite: «ردیف ۱۲، ستون کد پرسنلی: …» */
+/**
+ * Operator cite: «ردیف ۱۲، ستون کد پرسنلی، موضوع P-100: …»
+ * Never cites internal UUIDs (FR-57 / UX-DR35).
+ */
 export function formatImportIssueCite(issue: ImportIssue): string {
-  return `ردیف ${issue.row}، ستون ${issue.columnCaptionFa}: ${issue.messageFa}`;
+  const subject = issue.subjectBusinessCode?.trim();
+  const subjectPart =
+    subject && !looksLikeInternalId(subject) ? `، موضوع ${subject}` : "";
+  return `ردیف ${issue.row}، ستون ${issue.columnCaptionFa}${subjectPart}: ${issue.messageFa}`;
 }
 
 export function columnMetaForKey(

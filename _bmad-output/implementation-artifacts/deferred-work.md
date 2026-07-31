@@ -723,3 +723,7 @@
 - Wire `selfcheck:sample-workbook` into design-qa / aggregate CI ? DoD ran standalone; orchestrate later if gate should own migration package checks
 - Catalogue selection `aria-pressed` / richer a11y ? Epic 8 interactive a11y ceiling is AST + gallery; expand when bulk wizard a11y DoD lands
 - `downloadSampleWorkbook` governed meta hard-codes `person.write` while DTO uses per-template `requiredPermission` ? revisit when a non-`person.write` template is registered
+
+## Deferred from: code review of 9-2-shared-bulk-entry-flow.md (2026-08-01)
+
+- Day-to-day selfcheck never exercises composed tRPC promote?commit failure/retry path ? domain selfcheck covers in-process commit; expand when integration/tRPC composition tests are added for migration

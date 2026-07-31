@@ -24,6 +24,7 @@ import {
   buildDomainComparisonRows,
   buildImportPreviewBatch,
   cancelImportPreviewBatch,
+  commitDayToDayBulk,
   confirmImportPreviewDraft,
   createReconciliationRun,
   executeImportBatch,
@@ -37,6 +38,7 @@ import {
   getStoredDraftForStaging,
   isLaunchImportTemplateKey,
   listReconciliationRuns,
+  mapCutoverCounts,
   parseImportFile,
   projectStagingBatchForViewer,
   promoteConfirmedDraftToStaging,
@@ -151,6 +153,54 @@ function filterEvidenceRecordIds(
     return { ...evidence, createdRecordIds: [] };
   }
   return { ...evidence, createdRecordIds: pop.subjectIds };
+}
+
+/**
+ * Keep created/updated honest to population-filtered evidence IDs.
+ * When IDs are omitted, scale outcome counts to the visible set (sum = visible).
+ */
+function countsAlignedToFilteredEvidence(
+  result: { created: number; updated: number; rejected: number },
+  rawEvidence: ImportBatchEvidence,
+  filteredEvidence: ImportBatchEvidence,
+  mode: "fixture-fail-closed" | "uuid-registry",
+): { created: number; updated: number; rejected: number } {
+  if (mode === "fixture-fail-closed") {
+    return {
+      created: result.created,
+      updated: result.updated,
+      rejected: result.rejected,
+    };
+  }
+  const fullLen = rawEvidence.createdRecordIds?.length ?? 0;
+  const visLen = filteredEvidence.createdRecordIds?.length ?? 0;
+  if (fullLen === visLen) {
+    return {
+      created: result.created,
+      updated: result.updated,
+      rejected: result.rejected,
+    };
+  }
+  if (visLen === 0) {
+    return { created: 0, updated: 0, rejected: result.rejected };
+  }
+  const fullOutcomes = result.created + result.updated;
+  if (fullOutcomes <= 0) {
+    return mapCutoverCounts({
+      createdPersonCount: 0,
+      recordIdsLength: visLen,
+      rejected: result.rejected,
+    });
+  }
+  const created = Math.min(
+    visLen,
+    Math.round((result.created / fullOutcomes) * visLen),
+  );
+  return {
+    created,
+    updated: visLen - created,
+    rejected: result.rejected,
+  };
 }
 
 function mapMigrationError(err: unknown): never {
@@ -277,6 +327,20 @@ export type MigrationExecuteResponse = {
   batch: StagingBatchRecord;
   evidence: ImportBatchEvidence;
   idempotentReplay: boolean;
+  populationAuthzMode: "fixture-fail-closed" | "uuid-registry";
+  populationDisclosureFa: string | null;
+};
+
+/** Story 9.2 — day-to-day bulk commit counts (no migration SoD). */
+export type MigrationDayToDayCommitResponse = {
+  batch: StagingBatchRecord;
+  evidence: ImportBatchEvidence;
+  idempotentReplay: boolean;
+  created: number;
+  updated: number;
+  rejected: number;
+  correlationId: string;
+  stagingBatchId: string;
   populationAuthzMode: "fixture-fail-closed" | "uuid-registry";
   populationDisclosureFa: string | null;
 };
@@ -676,8 +740,15 @@ export const migrationRouter = createTRPCRouter({
           registry: population.registry,
           mode: population.mode,
         });
+        const counts = countsAlignedToFilteredEvidence(
+          result,
+          result.evidence,
+          evidence,
+          population.mode,
+        );
         return {
           ...result,
+          ...counts,
           batch: projectBatchReveal(result.batch),
           evidence,
           populationAuthzMode: population.mode,
@@ -687,6 +758,128 @@ export const migrationRouter = createTRPCRouter({
         mapMigrationError(err);
       }
     }),
+
+  /**
+   * Story 9.2 — day-to-day bulk commit gated by template.requiredPermission only.
+   * Confirms draft + promotes staging + atomic cutover without migration SoD.
+   */
+  commitDayToDayBulk: governedProcedure
+    .meta({
+      permission: PERSON_WRITE_PERMISSION,
+      dataCategory: PERSON_DATA_CATEGORY,
+      action: "write",
+      organizationalScope: "org:selfcheck",
+      operation: "migration.commit_day_to_day_bulk",
+      sensitive: true,
+    })
+    .input(batchIdSchema)
+    .mutation(
+      async ({ ctx, input }): Promise<MigrationDayToDayCommitResponse> => {
+        let promotedStagingId: string | null = null;
+        try {
+          await assertActorHasPersonWrite(ctx.session.accountId);
+
+          const population = await resolvePersonnelPopulationRegistry();
+
+          // Freeze draft (idempotent) then promote — still not production until cutover.
+          confirmImportPreviewDraft(
+            input.previewBatchId,
+            ctx.session.accountId,
+          );
+          const stored = getStoredDraftForStaging(input.previewBatchId);
+          if (!stored) {
+            throw new MigrationError(
+              "STAGING_NOT_FOUND",
+              "پیش‌نویس برای ورود گروهی در دسترس نیست.",
+            );
+          }
+
+          const template = getLaunchImportTemplate(stored.batch.templateKey);
+          if (!template) {
+            throw new MigrationError(
+              "TEMPLATE_UNKNOWN",
+              MSG_TEMPLATE_INVALID_FA,
+            );
+          }
+          const mayCommit = await actorHoldsMigrationPermission(
+            ctx.session.accountId,
+            template.requiredPermission,
+          );
+          if (!mayCommit) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: accessRequirementFaFor(template.requiredPermission),
+            });
+          }
+
+          const staging = await promoteConfirmedDraftToStaging(
+            getMigrationPool(),
+            {
+              preview: stored.batch,
+              fullRows: stored.fullRows,
+              uploadedByAccountId: stored.createdByAccountId,
+              ownerDisplayName:
+                ctx.session.displayName || ctx.session.username,
+            },
+          );
+          promotedStagingId = staging.id;
+
+          const result = await commitDayToDayBulk(getMigrationPool(), {
+            batchId: staging.id,
+            actorAccountId: ctx.session.accountId,
+            actorDisplayName:
+              ctx.session.displayName || ctx.session.username,
+            permissionHolder: permissionHolder(ctx.session.accountId),
+          });
+
+          const evidence = filterEvidenceRecordIds(result.evidence, {
+            accountId: ctx.session.accountId,
+            organizationalScopeCodes: ctx.session.organizationalScopeCodes,
+            registry: population.registry,
+            mode: population.mode,
+          });
+          const counts = countsAlignedToFilteredEvidence(
+            result,
+            result.evidence,
+            evidence,
+            population.mode,
+          );
+
+          return {
+            batch: projectBatchReveal(result.batch),
+            evidence,
+            idempotentReplay: result.idempotentReplay,
+            created: counts.created,
+            updated: counts.updated,
+            rejected: counts.rejected,
+            correlationId: result.correlationId,
+            stagingBatchId: result.batch.id,
+            populationAuthzMode: population.mode,
+            populationDisclosureFa: population.disclosureFa,
+          };
+        } catch (err) {
+          // Best-effort: drop confirmed-draft staging left after promote-then-fail
+          // so leave/discard is not stuck with durable orphans (operators lack
+          // migration.rollback SoD). Failed cutovers already self-clean.
+          if (promotedStagingId) {
+            try {
+              const current = await getStagingBatch(
+                getMigrationPool(),
+                promotedStagingId,
+              );
+              if (current.status === "confirmed-draft") {
+                await rollbackImportStaging(getMigrationPool(), {
+                  batchId: promotedStagingId,
+                });
+              }
+            } catch {
+              // best-effort
+            }
+          }
+          mapMigrationError(err);
+        }
+      },
+    ),
 
   rollbackStaging: governedProcedure
     .meta({
