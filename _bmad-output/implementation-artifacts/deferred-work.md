@@ -1,3 +1,7 @@
+## Deferred from: code review of 8-7-row-action-affordance-dead-click-elimination.md (2026-07-31)
+
+- `Button` lacks `forwardRef` under Radix `asChild` Tooltip/Dropdown triggers ? pre-existing 8.1 Button; revisit if row-action/overflow focus bugs reproduce.
+
 ## Deferred from: code review of 8-6-governed-table-readability-upgrade.md (2026-07-31)
 
 - ResizeObserver ungarded if constructor missing in TruncatedCell layout effect ? modern client browsers assumed; add guard only if non-RO targets appear.

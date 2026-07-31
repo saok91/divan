@@ -23,7 +23,8 @@ import {
  * Esc = Stay (cancel leave). Pattern after authz-changed-modal.
  */
 export function LeaveGuardDialog() {
-  const { pending, dirtyEntries, resolvePending, busy } = useLeaveGuard();
+  const { pending, dirtyEntries, resolvePending, busy, saveBlockedReason } =
+    useLeaveGuard();
   const open = pending !== null;
 
   const stagingEntry = dirtyEntries.find((e) => e.kind === "import-staging");
@@ -45,6 +46,7 @@ export function LeaveGuardDialog() {
 
   const titleId = "leave-guard-title";
   const descId = "leave-guard-desc";
+  const blockedId = "leave-guard-save-blocked";
 
   return (
     <Dialog
@@ -56,7 +58,9 @@ export function LeaveGuardDialog() {
       <DialogContent
         showCloseButton={false}
         aria-labelledby={titleId}
-        aria-describedby={descId}
+        aria-describedby={
+          saveBlockedReason ? `${descId} ${blockedId}` : descId
+        }
         onEscapeKeyDown={(e) => {
           e.preventDefault();
           void resolvePending("stay");
@@ -72,8 +76,15 @@ export function LeaveGuardDialog() {
           <DialogDescription id={descId}>{body}</DialogDescription>
         </DialogHeader>
 
+        {saveBlockedReason ? (
+          <p id={blockedId} className="text-body text-destructive" role="status">
+            {saveBlockedReason}
+          </p>
+        ) : null}
+
         <DialogFooter className="gap-2 sm:justify-start">
           <Button
+            id="leave-guard-stay"
             type="button"
             variant="primary"
             disabled={busy}

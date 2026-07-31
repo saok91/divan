@@ -52,12 +52,14 @@ import {
 } from "@/components/personnel/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RowActionCluster } from "@/components/ui/row-action-overflow";
 import { usePlatformStatus } from "@/components/platform-status-provider";
 import {
   EVENT_TYPE_OPTIONS,
   formatChainLinksFa,
 } from "@/lib/personnel-event-timeline";
 import { api } from "@/lib/trpc/client";
+import { Ban, Pencil, Undo2 } from "lucide-react";
 
 type Conflict = {
   code: string;
@@ -2153,41 +2155,52 @@ export function PersonnelEventForm({
                         </p>
                       ) : null}
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                      {showCancel ? (
-                        <Button
-                          type="button"
-                          variant="rowAction"
-                          size="sm"
-                          disabled={isMutationBlockedByAuthzChange}
-                          onClick={() => openLifecycle("cancel", row.event.id)}
-                        >
-                          لغو
-                        </Button>
-                      ) : null}
-                      {showReverse ? (
-                        <Button
-                          type="button"
-                          variant="rowAction"
-                          size="sm"
-                          disabled={isMutationBlockedByAuthzChange}
-                          onClick={() => openLifecycle("reverse", row.event.id)}
-                        >
-                          بازگشت
-                        </Button>
-                      ) : null}
-                      {showCorrect ? (
-                        <Button
-                          type="button"
-                          variant="rowAction"
-                          size="sm"
-                          disabled={isMutationBlockedByAuthzChange}
-                          onClick={() => openLifecycle("correct", row.event.id)}
-                        >
-                          اصلاح
-                        </Button>
-                      ) : null}
-                    </div>
+                    <RowActionCluster
+                      actions={[
+                        ...(showCancel
+                          ? [
+                              {
+                                id: "cancel",
+                                label: "لغو",
+                                icon: Ban,
+                                disabled: isMutationBlockedByAuthzChange,
+                                disabledReason:
+                                  "تا تأیید تغییر دسترسی، این اقدام مسدود است.",
+                                onSelect: () =>
+                                  openLifecycle("cancel", row.event.id),
+                              },
+                            ]
+                          : []),
+                        ...(showReverse
+                          ? [
+                              {
+                                id: "reverse",
+                                label: "بازگشت",
+                                icon: Undo2,
+                                disabled: isMutationBlockedByAuthzChange,
+                                disabledReason:
+                                  "تا تأیید تغییر دسترسی، این اقدام مسدود است.",
+                                onSelect: () =>
+                                  openLifecycle("reverse", row.event.id),
+                              },
+                            ]
+                          : []),
+                        ...(showCorrect
+                          ? [
+                              {
+                                id: "correct",
+                                label: "اصلاح",
+                                icon: Pencil,
+                                disabled: isMutationBlockedByAuthzChange,
+                                disabledReason:
+                                  "تا تأیید تغییر دسترسی، این اقدام مسدود است.",
+                                onSelect: () =>
+                                  openLifecycle("correct", row.event.id),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
                   </li>
                 );
               })}

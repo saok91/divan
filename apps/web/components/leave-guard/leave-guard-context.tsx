@@ -27,6 +27,7 @@ export type LeaveGuardContextValue = {
    * Returns true if navigation may proceed.
    * When dirty, opens the leave dialog and resolves after Stay/Discard/Save.
    * On allow for href mode, performs router.push.
+   * A second call while the dialog is open replaces the waiter — never silent-fails.
    */
   requestNavigation: (href: string) => Promise<boolean>;
   dirtyEntries: readonly LeaveGuardRegistration[];
@@ -35,6 +36,8 @@ export type LeaveGuardContextValue = {
     action: "stay" | "discard" | "save",
   ) => Promise<void>;
   busy: boolean;
+  /** Explicit Persian reason when Save is blocked (never silent). */
+  saveBlockedReason: string | null;
 };
 
 export const LeaveGuardContext =

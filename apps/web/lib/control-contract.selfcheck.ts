@@ -324,12 +324,16 @@ for (const rel of mustNotGhost) {
   );
 }
 
-// org-flat drift: all row actions rowAction
+// org-flat drift: all row actions use shared icon-only primitive (8.7)
 {
   const src = read("components/organization/org-flat-job-ref-panel.tsx");
   const rowBlock = src.match(/rowActions\s*=\s*\{[\s\S]*?\n\s*\}/);
   assert.ok(rowBlock, "org-flat rowActions present");
-  assert.match(rowBlock[0], /variant="rowAction"/);
+  assert.match(
+    rowBlock[0],
+    /RowActionCluster|RowActionButton/,
+    "org-flat rowActions must use RowActionCluster/RowActionButton",
+  );
   assert.doesNotMatch(rowBlock[0], /variant="(ghost|outline|tertiary)"/);
 }
 

@@ -158,7 +158,7 @@ function TruncatedCell({
       <TooltipTrigger asChild>{trigger}</TooltipTrigger>
       <TooltipContent
         sideOffset={6}
-        className="max-w-[min(90vw,40rem)] whitespace-pre-wrap break-words rounded-sm bg-chrome px-2 py-1 text-caption text-chrome-foreground [&_svg]:bg-chrome [&_svg]:fill-chrome"
+        className="max-w-[min(90vw,40rem)] whitespace-pre-wrap break-words rounded-sm border border-border bg-popover px-2 py-1 text-[11px] font-normal leading-normal text-popover-foreground shadow-md [&_svg]:bg-popover [&_svg]:fill-popover"
       >
         {fullText}
       </TooltipContent>
@@ -369,6 +369,8 @@ export function GovernedDataTable<T>({
   pageSize = 25,
   toolbar,
   rowActions,
+  onRowClick,
+  rowActivateLabel = "باز کردن رکورد",
   exportSlot,
   emptyMessage,
   "aria-label": ariaLabel,
@@ -540,6 +542,7 @@ export function GovernedDataTable<T>({
   const onRowKeyDown = (
     event: React.KeyboardEvent<HTMLTableRowElement>,
     index: number,
+    row: T,
   ) => {
     if (event.target !== event.currentTarget) return;
     if (event.key === "ArrowDown") {
@@ -558,7 +561,32 @@ export function GovernedDataTable<T>({
         | HTMLElement
         | undefined;
       target?.focus();
+    } else if (
+      onRowClick &&
+      (event.key === "Enter" || event.key === " ") &&
+      event.target === event.currentTarget
+    ) {
+      event.preventDefault();
+      onRowClick(row);
     }
+  };
+
+  const activateRowFromPointer = (event: React.MouseEvent, row: T) => {
+    if (!onRowClick) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (
+      target.closest(
+        "a,button,input,textarea,select,[role='menuitem'],[role='menu'],[data-slot='dropdown-menu-content']",
+      )
+    ) {
+      return;
+    }
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      return;
+    }
+    onRowClick(row);
   };
 
   const totalPages = snapshot.pageCount;
@@ -625,6 +653,9 @@ export function GovernedDataTable<T>({
                     className={cn(
                       "h-table-header-height min-h-[var(--table-header-height)] whitespace-nowrap bg-surface-subtle text-column-header",
                       stickyHeadClass(column.sticky, horizontallyScrolled),
+                      (column.sticky === "actions" ||
+                        column.id === "__actions") &&
+                        "w-[1%]",
                       headMax,
                       headMax && "truncate",
                     )}
@@ -733,12 +764,21 @@ export function GovernedDataTable<T>({
                       focusedRowIndex === index ? "true" : undefined
                     }
                     data-density={density}
+                    aria-description={onRowClick ? rowActivateLabel : undefined}
                     className={cn(
                       "group outline-none focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                       rowHeightClass,
+                      onRowClick && "cursor-pointer hover:bg-muted/40",
                     )}
                     onFocus={() => setFocusedRowIndex(index)}
-                    onKeyDown={(e) => onRowKeyDown(e, index)}
+                    onClick={
+                      onRowClick
+                        ? (event) => {
+                            activateRowFromPointer(event, row);
+                          }
+                        : undefined
+                    }
+                    onKeyDown={(e) => onRowKeyDown(e, index, row)}
                   >
                     {displayColumns.map((column) => (
                       <TableCell
@@ -750,10 +790,22 @@ export function GovernedDataTable<T>({
                             column.sticky,
                             horizontallyScrolled,
                           ),
+                          column.sticky === "actions" ||
+                            column.id === "__actions"
+                            ? "w-[1%] whitespace-nowrap"
+                            : undefined,
                           column.cellOverflow === "wrap"
                             ? "whitespace-normal align-top"
                             : undefined,
                         )}
+                        onClick={
+                          column.id === "__actions" ||
+                          column.sticky === "actions"
+                            ? (event) => {
+                                event.stopPropagation();
+                              }
+                            : undefined
+                        }
                       >
                         {renderCellContent(column, row)}
                       </TableCell>

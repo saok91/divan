@@ -33,6 +33,17 @@ export type GovernedDataTableProps<T> = {
   pageSize?: number;
   toolbar?: React.ReactNode;
   rowActions?: (row: T) => React.ReactNode;
+  /**
+   * Optional row activate — opens the record (click / Enter / Space when the
+   * row itself is focused). Row actions must stopPropagation so they never
+   * trigger this as a side effect. Additive; omit when there is no record-open.
+   */
+  onRowClick?: (row: T) => void;
+  /**
+   * Accessible description for row activate when `onRowClick` is set.
+   * Default: «باز کردن رکورد».
+   */
+  rowActivateLabel?: string;
   exportSlot?: React.ReactNode;
   /** Override empty-state copy (default: operationalCopy.emptySearch). */
   emptyMessage?: string;

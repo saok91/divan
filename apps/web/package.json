@@ -28,7 +28,9 @@
     "selfcheck:evaluation-snapshot": "tsx src/server/evaluation-snapshot.selfcheck.ts",
     "selfcheck:control-contract": "tsx lib/control-contract.selfcheck.ts",
     "selfcheck:layout-system": "tsx lib/layout-system.selfcheck.ts",
-    "selfcheck:entity-picker": "tsx lib/entity-picker.selfcheck.ts"
+    "selfcheck:entity-picker": "tsx lib/entity-picker.selfcheck.ts",
+    "selfcheck:leave-guard": "tsx components/leave-guard/leave-guard-algorithm.selfcheck.ts",
+    "selfcheck:row-actions": "tsx lib/row-actions.selfcheck.ts"
   },
   "dependencies": {
     "@divan/audit-envelope": "workspace:*",

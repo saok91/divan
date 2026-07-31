@@ -19,7 +19,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RowActionCluster } from "@/components/ui/row-action-overflow";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Ban, CircleCheck, Pencil } from "lucide-react";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -405,44 +407,40 @@ export function OrgFlatJobRefPanel({ concept }: { concept: FlatJobRefConcept }) 
             </Button>
           }
           rowActions={(row) => (
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                variant="rowAction"
-                size="xs"
-                onClick={() => openEdit(row)}
-              >
-                ویرایش
-              </Button>
-              {row.active ? (
-                <Button
-                  type="button"
-                  variant="rowAction"
-                  size="xs"
-                  disabled={busyId === row.id}
-                  onClick={() => openDeactivate(row)}
-                >
-                  غیرفعال‌سازی
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="rowAction"
-                  size="xs"
-                  disabled={busyId === row.id}
-                  onClick={() => {
-                    setFormError(null);
-                    if (concept === "role")
-                      activateRole.mutate({ id: row.id });
-                    else if (concept === "jobTitle")
-                      activateJobTitle.mutate({ id: row.id });
-                    else activateSeniority.mutate({ id: row.id });
-                  }}
-                >
-                  فعال‌سازی
-                </Button>
-              )}
-            </div>
+            <RowActionCluster
+              actions={[
+                {
+                  id: "edit",
+                  label: "ویرایش",
+                  icon: Pencil,
+                  onSelect: () => openEdit(row),
+                },
+                row.active
+                  ? {
+                      id: "deactivate",
+                      label: "غیرفعال‌سازی",
+                      icon: Ban,
+                      disabled: busyId === row.id,
+                      disabledReason: "در حال انجام عملیات…",
+                      onSelect: () => openDeactivate(row),
+                    }
+                  : {
+                      id: "activate",
+                      label: "فعال‌سازی",
+                      icon: CircleCheck,
+                      disabled: busyId === row.id,
+                      disabledReason: "در حال انجام عملیات…",
+                      onSelect: () => {
+                        setFormError(null);
+                        if (concept === "role")
+                          activateRole.mutate({ id: row.id });
+                        else if (concept === "jobTitle")
+                          activateJobTitle.mutate({ id: row.id });
+                        else activateSeniority.mutate({ id: row.id });
+                      },
+                    },
+              ]}
+            />
           )}
         />
       )}

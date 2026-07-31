@@ -5,7 +5,9 @@ import * as React from "react";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RowActionButton } from "@/components/ui/row-action-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Ban } from "lucide-react";
 import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -344,15 +346,13 @@ export function HeadcountApprovalPanel() {
                     </Button>
                   ) : null}
                   {row.status === "draft" || row.status === "active" ? (
-                    <Button
-                      type="button"
-                      variant="rowAction"
-                      size="sm"
+                    <RowActionButton
+                      label="لغو"
+                      icon={Ban}
                       disabled={busyId === row.id}
+                      disabledReason="در حال انجام عملیات…"
                       onClick={() => void runAction(row.id, "cancel")}
-                    >
-                      لغو
-                    </Button>
+                    />
                   ) : null}
                 </div>
               </li>

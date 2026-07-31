@@ -5,6 +5,7 @@ import { useId, useMemo, useState } from "react";
 import { JalaliDateTimePicker } from "@/components/jalali-date-picker";
 import { useLeaveGuardRegistration } from "@/components/leave-guard";
 import { Button } from "@/components/ui/button";
+import { RowActionButton } from "@/components/ui/row-action-button";
 import {
   formatJalaliDateTimeFromIso,
   gregorianDateTimePartsToIso,
@@ -13,6 +14,7 @@ import {
 import { operationalCopy } from "@/lib/operational-copy";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+import { RefreshCw } from "lucide-react";
 
 type GrantKind =
   | "sensitive"
@@ -364,10 +366,11 @@ export function EntitlementGrantsPanel({
                     </Button>
                   ) : null}
                   {canRecert ? (
-                    <Button
-                      type="button"
-                      variant="rowAction"
+                    <RowActionButton
+                      label="بازتأیید"
+                      icon={RefreshCw}
                       disabled={recertifyGrant.isPending}
+                      disabledReason="در حال انجام عملیات…"
                       onClick={() => {
                         setActionError(null);
                         setStatusNote(null);
@@ -376,9 +379,7 @@ export function EntitlementGrantsPanel({
                           { onError: captureError },
                         );
                       }}
-                    >
-                      بازتأیید
-                    </Button>
+                    />
                   ) : null}
                 </div>
               </li>

@@ -13,7 +13,9 @@ import {
   type ReportFilterState,
 } from "@/components/reports/report-filters";
 import { Button } from "@/components/ui/button";
+import { RowActionButton } from "@/components/ui/row-action-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FileSearch } from "lucide-react";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -323,14 +325,11 @@ export function ReportCataloguePanel() {
               tableRows.some((r) => r.href)
                 ? (row) =>
                     row.href ? (
-                      <Button
-                        type="button"
-                        variant="rowAction"
-                        size="xs"
+                      <RowActionButton
+                        label="مشاهده"
+                        icon={FileSearch}
                         onClick={() => openHref(row.href!)}
-                      >
-                        مشاهده
-                      </Button>
+                      />
                     ) : null
                 : undefined
             }

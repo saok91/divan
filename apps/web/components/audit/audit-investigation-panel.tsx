@@ -33,6 +33,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RowActionButton } from "@/components/ui/row-action-button";
+import { Eye } from "lucide-react";
 import { formatJalaliDateTimeFromIso, gregorianDateTimePartsToIso } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
@@ -804,19 +806,16 @@ export function AuditInvestigationPanel() {
           pageSize={25}
           emptyMessage={tableEmptyMessage}
           rowActions={(row) => (
-            <Button
-              type="button"
-              variant="rowAction"
-              size="xs"
+            <RowActionButton
+              label="جزئیات"
+              icon={Eye}
               onClick={() => {
                 setDetail(row);
                 setArtifactError(null);
                 setCustodyAck(false);
                 setRecipient("");
               }}
-            >
-              جزئیات
-            </Button>
+            />
           )}
         />
 

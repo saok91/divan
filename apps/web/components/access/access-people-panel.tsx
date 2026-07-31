@@ -29,6 +29,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RowActionCluster } from "@/components/ui/row-action-overflow";
+import { CircleCheck, MapPinned, Shield } from "lucide-react";
 import { operationalCopy } from "@/lib/operational-copy";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -305,42 +307,41 @@ export function AccessPeoplePanel() {
                 </p>
               }
               rowActions={(row) => (
-                <div className="flex flex-wrap items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="rowAction"
-                    size="xs"
-                    onClick={() => openRolesDialog(row)}
-                  >
-                    تخصیص نقش
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="rowAction"
-                    size="xs"
-                    onClick={() => openScopesDialog(row)}
-                  >
-                    محدوده
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="rowAction"
-                    size="xs"
-                    disabled={
-                      setStatus.isPending || row.status === "active"
-                    }
-                    onClick={() => {
-                      selectAccount(row);
-                      setActionError(null);
-                      setStatus.mutate(
-                        { accountId: row.accountId, status: "active" },
-                        { onError: captureError },
-                      );
-                    }}
-                  >
-                    فعال‌سازی
-                  </Button>
-                </div>
+                <RowActionCluster
+                  actions={[
+                    {
+                      id: "roles",
+                      label: "تخصیص نقش",
+                      icon: Shield,
+                      onSelect: () => openRolesDialog(row),
+                    },
+                    {
+                      id: "scopes",
+                      label: "محدوده",
+                      icon: MapPinned,
+                      onSelect: () => openScopesDialog(row),
+                    },
+                    {
+                      id: "activate",
+                      label: "فعال‌سازی",
+                      icon: CircleCheck,
+                      disabled:
+                        setStatus.isPending || row.status === "active",
+                      disabledReason:
+                        row.status === "active"
+                          ? "این حساب از قبل فعال است."
+                          : "در حال انجام عملیات…",
+                      onSelect: () => {
+                        selectAccount(row);
+                        setActionError(null);
+                        setStatus.mutate(
+                          { accountId: row.accountId, status: "active" },
+                          { onError: captureError },
+                        );
+                      },
+                    },
+                  ]}
+                />
               )}
             />
         </div>

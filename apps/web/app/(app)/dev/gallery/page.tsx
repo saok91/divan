@@ -2,13 +2,19 @@
 
 import { notFound } from "next/navigation";
 import {
+  CalendarPlus,
+  CircleCheck,
   Copy,
   Ellipsis,
   ExternalLink,
+  Eye,
+  FileSearch,
   ListFilter,
+  MapPinned,
   Pencil,
   Plus,
   Search,
+  Shield,
   Trash2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -28,6 +34,8 @@ import { PageHeader } from "@/components/page-header";
 import { SectionTabs } from "@/components/section-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RowActionButton } from "@/components/ui/row-action-button";
+import { RowActionCluster } from "@/components/ui/row-action-overflow";
 
 import { EntityPickerGalleryDemos } from "./entity-picker-demos";
 
@@ -108,12 +116,53 @@ export default function DevGalleryPage() {
           <Button variant="primary">Primary</Button>
           <Button variant="secondary">Secondary</Button>
           <Button variant="tertiary">Tertiary</Button>
-          <Button variant="rowAction" size="xs">
-            Row
-          </Button>
+          <RowActionButton
+            label="ویرایش"
+            icon={Pencil}
+            onClick={() => undefined}
+          />
           <Button variant="destructive">Destructive</Button>
           <Button variant="ghost">Ghost</Button>
           <Button variant="link">Link</Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-caption text-text-tertiary w-full">
+            Row actions — icon-only + tooltip; overflow when &gt;2
+          </p>
+          <RowActionCluster
+            actions={[
+              {
+                id: "edit",
+                label: "اطلاعات کامل/ویرایش",
+                icon: Pencil,
+                onSelect: () => undefined,
+              },
+              {
+                id: "register",
+                label: "ثبت رویداد",
+                icon: CalendarPlus,
+                onSelect: () => undefined,
+              },
+              {
+                id: "roles",
+                label: "تخصیص نقش",
+                icon: Shield,
+                onSelect: () => undefined,
+              },
+              {
+                id: "scopes",
+                label: "محدوده",
+                icon: MapPinned,
+                onSelect: () => undefined,
+              },
+              {
+                id: "activate",
+                label: "فعال‌سازی",
+                icon: CircleCheck,
+                onSelect: () => undefined,
+              },
+            ]}
+          />
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
@@ -159,7 +208,7 @@ export default function DevGalleryPage() {
 
       <section className="space-y-3 px-content-padding-inline" aria-labelledby="gallery-icons">
         <h2 id="gallery-icons" className="text-heading-sm">
-          Icons (starter map)
+          Icons (canonical map 8.7)
         </h2>
         <p className="text-caption text-text-secondary">
           See{" "}
@@ -167,6 +216,12 @@ export default function DevGalleryPage() {
         </p>
         <div className="flex flex-wrap gap-4 text-text-secondary">
           <Pencil className="size-3" aria-label="edit" />
+          <CalendarPlus className="size-3" aria-label="register-event" />
+          <Shield className="size-3" aria-label="roles" />
+          <MapPinned className="size-3" aria-label="scopes" />
+          <CircleCheck className="size-3" aria-label="activate" />
+          <Eye className="size-3" aria-label="details" />
+          <FileSearch className="size-3" aria-label="view-report" />
           <Trash2 className="size-3" aria-label="delete" />
           <Plus className="size-4" aria-label="add" />
           <ListFilter className="size-4" aria-label="filter" />

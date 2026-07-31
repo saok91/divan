@@ -1,6 +1,6 @@
-# Icon contract (Story 8.2)
+# Icon contract (Story 8.2 + 8.7)
 
-Living reference for chrome + gallery. Full table row-action icon-only retrofit is **Story 8.7**.
+Living reference for chrome, gallery, and **canonical row-action** icons.
 
 ## Library
 
@@ -11,7 +11,7 @@ Living reference for chrome + gallery. Full table row-action icon-only retrofit 
 
 | Context | Size | Notes |
 | --- | --- | --- |
-| Row action | **12px** | `size-3` / `h-3 w-3` inside `rowAction` Button (`--control-height-xs`) |
+| Row action | **12px** | `size-3` / `h-3 w-3` inside `RowActionButton` (`--control-height-xs`) |
 | Toolbar / filter chrome | **16px** | `size-4` (existing default on Button `[&_svg]:size-4`) |
 | Nav / sidebar | **16–20px** | Keep existing call-site sizes |
 
@@ -20,21 +20,42 @@ Living reference for chrome + gallery. Full table row-action icon-only retrofit 
 - Use Lucide **default stroke** (outline).
 - Do not mix filled and outline randomly for the same action family.
 
-## Starter per-action map (chrome / gallery)
+## Canonical per-action map (Story 8.7)
 
-| Action | Lucide export | Typical size |
+Same Persian action ⇒ same Lucide export on every surface.
+
+| Action (Persian label) | Lucide export | Notes |
 | --- | --- | --- |
-| Edit | `Pencil` | 12px row / 16px toolbar |
-| Delete / destructive | `Trash2` | 12px row |
-| Add | `Plus` | 16px toolbar |
-| Filter | `ListFilter` | 16px toolbar |
-| More / overflow | `Ellipsis` | 12–16px |
-| Copy | `Copy` | 12px (identifier disclosure) |
-| External | `ExternalLink` | 12–16px |
-| Search | `Search` | 16px (picker / command) |
+| اطلاعات کامل/ویرایش | `Pencil` | Personnel primary open/edit |
+| ویرایش | `Pencil` | Org refs / generic edit |
+| ثبت رویداد | `CalendarPlus` | Personnel register event |
+| تخصیص نقش | `Shield` | Access |
+| محدوده | `MapPinned` | Access scopes |
+| فعال‌سازی | `CircleCheck` | Access / org activate |
+| غیرفعال‌سازی | `Ban` | Org deactivate |
+| جزئیات | `Eye` | Audit / correction |
+| مشاهده | `FileSearch` | Report open |
+| اقدامات بیشتر (overflow) | `Ellipsis` | Mandatory overflow trigger |
+| حذف / مخرب | `Trash2` | Destructive still confirms via existing dialogs |
+| لغو (lifecycle / revoke) | `Ban` | Event cancel / exemption revoke |
+| بازگشت (lifecycle) | `Undo2` | Event reverse |
+| اصلاح (lifecycle) | `Pencil` | Event correct |
+| دریافت | `Download` | Correction attachment |
+| پیش‌نمایش | `Eye` | Correction attachment preview |
+| بازتأیید | `RefreshCw` | Entitlement recert |
+| افزودن | `Plus` | Toolbar |
+| فیلتر | `ListFilter` | Toolbar |
+| کپی | `Copy` | Identifier disclosure |
+| پیوند خارجی | `ExternalLink` | External open |
+| جستجو | `Search` | Picker / command |
 
-## Non-goals (→ 8.7)
+## Primitives
 
-- Full per-row icon-only mapping across GovernedDataTable
-- Overflow menu standardization
-- Inert-action / dead-click selfcheck
+- `RowActionButton` — icon-only `rowAction` + required `aria-label` + tooltip (hover **and** focus)
+- `RowActionCluster` / `RowActionOverflow` — at most **two** visible icons; #3+ in labelled overflow
+
+## Non-goals (other stories)
+
+- Skeletons / toast / motion → **8.8**
+- Glossary / banner rewrite → **8.9**
+- Design QA gate → **8.10**

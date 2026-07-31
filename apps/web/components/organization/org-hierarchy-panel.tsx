@@ -18,7 +18,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RowActionButton } from "@/components/ui/row-action-button";
+import { RowActionCluster } from "@/components/ui/row-action-overflow";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Ban, CircleCheck, Pencil } from "lucide-react";
 import {
   formatGregorianDateOnly,
   formatJalaliDisplayFromGregorian,
@@ -434,37 +437,34 @@ export function OrgHierarchyPanel() {
             </Button>
           }
           renderRowEnd={(node) => (
-            <>
-              {node.active ? (
-                <Button
-                  type="button"
-                  variant="rowAction"
-                  size="xs"
-                  disabled={busyId === node.id}
-                  onClick={() => openDeactivate(node)}
-                >
-                  غیرفعال‌سازی
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="rowAction"
-                  size="xs"
-                  disabled={busyId === node.id}
-                  onClick={() => activateMutation.mutate({ id: node.id })}
-                >
-                  فعال‌سازی
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="rowAction"
-                size="xs"
-                onClick={() => openEdit(node)}
-              >
-                ویرایش
-              </Button>
-            </>
+            <RowActionCluster
+              actions={[
+                node.active
+                  ? {
+                      id: "deactivate",
+                      label: "غیرفعال‌سازی",
+                      icon: Ban,
+                      disabled: busyId === node.id,
+                      disabledReason: "در حال انجام عملیات…",
+                      onSelect: () => openDeactivate(node),
+                    }
+                  : {
+                      id: "activate",
+                      label: "فعال‌سازی",
+                      icon: CircleCheck,
+                      disabled: busyId === node.id,
+                      disabledReason: "در حال انجام عملیات…",
+                      onSelect: () =>
+                        activateMutation.mutate({ id: node.id }),
+                    },
+                {
+                  id: "edit",
+                  label: "ویرایش",
+                  icon: Pencil,
+                  onSelect: () => openEdit(node),
+                },
+              ]}
+            />
           )}
         />
       )}
@@ -484,15 +484,13 @@ export function OrgHierarchyPanel() {
                   {u.nameFa} · {UNIT_TYPE_LABEL_FA[u.unitType as UnitType]} ·{" "}
                   {toPersianDigits(u.code)}
                 </span>
-                <Button
-                  type="button"
-                  variant="rowAction"
-                  size="xs"
+                <RowActionButton
+                  label="فعال‌سازی"
+                  icon={CircleCheck}
                   disabled={busyId === u.id}
+                  disabledReason="در حال انجام عملیات…"
                   onClick={() => activateMutation.mutate({ id: u.id })}
-                >
-                  فعال‌سازی
-                </Button>
+                />
               </li>
             ))}
           </ul>

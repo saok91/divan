@@ -28,7 +28,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RowActionButton } from "@/components/ui/row-action-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Download, Eye } from "lucide-react";
 import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
@@ -566,14 +568,11 @@ export function CorrectionCasesPanel() {
           pageSize={25}
           emptyMessage={operationalCopy.correctionCaseEmpty}
           rowActions={(r) => (
-            <Button
-              type="button"
-              variant="rowAction"
-              size="xs"
+            <RowActionButton
+              label={operationalCopy.correctionCaseDetail}
+              icon={Eye}
               onClick={() => setSelectedId(r.id)}
-            >
-              {operationalCopy.correctionCaseDetail}
-            </Button>
+            />
           )}
         />
       )}
@@ -758,26 +757,20 @@ export function CorrectionCasesPanel() {
                       </span>
                       {a.inspectionStatus === "allowed" ? (
                         <>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="rowAction"
+                          <RowActionButton
+                            label={operationalCopy.correctionCaseDownload}
+                            icon={Download}
                             onClick={() =>
                               void downloadAttachment(a.id, "download")
                             }
-                          >
-                            {operationalCopy.correctionCaseDownload}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="rowAction"
+                          />
+                          <RowActionButton
+                            label={operationalCopy.correctionCasePreview}
+                            icon={Eye}
                             onClick={() =>
                               void downloadAttachment(a.id, "preview")
                             }
-                          >
-                            {operationalCopy.correctionCasePreview}
-                          </Button>
+                          />
                         </>
                       ) : null}
                     </li>

@@ -18,7 +18,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RowActionCluster } from "@/components/ui/row-action-overflow";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Ban, CircleCheck, Pencil } from "lucide-react";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -555,43 +557,39 @@ export function OrgLadderGradePanel() {
             </>
           }
           renderRowEnd={(node) => (
-            <>
-              {node.active ? (
-                <Button
-                  type="button"
-                  variant="rowAction"
-                  size="xs"
-                  disabled={busyId === node.id}
-                  onClick={() => void openDeactivate(node)}
-                >
-                  غیرفعال‌سازی
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="rowAction"
-                  size="xs"
-                  disabled={busyId === node.id}
-                  onClick={() => {
-                    if (node.kind === "ladder") {
-                      activateLadder.mutate({ id: node.id });
-                    } else {
-                      activateGrade.mutate({ id: node.id });
+            <RowActionCluster
+              actions={[
+                node.active
+                  ? {
+                      id: "deactivate",
+                      label: "غیرفعال‌سازی",
+                      icon: Ban,
+                      disabled: busyId === node.id,
+                      disabledReason: "در حال انجام عملیات…",
+                      onSelect: () => void openDeactivate(node),
                     }
-                  }}
-                >
-                  فعال‌سازی
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="rowAction"
-                size="xs"
-                onClick={() => openEdit(node)}
-              >
-                ویرایش
-              </Button>
-            </>
+                  : {
+                      id: "activate",
+                      label: "فعال‌سازی",
+                      icon: CircleCheck,
+                      disabled: busyId === node.id,
+                      disabledReason: "در حال انجام عملیات…",
+                      onSelect: () => {
+                        if (node.kind === "ladder") {
+                          activateLadder.mutate({ id: node.id });
+                        } else {
+                          activateGrade.mutate({ id: node.id });
+                        }
+                      },
+                    },
+                {
+                  id: "edit",
+                  label: "ویرایش",
+                  icon: Pencil,
+                  onSelect: () => openEdit(node),
+                },
+              ]}
+            />
           )}
         />
         </div>

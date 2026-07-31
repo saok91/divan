@@ -13,7 +13,9 @@ import {
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RowActionButton } from "@/components/ui/row-action-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Ban } from "lucide-react";
 import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -337,18 +339,16 @@ export function HeadcountExemptionPanel() {
                   </Button>
                 ) : null}
                 {row.status === "draft" || row.status === "active" ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="rowAction"
+                  <RowActionButton
+                    label="لغو"
+                    icon={Ban}
                     disabled={busyId === row.id}
+                    disabledReason="در حال انجام عملیات…"
                     onClick={() => {
                       setBusyId(row.id);
                       revokeMutation.mutate({ id: row.id });
                     }}
-                  >
-                    لغو
-                  </Button>
+                  />
                 ) : null}
               </div>
             </li>

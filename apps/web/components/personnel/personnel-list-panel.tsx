@@ -14,6 +14,8 @@ import type { PersonnelListRow } from "@/components/personnel/personnel-list-typ
 import { PersonnelQuickCreateDialog } from "@/components/personnel/personnel-quick-create-dialog";
 import { PersonnelQuickEditModal } from "@/components/personnel/personnel-quick-edit-modal";
 import { Button } from "@/components/ui/button";
+import { RowActionCluster } from "@/components/ui/row-action-overflow";
+import { CalendarPlus, Pencil } from "lucide-react";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -342,25 +344,24 @@ export function PersonnelListPanel() {
             ) : undefined
           }
           rowActions={(row) => (
-            <div className="flex flex-wrap items-center gap-1">
-              <Button
-                type="button"
-                variant="rowAction"
-                size="xs"
-                onClick={() => openEdit(row)}
-              >
-                اطلاعات کامل/ویرایش
-              </Button>
-              <Button
-                type="button"
-                variant="rowAction"
-                size="xs"
-                onClick={() => navigateRegister(row.id)}
-              >
-                ثبت رویداد
-              </Button>
-            </div>
+            <RowActionCluster
+              actions={[
+                {
+                  id: "edit",
+                  label: "اطلاعات کامل/ویرایش",
+                  icon: Pencil,
+                  onSelect: () => openEdit(row),
+                },
+                {
+                  id: "register",
+                  label: "ثبت رویداد",
+                  icon: CalendarPlus,
+                  onSelect: () => navigateRegister(row.id),
+                },
+              ]}
+            />
           )}
+          onRowClick={(row) => openEdit(row)}
         />
 
       {!suppressed && totalInSnapshot != null && totalInSnapshot > pageSize ? (

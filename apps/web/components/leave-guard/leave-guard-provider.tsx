@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 
 import { LeaveGuardDialog } from "@/components/leave-guard/leave-guard-dialog";
 import {
+  decideRequestNavigation,
+  decideSaveGate,
+} from "@/components/leave-guard/leave-guard-algorithm";
+import {
   LeaveGuardContext,
   type LeaveGuardContextValue,
   type LeaveGuardRegistration,
@@ -27,6 +31,11 @@ function isLeaveGuardState(state: unknown): boolean {
 /**
  * Shell-level dirty registry + Persian leave dialog (ماندن · دور انداختن · ذخیره).
  * Theme toggle and sidebar collapse must never call requestNavigation.
+ *
+ * Leave-guard honesty (Story 8.7):
+ * - Second requestNavigation while pending → replace waiter + keep dialog visible
+ *   (previous waiter resolves false; operator still sees LeaveGuardDialog).
+ * - Save when some dirty entries lack onSave → keep dialog + explicit Persian reason.
  */
 export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
   const router = useRouter();
@@ -35,6 +44,9 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
   >(() => new Map());
   const [pending, setPending] = React.useState<PendingNavigation | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [saveBlockedReason, setSaveBlockedReason] = React.useState<
+    string | null
+  >(null);
   const pendingRef = React.useRef<PendingNavigation | null>(null);
   const busyRef = React.useRef(false);
   const historyTrapArmed = React.useRef(false);
@@ -81,6 +93,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
   const openPending = React.useCallback((nav: PendingNavigation) => {
     pendingRef.current = nav;
     setPending(nav);
+    setSaveBlockedReason(null);
   }, []);
 
   const markClean = React.useCallback((dirty: LeaveGuardRegistration[]) => {
@@ -112,23 +125,65 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
     [router],
   );
 
+  const focusLeaveDialog = React.useCallback(() => {
+    // Keep dialog visible and move focus to the Stay CTA after paint
+    // (dialog may not be mounted yet on the same turn as openPending).
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.getElementById("leave-guard-stay")?.focus();
+      });
+    });
+  }, []);
+
+  const clearPendingAndNavigate = React.useCallback(
+    (href: string): Promise<boolean> => {
+      const previous = pendingRef.current;
+      if (previous) {
+        previous.resolve(true);
+        pendingRef.current = null;
+        setPending(null);
+        setSaveBlockedReason(null);
+      }
+      router.push(href);
+      return Promise.resolve(true);
+    },
+    [router],
+  );
+
   const requestNavigation = React.useCallback(
     (href: string): Promise<boolean> => {
       const dirty = [...registrationsLive.current.values()].filter(
         (e) => e.isDirty,
       );
-      if (dirty.length === 0) {
+      const decision = decideRequestNavigation({
+        dirtyCount: dirty.length,
+        hasPending: pendingRef.current !== null,
+      });
+
+      if (decision.kind === "navigate-clean") {
         router.push(href);
         return Promise.resolve(true);
       }
-      if (pendingRef.current) {
-        return Promise.resolve(false);
+
+      if (decision.kind === "clear-pending-and-navigate") {
+        return clearPendingAndNavigate(href);
       }
+
+      if (decision.kind === "replace-waiter") {
+        const previous = pendingRef.current!;
+        // Previous waiter already saw the dialog; resolve it without hiding UI.
+        previous.resolve(false);
+        return new Promise<boolean>((resolve) => {
+          openPending({ href, mode: "push", resolve });
+          focusLeaveDialog();
+        });
+      }
+
       return new Promise<boolean>((resolve) => {
         openPending({ href, mode: "push", resolve });
       });
     },
-    [openPending, router],
+    [clearPendingAndNavigate, focusLeaveDialog, openPending, router],
   );
 
   const resolvePending = React.useCallback(
@@ -140,6 +195,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
         current.resolve(false);
         pendingRef.current = null;
         setPending(null);
+        setSaveBlockedReason(null);
         return;
       }
 
@@ -155,17 +211,24 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
         current.resolve(true);
         pendingRef.current = null;
         setPending(null);
+        setSaveBlockedReason(null);
         proceedNavigation(current);
         return;
       }
 
       // Save: every dirty entry must expose onSave (dialog gates this; defend here too).
-      if (dirty.some((e) => !e.onSave)) {
+      const saveGate = decideSaveGate({
+        everyDirtyHasOnSave: dirty.every((e) => typeof e.onSave === "function"),
+      });
+      if (saveGate.kind === "blocked-no-save") {
+        setSaveBlockedReason(saveGate.reason);
+        focusLeaveDialog();
         return;
       }
 
       busyRef.current = true;
       setBusy(true);
+      setSaveBlockedReason(null);
       try {
         for (const entry of dirty) {
           const ok = await entry.onSave!();
@@ -186,7 +249,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
         setBusy(false);
       }
     },
-    [markClean, proceedNavigation],
+    [focusLeaveDialog, markClean, proceedNavigation],
   );
 
   React.useEffect(() => {
@@ -251,6 +314,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
       pending,
       resolvePending,
       busy,
+      saveBlockedReason,
     }),
     [
       upsert,
@@ -261,6 +325,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
       pending,
       resolvePending,
       busy,
+      saveBlockedReason,
     ],
   );
 
