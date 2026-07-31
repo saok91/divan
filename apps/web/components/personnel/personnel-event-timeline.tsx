@@ -30,13 +30,24 @@ type PersonnelEventTimelineProps = {
 function TimelineSkeleton() {
   return (
     <div
-      className="space-y-4"
+      className="space-y-3"
       aria-busy="true"
       aria-label="در حال بارگذاری گاه‌شمار"
+      data-slot="timeline-skeleton"
     >
-      <Skeleton className="h-16 w-full" />
-      <Skeleton className="h-16 w-full" />
-      <Skeleton className="h-16 w-full" />
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex gap-3 border-b border-hairline pb-3 last:border-b-0"
+        >
+          <Skeleton className="mt-1 size-3 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

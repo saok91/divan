@@ -42,6 +42,7 @@ import {
 } from "./snapshot";
 import type { GovernedColumn, GovernedDataTableProps, TableDensity } from "./types";
 import { GOVERNED_TABLE_DEFAULT_DENSITY } from "./types";
+import { TableSkeleton } from "./table-skeleton";
 import { useGovernedTableSnapshot } from "./use-governed-table-snapshot";
 
 const DEFAULT_MAX_WIDTH = "max-w-[16rem]";
@@ -199,11 +200,13 @@ function EnumMultiFilter({
   options,
   selected,
   onChange,
+  disabled = false,
 }: {
   columnHeader: string;
   options: { value: string; label: string }[];
   selected: string[];
   onChange: (next: string[]) => void;
+  disabled?: boolean;
 }) {
   const optionsKey = options.map((o) => o.value).join("\0");
   const selectedKey = selected.join("\0");
@@ -231,6 +234,7 @@ function EnumMultiFilter({
           size="sm"
           className="h-filter-row-height min-h-[var(--filter-row-height)] w-full justify-between px-2 text-caption font-normal"
           aria-label={`فیلتر ${columnHeader}`}
+          disabled={disabled}
         >
           <span className="truncate">{label}</span>
           <ChevronDownIcon className="size-3.5 shrink-0 opacity-60" />
@@ -277,12 +281,14 @@ function TableChromeControls<T>({
   hiddenColumnIds,
   onDensityChange,
   onHiddenChange,
+  disabled = false,
 }: {
   columns: GovernedColumn<T>[];
   density: TableDensity;
   hiddenColumnIds: string[];
   onDensityChange: (next: TableDensity) => void;
   onHiddenChange: (next: string[]) => void;
+  disabled?: boolean;
 }) {
   const hideable = columns.filter((c) => isColumnHideable(c));
   const hiddenSet = new Set(hiddenColumnIds);
@@ -298,6 +304,7 @@ function TableChromeControls<T>({
         size="sm"
         aria-label={`تراکم ردیف: ${densityLabel}. برای تغییر به ${nextDensity === "dense" ? "فشرده" : "راحت"} فعال کنید`}
         aria-pressed={density === "comfortable"}
+        disabled={disabled}
         onClick={() => onDensityChange(nextDensity)}
       >
         <Rows3Icon className="size-3.5" aria-hidden="true" />
@@ -312,6 +319,7 @@ function TableChromeControls<T>({
               variant="tertiary"
               size="sm"
               aria-label="نمایش ستون‌ها"
+              disabled={disabled}
             >
               <Columns3Icon className="size-3.5" aria-hidden="true" />
               ستون‌ها
@@ -373,6 +381,8 @@ export function GovernedDataTable<T>({
   rowActivateLabel = "باز کردن رکورد",
   exportSlot,
   emptyMessage,
+  loading = false,
+  loadingRowCount = 8,
   "aria-label": ariaLabel,
   preferencesKey,
   defaultDensity = GOVERNED_TABLE_DEFAULT_DENSITY,
@@ -489,7 +499,9 @@ export function GovernedDataTable<T>({
     [focusScopeKey],
   );
 
-  const liveMessage = `${formatPersianInteger(snapshot.total)} نتیجه`;
+  const liveMessage = loading
+    ? operationalCopy.actionPending
+    : `${formatPersianInteger(snapshot.total)} نتیجه`;
 
   const displayColumns = React.useMemo(() => {
     const cols = [...snapshot.visible];
@@ -590,7 +602,7 @@ export function GovernedDataTable<T>({
   };
 
   const totalPages = snapshot.pageCount;
-  const empty = snapshot.total === 0;
+  const empty = !loading && snapshot.total === 0;
   const rowHeightClass = densityRowClass(density);
 
   return (
@@ -603,12 +615,21 @@ export function GovernedDataTable<T>({
               columns={visibilityUiColumns}
               density={density}
               hiddenColumnIds={hiddenColumnIds}
+              disabled={loading}
               onDensityChange={(next) => persistPrefs({ density: next })}
               onHiddenChange={(next) =>
                 persistPrefs({ hiddenColumnIds: next })
               }
             />
-            {exportSlot ? <div className="shrink-0">{exportSlot}</div> : null}
+            {exportSlot ? (
+              <div
+                className="shrink-0"
+                aria-disabled={loading || undefined}
+                inert={loading || undefined}
+              >
+                {exportSlot}
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -617,11 +638,14 @@ export function GovernedDataTable<T>({
         </div>
 
         <p className="text-caption text-muted-foreground" aria-hidden="true">
-          {formatPersianInteger(snapshot.total)} نتیجه
+          {loading
+            ? operationalCopy.actionPending
+            : `${formatPersianInteger(snapshot.total)} نتیجه`}
         </p>
 
         <Table
           aria-label={ariaLabel}
+          aria-busy={loading || undefined}
           className="w-full"
           containerClassName="w-full"
           containerProps={{
@@ -664,7 +688,8 @@ export function GovernedDataTable<T>({
                     {column.sortable ? (
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1 rounded-sm text-column-header outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="inline-flex items-center gap-1 rounded-sm text-column-header outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                        disabled={loading}
                         onClick={() => toggleSort(column.id)}
                       >
                         {column.header}
@@ -710,6 +735,7 @@ export function GovernedDataTable<T>({
                         onChange={(e) =>
                           setTextFilter(column.id, e.target.value)
                         }
+                        disabled={loading}
                         aria-label={`فیلتر ${column.header}`}
                         className="h-filter-row-height min-h-[var(--filter-row-height)] text-caption"
                       />
@@ -723,6 +749,7 @@ export function GovernedDataTable<T>({
                             : []
                         }
                         onChange={(next) => setEnumFilter(column.id, next)}
+                        disabled={loading}
                       />
                     ) : null}
                   </TableHead>
@@ -732,7 +759,22 @@ export function GovernedDataTable<T>({
           </TableHeader>
 
           <TableBody>
-            {empty ? (
+            {loading ? (
+              <TableSkeleton
+                columnCount={displayColumns.length}
+                rowCount={loadingRowCount}
+                density={density}
+                horizontallyScrolled={horizontallyScrolled}
+                columnStickies={displayColumns.map((c) =>
+                  c.sticky === "actions" || c.id === "__actions"
+                    ? "actions"
+                    : c.sticky,
+                )}
+                hasActionsColumn={displayColumns.some(
+                  (c) => c.sticky === "actions" || c.id === "__actions",
+                )}
+              />
+            ) : empty ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell
                   colSpan={Math.max(displayColumns.length, 1)}
@@ -817,7 +859,7 @@ export function GovernedDataTable<T>({
           </TableBody>
         </Table>
 
-        {!empty ? (
+        {!loading && !empty ? (
           <nav
             className="flex flex-wrap items-center justify-between gap-2"
             aria-label="صفحه‌بندی جدول"

@@ -110,7 +110,7 @@ export function AppSidebar({ navItems, accountId }: AppSidebarProps) {
         ref={asideRef}
         className={cn(
           "fixed inset-y-0 inset-inline-start-0 z-30 flex w-sidebar-current-width flex-col bg-chrome text-chrome-foreground",
-          "motion-safe:transition-[width] motion-safe:duration-200 motion-safe:ease-out",
+          "motion-safe:transition-[width] motion-safe:duration-[var(--duration-state)] motion-safe:ease-[var(--ease-out)]",
         )}
         style={{
           paddingTop:

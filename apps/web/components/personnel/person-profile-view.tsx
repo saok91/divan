@@ -77,13 +77,33 @@ function FieldRow({
 
 function ProfileSkeleton() {
   return (
-    <div className="space-y-6" aria-busy="true" aria-label="در حال بارگذاری پروفایل">
+    <div
+      className="space-y-6"
+      aria-busy="true"
+      aria-label="در حال بارگذاری پروفایل"
+      data-slot="profile-skeleton"
+    >
       <Skeleton className="h-8 w-48" />
-      <Skeleton className="h-28 w-full" />
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-16 w-full" />
+      <div className="space-y-3 rounded-md border border-hairline p-4">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+      <div className="space-y-3 rounded-md border border-hairline p-4">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+      </div>
+      <div className="space-y-3 rounded-md border border-hairline p-4">
+        <Skeleton className="h-4 w-36" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-1/2" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-16 w-full" />
+      </div>
     </div>
   );
 }

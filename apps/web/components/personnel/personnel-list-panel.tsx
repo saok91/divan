@@ -5,6 +5,7 @@
 "use client";
 
 import * as React from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import { ExportArtifactPanel } from "@/components/export/export-artifact-panel";
 import { GovernedDataTable } from "@/components/governed-data-table";
@@ -172,12 +173,15 @@ export function PersonnelListPanel() {
   const snapshotTokenRef = React.useRef<string | undefined>(undefined);
   const pageSize = 25;
 
-  const searchQuery = api.person.search.useQuery({
-    channel: "list",
-    page,
-    pageSize,
-    evaluationSnapshotId,
-  });
+  const searchQuery = api.person.search.useQuery(
+    {
+      channel: "list",
+      page,
+      pageSize,
+      evaluationSnapshotId,
+    },
+    { placeholderData: keepPreviousData },
+  );
 
   React.useEffect(() => {
     const token = searchQuery.data?.evaluationSnapshotId;
@@ -278,9 +282,14 @@ export function PersonnelListPanel() {
   }
 
   const tableRows =
-    searchQuery.isLoading || searchQuery.isError || suppressed ? [] : rows;
+    searchQuery.isError || suppressed ? [] : rows;
   // One server page of rows — disable client re-slice of the same page.
   const clientPageSize = Math.max(tableRows.length, 1);
+  const coldLoading =
+    searchQuery.isLoading &&
+    !searchQuery.data &&
+    !searchQuery.isError &&
+    !suppressed;
 
   return (
     <section className="space-y-3" aria-labelledby="personnel-list-heading">
@@ -312,6 +321,7 @@ export function PersonnelListPanel() {
           preferencesKey="personnel-list"
           columns={columns}
           rows={tableRows}
+          loading={coldLoading}
           getRowId={(row) => row.id}
           sectionDefaultFilters={PERSONNEL_SECTION_DEFAULT_FILTERS}
           pageSize={clientPageSize}

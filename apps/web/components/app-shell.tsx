@@ -7,6 +7,7 @@ import { CommandPaletteHost } from "@/components/command-palette";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { RouteAnnouncer } from "@/components/route-announcer";
 import { SkipLink } from "@/components/skip-link";
+import { Toaster } from "@/components/ui/toast";
 import { UserMenu } from "@/components/user-menu";
 import { ViewportGateFocusGuard } from "@/components/viewport-gate-focus-guard";
 import { operationalCopy } from "@/lib/operational-copy";
@@ -83,7 +84,7 @@ export function AppShell({
           <AppSidebar accountId={accountId} navItems={navItems} />
 
           <div
-            className="ps-sidebar-current-width motion-safe:transition-[padding-inline-start] motion-safe:duration-200 motion-safe:ease-out"
+            className="ps-sidebar-current-width motion-safe:transition-[padding-inline-start] motion-safe:duration-[var(--duration-state)] motion-safe:ease-[var(--ease-out)]"
             style={{
               paddingTop:
                 "calc(var(--chrome-height) + var(--banner-stack-height, 0px))",
@@ -99,6 +100,7 @@ export function AppShell({
           </div>
         </div>
       </LeaveGuardProvider>
+      <Toaster />
     </>
   );
 }

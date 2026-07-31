@@ -1,3 +1,9 @@
+## Deferred from: code review of 8-8-feedback-loading-motion-system.md (2026-07-31)
+
+- Local `StatusMessage` clones in org/headcount/access panels not migrated to shared `FeedbackMessage` ? story allowed proof-set-only; full unification deferred to 8.10 consistency pass.
+- `PendingSurface` / `pendingLabel` only wired in gallery ? production save/finalize still use existing `disabled`/`busy`/`aria-busy`; adopt helper when touching those forms.
+- Toast dismiss button / pause-on-hover ? MVP auto-dismiss channel shipped; richer toaster chrome later if operators need it.
+
 ## Deferred from: code review of 8-7-row-action-affordance-dead-click-elimination.md (2026-07-31)
 
 - `Button` lacks `forwardRef` under Radix `asChild` Tooltip/Dropdown triggers ? pre-existing 8.1 Button; revisit if row-action/overflow focus bugs reproduce.

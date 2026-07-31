@@ -181,7 +181,11 @@ export const operationalCopy = {
   importExecuteConsequence:
     "اجرا دسته را از انبار موقت به تولید قطعی می‌کند. در صورت ناموفق بودن، وضعیت تولید تغییر نمی‌کند.",
   importExecuteSuccess: "اجرا موفق بود. شناسه‌های ایجادشده در شواهد دسته ثبت شد.",
+  importToastBatchLink: "بازگشت به واردسازی",
   importExecuteFailed: "ناموفق",
+  /** In-place pending — must not read as committed success. */
+  actionPending: "در حال انجام…",
+  actionSaving: "در حال ذخیره…",
   importConcurrentBatch: "دسته دیگری در حال اجراست",
   importSodBlocked: "تفکیک وظایف رعایت نشده است.",
   importContentsReadOnly: "محتوای تأییدشده فقط خواندنی است و قابل ویرایش نیست.",

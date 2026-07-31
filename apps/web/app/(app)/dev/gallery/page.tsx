@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { notFound } from "next/navigation";
 import {
   CalendarPlus,
@@ -32,13 +33,25 @@ import {
 } from "@/components/layout/panel-section";
 import { PageHeader } from "@/components/page-header";
 import { SectionTabs } from "@/components/section-tabs";
+import { TableSkeleton } from "@/components/governed-data-table";
 import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
+import { PendingSurface, pendingLabel } from "@/components/ui/pending-surface";
 import { RowActionButton } from "@/components/ui/row-action-button";
 import { RowActionCluster } from "@/components/ui/row-action-overflow";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toastBackground } from "@/components/ui/toast";
+import { operationalCopy } from "@/lib/operational-copy";
 
 import { EntityPickerGalleryDemos } from "./entity-picker-demos";
-
 /**
  * Dev-only living reference for layout primitives (Story 8.2).
  * Gated out of production builds.
@@ -287,12 +300,106 @@ export default function DevGalleryPage() {
 
       <EntityPickerGalleryDemos />
 
-      <section className="space-y-2 px-content-padding-inline" aria-labelledby="gallery-stubs">
-        <h2 id="gallery-stubs" className="text-heading-sm">
-          Stub slots
+      <section
+        className="space-y-4 px-content-padding-inline"
+        aria-labelledby="gallery-feedback"
+      >
+        <h2 id="gallery-feedback" className="text-heading-sm">
+          Feedback, loading &amp; motion (Story 8.8)
         </h2>
-        <p className="text-caption text-text-tertiary">skeleton — Story 8.8</p>
+        <p className="text-caption text-text-secondary">
+          Precedence: inline → toast (background only) → banner. Pulse skeleton
+          (opacity); static under{" "}
+          <code className="text-identifier">prefers-reduced-motion</code>. See{" "}
+          <code className="text-identifier">components/feedback/FEEDBACK.md</code>
+          .
+        </p>
+
+        <div className="space-y-2">
+          <p className="text-field-label">Skeleton pulse</p>
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-field-label">TableSkeleton</p>
+          <Table aria-label="نمونه اسکلت جدول" className="w-full">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-column-header">کد</TableHead>
+                <TableHead className="text-column-header">نام</TableHead>
+                <TableHead className="text-column-header">نقش</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableSkeleton columnCount={3} rowCount={4} density="dense" />
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-field-label">FeedbackMessage (inline)</p>
+          <FeedbackMessage kind="pending">
+            {operationalCopy.actionPending}
+          </FeedbackMessage>
+          <FeedbackMessage kind="error">خطای نمونه — فقط اینلاین</FeedbackMessage>
+          <FeedbackMessage kind="success">
+            نتیجهٔ تأییدشده از سرور (نه خوش‌بینانه)
+          </FeedbackMessage>
+        </div>
+
+        <GalleryPendingDemo />
+
+        <div className="space-y-2">
+          <p className="text-field-label">
+            Toast — background work only (not for form save)
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              toastBackground({
+                message: operationalCopy.importExecuteSuccess,
+                href: "/import",
+                hrefLabel: operationalCopy.importToastBatchLink,
+              })
+            }
+          >
+            نمایش toast پس‌زمینه
+          </Button>
+        </div>
       </section>
     </div>
+  );
+}
+
+function GalleryPendingDemo() {
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (!pending) return;
+    const id = window.setTimeout(() => setPending(false), 1500);
+    return () => window.clearTimeout(id);
+  }, [pending]);
+
+  return (
+    <PendingSurface pending={pending} className="space-y-2">
+      <p className="text-field-label">In-place pending</p>
+      <Button
+        type="button"
+        variant="primary"
+        disabled={pending}
+        disabledReason={pending ? operationalCopy.actionPending : undefined}
+        onClick={() => {
+          setPending(true);
+        }}
+      >
+        {pendingLabel(
+          pending,
+          "ذخیره نمونه",
+          operationalCopy.actionSaving,
+        )}
+      </Button>
+    </PendingSurface>
   );
 }

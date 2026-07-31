@@ -47,6 +47,14 @@ export type GovernedDataTableProps<T> = {
   exportSlot?: React.ReactNode;
   /** Override empty-state copy (default: operationalCopy.emptySearch). */
   emptyMessage?: string;
+  /**
+   * Cold-load / initial query loading. Shows content-shaped skeleton rows
+   * (density + column rhythm). Does not replace an in-session surface that
+   * already has rows — callers should pass false while refetching with data.
+   */
+  loading?: boolean;
+  /** Skeleton row count when `loading` (default 8). */
+  loadingRowCount?: number;
   "aria-label": string;
   /**
    * Session-prefs bucket key (with account id). Required for density /

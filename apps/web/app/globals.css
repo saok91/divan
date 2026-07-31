@@ -50,6 +50,11 @@
   --selection-tint: #eaf3ff;
   --selection-tint-border: #c7deff;
   --skeleton: #e9eaf0;
+  /* Motion budget (UX-DR39 / Story 8.8) — 150–250ms purposeful transitions */
+  --duration-fast: 150ms;
+  --duration-state: 200ms;
+  --duration-enter: 250ms;
+  --ease-out: ease-out;
   --keycap-background: #eef1f6;
   --destructive-background: #fff5f5;
   --dirty-border: #e09e00;
@@ -403,10 +408,14 @@
     }
   }
 
-  /* Skeleton shimmer + toast slide — disabled under reduced motion */
-  @keyframes divan-skeleton-shimmer {
+  /* Skeleton opacity pulse + toast slide — disabled under reduced motion (UX-DR39) */
+  @keyframes divan-skeleton-pulse {
+    0%,
     100% {
-      transform: translateX(-100%);
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
     }
   }
 
@@ -421,27 +430,12 @@
     }
   }
 
-  .animate-skeleton-shimmer {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .animate-skeleton-shimmer::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    transform: translateX(100%);
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgb(255 255 255 / 35%),
-      transparent
-    );
-    animation: divan-skeleton-shimmer 1.2s infinite;
+  .animate-skeleton-pulse {
+    animation: divan-skeleton-pulse 1.4s var(--ease-out) infinite;
   }
 
   .animate-toast-slide {
-    animation: divan-toast-slide-in 0.2s ease-out;
+    animation: divan-toast-slide-in var(--duration-state) var(--ease-out);
   }
 
   /* UX-DR10 status-badge-* tokens */
@@ -472,9 +466,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .animate-skeleton-shimmer::after {
+    .animate-skeleton-pulse {
       animation: none;
-      display: none;
     }
 
     .animate-toast-slide {

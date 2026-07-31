@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { todayDateOnlyTehran } from "@divan/temporal-engine";
 
 import {
@@ -132,6 +133,8 @@ export function DashboardPanel() {
     enabled: Boolean(queryInput.trendRangeStart && queryInput.trendRangeEnd),
     // Keep cards synchronized — one query identity for all metrics.
     staleTime: 30_000,
+    // Filter apply = in-place pending (AC2) — keep prior cards while new key fetches.
+    placeholderData: keepPreviousData,
   });
 
   const cards = query.data?.cards ?? [];
@@ -181,10 +184,22 @@ export function DashboardPanel() {
         </p>
       ) : null}
 
-      {query.isLoading ? (
-        <div className={cn(GRID_CLASS)}>
+      {!query.data && query.isLoading ? (
+        <div
+          className={cn(GRID_CLASS)}
+          aria-busy="true"
+          aria-label={operationalCopy.dashboardPending}
+          data-slot="dashboard-skeleton"
+        >
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full" />
+            <div
+              key={i}
+              className="space-y-3 rounded-md border border-hairline p-4"
+            >
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-3 w-3/4" />
+            </div>
           ))}
         </div>
       ) : query.isError ? (

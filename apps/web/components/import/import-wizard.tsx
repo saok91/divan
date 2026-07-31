@@ -23,6 +23,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { toastBackground } from "@/components/ui/toast";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -244,11 +245,18 @@ export function ImportWizard() {
       });
       setExecuteOpen(false);
       setStep("result");
-      setLocalMessage(
+      // Background-job result → toast only (one channel). Result step stays
+      // as the workspace (evidence / disclosure); no second celebratory inline.
+      const successMessage =
         executeTier === "production"
           ? operationalCopy.importExecuteSuccess
-          : `${operationalCopy.importExecuteSuccess} — ${operationalCopy.reconTrialExecuteStatus}`,
-      );
+          : `${operationalCopy.importExecuteSuccess} — ${operationalCopy.reconTrialExecuteStatus}`;
+      toastBackground({
+        message: `${successMessage} — ${stagingBatchId}`,
+        href: "/import",
+        hrefLabel: operationalCopy.importToastBatchLink,
+      });
+      setLocalMessage(null);
     } catch (err) {
       setExecuteOpen(false);
       setStep("result");

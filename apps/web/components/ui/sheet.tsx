@@ -43,7 +43,7 @@ function SheetOverlay({
     <DialogPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-black/50 motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=closed]:fade-out-0 motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:fade-in-0 motion-reduce:transition-none",
         className
       )}
       {...props}
@@ -70,15 +70,15 @@ function SheetContent({
       <DialogPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:animate-in data-[state=open]:duration-300",
+          "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-[var(--ease-out)] motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=closed]:duration-[var(--duration-state)] motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:duration-[var(--duration-enter)] motion-reduce:transition-none",
           side === "bottom" &&
-            "inset-x-0 bottom-0 max-h-[92vh] rounded-t-lg border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+            "inset-x-0 bottom-0 max-h-[92vh] rounded-t-lg border-t motion-safe:data-[state=closed]:slide-out-to-bottom motion-safe:data-[state=open]:slide-in-from-bottom",
           side === "top" &&
-            "inset-x-0 top-0 max-h-[92vh] rounded-b-lg border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+            "inset-x-0 top-0 max-h-[92vh] rounded-b-lg border-b motion-safe:data-[state=closed]:slide-out-to-top motion-safe:data-[state=open]:slide-in-from-top",
           side === "right" &&
-            "inset-y-0 end-0 h-full w-full max-w-lg border-s data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+            "inset-y-0 end-0 h-full w-full max-w-lg border-s motion-safe:data-[state=closed]:slide-out-to-right motion-safe:data-[state=open]:slide-in-from-right",
           side === "left" &&
-            "inset-y-0 start-0 h-full w-full max-w-lg border-e data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+            "inset-y-0 start-0 h-full w-full max-w-lg border-e motion-safe:data-[state=closed]:slide-out-to-left motion-safe:data-[state=open]:slide-in-from-left",
           fullWidth && "w-full max-w-none",
           className
         )}

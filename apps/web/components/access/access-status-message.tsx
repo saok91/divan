@@ -1,5 +1,9 @@
-import { cn } from "@/lib/utils";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 
+/**
+ * @deprecated Prefer `FeedbackMessage` for new call sites (Story 8.8).
+ * Thin alias preserving access-panel imports.
+ */
 export function AccessStatusMessage({
   kind,
   children,
@@ -7,16 +11,5 @@ export function AccessStatusMessage({
   kind: "loading" | "error" | "empty" | "info";
   children: React.ReactNode;
 }) {
-  return (
-    <p
-      role={kind === "error" ? "alert" : "status"}
-      aria-live={kind === "error" ? "assertive" : "polite"}
-      className={cn(
-        "text-body-medium",
-        kind === "error" ? "text-destructive" : "text-muted-foreground",
-      )}
-    >
-      {children}
-    </p>
-  );
+  return <FeedbackMessage kind={kind}>{children}</FeedbackMessage>;
 }
