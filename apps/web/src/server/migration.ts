@@ -4,7 +4,8 @@
  * Pipeline: authorize → parse/validate / staging approve / atomic cutover
  * → PopulationPort intersect/omit + honesty fields on reveal payloads.
  *
- * SoD (provisional): upload/confirm = person.write; approve = migration.approve;
+ * SoD (provisional): day-to-day ops authorize via template.requiredPermission
+ * (Story 9.3 input-aware meta); approve = migration.approve;
  * execute = migration.execute. AR-MIGRATION pending freeze.
  * SoD PermissionSet seed is bootstrap/selfcheck only — not per-request.
  *
@@ -40,6 +41,9 @@ import {
   listReconciliationRuns,
   mapCutoverCounts,
   parseImportFile,
+  peekPreviewTemplateKey,
+  permittedDataCategoriesForTemplate,
+  envelopeDataCategoryForTemplate,
   projectStagingBatchForViewer,
   promoteConfirmedDraftToStaging,
   requireLaunchImportTemplateCatalogue,
@@ -51,16 +55,15 @@ import {
   verifyProductionGateOnRun,
   type ImportBatchEvidence,
   type ImportPreviewBatch,
+  type LaunchImportTemplate,
   type ReconciliationRun,
   type StagingBatchRecord,
 } from "@divan/migration";
 import {
   PERSON_DATA_CATEGORY,
   PERSON_READ_PERMISSION,
-  PERSON_WRITE_PERMISSION,
   PersonIdentityError,
   assertActorHasPersonRead,
-  assertActorHasPersonWrite,
 } from "@divan/person-employment";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -117,10 +120,97 @@ function permissionHolder(accountId: string) {
   };
 }
 
-function projectBatchReveal(batch: StagingBatchRecord): StagingBatchRecord {
+function projectBatchReveal(
+  batch: StagingBatchRecord,
+  template?: LaunchImportTemplate,
+): StagingBatchRecord {
+  const resolved =
+    template ??
+    (isLaunchImportTemplateKey(batch.templateKey)
+      ? getLaunchImportTemplate(batch.templateKey)
+      : undefined);
+  if (!resolved) {
+    throw new MigrationError(
+      "TEMPLATE_UNKNOWN",
+      `قالب «${batch.templateKey}» برای نمایش دسته پشتیبانی نمی‌شود.`,
+    );
+  }
+  const cats = permittedDataCategoriesForTemplate(resolved);
   return projectStagingBatchForViewer(batch, {
-    permittedDataCategories: new Set([PERSON_DATA_CATEGORY]),
+    permittedDataCategories: cats,
   });
+}
+
+function authorizeFromTemplate(
+  template: LaunchImportTemplate,
+): { permission: string; dataCategory: string } {
+  return {
+    permission: template.requiredPermission,
+    dataCategory: envelopeDataCategoryForTemplate(template),
+  };
+}
+
+/** Resolve template-aware authorize for inputs carrying templateKey. */
+function resolveAuthorizeFromTemplateKey(
+  rawInput: unknown,
+): { permission: string; dataCategory: string } | null {
+  const key =
+    rawInput &&
+    typeof rawInput === "object" &&
+    "templateKey" in rawInput &&
+    typeof (rawInput as { templateKey: unknown }).templateKey === "string"
+      ? (rawInput as { templateKey: string }).templateKey.trim()
+      : "";
+  if (!key || !isLaunchImportTemplateKey(key)) return null;
+  const template = getLaunchImportTemplate(key);
+  if (!template) return null;
+  return authorizeFromTemplate(template);
+}
+
+/** Resolve from previewBatchId (stored draft templateKey). */
+function resolveAuthorizeFromPreviewBatchId(
+  rawInput: unknown,
+): { permission: string; dataCategory: string } | null {
+  const id =
+    rawInput &&
+    typeof rawInput === "object" &&
+    "previewBatchId" in rawInput &&
+    typeof (rawInput as { previewBatchId: unknown }).previewBatchId ===
+      "string"
+      ? (rawInput as { previewBatchId: string }).previewBatchId.trim()
+      : "";
+  if (!id) return null;
+  const templateKey = peekPreviewTemplateKey(id);
+  if (!templateKey || !isLaunchImportTemplateKey(templateKey)) return null;
+  const template = getLaunchImportTemplate(templateKey);
+  if (!template) return null;
+  return authorizeFromTemplate(template);
+}
+
+/** Resolve from durable staging batchId. */
+async function resolveAuthorizeFromStagingBatchId(
+  rawInput: unknown,
+): Promise<{ permission: string; dataCategory: string } | null> {
+  const id =
+    rawInput &&
+    typeof rawInput === "object" &&
+    "batchId" in rawInput &&
+    typeof (rawInput as { batchId: unknown }).batchId === "string"
+      ? (rawInput as { batchId: string }).batchId.trim()
+      : "";
+  if (!id) return null;
+  try {
+    const batch = await getStagingBatch(getMigrationPool(), id);
+    if (!isLaunchImportTemplateKey(batch.templateKey)) return null;
+    const template = getLaunchImportTemplate(batch.templateKey);
+    if (!template) return null;
+    return authorizeFromTemplate(template);
+  } catch (err) {
+    if (err instanceof MigrationError && err.code === "STAGING_NOT_FOUND") {
+      return null;
+    }
+    throw err;
+  }
 }
 
 function filterEvidenceRecordIds(
@@ -255,6 +345,8 @@ export type MigrationTemplateEntry = {
   /** Persian access requirement when `!callerMayUse`; null when usable. */
   accessRequirementFa: string | null;
   arMigrationStatus: "provisional-pending-freeze";
+  sections: Array<"personnel" | "personnel-events" | "headcount">;
+  migrationSodEligible: boolean;
   columns: Array<{
     key: string;
     headerFa: string;
@@ -299,6 +391,8 @@ async function mapCatalogueEntry(
       ? null
       : accessRequirementFaFor(t.requiredPermission),
     arMigrationStatus: t.arMigrationStatus,
+    sections: [...t.sections],
+    migrationSodEligible: t.migrationSodEligible === true,
     columns: t.columns.map((c) => ({
       key: c.key,
       headerFa: c.headerFa,
@@ -407,19 +501,16 @@ export const migrationRouter = createTRPCRouter({
 
   downloadSampleWorkbook: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
-      dataCategory: PERSON_DATA_CATEGORY,
       action: "write",
       organizationalScope: "org:selfcheck",
       operation: "migration.sample_workbook",
       sensitive: true,
+      resolveAuthorizeFromInput: resolveAuthorizeFromTemplateKey,
     })
     .input(z.object({ templateKey: z.string().min(1) }))
     .mutation(
       async ({ ctx, input }): Promise<MigrationSampleWorkbookResponse> => {
         try {
-          await assertActorHasPersonWrite(ctx.session.accountId);
-
           if (!isLaunchImportTemplateKey(input.templateKey)) {
             throw new TRPCError({
               code: "BAD_REQUEST",
@@ -465,18 +556,15 @@ export const migrationRouter = createTRPCRouter({
 
   uploadAndValidate: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
-      dataCategory: PERSON_DATA_CATEGORY,
       action: "write",
       organizationalScope: "org:selfcheck",
       operation: "migration.upload_and_validate",
       sensitive: true,
+      resolveAuthorizeFromInput: resolveAuthorizeFromTemplateKey,
     })
     .input(uploadInputSchema)
     .mutation(async ({ ctx, input }): Promise<MigrationPreviewResponse> => {
       try {
-        await assertActorHasPersonWrite(ctx.session.accountId);
-
         if (!isLaunchImportTemplateKey(input.templateKey)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -525,7 +613,8 @@ export const migrationRouter = createTRPCRouter({
         });
 
         const batch = buildImportPreviewBatch(parsed, {
-          permittedDataCategories: new Set([PERSON_DATA_CATEGORY]),
+          permittedDataCategories:
+            permittedDataCategoriesForTemplate(uploadTemplate),
           createdByAccountId: ctx.session.accountId,
         });
 
@@ -540,21 +629,32 @@ export const migrationRouter = createTRPCRouter({
 
   getPreview: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
-      dataCategory: PERSON_DATA_CATEGORY,
       action: "read",
       organizationalScope: "org:selfcheck",
       operation: "migration.get_preview",
       sensitive: true,
+      resolveAuthorizeFromInput: resolveAuthorizeFromPreviewBatchId,
     })
     .input(batchIdSchema)
     .query(async ({ ctx, input }): Promise<MigrationPreviewResponse> => {
       try {
-        await assertActorHasPersonWrite(ctx.session.accountId);
         const population = await resolvePersonnelPopulationRegistry();
+        const templateKey = peekPreviewTemplateKey(input.previewBatchId);
+        const template = templateKey
+          ? getLaunchImportTemplate(templateKey)
+          : undefined;
+        if (templateKey && !template) {
+          throw new MigrationError(
+            "TEMPLATE_UNKNOWN",
+            `قالب «${templateKey}» برای پیش‌نمایش پشتیبانی نمی‌شود.`,
+          );
+        }
+        const cats = template
+          ? permittedDataCategoriesForTemplate(template)
+          : new Set([PERSON_DATA_CATEGORY]);
         const batch = getImportPreviewBatch(input.previewBatchId, {
           actorAccountId: ctx.session.accountId,
-          permittedDataCategories: new Set([PERSON_DATA_CATEGORY]),
+          permittedDataCategories: cats,
         });
         const staging = await getStagingBatchByPreviewId(
           getMigrationPool(),
@@ -575,17 +675,15 @@ export const migrationRouter = createTRPCRouter({
 
   cancelPreview: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
-      dataCategory: PERSON_DATA_CATEGORY,
       action: "write",
       organizationalScope: "org:selfcheck",
       operation: "migration.cancel_preview",
       sensitive: false,
+      resolveAuthorizeFromInput: resolveAuthorizeFromPreviewBatchId,
     })
     .input(batchIdSchema)
     .mutation(async ({ ctx, input }): Promise<{ cancelled: true }> => {
       try {
-        await assertActorHasPersonWrite(ctx.session.accountId);
         cancelImportPreviewBatch(
           input.previewBatchId,
           ctx.session.accountId,
@@ -602,17 +700,15 @@ export const migrationRouter = createTRPCRouter({
    */
   confirmDraft: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
-      dataCategory: PERSON_DATA_CATEGORY,
       action: "write",
       organizationalScope: "org:selfcheck",
       operation: "migration.confirm_draft",
       sensitive: true,
+      resolveAuthorizeFromInput: resolveAuthorizeFromPreviewBatchId,
     })
     .input(batchIdSchema)
     .mutation(async ({ ctx, input }): Promise<MigrationPreviewResponse> => {
       try {
-        await assertActorHasPersonWrite(ctx.session.accountId);
         const population = await resolvePersonnelPopulationRegistry();
         const batch = confirmImportPreviewDraft(
           input.previewBatchId,
@@ -681,21 +777,20 @@ export const migrationRouter = createTRPCRouter({
 
   getBatch: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
-      dataCategory: PERSON_DATA_CATEGORY,
       action: "read",
       organizationalScope: "org:selfcheck",
       operation: "migration.get_batch",
       sensitive: true,
+      resolveAuthorizeFromInput: resolveAuthorizeFromStagingBatchId,
     })
     .input(stagingIdSchema)
     .query(async ({ ctx, input }): Promise<MigrationStagingResponse> => {
       try {
-        await assertActorHasPersonWrite(ctx.session.accountId);
         const population = await resolvePersonnelPopulationRegistry();
         const batch = await getStagingBatch(getMigrationPool(), input.batchId);
+        const template = getLaunchImportTemplate(batch.templateKey);
         return {
-          batch: projectBatchReveal(batch),
+          batch: projectBatchReveal(batch, template),
           populationAuthzMode: population.mode,
           populationDisclosureFa: population.disclosureFa,
           contentsReadOnly: batch.payloadFrozen,
@@ -765,20 +860,17 @@ export const migrationRouter = createTRPCRouter({
    */
   commitDayToDayBulk: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
-      dataCategory: PERSON_DATA_CATEGORY,
       action: "write",
       organizationalScope: "org:selfcheck",
       operation: "migration.commit_day_to_day_bulk",
       sensitive: true,
+      resolveAuthorizeFromInput: resolveAuthorizeFromPreviewBatchId,
     })
     .input(batchIdSchema)
     .mutation(
       async ({ ctx, input }): Promise<MigrationDayToDayCommitResponse> => {
         let promotedStagingId: string | null = null;
         try {
-          await assertActorHasPersonWrite(ctx.session.accountId);
-
           const population = await resolvePersonnelPopulationRegistry();
 
           // Freeze draft (idempotent) then promote — still not production until cutover.
@@ -846,7 +938,7 @@ export const migrationRouter = createTRPCRouter({
           );
 
           return {
-            batch: projectBatchReveal(result.batch),
+            batch: projectBatchReveal(result.batch, template),
             evidence,
             idempotentReplay: result.idempotentReplay,
             created: counts.created,
@@ -922,12 +1014,11 @@ export const migrationRouter = createTRPCRouter({
 
   getBatchEvidence: governedProcedure
     .meta({
-      permission: PERSON_WRITE_PERMISSION,
-      dataCategory: PERSON_DATA_CATEGORY,
       action: "read",
       organizationalScope: "org:selfcheck",
       operation: "migration.get_batch_evidence",
       sensitive: true,
+      resolveAuthorizeFromInput: resolveAuthorizeFromStagingBatchId,
     })
     .input(stagingIdSchema)
     .query(
@@ -940,7 +1031,6 @@ export const migrationRouter = createTRPCRouter({
         populationDisclosureFa: string | null;
       }> => {
         try {
-          await assertActorHasPersonWrite(ctx.session.accountId);
           const population = await resolvePersonnelPopulationRegistry();
           const evidence = await getLatestBatchEvidence(
             getMigrationPool(),

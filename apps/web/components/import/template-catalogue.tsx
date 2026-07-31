@@ -10,18 +10,26 @@ import { api } from "@/lib/trpc/client";
 
 export type TemplateCatalogueVariant = "migration" | "bulk";
 
+export type TemplateCatalogueSection =
+  | "personnel"
+  | "personnel-events"
+  | "headcount";
+
 /**
- * Shared template catalogue + sample download (Story 9.1).
+ * Shared template catalogue + sample download (Story 9.1 / 9.3).
  * Mounted on «ورود داده» identify step and each «ورود گروهی» tab.
  * Denied templates stay visible with FeedbackMessage access requirement.
  */
 export function TemplateCatalogue({
   variant,
+  section,
   selectedTemplateKey,
   onSelectTemplate,
   disabled,
 }: {
   variant: TemplateCatalogueVariant;
+  /** Bulk host section — filter to templates whose sections include this. */
+  section?: TemplateCatalogueSection;
   /** When provided, highlights/selects a row for the migration wizard. */
   selectedTemplateKey?: string;
   onSelectTemplate?: (key: string) => void;
@@ -33,6 +41,17 @@ export function TemplateCatalogue({
   const [downloadingKey, setDownloadingKey] = React.useState<string | null>(
     null,
   );
+
+  const visibleTemplates = React.useMemo(() => {
+    const all = templatesQuery.data?.templates ?? [];
+    if (variant === "migration") {
+      return all.filter((t) => t.migrationSodEligible === true);
+    }
+    if (section) {
+      return all.filter((t) => t.sections?.includes(section));
+    }
+    return all;
+  }, [templatesQuery.data?.templates, variant, section]);
 
   async function onDownload(templateKey: string) {
     setDownloadError(null);
@@ -69,13 +88,13 @@ export function TemplateCatalogue({
         <FeedbackMessage kind="error">
           {templatesQuery.error.message || operationalCopy.importLoadError}
         </FeedbackMessage>
-      ) : (templatesQuery.data?.templates.length ?? 0) === 0 ? (
+      ) : visibleTemplates.length === 0 ? (
         <FeedbackMessage kind="empty">
           {operationalCopy.importNoTemplates}
         </FeedbackMessage>
       ) : (
         <ul className="space-y-3" role="list">
-          {templatesQuery.data!.templates.map((t) => {
+          {visibleTemplates.map((t) => {
             const selected = selectedTemplateKey === t.key;
             const accessReason =
               t.accessRequirementFa ??

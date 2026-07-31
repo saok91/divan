@@ -1,9 +1,10 @@
 /**
- * Day-to-day bulk commit selfcheck (Story 9.2).
+ * Day-to-day bulk commit selfcheck (Story 9.2 / 9.3).
  * Run: pnpm --filter @divan/migration selfcheck:day-to-day-bulk
  *
  * Proves: operator with person.write (no migration SoD) can commit;
- * concurrent lock still blocks; migration approve≠execute SoD still holds.
+ * concurrent lock still blocks; migration approve≠execute SoD still holds;
+ * headcount + transfer templates gate on their requiredPermission and cut over.
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -11,7 +12,23 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createPgPool, createPrismaClient } from "@divan/db";
+import {
+  ensureHeadcountCapacitySchema,
+  seedCapacitySlot,
+  seedDemoHeadcountCapacity,
+  createApproval,
+  activateApproval,
+} from "@divan/headcount";
 import { config as loadEnv } from "dotenv";
+import {
+  SEED_JOB_REFERENCES,
+  SEED_ORGANIZATION_HIERARCHY,
+  SEED_PERSON_IDENTITY,
+  seedJobReferenceFixtures,
+  seedOrganizationHierarchyFixtures,
+  seedPersonIdentityFixtures,
+  seedPrimaryAssignmentFixtures,
+} from "@divan/person-employment";
 
 import {
   MSG_CONCURRENT_BATCH_FA,
@@ -29,14 +46,6 @@ import {
   approveStagingBatch,
   validateImportMatrix,
 } from "./index";
-
-import {
-  SEED_JOB_REFERENCES,
-  SEED_ORGANIZATION_HIERARCHY,
-  seedJobReferenceFixtures,
-  seedOrganizationHierarchyFixtures,
-  seedPersonIdentityFixtures,
-} from "@divan/person-employment";
 
 const rootEnv = resolve(
   fileURLToPath(new URL(".", import.meta.url)),
@@ -89,6 +98,9 @@ async function main() {
     await seedPersonIdentityFixtures(prisma);
     await seedOrganizationHierarchyFixtures(prisma);
     await seedJobReferenceFixtures(prisma);
+    await seedPrimaryAssignmentFixtures(prisma);
+    await ensureHeadcountCapacitySchema(pool);
+    await seedDemoHeadcountCapacity(prisma, pool);
 
     const team = await prisma.organizationalUnit.findUnique({
       where: { code: SEED_ORGANIZATION_HIERARCHY.teamActive.code },
@@ -407,6 +419,277 @@ async function main() {
     assert.equal(matchCommit.created, 0);
     assert.equal(matchCommit.updated, 1);
     assert.equal(matchCommit.rejected, 0);
+
+    // --- Story 9.3: headcount_approval_create day-to-day ---
+    const hcTemplateKey = "headcount_approval_create";
+    const hcHeaders = [
+      "کد نیازمندی",
+      "کد تیم",
+      "کد عنوان شغلی",
+      "کد ارشدیت",
+      "سقف مجاز",
+      "شروع اعتبار",
+      "پایان اعتبار (غیرشامل)",
+      "مرجع مجوز",
+    ];
+    const reqCode = `REQ-D${suffix.slice(0, 6)}`;
+    const hcRow = [
+      reqCode,
+      teamCode,
+      jobCode,
+      "",
+      "3",
+      "2026-01-01",
+      "2027-01-01",
+      "MEMO-SC",
+    ];
+    const hcCsv = [csvLine(hcHeaders), csvLine(hcRow)].join("\n");
+    const hcParsed = await parseCsvBuffer(
+      Buffer.from(hcCsv, "utf8"),
+      hcTemplateKey,
+      "hc.csv",
+    );
+    const hcIssues = validateImportMatrix(hcParsed);
+    assert.equal(
+      hcIssues.filter((i) => i.severity === "error").length,
+      0,
+      JSON.stringify(hcIssues),
+    );
+
+    clearImportPreviewDraftStore();
+    const hcPreview = buildImportPreviewBatch(hcParsed, {
+      permittedDataCategories: new Set(["organization.headcount_approval"]),
+      createdByAccountId: operator,
+    });
+    assert.equal(hcPreview.errorCount, 0);
+    confirmImportPreviewDraft(hcPreview.previewBatchId, operator);
+    const hcStored = getStoredDraftForStaging(hcPreview.previewBatchId)!;
+    const hcStaging = await promoteConfirmedDraftToStaging(pool, {
+      preview: hcStored.batch,
+      fullRows: hcStored.fullRows,
+      uploadedByAccountId: operator,
+      ownerDisplayName: "HC Operator",
+    });
+
+    let hcDenied = false;
+    try {
+      await commitDayToDayBulk(pool, {
+        batchId: hcStaging.id,
+        actorAccountId: operator,
+        permissionHolder: operatorHolder,
+      });
+    } catch (err) {
+      hcDenied = true;
+      assert.equal((err as { code: string }).code, "PERMISSION_DENIED");
+    }
+    assert.equal(hcDenied, true, "person.write must not commit HC template");
+
+    const hcHolder = {
+      holds: async (p: string) => p === "headcount.approval.write",
+    };
+    const hcCommit = await commitDayToDayBulk(pool, {
+      batchId: hcStaging.id,
+      actorAccountId: operator,
+      actorDisplayName: "HC Operator",
+      permissionHolder: hcHolder,
+    });
+    assert.equal(hcCommit.batch.status, "cutover-complete");
+    assert.equal(hcCommit.created, 1);
+    assert.equal(hcCommit.rejected, 0);
+
+    // --- Story 9.3: personnel_event_transfer structural + permission gate ---
+    const peTemplateKey = "personnel_event_transfer";
+    const peHeaders = [
+      "کد پرسنلی",
+      "تاریخ مؤثر",
+      "کد تیم مقصد",
+      "کد نقش سازمانی",
+      "کد عنوان شغلی",
+      "کد نردبان",
+      "کد گرید",
+      "کد ارشدیت",
+      "کد مجوز ظرفیت ترجیحی",
+    ];
+    const peRow = [
+      code1,
+      "2026-06-01",
+      teamCode,
+      roleCode,
+      jobCode,
+      ladderCode,
+      gradeCode,
+      "",
+      "",
+    ];
+    const peCsv = [csvLine(peHeaders), csvLine(peRow)].join("\n");
+    const peParsed = await parseCsvBuffer(
+      Buffer.from(peCsv, "utf8"),
+      peTemplateKey,
+      "pe.csv",
+    );
+    const peIssues = validateImportMatrix(peParsed);
+    assert.equal(
+      peIssues.filter((i) => i.severity === "error").length,
+      0,
+      JSON.stringify(peIssues),
+    );
+    // Cite subject = personnelCode
+    const peCite = formatImportIssueCite({
+      row: 2,
+      column: "teamCode",
+      columnCaptionFa: "کد تیم مقصد",
+      severity: "error",
+      messageFa: "آزمایش",
+      subjectBusinessCode: code1,
+    });
+    assert.ok(peCite.includes(`موضوع ${code1}`));
+
+    clearImportPreviewDraftStore();
+    const pePreview = buildImportPreviewBatch(peParsed, {
+      permittedDataCategories: new Set(["identity.person"]),
+      createdByAccountId: operator,
+    });
+    confirmImportPreviewDraft(pePreview.previewBatchId, operator);
+    const peStored = getStoredDraftForStaging(pePreview.previewBatchId)!;
+    const peStaging = await promoteConfirmedDraftToStaging(pool, {
+      preview: peStored.batch,
+      fullRows: peStored.fullRows,
+      uploadedByAccountId: operator,
+      ownerDisplayName: "PE Operator",
+    });
+    let peDenied = false;
+    try {
+      await commitDayToDayBulk(pool, {
+        batchId: peStaging.id,
+        actorAccountId: operator,
+        permissionHolder: hcHolder,
+      });
+    } catch (err) {
+      peDenied = true;
+      assert.equal((err as { code: string }).code, "PERMISSION_DENIED");
+    }
+    assert.equal(
+      peDenied,
+      true,
+      "headcount.approval.write must not commit event template",
+    );
+
+    // Transfer happy path: demo seeded person with active employment → dest team w/ capacity
+    const demoCode = SEED_PERSON_IDENTITY.demoPersonnelCode;
+    const dept = await prisma.organizationalUnit.findUnique({
+      where: { code: SEED_ORGANIZATION_HIERARCHY.department.code },
+    });
+    assert.ok(dept);
+    const destTeam = await prisma.organizationalUnit.create({
+      data: {
+        code: `TEAM-B${suffix.slice(0, 6)}`,
+        nameFa: "تیم مقصد bulk",
+        unitType: "TEAM",
+        parentId: dept!.id,
+        startDate: new Date("2020-01-01T00:00:00.000Z"),
+      },
+    });
+    const jobTitle = await prisma.jobTitle.findUnique({
+      where: { code: jobCode },
+    });
+    const destLadder = await prisma.ladder.findUnique({
+      where: { code: ladderCode },
+    });
+    const destGrade = await prisma.grade.findFirst({
+      where: { ladderId: destLadder?.id, code: gradeCode },
+    });
+    assert.ok(jobTitle && destLadder && destGrade);
+    const destApproval = await createApproval(pool, {
+      requirementCode: `REQ-X${suffix.slice(0, 6)}`,
+      teamId: destTeam.id,
+      jobTitleId: jobTitle!.id,
+      seniorityId: null,
+      allowedCount: 5,
+      validityStart: "2020-01-01",
+      validityEndExclusive: "2030-01-01",
+      actorId: operator,
+    });
+    await activateApproval(pool, {
+      id: destApproval.id,
+      actorId: operator,
+    });
+    await seedCapacitySlot(pool, {
+      id: randomUUID(),
+      teamId: destTeam.id,
+      jobTitleId: jobTitle!.id,
+      ladderId: destLadder!.id,
+      gradeId: destGrade!.id,
+      startDate: "2020-01-01",
+      freeUnits: 5,
+      label: `bulk-dest-${suffix}`,
+    });
+
+    const peHappyMonth = String((parseInt(suffix.slice(0, 2), 16) % 12) + 1).padStart(
+      2,
+      "0",
+    );
+    const peHappyDay = String((parseInt(suffix.slice(2, 4), 16) % 27) + 1).padStart(
+      2,
+      "0",
+    );
+    const peHappyDate = `2028-${peHappyMonth}-${peHappyDay}`;
+    const peHappyRow = [
+      demoCode,
+      peHappyDate,
+      destTeam.code,
+      roleCode,
+      jobCode,
+      ladderCode,
+      gradeCode,
+      "",
+      destApproval.requirementCode,
+    ];
+    const peHappyCsv = [csvLine(peHeaders), csvLine(peHappyRow)].join("\n");
+    const peHappyParsed = await parseCsvBuffer(
+      Buffer.from(peHappyCsv, "utf8"),
+      peTemplateKey,
+      "pe-happy.csv",
+    );
+    clearImportPreviewDraftStore();
+    const peHappyPreview = buildImportPreviewBatch(peHappyParsed, {
+      permittedDataCategories: new Set(["identity.person"]),
+      createdByAccountId: operator,
+    });
+    assert.equal(peHappyPreview.errorCount, 0);
+    confirmImportPreviewDraft(peHappyPreview.previewBatchId, operator);
+    const peHappyStored = getStoredDraftForStaging(
+      peHappyPreview.previewBatchId,
+    )!;
+    const peHappyStaging = await promoteConfirmedDraftToStaging(pool, {
+      preview: peHappyStored.batch,
+      fullRows: peHappyStored.fullRows,
+      uploadedByAccountId: operator,
+      ownerDisplayName: "PE Finalize Operator",
+    });
+    const peHolder = {
+      holds: async (p: string) => p === "personnel_event.finalize",
+    };
+    const peActor =
+      (
+        await prisma.internalAccount.findUnique({
+          where: { username: "hr.admin" },
+        })
+      )?.id ??
+      (
+        await prisma.internalAccount.findUnique({
+          where: { username: "hr.operator" },
+        })
+      )?.id ??
+      operator;
+    const peCommit = await commitDayToDayBulk(pool, {
+      batchId: peHappyStaging.id,
+      actorAccountId: peActor,
+      actorDisplayName: "PE Finalize Operator",
+      permissionHolder: peHolder,
+    });
+    assert.equal(peCommit.batch.status, "cutover-complete");
+    assert.ok(peCommit.created + peCommit.updated >= 1);
+    assert.equal(peCommit.rejected, 0);
 
     console.log("selfcheck:day-to-day-bulk OK");
   } finally {

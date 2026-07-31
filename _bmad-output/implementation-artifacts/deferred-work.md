@@ -1,3 +1,9 @@
+## Deferred from: code review of 9-3-bulk-entry-personnel-events-headcount.md (2026-08-01)
+
+- Multi-row FR-38 absolute atomicity for PE/HC day-to-day bulk cutover ? accepted `domainOutsideTx` (nested TX deadlock); honesty+harden path instead of saga/shared-TX redesign. Follow-up architecture if product requires true multi-row all-or-nothing across PE finalize / HC activate.
+- `listApprovals(client)` full-table scan to resolve `preferredApprovalCode` in transfer cutover ? no published get-by-requirementCode API; filter-in-memory until headcount exports a code lookup.
+- Day-to-day bulk selfcheck covers in-process `commitDayToDayBulk` + permissionHolder, not composed tRPC `resolveAuthorizeFromInput` envelope (sample?upload?commit) for event/HC-only actors ? optional defer per Task 6 / 9.2 composed tRPC note.
+
 ## Deferred from: code review of 8-8-feedback-loading-motion-system.md (2026-07-31)
 
 - Local `StatusMessage` clones in org/headcount/access panels not migrated to shared `FeedbackMessage` ? story allowed proof-set-only; full unification deferred to 8.10 consistency pass.
@@ -25,24 +31,24 @@
 
 ## Deferred from: code review of 7-8-authoritative-evaluation-snapshot-integrity.md (2026-07-30)
 
-- UI مدیریت expire/supersede برای `evaluation.snapshot.manage` سیم‌کشی نشده (`evaluation-snapshot-honesty.tsx`) — MVP ops honesty counts only; manage seed موجود است برای repair بعدی
-- ستون‌های `evaluation_snapshot_id` روی export/publication بدون FK به `governance.evaluation_snapshot` — الگوی stamp nullable افزایشی؛ FK سخت‌گیرانه بعداً
-- `emptyDeniedResult` در pagination continuation خطای اسنپ‌شات را با شکل outcome انکار دسترسی برمی‌گرداند — الگوی soft mapping موجود search؛ قرارداد خطای صریح‌تر بعداً
+- UI ?????? expire/supersede ???? `evaluation.snapshot.manage` ??????? ???? (`evaluation-snapshot-honesty.tsx`) ? MVP ops honesty counts only; manage seed ????? ??? ???? repair ????
+- ???????? `evaluation_snapshot_id` ??? export/publication ???? FK ?? `governance.evaluation_snapshot` ? ????? stamp nullable ???????? FK ?????????? ?????
+- `emptyDeniedResult` ?? pagination continuation ???? ???????? ?? ?? ??? outcome ????? ?????? ??????????? ? ????? soft mapping ????? search? ??????? ???? ??????? ?????
 
 ## Deferred from: code review of 7-7-launch-artifact-change-control-hooks.md (2026-07-30)
 
-- Permission helper ignores inactive-role / org-scope filters (`actorHoldsLaunchPermission`) — same MVP pattern as other ops routers; revisit with AR-ACCESS multi-tenant scopes
-- No `assertWaiverAllows` continued-use helper — gates do not yet consult waivers to authorize continued use; add when waiver-bypass gate paths ship
-- SoD on version approve (creator≠approver) / manage+approve on same `hr.admin` set — provisional until AR-ACCESS freeze (matches 7.6 seed SoD defer)
-- Independent-approver attestation remains free-text id ≠ requester/actor — identity-bound / second-session owned by AR-ACCESS freeze
+- Permission helper ignores inactive-role / org-scope filters (`actorHoldsLaunchPermission`) ? same MVP pattern as other ops routers; revisit with AR-ACCESS multi-tenant scopes
+- No `assertWaiverAllows` continued-use helper ? gates do not yet consult waivers to authorize continued use; add when waiver-bypass gate paths ship
+- SoD on version approve (creator?approver) / manage+approve on same `hr.admin` set ? provisional until AR-ACCESS freeze (matches 7.6 seed SoD defer)
+- Independent-approver attestation remains free-text id ? requester/actor ? identity-bound / second-session owned by AR-ACCESS freeze
 
 ## Deferred from: code review of 7-6-published-decision-report-reproducibility.md (2026-07-29)
 
-- Retrieve/list do not enforce recorded `permittedAudience` (`decision-publication` router) — MVP `org:selfcheck` / Known gaps IDOR class; revisit with AR-ACCESS audience matrix
-- Person-intersection helper uses JSON text `LIKE` + `LIMIT 100` (`listPublicationsIntersectingPerson`) — auto-Correction wire honesty-deferred; harden when automatic notices ship
-- Selfchecks are mostly string/optional-DB and skip disposal-scope / immutability trigger proofs — Vitest/harness carry-in
-- Seed grants read+publish+supersede+manage on single `hr.admin` PermissionSet — provisional AR-ACCESS SoD freeze
-- Client-supplied `fieldIds` not re-intersected with actor-permitted catalogue fields on publish API — MVP trust of reviewed-run hash from UI session; harden with catalogue capability intersect later
+- Retrieve/list do not enforce recorded `permittedAudience` (`decision-publication` router) ? MVP `org:selfcheck` / Known gaps IDOR class; revisit with AR-ACCESS audience matrix
+- Person-intersection helper uses JSON text `LIKE` + `LIMIT 100` (`listPublicationsIntersectingPerson`) ? auto-Correction wire honesty-deferred; harden when automatic notices ship
+- Selfchecks are mostly string/optional-DB and skip disposal-scope / immutability trigger proofs ? Vitest/harness carry-in
+- Seed grants read+publish+supersede+manage on single `hr.admin` PermissionSet ? provisional AR-ACCESS SoD freeze
+- Client-supplied `fieldIds` not re-intersected with actor-permitted catalogue fields on publish API ? MVP trust of reviewed-run hash from UI session; harden with catalogue capability intersect later
 
 ## Deferred from: code review of 7-5-external-data-subject-correction-cases.md (2026-07-29)
 
@@ -700,15 +706,15 @@
 
 ## Deferred from: code review of 8-1-interaction-system-audit-control-contract.md (2026-07-31)
 
-- File-path ghost allowlists / brace-count `rowActions` heuristic / pagination classifier tied to exact `aria-label` � selfcheck approximation acceptable for 8.1; tighten to AST/usage-scoped guards in a later hardening pass
-- `destructive` uses hardcoded `text-white` with no `--destructive-foreground` token � wait for Story 8.2 token/spacing pass
-- `aria-disabled` without native `disabled` ignores `disabledReason` � no current Button call sites; extend when `aria-disabled` inert pattern appears
+- File-path ghost allowlists / brace-count `rowActions` heuristic / pagination classifier tied to exact `aria-label` ? selfcheck approximation acceptable for 8.1; tighten to AST/usage-scoped guards in a later hardening pass
+- `destructive` uses hardcoded `text-white` with no `--destructive-foreground` token ? wait for Story 8.2 token/spacing pass
+- `aria-disabled` without native `disabled` ignores `disabledReason` ? no current Button call sites; extend when `aria-disabled` inert pattern appears
 
 ## Deferred from: code review of 8-9-self-explaining-state-operational-copy.md (2026-07-31)
 
-- `<details>` inside `role="alert"` assertive region on stale recalc banner — pre-existing banner a11y pattern; disclosure required by Story 8.9 AC; revisit live-region composition in 8.10 a11y gate
-- Profile stacks `RecalcPendingMark` `aria-live="polite"` with sibling `role="alert"` for the same freshness block — pre-existing stacking; consolidate announcements in a11y pass
-- Duplicate `getCurrentState` query in `PersonRecalcSubjectChrome` vs profile/form hosts — optimization only; share query cache/props when form chrome is refined
+- `<details>` inside `role="alert"` assertive region on stale recalc banner ? pre-existing banner a11y pattern; disclosure required by Story 8.9 AC; revisit live-region composition in 8.10 a11y gate
+- Profile stacks `RecalcPendingMark` `aria-live="polite"` with sibling `role="alert"` for the same freshness block ? pre-existing stacking; consolidate announcements in a11y pass
+- Duplicate `getCurrentState` query in `PersonRecalcSubjectChrome` vs profile/form hosts ? optimization only; share query cache/props when form chrome is refined
 
 ## Deferred from: code review of 8-10-design-qa-consistency-accessibility-gate.md (2026-07-31)
 

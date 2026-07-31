@@ -83,8 +83,10 @@ export function ImportWizard() {
   const approveMutation = api.migration.approveBatch.useMutation();
   const executeMutation = api.migration.executeBatch.useMutation();
 
-  const usableTemplates =
-    templatesQuery.data?.templates.filter((t) => t.callerMayUse) ?? [];
+    const usableTemplates =
+    templatesQuery.data?.templates.filter(
+      (t) => t.callerMayUse && t.migrationSodEligible === true,
+    ) ?? [];
   const resolvedTemplateKey =
     (templateKey && usableTemplates.some((t) => t.key === templateKey)
       ? templateKey

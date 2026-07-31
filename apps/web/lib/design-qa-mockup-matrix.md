@@ -11,7 +11,7 @@ Result values: `pass` | `fixed` | `amendment` (required non-empty for gate).
 | Reports workspace | `screens-reports-capacity.html` | `/reports` (catalogue scaffold) | amendment | Epic **9.5** owns reports section-tabs workspace; catalogue scaffold compared — no silent product completeness claim |
 | Dashboard | Direction A / capacity screens | `/dashboard` | pass | Metric cards + stale banner tokens; chart series colors gated via DESIGN categorical (cyan AA nudge — see amendments) |
 | Headcount + drawer | `screens-reports-capacity.html` | `/headcount/*` panels + sheet/drawer primitives | pass | Capacity/approval/exemption/override panels present; drawer focus trap covered by a11y probes |
-| Bulk-entry wizard | `screens-bulk-entry-profile.html` | `/personnel/*/bulk-import`, `/personnel-events/*/bulk-import`, `/headcount/*/bulk-import` | amendment | Story **9.2** landed shared five-step day-to-day flow on all three tabs; Result stays `amendment` until **9.3** domain template/validator wiring |
+| Bulk-entry wizard | `screens-bulk-entry-profile.html` | `/personnel/*/bulk-import`, `/personnel-events/*/bulk-import`, `/headcount/*/bulk-import` | pass | Story **9.3** domain templates + validators + cutover wiring on shared five-step flow (person / TransferRecorded / headcount approval) |
 | Settings | `screens-settings.html` | no production settings route yet | amendment | Epic **10.1–10.2** owns settings registry/surface; mock retained as target — amendment recorded |
 | Chart palettes | `chart-palettes.html` | DESIGN `chart.categorical` + dashboard/report consumers | fixed | Light series-2 cyan `#0B8FA8` → `#087A90` for ≥4.5:1 on white canvas (spine amendment 8.10-A1); mockups synced to `#087A90`; dark categorical unchanged |
 

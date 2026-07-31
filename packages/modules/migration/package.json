@@ -29,6 +29,7 @@
     "@divan/audit-envelope": "workspace:*",
     "@divan/db": "workspace:*",
     "@divan/event-store": "workspace:*",
+    "@divan/headcount": "workspace:*",
     "@divan/person-employment": "workspace:*",
     "@divan/temporal-engine": "workspace:*",
     "exceljs": "4.4.0"

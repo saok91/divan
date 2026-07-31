@@ -40,17 +40,15 @@ export type SharedBulkEntrySection =
   | "headcount";
 
 /**
- * Shared five-step day-to-day bulk entry (Story 9.2).
+ * Shared five-step day-to-day bulk entry (Story 9.2 / 9.3).
  * Mounted on all «ورود گروهی» tabs — not the `/import` migration wizard.
  */
 export function SharedBulkEntryFlow({
   section,
 }: {
-  /** Reserved for Story 9.3 template filtering — unused in 9.2. */
+  /** Host section — filters catalogue to matching template.sections (Story 9.3). */
   section?: SharedBulkEntrySection;
 }) {
-  void section;
-
   const [step, setStep] = React.useState<BulkStep>("template");
   const [templateKey, setTemplateKey] = React.useState("");
   const [file, setFile] = React.useState<File | null>(null);
@@ -66,8 +64,13 @@ export function SharedBulkEntryFlow({
   const cancelMutation = api.migration.cancelPreview.useMutation();
   const commitMutation = api.migration.commitDayToDayBulk.useMutation();
 
-  const usableTemplates =
-    templatesQuery.data?.templates.filter((t) => t.callerMayUse) ?? [];
+  const sectionTemplates = React.useMemo(() => {
+    const all = templatesQuery.data?.templates ?? [];
+    if (!section) return all;
+    return all.filter((t) => t.sections?.includes(section));
+  }, [templatesQuery.data?.templates, section]);
+
+  const usableTemplates = sectionTemplates.filter((t) => t.callerMayUse);
   const resolvedTemplateKey =
     (templateKey && usableTemplates.some((t) => t.key === templateKey)
       ? templateKey
@@ -239,6 +242,7 @@ export function SharedBulkEntryFlow({
           </h2>
           <TemplateCatalogue
             variant="bulk"
+            section={section}
             selectedTemplateKey={resolvedTemplateKey}
             disabled={busy || Boolean(preview && preview.status === "preview")}
             onSelectTemplate={(key) => {

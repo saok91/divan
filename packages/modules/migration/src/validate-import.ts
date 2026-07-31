@@ -1,5 +1,5 @@
 /**
- * FR-37 import validators → row/column Persian issues (Story 6.1 / 9.1).
+ * FR-37 import validators → row/column Persian issues (Story 6.1 / 9.1 / 9.3).
  *
  * Covers: structure, required, identifiers, uniqueness, dates, enums,
  * hierarchy, references, Ladder–Grade, overlaps, order, duplicate rows.
@@ -7,6 +7,7 @@
  * live DB FK resolution is cutover (6.2), not preview fabrication.
  *
  * Story 9.1: entity refs are business codes — UUID-shaped values fail closed.
+ * Story 9.3: per-template dispatch (person / event transfer / headcount).
  */
 
 import { toLatinDigits } from "@divan/person-employment";
@@ -57,12 +58,28 @@ const COLLABORATION_ENUM = new Set([
 
 const GENDER_ENUM = new Set(["male", "female", "other", "unspecified", ""]);
 
-const ENTITY_CODE_FIELDS = [
+const PERSON_ENTITY_CODE_FIELDS = [
   "teamCode",
   "organizationalRoleCode",
   "jobTitleCode",
   "ladderCode",
   "gradeCode",
+  "seniorityCode",
+] as const;
+
+const TRANSFER_ENTITY_CODE_FIELDS = [
+  "teamCode",
+  "organizationalRoleCode",
+  "jobTitleCode",
+  "ladderCode",
+  "gradeCode",
+  "seniorityCode",
+  "preferredApprovalCode",
+] as const;
+
+const HEADCOUNT_ENTITY_CODE_FIELDS = [
+  "teamCode",
+  "jobTitleCode",
   "seniorityCode",
 ] as const;
 
@@ -120,47 +137,45 @@ function validateRequired(
   }
 }
 
-function validateIdentifiers(
+function validateBusinessCodeField(
   issues: ImportIssue[],
   rowNum: number,
-  record: Record<string, string>,
   template: LaunchImportTemplate,
+  key: string,
+  raw: string,
+  opts?: { rejectUuidAsPersonnel?: boolean },
 ): void {
-  const code = normalizeBusinessCode(record.personnelCode ?? "");
-  if (code && (looksLikeInternalId(code) || !BUSINESS_CODE_RE.test(code))) {
+  if (!raw) return;
+  if (looksLikeInternalId(raw) || !BUSINESS_CODE_RE.test(raw)) {
+    const isPersonnel = key === "personnelCode" || key === "requirementCode";
     pushIssue(issues, {
       row: rowNum,
-      column: "personnelCode",
-      columnCaptionFa: captionFor(template, "personnelCode"),
+      column: key,
+      columnCaptionFa: captionFor(template, key),
       severity: "error",
-      messageFa: looksLikeInternalId(code)
-        ? "کد پرسنلی نباید شناسه داخلی (UUID) باشد."
-        : "کد پرسنلی فقط حروف/رقم و جداکننده‌های مجاز تا ۳۲ نویسه است.",
+      messageFa: looksLikeInternalId(raw)
+        ? isPersonnel && opts?.rejectUuidAsPersonnel !== false
+          ? key === "requirementCode"
+            ? "کد نیازمندی نباید شناسه داخلی (UUID) باشد."
+            : "کد پرسنلی نباید شناسه داخلی (UUID) باشد."
+          : `«${captionFor(template, key)}» باید کد کسب‌وکار معتبر باشد (نه شناسه داخلی).`
+        : isPersonnel && key === "personnelCode"
+          ? "کد پرسنلی فقط حروف/رقم و جداکننده‌های مجاز تا ۳۲ نویسه است."
+          : isPersonnel && key === "requirementCode"
+            ? "کد نیازمندی فقط حروف/رقم و جداکننده‌های مجاز تا ۳۲ نویسه است."
+            : `«${captionFor(template, key)}» باید کد کسب‌وکار معتبر باشد (نه شناسه داخلی).`,
     });
-  }
-
-  for (const key of ENTITY_CODE_FIELDS) {
-    const raw = normalizeBusinessCode(record[key] ?? "");
-    if (!raw) continue;
-    if (looksLikeInternalId(raw) || !BUSINESS_CODE_RE.test(raw)) {
-      pushIssue(issues, {
-        row: rowNum,
-        column: key,
-        columnCaptionFa: captionFor(template, key),
-        severity: "error",
-        messageFa: `«${captionFor(template, key)}» باید کد کسب‌وکار معتبر باشد (نه شناسه داخلی).`,
-      });
-    }
   }
 }
 
-function validateDates(
+function validateDatesOnKeys(
   issues: ImportIssue[],
   rowNum: number,
   record: Record<string, string>,
   template: LaunchImportTemplate,
+  keys: readonly string[],
 ): void {
-  for (const key of ["birthDate", "startDate"] as const) {
+  for (const key of keys) {
     const raw = record[key]?.trim() ?? "";
     if (!raw) continue;
     const parsed = parseDateOnly(raw);
@@ -176,40 +191,6 @@ function validateDates(
   }
 }
 
-function validateEnums(
-  issues: ImportIssue[],
-  rowNum: number,
-  record: Record<string, string>,
-  template: LaunchImportTemplate,
-): void {
-  const collab = (record.collaborationType ?? "").trim().toLowerCase();
-  if (collab && !COLLABORATION_ENUM.has(collab)) {
-    pushIssue(issues, {
-      row: rowNum,
-      column: "collaborationType",
-      columnCaptionFa: captionFor(template, "collaborationType"),
-      severity: "error",
-      messageFa:
-        "نوع همکاری باید یکی از employee، contractor، intern، consultant باشد.",
-    });
-  }
-  const gender = (record.gender ?? "").trim().toLowerCase();
-  if (gender && !GENDER_ENUM.has(gender)) {
-    pushIssue(issues, {
-      row: rowNum,
-      column: "gender",
-      columnCaptionFa: captionFor(template, "gender"),
-      severity: "warning",
-      messageFa:
-        "مقدار جنسیت استاندارد نیست؛ در اجرا ممکن است رد شود (male/female/other/unspecified).",
-    });
-  }
-}
-
-/**
- * Ladder–Grade pairing: both required together; warn if one blank when other set
- * (required validator already catches blanks for required cols).
- */
 function validateLadderGrade(
   issues: ImportIssue[],
   rowNum: number,
@@ -232,7 +213,6 @@ function validateLadderGrade(
   }
 }
 
-/** Soft hierarchy: team present when role/job present. */
 function validateHierarchy(
   issues: ImportIssue[],
   rowNum: number,
@@ -253,15 +233,12 @@ function validateHierarchy(
   }
 }
 
-/** Reference shape covered by business-code checks; flag copy-paste across cols. */
 function validateReferences(
   issues: ImportIssue[],
   rowNum: number,
   record: Record<string, string>,
   template: LaunchImportTemplate,
 ): void {
-  // Preview cannot invent live org/job existence — structural only.
-  // Duplicate identical code across distinct semantic columns → warning.
   const codes = [
     record.teamCode,
     record.organizationalRoleCode,
@@ -310,8 +287,187 @@ function validateOrderAndOverlaps(
   }
 }
 
+function validatePersonRow(
+  issues: ImportIssue[],
+  template: LaunchImportTemplate,
+  rowNum: number,
+  record: Record<string, string>,
+  priorStartByCode: Map<string, string>,
+): void {
+  validateRequired(issues, template, rowNum, record);
+
+  const code = normalizeBusinessCode(record.personnelCode ?? "");
+  validateBusinessCodeField(issues, rowNum, template, "personnelCode", code);
+
+  for (const key of PERSON_ENTITY_CODE_FIELDS) {
+    validateBusinessCodeField(
+      issues,
+      rowNum,
+      template,
+      key,
+      normalizeBusinessCode(record[key] ?? ""),
+    );
+  }
+
+  validateDatesOnKeys(issues, rowNum, record, template, [
+    "birthDate",
+    "startDate",
+  ]);
+
+  const collab = (record.collaborationType ?? "").trim().toLowerCase();
+  if (collab && !COLLABORATION_ENUM.has(collab)) {
+    pushIssue(issues, {
+      row: rowNum,
+      column: "collaborationType",
+      columnCaptionFa: captionFor(template, "collaborationType"),
+      severity: "error",
+      messageFa:
+        "نوع همکاری باید یکی از employee، contractor، intern، consultant باشد.",
+    });
+  }
+  const gender = (record.gender ?? "").trim().toLowerCase();
+  if (gender && !GENDER_ENUM.has(gender)) {
+    pushIssue(issues, {
+      row: rowNum,
+      column: "gender",
+      columnCaptionFa: captionFor(template, "gender"),
+      severity: "warning",
+      messageFa:
+        "مقدار جنسیت استاندارد نیست؛ در اجرا ممکن است رد شود (male/female/other/unspecified).",
+    });
+  }
+
+  validateLadderGrade(issues, rowNum, record, template);
+  validateHierarchy(issues, rowNum, record, template);
+  validateReferences(issues, rowNum, record, template);
+  validateOrderAndOverlaps(
+    issues,
+    rowNum,
+    record,
+    template,
+    priorStartByCode,
+  );
+}
+
+function validateTransferRow(
+  issues: ImportIssue[],
+  template: LaunchImportTemplate,
+  rowNum: number,
+  record: Record<string, string>,
+): void {
+  validateRequired(issues, template, rowNum, record);
+
+  validateBusinessCodeField(
+    issues,
+    rowNum,
+    template,
+    "personnelCode",
+    normalizeBusinessCode(record.personnelCode ?? ""),
+  );
+
+  for (const key of TRANSFER_ENTITY_CODE_FIELDS) {
+    validateBusinessCodeField(
+      issues,
+      rowNum,
+      template,
+      key,
+      normalizeBusinessCode(record[key] ?? ""),
+    );
+  }
+
+  validateDatesOnKeys(issues, rowNum, record, template, ["effectiveDate"]);
+  validateLadderGrade(issues, rowNum, record, template);
+  validateHierarchy(issues, rowNum, record, template);
+  validateReferences(issues, rowNum, record, template);
+}
+
+function validateHeadcountRow(
+  issues: ImportIssue[],
+  template: LaunchImportTemplate,
+  rowNum: number,
+  record: Record<string, string>,
+): void {
+  validateRequired(issues, template, rowNum, record);
+
+  validateBusinessCodeField(
+    issues,
+    rowNum,
+    template,
+    "requirementCode",
+    normalizeBusinessCode(record.requirementCode ?? ""),
+  );
+
+  for (const key of HEADCOUNT_ENTITY_CODE_FIELDS) {
+    validateBusinessCodeField(
+      issues,
+      rowNum,
+      template,
+      key,
+      normalizeBusinessCode(record[key] ?? ""),
+    );
+  }
+
+  validateDatesOnKeys(issues, rowNum, record, template, [
+    "validityStart",
+    "validityEndExclusive",
+  ]);
+
+  const start = record.validityStart?.trim() ?? "";
+  const end = record.validityEndExclusive?.trim() ?? "";
+  if (start && end && start >= end) {
+    const startOk = parseDateOnly(start);
+    const endOk = parseDateOnly(end);
+    if (startOk.ok && endOk.ok) {
+      pushIssue(issues, {
+        row: rowNum,
+        column: "validityEndExclusive",
+        columnCaptionFa: captionFor(template, "validityEndExclusive"),
+        severity: "error",
+        messageFa: "پایان اعتبار باید بعد از شروع اعتبار باشد.",
+      });
+    }
+  }
+
+  const allowedRaw = toLatinDigits(record.allowedCount ?? "").trim();
+  if (allowedRaw) {
+    if (!/^\d+$/.test(allowedRaw)) {
+      pushIssue(issues, {
+        row: rowNum,
+        column: "allowedCount",
+        columnCaptionFa: captionFor(template, "allowedCount"),
+        severity: "error",
+        messageFa: "سقف مجاز باید عدد صحیح غیرمنفی باشد.",
+      });
+    }
+  }
+}
+
 function rowFingerprint(record: Record<string, string>, keys: string[]): string {
   return keys.map((k) => `${k}=${(record[k] ?? "").trim()}`).join("|");
+}
+
+function subjectCodeForTemplate(
+  template: LaunchImportTemplate,
+  record: Record<string, string>,
+): string | undefined {
+  const raw =
+    template.key === "headcount_approval_create"
+      ? (record.requirementCode ?? "").trim()
+      : (record.personnelCode ?? "").trim();
+  if (raw && !looksLikeInternalId(raw)) return raw;
+  return undefined;
+}
+
+function uniquenessKeyForTemplate(
+  template: LaunchImportTemplate,
+  record: Record<string, string>,
+): { column: string; code: string } | null {
+  if (template.key === "headcount_approval_create") {
+    const code = record.requirementCode?.trim() ?? "";
+    return code ? { column: "requirementCode", code } : null;
+  }
+  const code = record.personnelCode?.trim() ?? "";
+  return code ? { column: "personnelCode", code } : null;
 }
 
 /**
@@ -340,35 +496,51 @@ export function validateImportMatrix(parsed: ParsedImportMatrix): ImportIssue[] 
     const record = rows[i]!;
     const rowNum = sourceRowNumbers[i] ?? i + 2;
 
-    validateRequired(issues, template, rowNum, record);
-    validateIdentifiers(issues, rowNum, record, template);
-    validateDates(issues, rowNum, record, template);
-    validateEnums(issues, rowNum, record, template);
-    validateLadderGrade(issues, rowNum, record, template);
-    validateHierarchy(issues, rowNum, record, template);
-    validateReferences(issues, rowNum, record, template);
-    validateOrderAndOverlaps(
-      issues,
-      rowNum,
-      record,
-      template,
-      priorStartByCode,
-    );
+    switch (template.key) {
+      case "personnel_event_transfer":
+        validateTransferRow(issues, template, rowNum, record);
+        break;
+      case "headcount_approval_create":
+        validateHeadcountRow(issues, template, rowNum, record);
+        break;
+      case "person_employment_start":
+        validatePersonRow(
+          issues,
+          template,
+          rowNum,
+          record,
+          priorStartByCode,
+        );
+        break;
+      default:
+        pushIssue(issues, {
+          row: rowNum,
+          column: "_template",
+          columnCaptionFa: "قالب",
+          severity: "error",
+          messageFa: `قالب «${template.key}» برای اعتبارسنجی پشتیبانی نمی‌شود.`,
+        });
+        break;
+    }
 
-    const code = record.personnelCode?.trim() ?? "";
-    if (code) {
-      const list = codeRows.get(code) ?? [];
+    const uniq = uniquenessKeyForTemplate(template, record);
+    if (uniq) {
+      const list = codeRows.get(`${uniq.column}:${uniq.code}`) ?? [];
       list.push(rowNum);
-      codeRows.set(code, list);
+      codeRows.set(`${uniq.column}:${uniq.code}`, list);
     }
 
     const fp = rowFingerprint(record, keys);
     const prevFpRow = fingerprints.get(fp);
     if (prevFpRow != null) {
+      const subjectCol =
+        template.key === "headcount_approval_create"
+          ? "requirementCode"
+          : "personnelCode";
       pushIssue(issues, {
         row: rowNum,
-        column: "personnelCode",
-        columnCaptionFa: captionFor(template, "personnelCode"),
+        column: subjectCol,
+        columnCaptionFa: captionFor(template, subjectCol),
         severity: "error",
         messageFa: `ردیف تکراری با ردیف ${prevFpRow} (تمام ستون‌ها یکسان).`,
       });
@@ -377,10 +549,11 @@ export function validateImportMatrix(parsed: ParsedImportMatrix): ImportIssue[] 
     }
   }
 
-  // Uniqueness of personnel code across rows (soft: same code different facts = warning)
-  for (const [code, rowList] of codeRows) {
+  for (const [keyed, rowList] of codeRows) {
     if (rowList.length <= 1) continue;
-    // If not already flagged as full duplicate, warn uniqueness
+    const sep = keyed.indexOf(":");
+    const column = keyed.slice(0, sep);
+    const code = keyed.slice(sep + 1);
     for (let i = 1; i < rowList.length; i++) {
       const rowNum = rowList[i]!;
       const alreadyDup = issues.some(
@@ -389,25 +562,24 @@ export function validateImportMatrix(parsed: ParsedImportMatrix): ImportIssue[] 
           iss.messageFa.includes("ردیف تکراری"),
       );
       if (alreadyDup) continue;
+      const label =
+        column === "requirementCode" ? "کد نیازمندی" : "کد پرسنلی";
       pushIssue(issues, {
         row: rowNum,
-        column: "personnelCode",
-        columnCaptionFa: captionFor(template, "personnelCode"),
+        column,
+        columnCaptionFa: captionFor(template, column),
         severity: "warning",
-        messageFa: `کد پرسنلی «${code}» در چند ردیف تکرار شده (${rowList.join("، ")}).`,
+        messageFa: `${label} «${code}» در چند ردیف تکرار شده (${rowList.join("، ")}).`,
         subjectBusinessCode: looksLikeInternalId(code) ? undefined : code,
       });
     }
   }
 
-  // Attach subject business code (personnelCode) when present — never UUID.
   const codeByRow = new Map<number, string>();
   for (let i = 0; i < rows.length; i++) {
     const rowNum = sourceRowNumbers[i] ?? i + 2;
-    const raw = (rows[i]!.personnelCode ?? "").trim();
-    if (raw && !looksLikeInternalId(raw)) {
-      codeByRow.set(rowNum, raw);
-    }
+    const subject = subjectCodeForTemplate(template, rows[i]!);
+    if (subject) codeByRow.set(rowNum, subject);
   }
   for (const issue of issues) {
     if (issue.subjectBusinessCode) continue;

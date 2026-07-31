@@ -36,8 +36,12 @@ export type TrpcContext = {
  * Handlers must not omit this — default-deny at the envelope.
  */
 export type GovernedProcedureMeta = {
-  permission: string;
-  dataCategory: string;
+  /**
+   * Coarse permission for envelope authorize.
+   * Optional when `resolveAuthorizeFromInput` supplies permission+dataCategory.
+   */
+  permission?: string;
+  dataCategory?: string;
   action: string;
   organizationalScope: string;
   operation: string;
@@ -55,6 +59,17 @@ export type GovernedProcedureMeta = {
    * Default false — raw client temporal fields are ignored (Story 2.6 review).
    */
   allowClientTemporal?: boolean;
+  /**
+   * Story 9.3 — resolve permission + dataCategory from raw input before
+   * envelope authorize (template-aware day-to-day bulk). Fail closed when
+   * resolver returns null / incomplete. Does not invent permission keys.
+   */
+  resolveAuthorizeFromInput?: (
+    rawInput: unknown,
+  ) =>
+    | { permission: string; dataCategory: string }
+    | Promise<{ permission: string; dataCategory: string } | null>
+    | null;
 };
 
 const t = initTRPC
@@ -159,11 +174,9 @@ export const governedProcedure = protectedProcedure.use(
     }
 
     if (
-      !meta?.permission?.trim() ||
-      !meta.dataCategory?.trim() ||
-      !meta.action?.trim() ||
-      !meta.organizationalScope?.trim() ||
-      !meta.operation?.trim()
+      !meta?.action?.trim() ||
+      !meta?.organizationalScope?.trim() ||
+      !meta?.operation?.trim()
     ) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
@@ -189,6 +202,29 @@ export const governedProcedure = protectedProcedure.use(
     const rawInput = (await getRawInput()) as
       | { asOfDate?: unknown; evaluationMode?: EvaluationMode }
       | undefined;
+
+    let permission = meta.permission?.trim() ?? "";
+    let dataCategory = meta.dataCategory?.trim() ?? "";
+    if (meta.resolveAuthorizeFromInput) {
+      const resolved = await meta.resolveAuthorizeFromInput(rawInput);
+      if (
+        !resolved?.permission?.trim() ||
+        !resolved?.dataCategory?.trim()
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: MSG_ACCESS_DENIED_FA,
+        });
+      }
+      permission = resolved.permission.trim();
+      dataCategory = resolved.dataCategory.trim();
+    }
+    if (!permission || !dataCategory) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: operationalCopy.accessDeniedTitle,
+      });
+    }
 
     // Only honor client temporal fields when meta explicitly allows it.
     const allowClientTemporal = meta.allowClientTemporal === true;
@@ -219,8 +255,8 @@ export const governedProcedure = protectedProcedure.use(
     try {
       const authorized = await getEnvelope().authorizeOrThrow({
         context: toEnvelopeAuthzContext(fresh),
-        permission: meta.permission.trim(),
-        dataCategory: meta.dataCategory.trim(),
+        permission,
+        dataCategory,
         action: meta.action.trim(),
         organizationalScope: meta.organizationalScope.trim(),
         operation: meta.operation.trim(),

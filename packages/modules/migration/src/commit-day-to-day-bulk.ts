@@ -156,7 +156,8 @@ export async function commitDayToDayBulk(
     evidence: result.evidence,
     idempotentReplay: false,
     correlationId: result.batch.correlationId,
-    created: result.createdPersonIds.length,
+    created:
+      result.createdPersonIds.length + result.createdDomainRecordIds.length,
     updated: result.matchedPersonIds.length,
     rejected: 0,
   };

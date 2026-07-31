@@ -387,6 +387,19 @@ export function getStoredDraftForStaging(previewBatchId: string): {
   };
 }
 
+/**
+ * Story 9.3 — resolve templateKey before envelope authorize (no ownership check).
+ * Returns null when draft missing/cancelled.
+ */
+export function peekPreviewTemplateKey(
+  previewBatchId: string,
+): string | null {
+  purgeExpiredDrafts();
+  const stored = draftStore.get(previewBatchId);
+  if (!stored || stored.batch.status === "cancelled") return null;
+  return stored.batch.templateKey;
+}
+
 /** Test/selfcheck helper — wipe in-memory drafts. */
 export function clearImportPreviewDraftStore(): void {
   draftStore.clear();

@@ -30,8 +30,21 @@ import {
   withTransaction,
 } from "@divan/event-store";
 import {
+  activateApproval,
+  createApproval,
+  HeadcountApprovalError,
+  listApprovals,
+} from "@divan/headcount";
+import {
   PersonIdentityError,
+  PersonnelEventError,
+  PERSONNEL_EVENT_PRODUCT_RISK_TIERS,
+  createDraft,
   createPerson,
+  deleteDraft,
+  finalizeDraft,
+  getDraft,
+  getActiveEmploymentAsOf,
   getGradeByCode,
   getJobTitleByCode,
   getLadderByCode,
@@ -115,15 +128,21 @@ export type CutoverClaimStatus = "approved" | "confirmed-draft";
 /**
  * Map evidence + row outcome ids → operator counts.
  * Success path is all-or-nothing → rejected = 0.
- * Idempotent replay: updated = total record ids − created persons.
+ * Person path: created = persons; updated = matched − created.
+ * PE/HC path: createdPersonCount is 0; created = all createdRecordIds.
  */
 export function mapCutoverCounts(opts: {
   createdPersonCount: number;
   recordIdsLength: number;
   rejected?: number;
 }): { created: number; updated: number; rejected: number } {
-  const created = opts.createdPersonCount;
-  const updated = Math.max(0, opts.recordIdsLength - created);
+  const personCreates = opts.createdPersonCount;
+  const created =
+    personCreates > 0 ? personCreates : opts.recordIdsLength;
+  const updated =
+    personCreates > 0
+      ? Math.max(0, opts.recordIdsLength - personCreates)
+      : 0;
   return {
     created,
     updated,
@@ -179,13 +198,31 @@ export function revalidateStagingBatch(batch: StagingBatchRecord): ImportIssue[]
 }
 
 /**
- * Authoritative live FK checks via published PE APIs (AC #3).
+ * Authoritative live FK checks via published PE/HC APIs (AC #3).
  * Story 9.1: staging rows carry business codes; resolve via *ByCode.
+ * Story 9.3: per-template subject existence where product requires it.
  */
 export async function revalidateAuthoritativeReferences(
   batch: StagingBatchRecord,
 ): Promise<void> {
   for (const row of batch.rows) {
+    if (batch.templateKey === "personnel_event_transfer") {
+      const personnelCode = (row.values.personnelCode ?? "").trim();
+      if (!personnelCode) {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: کد پرسنلی الزامی است.`,
+        );
+      }
+      const person = await getPersonByPersonnelCode(personnelCode);
+      if (!person) {
+        throw new MigrationError(
+          "REVALIDATION_FAILED",
+          `ردیف ${row.sourceRow}: کد پرسنلی «${personnelCode}» یافت نشد.`,
+        );
+      }
+    }
+
     const teamCode = (row.values.teamCode ?? "").trim();
     if (teamCode) {
       const unit = await getOrgUnitByCode(teamCode);
@@ -257,11 +294,11 @@ export async function revalidateAuthoritativeReferences(
   }
 }
 
-function assertNoDuplicatePersonnelCodes(issues: ImportIssue[]): void {
+function assertNoDuplicateSubjectCodes(issues: ImportIssue[]): void {
   const dups = issues.filter(
     (i) =>
       i.severity === "warning" &&
-      i.column === "personnelCode" &&
+      (i.column === "personnelCode" || i.column === "requirementCode") &&
       i.messageFa.includes("در چند ردیف"),
   );
   if (dups.length > 0) {
@@ -273,15 +310,13 @@ function assertNoDuplicatePersonnelCodes(issues: ImportIssue[]): void {
 }
 
 /**
- * Assert no production business events exist for this batch correlation.
- * Used after pre-cutover rollback / failed cutover (AC #4).
- *
- * Honesty: does not detect Prisma Person orphans (see file header AD-6 note).
+ * Count production business events for this batch correlation.
+ * Honesty: does not detect Prisma Person / HC approval orphans (AD-6 / 9.3).
  */
-export async function assertZeroProductionTrace(
+export async function countProductionBusinessEvents(
   client: PoolClient,
   correlationId: string,
-): Promise<void> {
+): Promise<number> {
   const res = await client.query(
     `SELECT COUNT(*)::int AS c
      FROM kernel_events
@@ -289,7 +324,18 @@ export async function assertZeroProductionTrace(
        AND event_class = 'business'`,
     [correlationId],
   );
-  const count = Number(res.rows[0]?.c ?? 0);
+  return Number(res.rows[0]?.c ?? 0);
+}
+
+/**
+ * Assert no production business events exist for this batch correlation.
+ * Used after pre-cutover rollback / failed cutover when no domain side-effects.
+ */
+export async function assertZeroProductionTrace(
+  client: PoolClient,
+  correlationId: string,
+): Promise<void> {
+  const count = await countProductionBusinessEvents(client, correlationId);
   if (count > 0) {
     throw new MigrationError(
       "CUTOVER_FAILED",
@@ -301,6 +347,20 @@ export async function assertZeroProductionTrace(
 function mapPersonIdentityToMigration(err: PersonIdentityError): never {
   throw new MigrationError(
     err.code === "PERMISSION_DENIED" ? "SOD_VIOLATION" : "REVALIDATION_FAILED",
+    err.messageFa,
+  );
+}
+
+function mapPersonnelEventToMigration(err: PersonnelEventError): never {
+  throw new MigrationError(
+    err.code === "PERMISSION_DENIED" ? "PERMISSION_DENIED" : "CUTOVER_FAILED",
+    err.messageFa,
+  );
+}
+
+function mapHeadcountApprovalToMigration(err: HeadcountApprovalError): never {
+  throw new MigrationError(
+    err.code === "PERMISSION_DENIED" ? "PERMISSION_DENIED" : "CUTOVER_FAILED",
     err.messageFa,
   );
 }
@@ -341,96 +401,472 @@ function buildImportEvaluationBoundRefs(
 function resolveFailureMessageFa(err: unknown): string {
   if (err instanceof MigrationError) return err.messageFa;
   if (err instanceof EvaluationSnapshotError) return err.messageFa;
+  if (err instanceof PersonnelEventError) return err.messageFa;
+  if (err instanceof HeadcountApprovalError) return err.messageFa;
   return "اجرای دسته ناموفق بود.";
 }
 
 function resolveFailureCode(err: unknown): string {
   if (err instanceof MigrationError) return err.code;
   if (err instanceof EvaluationSnapshotError) return err.code;
+  if (err instanceof PersonnelEventError) return err.code;
+  if (err instanceof HeadcountApprovalError) return err.code;
   return "CUTOVER_FAILED";
 }
 
+const MSG_CUTOVER_NO_PRODUCTION_CHANGE_FA =
+  "اجرای دسته ناموفق بود؛ وضعیت تولید تغییر نکرد.";
+const MSG_CUTOVER_PARTIAL_PRODUCTION_FA =
+  "اجرای دسته ناموفق بود؛ بخشی از وضعیت تولید ممکن است تغییر کرده باشد. دسته را بازبینی کنید.";
+
+async function cutoverPersonRow(
+  client: PoolClient,
+  batch: StagingBatchRecord,
+  row: StagingBatchRow,
+  executorAccountId: string,
+  createdPersonIds: string[],
+  matchedPersonIds: string[],
+  eventIds: string[],
+): Promise<void> {
+  const code = (row.values.personnelCode ?? "").trim();
+  if (!code) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${row.sourceRow}: کد پرسنلی خالی است.`,
+    );
+  }
+
+  let person;
+  try {
+    person = await getPersonByPersonnelCode(code);
+    if (!person) {
+      person = await createPerson(rowToCreatePersonInput(row.values), {
+        accountId: executorAccountId,
+        correlationId: batch.correlationId,
+      });
+      createdPersonIds.push(person.id);
+    } else {
+      matchedPersonIds.push(person.id);
+    }
+  } catch (err) {
+    if (err instanceof PersonIdentityError) mapPersonIdentityToMigration(err);
+    throw err;
+  }
+
+  const effectiveDate =
+    (row.values.startDate ?? "").trim() ||
+    new Date().toISOString().slice(0, 10);
+
+  const { id: eventId } = await appendBusinessEvent(client, {
+    correlationId: batch.correlationId,
+    eventType: BASELINE_RECORDED_EVENT_TYPE,
+    personId: person.id,
+    effectiveDate,
+    registeredBy: executorAccountId,
+    status: "Effective",
+    finalizedBy: executorAccountId,
+    finalizedAt: new Date(),
+    provenance: {
+      source: "migration",
+      batchId: batch.id,
+      previewBatchId: batch.previewBatchId,
+      templateKey: batch.templateKey,
+      sourceRow: row.sourceRow,
+    },
+    payload: {
+      source: "migration",
+      rowId: row.rowId,
+      teamCode: row.values.teamCode ?? null,
+      organizationalRoleCode: row.values.organizationalRoleCode ?? null,
+      jobTitleCode: row.values.jobTitleCode ?? null,
+      ladderCode: row.values.ladderCode ?? null,
+      gradeCode: row.values.gradeCode ?? null,
+      seniorityCode: row.values.seniorityCode ?? null,
+      collaborationType: row.values.collaborationType ?? null,
+    },
+    afterEvidence: {
+      personnelCode: code,
+      personId: person.id,
+    },
+  });
+  eventIds.push(eventId);
+}
+
+async function resolveTransferPayloadIds(
+  values: Record<string, string>,
+  sourceRow: number,
+  client: PoolClient,
+): Promise<{
+  teamId: string;
+  organizationalRoleId: string;
+  jobTitleId: string;
+  ladderId: string;
+  gradeId: string;
+  seniorityId?: string;
+  preferredApprovalId?: string;
+}> {
+  const team = await getOrgUnitByCode((values.teamCode ?? "").trim());
+  if (!team || team.unitType !== "TEAM") {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${sourceRow}: کد تیم مقصد معتبر نیست.`,
+    );
+  }
+  const role = await getOrganizationalRoleByCode(
+    (values.organizationalRoleCode ?? "").trim(),
+  );
+  if (!role) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${sourceRow}: کد نقش سازمانی یافت نشد.`,
+    );
+  }
+  const job = await getJobTitleByCode((values.jobTitleCode ?? "").trim());
+  if (!job) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${sourceRow}: کد عنوان شغلی یافت نشد.`,
+    );
+  }
+  const ladder = await getLadderByCode((values.ladderCode ?? "").trim());
+  if (!ladder) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${sourceRow}: کد نردبان یافت نشد.`,
+    );
+  }
+  const grade = await getGradeByCode(
+    ladder.id,
+    (values.gradeCode ?? "").trim(),
+  );
+  if (!grade) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${sourceRow}: کد گرید یافت نشد.`,
+    );
+  }
+
+  const payload: {
+    teamId: string;
+    organizationalRoleId: string;
+    jobTitleId: string;
+    ladderId: string;
+    gradeId: string;
+    seniorityId?: string;
+    preferredApprovalId?: string;
+  } = {
+    teamId: team.id,
+    organizationalRoleId: role.id,
+    jobTitleId: job.id,
+    ladderId: ladder.id,
+    gradeId: grade.id,
+  };
+
+  const seniorityCode = (values.seniorityCode ?? "").trim();
+  if (seniorityCode) {
+    const seniority = await getSeniorityByCode(seniorityCode);
+    if (!seniority) {
+      throw new MigrationError(
+        "REVALIDATION_FAILED",
+        `ردیف ${sourceRow}: کد ارشدیت یافت نشد.`,
+      );
+    }
+    payload.seniorityId = seniority.id;
+  }
+
+  const preferredCode = (values.preferredApprovalCode ?? "").trim();
+  if (preferredCode) {
+    const approvals = await listApprovals(client);
+    const match = approvals.find(
+      (a) => a.requirementCode === preferredCode && a.status === "active",
+    );
+    if (!match) {
+      throw new MigrationError(
+        "REVALIDATION_FAILED",
+        `ردیف ${sourceRow}: کد مجوز ظرفیت ترجیحی «${preferredCode}» یافت نشد یا فعال نیست.`,
+      );
+    }
+    // Product form uses preferredApprovalId; transfer facts also accept headcountApprovalId.
+    payload.preferredApprovalId = match.id;
+    (payload as { headcountApprovalId?: string }).headcountApprovalId =
+      match.id;
+  }
+
+  return payload;
+}
+
+async function cutoverTransferRow(
+  pool: Pool,
+  client: PoolClient,
+  batch: StagingBatchRecord,
+  row: StagingBatchRow,
+  executorAccountId: string,
+  createdRecordIds: string[],
+  eventIds: string[],
+): Promise<void> {
+  const code = (row.values.personnelCode ?? "").trim();
+  const effectiveDate = (row.values.effectiveDate ?? "").trim();
+  if (!code || !effectiveDate) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${row.sourceRow}: کد پرسنلی یا تاریخ مؤثر خالی است.`,
+    );
+  }
+
+  const person = await getPersonByPersonnelCode(code);
+  if (!person) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${row.sourceRow}: کد پرسنلی «${code}» یافت نشد.`,
+    );
+  }
+
+  let employment;
+  try {
+    employment = await getActiveEmploymentAsOf(person.id, effectiveDate);
+  } catch (err) {
+    if (err instanceof PersonIdentityError) mapPersonIdentityToMigration(err);
+    throw err;
+  }
+  if (!employment) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${row.sourceRow}: اشتغال فعال برای «${code}» در تاریخ مؤثر یافت نشد.`,
+    );
+  }
+
+  const ids = await resolveTransferPayloadIds(
+    row.values,
+    row.sourceRow,
+    client,
+  );
+
+  try {
+    const draft = await createDraft(
+      {
+        personId: person.id,
+        employmentId: employment.id,
+        eventType: "TransferRecorded",
+        effectiveDate,
+        payload: {
+          ...ids,
+          employmentId: employment.id,
+        },
+      },
+      { accountId: executorAccountId },
+    );
+
+    try {
+      const finalized = await finalizeDraft(
+        {
+          draftId: draft.id,
+          actorId: executorAccountId,
+          correlationId: batch.correlationId,
+          riskTier: PERSONNEL_EVENT_PRODUCT_RISK_TIERS,
+        },
+        pool,
+      );
+
+      if (finalized.outcome !== "finalized" || !finalized.eventId) {
+        const conflictHint =
+          finalized.outcome === "rejected" &&
+          Array.isArray(finalized.conflicts) &&
+          finalized.conflicts.length > 0
+            ? ` — ${finalized.conflicts
+                .map((c) =>
+                  typeof c === "object" && c && "messageFa" in c
+                    ? String((c as { messageFa: string }).messageFa)
+                    : String(c),
+                )
+                .slice(0, 3)
+                .join("؛ ")}`
+            : "";
+        throw new MigrationError(
+          "CUTOVER_FAILED",
+          `ردیف ${row.sourceRow}: نهایی‌سازی رویداد انتقال به وضعیت قطعی نرسید (${finalized.outcome})${conflictHint}.`,
+        );
+      }
+
+      createdRecordIds.push(draft.id);
+      eventIds.push(finalized.eventId);
+    } catch (finalizeErr) {
+      // Best-effort: abandon open/pending draft so failed finalize does not leave orphans.
+      try {
+        const current = await getDraft(draft.id);
+        if (
+          current.status === "open" ||
+          current.status === "pending_review"
+        ) {
+          await deleteDraft(draft.id, current.version, {
+            accountId: executorAccountId,
+          });
+        }
+      } catch {
+        // draft may already be deleted / finalized race
+      }
+      throw finalizeErr;
+    }
+  } catch (err) {
+    if (err instanceof PersonnelEventError) mapPersonnelEventToMigration(err);
+    if (err instanceof MigrationError) throw err;
+    throw err;
+  }
+}
+
+async function cutoverHeadcountRow(
+  pool: Pool,
+  row: StagingBatchRow,
+  executorAccountId: string,
+  createdRecordIds: string[],
+): Promise<void> {
+  const requirementCode = (row.values.requirementCode ?? "").trim();
+  const teamCode = (row.values.teamCode ?? "").trim();
+  const jobTitleCode = (row.values.jobTitleCode ?? "").trim();
+  const allowedRaw = (row.values.allowedCount ?? "").trim();
+  const validityStart = (row.values.validityStart ?? "").trim();
+  const validityEndExclusive = (row.values.validityEndExclusive ?? "").trim();
+
+  if (
+    !requirementCode ||
+    !teamCode ||
+    !jobTitleCode ||
+    !allowedRaw ||
+    !validityStart ||
+    !validityEndExclusive
+  ) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${row.sourceRow}: فیلدهای الزامی مجوز ظرفیت ناقص است.`,
+    );
+  }
+
+  const team = await getOrgUnitByCode(teamCode);
+  if (!team || team.unitType !== "TEAM") {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${row.sourceRow}: کد تیم معتبر نیست.`,
+    );
+  }
+  const job = await getJobTitleByCode(jobTitleCode);
+  if (!job) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${row.sourceRow}: کد عنوان شغلی یافت نشد.`,
+    );
+  }
+
+  let seniorityId: string | null = null;
+  const seniorityCode = (row.values.seniorityCode ?? "").trim();
+  if (seniorityCode) {
+    const seniority = await getSeniorityByCode(seniorityCode);
+    if (!seniority) {
+      throw new MigrationError(
+        "REVALIDATION_FAILED",
+        `ردیف ${row.sourceRow}: کد ارشدیت یافت نشد.`,
+      );
+    }
+    seniorityId = seniority.id;
+  }
+
+  const allowedCount = Number.parseInt(allowedRaw, 10);
+  if (!Number.isFinite(allowedCount) || allowedCount < 0) {
+    throw new MigrationError(
+      "REVALIDATION_FAILED",
+      `ردیف ${row.sourceRow}: سقف مجاز نامعتبر است.`,
+    );
+  }
+
+  try {
+    // Single TX: create+activate — PoolClient path skips nested BEGIN (headcount runInTransaction).
+    const activated = await withTransaction(pool, async (tx) => {
+      const created = await createApproval(tx, {
+        requirementCode,
+        teamId: team.id,
+        jobTitleId: job.id,
+        seniorityId,
+        allowedCount,
+        validityStart,
+        validityEndExclusive,
+        approvalReference:
+          (row.values.approvalReference ?? "").trim() || null,
+        actorId: executorAccountId,
+      });
+      return activateApproval(tx, {
+        id: created.id,
+        actorId: executorAccountId,
+      });
+    });
+    createdRecordIds.push(activated.id);
+  } catch (err) {
+    if (err instanceof HeadcountApprovalError) {
+      mapHeadcountApprovalToMigration(err);
+    }
+    throw err;
+  }
+}
+
 async function cutoverRowsInTx(
+  pool: Pool,
   client: PoolClient,
   batch: StagingBatchRecord,
   executorAccountId: string,
 ): Promise<{
   createdPersonIds: string[];
   matchedPersonIds: string[];
+  createdDomainRecordIds: string[];
   eventIds: string[];
 }> {
   const createdPersonIds: string[] = [];
   const matchedPersonIds: string[] = [];
+  const createdDomainRecordIds: string[] = [];
   const eventIds: string[] = [];
 
   for (const row of batch.rows) {
-    const code = (row.values.personnelCode ?? "").trim();
-    if (!code) {
-      throw new MigrationError(
-        "REVALIDATION_FAILED",
-        `ردیف ${row.sourceRow}: کد پرسنلی خالی است.`,
-      );
+    switch (batch.templateKey) {
+      case "personnel_event_transfer":
+        await cutoverTransferRow(
+          pool,
+          client,
+          batch,
+          row,
+          executorAccountId,
+          createdDomainRecordIds,
+          eventIds,
+        );
+        break;
+      case "headcount_approval_create":
+        await cutoverHeadcountRow(
+          pool,
+          row,
+          executorAccountId,
+          createdDomainRecordIds,
+        );
+        break;
+      case "person_employment_start":
+        await cutoverPersonRow(
+          client,
+          batch,
+          row,
+          executorAccountId,
+          createdPersonIds,
+          matchedPersonIds,
+          eventIds,
+        );
+        break;
+      default:
+        throw new MigrationError(
+          "TEMPLATE_UNKNOWN",
+          `قالب «${batch.templateKey}» برای قطعی‌سازی پشتیبانی نمی‌شود.`,
+        );
     }
-
-    let person;
-    try {
-      person = await getPersonByPersonnelCode(code);
-      if (!person) {
-        person = await createPerson(rowToCreatePersonInput(row.values), {
-          accountId: executorAccountId,
-          correlationId: batch.correlationId,
-        });
-        createdPersonIds.push(person.id);
-      } else {
-        matchedPersonIds.push(person.id);
-      }
-    } catch (err) {
-      if (err instanceof PersonIdentityError) mapPersonIdentityToMigration(err);
-      throw err;
-    }
-
-    const effectiveDate =
-      (row.values.startDate ?? "").trim() ||
-      new Date().toISOString().slice(0, 10);
-
-    const { id: eventId } = await appendBusinessEvent(client, {
-      correlationId: batch.correlationId,
-      eventType: BASELINE_RECORDED_EVENT_TYPE,
-      personId: person.id,
-      effectiveDate,
-      registeredBy: executorAccountId,
-      status: "Effective",
-      finalizedBy: executorAccountId,
-      finalizedAt: new Date(),
-      // provenance.source=migration is audit metadata only (FR-39 / AD-4) —
-      // never a cutover/authz control; SoD/approve/execute gate elsewhere.
-      provenance: {
-        source: "migration",
-        batchId: batch.id,
-        previewBatchId: batch.previewBatchId,
-        templateKey: batch.templateKey,
-        sourceRow: row.sourceRow,
-      },
-      payload: {
-        source: "migration",
-        rowId: row.rowId,
-        teamCode: row.values.teamCode ?? null,
-        organizationalRoleCode: row.values.organizationalRoleCode ?? null,
-        jobTitleCode: row.values.jobTitleCode ?? null,
-        ladderCode: row.values.ladderCode ?? null,
-        gradeCode: row.values.gradeCode ?? null,
-        seniorityCode: row.values.seniorityCode ?? null,
-        collaborationType: row.values.collaborationType ?? null,
-      },
-      afterEvidence: {
-        personnelCode: code,
-        personId: person.id,
-      },
-    });
-    eventIds.push(eventId);
   }
 
-  return { createdPersonIds, matchedPersonIds, eventIds };
+  return {
+    createdPersonIds,
+    matchedPersonIds,
+    createdDomainRecordIds,
+    eventIds,
+  };
 }
 
 function countsFromEvidence(evidence: ImportBatchEvidence): {
@@ -465,6 +901,7 @@ export async function performAtomicCutover(
   evidence: ImportBatchEvidence;
   createdPersonIds: string[];
   matchedPersonIds: string[];
+  createdDomainRecordIds: string[];
   eventIds: string[];
 }> {
   const { batch } = opts;
@@ -476,15 +913,21 @@ export async function performAtomicCutover(
       `اعتبارسنجی مجدد ناموفق: ${formatImportIssueCite(errors[0]!)}`,
     );
   }
-  assertNoDuplicatePersonnelCodes(issues);
+  assertNoDuplicateSubjectCodes(issues);
   await revalidateAuthoritativeReferences(batch);
 
   const overlapKeys = buildOverlapKeys(batch.rows);
   let evalSnapId: string | null = null;
   let evalSnapFingerprint: string | null = null;
+  const domainOutsideTx =
+    batch.templateKey === "personnel_event_transfer" ||
+    batch.templateKey === "headcount_approval_create";
 
   try {
-    const result = await withTransaction(pool, async (client) => {
+    // Phase 1 — claim + mutex + evaluation snapshot (short TX).
+    // Story 9.3: PE finalize / HC activate open their own transactions; running
+    // them inside this TX deadlocks the pool. Domain cutover runs after commit.
+    const prep = await withTransaction(pool, async (client) => {
       const claimed = await client.query(
         `SELECT id FROM migration_staging.import_batch
          WHERE id = $1::uuid AND status = $2
@@ -520,7 +963,6 @@ export async function performAtomicCutover(
         },
       });
 
-      // Story 7.8 — bind under claim/mutex (AC4 Task 3).
       const evalSnap = await beginEvaluationSnapshot(client, {
         kind: "import_execution",
         payload: buildImportEvaluationPayload(batch),
@@ -531,7 +973,6 @@ export async function performAtomicCutover(
       evalSnapId = evalSnap.id;
       evalSnapFingerprint = evalSnap.contentFingerprint;
 
-      // Live org/role/ref re-check + fingerprint — concurrent drift fails closed.
       await revalidateAuthoritativeReferences(batch);
       const preCutoverCheck = await revalidateEvaluationSnapshot(
         client,
@@ -547,8 +988,47 @@ export async function performAtomicCutover(
         throwEvaluationSnapshotConflict(preCutoverCheck);
       }
 
-      const { createdPersonIds, matchedPersonIds, eventIds } =
-        await cutoverRowsInTx(client, batch, opts.executorAccountId);
+      return { evalSnap };
+    });
+
+    // Phase 2 — person cutover stays in one TX with Baseline append;
+    // PE/HC cutover runs outside (product APIs own their transactions).
+    let createdPersonIds: string[] = [];
+    let matchedPersonIds: string[] = [];
+    let createdDomainRecordIds: string[] = [];
+    let eventIds: string[] = [];
+
+    if (domainOutsideTx) {
+      const client = await pool.connect();
+      try {
+        const cut = await cutoverRowsInTx(
+          pool,
+          client,
+          batch,
+          opts.executorAccountId,
+        );
+        createdPersonIds = cut.createdPersonIds;
+        matchedPersonIds = cut.matchedPersonIds;
+        createdDomainRecordIds = cut.createdDomainRecordIds;
+        eventIds = cut.eventIds;
+      } finally {
+        client.release();
+      }
+    }
+
+    const result = await withTransaction(pool, async (client) => {
+      if (!domainOutsideTx) {
+        const cut = await cutoverRowsInTx(
+          pool,
+          client,
+          batch,
+          opts.executorAccountId,
+        );
+        createdPersonIds = cut.createdPersonIds;
+        matchedPersonIds = cut.matchedPersonIds;
+        createdDomainRecordIds = cut.createdDomainRecordIds;
+        eventIds = cut.eventIds;
+      }
 
       await markStagingStatus(client, batch.id, "cutover-complete", {
         executedBy: opts.executorAccountId,
@@ -560,7 +1040,7 @@ export async function performAtomicCutover(
       await revalidateAuthoritativeReferences(batch);
       const preCommitCheck = await revalidateEvaluationSnapshot(
         client,
-        { id: evalSnap.id },
+        { id: prep.evalSnap.id },
         {
           liveFingerprint: computeContentFingerprint(
             buildImportEvaluationPayload(batch),
@@ -573,7 +1053,7 @@ export async function performAtomicCutover(
       }
 
       await bindOperationToSnapshot(client, {
-        snapshot: evalSnap,
+        snapshot: prep.evalSnap,
         operationRef: {
           entityType: "import_batch",
           entityId: batch.id,
@@ -582,7 +1062,11 @@ export async function performAtomicCutover(
         markConsumed: true,
       });
 
-      const allRecordIds = [...createdPersonIds, ...matchedPersonIds];
+      const allRecordIds = [
+        ...createdPersonIds,
+        ...matchedPersonIds,
+        ...createdDomainRecordIds,
+      ];
       const evidence = await persistBatchEvidence(client, {
         batchId: batch.id,
         correlationId: batch.correlationId,
@@ -594,8 +1078,8 @@ export async function performAtomicCutover(
           approvedAt: batch.approvedAt,
           executedBy: opts.executorAccountId,
           executedAt: new Date().toISOString(),
-          evaluationSnapshotId: evalSnap.id,
-          evaluationSnapshotFingerprint: evalSnap.contentFingerprint,
+          evaluationSnapshotId: prep.evalSnap.id,
+          evaluationSnapshotFingerprint: prep.evalSnap.contentFingerprint,
         },
         counts: {
           rowCount: batch.rows.length,
@@ -607,7 +1091,13 @@ export async function performAtomicCutover(
         createdEventIds: eventIds,
       });
 
-      return { createdPersonIds, matchedPersonIds, eventIds, evidence };
+      return {
+        createdPersonIds,
+        matchedPersonIds,
+        createdDomainRecordIds,
+        eventIds,
+        evidence,
+      };
     });
 
     const updated = await getStagingBatch(pool, batch.id);
@@ -616,12 +1106,13 @@ export async function performAtomicCutover(
       evidence: result.evidence,
       createdPersonIds: result.createdPersonIds,
       matchedPersonIds: result.matchedPersonIds,
+      createdDomainRecordIds: result.createdDomainRecordIds,
       eventIds: result.eventIds,
     };
   } catch (err) {
-    // Pre-cutover / mid-cutover abort before COMMIT → TX rolled back by withTransaction
-    // (including any in-TX evaluation_snapshot insert). Best-effort staging cleanup.
-    // If a durable snapshot somehow survived outside this TX, expire it.
+    // Pre-cutover / mid-cutover abort. Story 9.3 Honesty+harden: PE/HC may have
+    // committed domain side-effects outside this TX — never leave status=executing,
+    // and do not claim "production unchanged" when business events exist.
     if (evalSnapId) {
       try {
         await markEvaluationSnapshotTerminal(pool, evalSnapId, "expired", {
@@ -632,16 +1123,50 @@ export async function performAtomicCutover(
         // best-effort
       }
     }
+
+    let productionEventCount = 0;
+    try {
+      const probe = await pool.connect();
+      try {
+        productionEventCount = await countProductionBusinessEvents(
+          probe,
+          batch.correlationId,
+        );
+      } finally {
+        probe.release();
+      }
+    } catch {
+      // probe failed — assume unknown; use domainOutsideTx as hint below
+      productionEventCount = domainOutsideTx ? -1 : 0;
+    }
+
+    const productionTouched =
+      productionEventCount > 0 ||
+      (productionEventCount < 0 && domainOutsideTx);
+    const failureMessageFa = productionTouched
+      ? `${resolveFailureMessageFa(err)} — ${MSG_CUTOVER_PARTIAL_PRODUCTION_FA}`
+      : resolveFailureMessageFa(err);
+
     try {
       await withTransaction(pool, async (client) => {
-        await assertZeroProductionTrace(client, batch.correlationId);
+        // Only assert zero-trace when we believe production is clean.
+        if (!productionTouched) {
+          await assertZeroProductionTrace(client, batch.correlationId);
+          await rollbackStagingBatch(client, batch.id);
+        } else {
+          // Drop staging rows when possible; do not require zero production.
+          try {
+            await rollbackStagingBatch(client, batch.id);
+          } catch {
+            // staging may already be inconsistent; still mark failed below
+          }
+        }
         await releaseOverlapLocksForBatch(client, batch.id);
-        await rollbackStagingBatch(client, batch.id);
         await markStagingStatus(client, batch.id, "failed", {
           executedBy: opts.executorAccountId,
           executedAt: new Date(),
           errorSummary: {
-            messageFa: resolveFailureMessageFa(err),
+            messageFa: failureMessageFa,
             code: resolveFailureCode(err),
           },
         });
@@ -666,25 +1191,30 @@ export async function performAtomicCutover(
           counts: {
             rowCount: batch.rows.length,
             createdPersonCount: 0,
-            createdEventCount: 0,
+            createdEventCount: Math.max(0, productionEventCount),
             errorCount: 1,
           },
-          errors: [resolveFailureMessageFa(err)],
+          errors: [failureMessageFa],
         });
       });
     } catch {
-      // Best-effort cleanup; rethrow original
+      // Best-effort cleanup; rethrow original below
     }
 
     if (err instanceof MigrationError) throw err;
     if (err instanceof PersonIdentityError) mapPersonIdentityToMigration(err);
-    // Story 7.8 — evaluation-snapshot conflicts are fail-closed, never swallowed.
+    if (err instanceof PersonnelEventError) mapPersonnelEventToMigration(err);
+    if (err instanceof HeadcountApprovalError) {
+      mapHeadcountApprovalToMigration(err);
+    }
     if (err instanceof EvaluationSnapshotError) {
       throw new MigrationError("REVALIDATION_FAILED", err.messageFa);
     }
     throw new MigrationError(
       "CUTOVER_FAILED",
-      "اجرای دسته ناموفق بود؛ وضعیت تولید تغییر نکرد.",
+      productionTouched
+        ? MSG_CUTOVER_PARTIAL_PRODUCTION_FA
+        : MSG_CUTOVER_NO_PRODUCTION_CHANGE_FA,
     );
   }
 }
@@ -791,7 +1321,8 @@ export async function executeImportBatch(
     batch: result.batch,
     evidence: result.evidence,
     idempotentReplay: false,
-    created: result.createdPersonIds.length,
+    created:
+      result.createdPersonIds.length + result.createdDomainRecordIds.length,
     updated: result.matchedPersonIds.length,
     rejected: 0,
   };
