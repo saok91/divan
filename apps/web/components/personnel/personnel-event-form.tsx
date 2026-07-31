@@ -4,6 +4,21 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  EntityPicker,
+  TechnicalDetailDisclosure,
+  createEmploymentSearch,
+  createGradeSearch,
+  createJobTitleSearch,
+  createLadderSearch,
+  createOrgUnitSearch,
+  createOrganizationalRoleSearch,
+  createPersonSearch,
+  createPrimaryAssignmentSearch,
+  createSenioritySearch,
+  useEntityPickerCascade,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
+import {
   FormField,
   FormFooter,
   FormLayout,
@@ -15,6 +30,16 @@ import {
   useLeaveGuardOptional,
   useLeaveGuardRegistration,
 } from "@/components/leave-guard";
+import {
+  employmentIdForPrimaryAssignment,
+  entityId,
+  formatCodeName,
+  fromEntitySnap,
+  hydrateEmploymentValue,
+  hydratePersonValue,
+  toEntitySnap,
+  type EntitySnap,
+} from "@/components/personnel/personnel-event-entity-helpers";
 import { HeadcountCapacityPanel } from "@/components/personnel/headcount-capacity-panel";
 import {
   ConflictList,
@@ -86,6 +111,23 @@ type PersonnelEventFormProps = {
   initialPersonId?: string;
 };
 
+type SourceQueryState = {
+  isError: boolean;
+  isPending: boolean;
+  isFetching: boolean;
+};
+
+/** Human source label, or loading / error / empty — never a perpetual ambiguous «…» on failure. */
+function resolveSourceLabel(
+  label: string | null,
+  query: SourceQueryState,
+): string {
+  if (label) return label;
+  if (query.isError) return "بارگذاری ناموفق";
+  if (query.isPending || query.isFetching) return "…";
+  return "—";
+}
+
 /**
  * Minimal فرم رویداد (UX-DR11) — Stories 4.2–4.3; relocated in 4b.7.
  * Save draft ≠ Finalize. Lifecycle Cancel/Reverse/Correct append-only.
@@ -105,19 +147,20 @@ export function PersonnelEventForm({
     registerPersonnelDraftSaveHandler,
   } = usePlatformStatus();
 
-  const [personId, setPersonId] = React.useState(() =>
-    initialPersonId?.trim() ? initialPersonId.trim() : "",
-  );
-  const [employmentId, setEmploymentId] = React.useState("");
+  const [person, setPerson] = React.useState<EntityPickerValue>(null);
+  const [employment, setEmployment] = React.useState<EntityPickerValue>(null);
+  const [primaryAssignment, setPrimaryAssignment] =
+    React.useState<EntityPickerValue>(null);
   const [eventType, setEventType] = React.useState("ScaffoldChangeRecorded");
   const [effectiveDate, setEffectiveDate] = React.useState("");
   const [collaborationType, setCollaborationType] = React.useState("employee");
-  const [teamId, setTeamId] = React.useState("");
-  const [organizationalRoleId, setOrganizationalRoleId] = React.useState("");
-  const [jobTitleId, setJobTitleId] = React.useState("");
-  const [ladderId, setLadderId] = React.useState("");
-  const [gradeId, setGradeId] = React.useState("");
-  const [seniorityId, setSeniorityId] = React.useState("");
+  const [team, setTeam] = React.useState<EntityPickerValue>(null);
+  const [organizationalRole, setOrganizationalRole] =
+    React.useState<EntityPickerValue>(null);
+  const [jobTitle, setJobTitle] = React.useState<EntityPickerValue>(null);
+  const [ladder, setLadder] = React.useState<EntityPickerValue>(null);
+  const [grade, setGrade] = React.useState<EntityPickerValue>(null);
+  const [seniority, setSeniority] = React.useState<EntityPickerValue>(null);
   const [clearSeniority, setClearSeniority] = React.useState(false);
   const [preferredApprovalId, setPreferredApprovalId] = React.useState("");
   const [terminationReason, setTerminationReason] =
@@ -136,19 +179,144 @@ export function PersonnelEventForm({
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
 
+  const personId = entityId(person);
+  const employmentId = entityId(employment);
+  const teamId = entityId(team);
+  const organizationalRoleId = entityId(organizationalRole);
+  const jobTitleId = entityId(jobTitle);
+  const ladderId = entityId(ladder);
+  const gradeId = entityId(grade);
+  const seniorityId = entityId(seniority);
+
+  const personSearch = React.useMemo(() => createPersonSearch(), []);
+  const orgUnitSearch = React.useMemo(() => createOrgUnitSearch(), []);
+  const roleSearch = React.useMemo(
+    () => createOrganizationalRoleSearch(),
+    [],
+  );
+  const jobTitleSearch = React.useMemo(() => createJobTitleSearch(), []);
+  const ladderSearch = React.useMemo(() => createLadderSearch(), []);
+  const senioritySearch = React.useMemo(() => createSenioritySearch(), []);
+  const employmentSearch = React.useMemo(
+    () => createEmploymentSearch(person?.id ?? null),
+    [person?.id],
+  );
+  const primaryAssignmentSearch = React.useMemo(
+    () => createPrimaryAssignmentSearch(person?.id ?? null),
+    [person?.id],
+  );
+  const gradeSearch = React.useMemo(
+    () => createGradeSearch(ladder?.id ?? null),
+    [ladder?.id],
+  );
+
+  const syncingEmploymentFromPa = React.useRef(false);
+  const paSyncGenRef = React.useRef(0);
+  const inboundHydrateGenRef = React.useRef(0);
+  const personRef = React.useRef(person);
+  const primaryAssignmentRef = React.useRef(primaryAssignment);
+  personRef.current = person;
+  primaryAssignmentRef.current = primaryAssignment;
+
+  const employmentCascade = useEntityPickerCascade(person, "فرد", {
+    value: employment,
+    onValueChange: (next) => {
+      setEmployment(next);
+      if (!syncingEmploymentFromPa.current) {
+        setPrimaryAssignment(null);
+      }
+    },
+  });
+  const primaryAssignmentCascade = useEntityPickerCascade(person, "فرد", {
+    value: primaryAssignment,
+    onValueChange: setPrimaryAssignment,
+  });
+  const gradeCascade = useEntityPickerCascade(ladder, "لدر", {
+    value: grade,
+    onValueChange: setGrade,
+  });
+
+  const onPersonChange = React.useCallback((next: EntityPickerValue) => {
+    inboundHydrateGenRef.current += 1;
+    setPerson(next);
+    setDirty(true);
+  }, []);
+
+  const onEmploymentChange = React.useCallback(
+    (next: EntityPickerValue) => {
+      employmentCascade.onValueChange(next);
+      setDirty(true);
+    },
+    [employmentCascade],
+  );
+
+  const onPrimaryAssignmentChange = React.useCallback(
+    (next: EntityPickerValue) => {
+      primaryAssignmentCascade.onValueChange(next);
+      setDirty(true);
+      const gen = ++paSyncGenRef.current;
+      if (!next || !person?.id) return;
+      const pid = person.id;
+      const paid = next.id;
+      void (async () => {
+        const empId = await employmentIdForPrimaryAssignment(pid, paid);
+        if (gen !== paSyncGenRef.current) return;
+        if (personRef.current?.id !== pid) return;
+        if (primaryAssignmentRef.current?.id !== paid) return;
+        if (!empId) {
+          // Keep PA and employment consistent — drop PA when mapping fails.
+          primaryAssignmentCascade.onValueChange(null);
+          setErrorMsg(
+            "همکاری متناظر با انتصاب اولیه یافت نشد؛ انتصاب پاک شد.",
+          );
+          return;
+        }
+        const empValue =
+          (await hydrateEmploymentValue(pid, empId)) ??
+          ({ id: empId, code: "", labelFa: "همکاری" } satisfies NonNullable<
+            EntityPickerValue
+          >);
+        if (gen !== paSyncGenRef.current) return;
+        if (personRef.current?.id !== pid) return;
+        if (primaryAssignmentRef.current?.id !== paid) return;
+        syncingEmploymentFromPa.current = true;
+        employmentCascade.onValueChange(empValue);
+        syncingEmploymentFromPa.current = false;
+      })();
+    },
+    [person?.id, primaryAssignmentCascade, employmentCascade],
+  );
+
+  const onLadderChange = React.useCallback(
+    (next: EntityPickerValue) => {
+      setLadder(next);
+      setDirty(true);
+    },
+    [],
+  );
+
+  const onGradeChange = React.useCallback(
+    (next: EntityPickerValue) => {
+      gradeCascade.onValueChange(next);
+      setDirty(true);
+    },
+    [gradeCascade],
+  );
+
   /** Snapshot of last-saved (or initial empty) fields for leave-guard Discard. */
   type FormSnapshot = {
-    personId: string;
-    employmentId: string;
+    person: EntitySnap;
+    employment: EntitySnap;
+    primaryAssignment: EntitySnap;
     eventType: string;
     effectiveDate: string;
     collaborationType: string;
-    teamId: string;
-    organizationalRoleId: string;
-    jobTitleId: string;
-    ladderId: string;
-    gradeId: string;
-    seniorityId: string;
+    team: EntitySnap;
+    organizationalRole: EntitySnap;
+    jobTitle: EntitySnap;
+    ladder: EntitySnap;
+    grade: EntitySnap;
+    seniority: EntitySnap;
     clearSeniority: boolean;
     preferredApprovalId: string;
     terminationReason: string;
@@ -162,17 +330,18 @@ export function PersonnelEventForm({
   };
 
   const emptySnapshot = React.useCallback((): FormSnapshot => ({
-    personId: "",
-    employmentId: "",
+    person: null,
+    employment: null,
+    primaryAssignment: null,
     eventType: "ScaffoldChangeRecorded",
     effectiveDate: "",
     collaborationType: "employee",
-    teamId: "",
-    organizationalRoleId: "",
-    jobTitleId: "",
-    ladderId: "",
-    gradeId: "",
-    seniorityId: "",
+    team: null,
+    organizationalRole: null,
+    jobTitle: null,
+    ladder: null,
+    grade: null,
+    seniority: null,
     clearSeniority: false,
     preferredApprovalId: "",
     terminationReason: "contract_ended",
@@ -186,34 +355,50 @@ export function PersonnelEventForm({
   }), []);
 
   const lastSavedRef = React.useRef<FormSnapshot>(
-    initialPersonId?.trim()
-      ? { ...emptySnapshot(), personId: initialPersonId.trim() }
-      : emptySnapshot(),
+    (() => {
+      const empty = emptySnapshot();
+      const inboundSeed = initialPersonId?.trim() ?? "";
+      return inboundSeed
+        ? {
+            ...empty,
+            person: { id: inboundSeed, code: "", labelFa: "پرسنل" },
+          }
+        : empty;
+    })(),
   );
 
-  const applySnapshot = React.useCallback((snap: FormSnapshot) => {
-    setPersonId(snap.personId);
-    setEmploymentId(snap.employmentId);
-    setEventType(snap.eventType);
-    setEffectiveDate(snap.effectiveDate);
-    setCollaborationType(snap.collaborationType);
-    setTeamId(snap.teamId);
-    setOrganizationalRoleId(snap.organizationalRoleId);
-    setJobTitleId(snap.jobTitleId);
-    setLadderId(snap.ladderId);
-    setGradeId(snap.gradeId);
-    setSeniorityId(snap.seniorityId);
-    setClearSeniority(snap.clearSeniority);
-    setPreferredApprovalId(snap.preferredApprovalId);
-    setTerminationReason(snap.terminationReason);
-    setOverrideReason(snap.overrideReason);
-    setCurrency(snap.currency);
-    setChangeType(snap.changeType);
-    setContractType(snap.contractType);
-    setCompensationAmount(snap.compensationAmount);
-    setDraftId(snap.draftId);
-    setVersion(snap.version);
-  }, []);
+  const applySnapshot = React.useCallback(
+    (snap: FormSnapshot) => {
+      inboundHydrateGenRef.current += 1;
+      paSyncGenRef.current += 1;
+      employmentCascade.alignParentId(snap.person?.id ?? null);
+      primaryAssignmentCascade.alignParentId(snap.person?.id ?? null);
+      gradeCascade.alignParentId(snap.ladder?.id ?? null);
+      setPerson(fromEntitySnap(snap.person));
+      setEmployment(fromEntitySnap(snap.employment));
+      setPrimaryAssignment(fromEntitySnap(snap.primaryAssignment));
+      setEventType(snap.eventType);
+      setEffectiveDate(snap.effectiveDate);
+      setCollaborationType(snap.collaborationType);
+      setTeam(fromEntitySnap(snap.team));
+      setOrganizationalRole(fromEntitySnap(snap.organizationalRole));
+      setJobTitle(fromEntitySnap(snap.jobTitle));
+      setLadder(fromEntitySnap(snap.ladder));
+      setGrade(fromEntitySnap(snap.grade));
+      setSeniority(fromEntitySnap(snap.seniority));
+      setClearSeniority(snap.clearSeniority);
+      setPreferredApprovalId(snap.preferredApprovalId);
+      setTerminationReason(snap.terminationReason);
+      setOverrideReason(snap.overrideReason);
+      setCurrency(snap.currency);
+      setChangeType(snap.changeType);
+      setContractType(snap.contractType);
+      setCompensationAmount(snap.compensationAmount);
+      setDraftId(snap.draftId);
+      setVersion(snap.version);
+    },
+    [employmentCascade.alignParentId, primaryAssignmentCascade.alignParentId, gradeCascade.alignParentId],
+  );
 
   // Prefill: host passes `initialPersonId` from ?person=; dirty inbound uses leave-guard first.
   // Clear preferred approval when event type changes (inline in select onChange).
@@ -308,6 +493,112 @@ export function PersonnelEventForm({
         /^[0-9a-f-]{36}$/i.test(capacityTeamId) &&
         /^[0-9a-f-]{36}$/i.test(capacityJobTitleId),
     },
+  );
+
+  const approvalLabelsQuery = api.headcount.listApprovals.useQuery(
+    capacityTeamId && /^[0-9a-f-]{36}$/i.test(capacityTeamId)
+      ? { teamId: capacityTeamId }
+      : undefined,
+    {
+      enabled:
+        Boolean(compatibleApprovalsQuery.data?.length) &&
+        Boolean(capacityTeamId) &&
+        /^[0-9a-f-]{36}$/i.test(capacityTeamId),
+    },
+  );
+
+  const approvalLabelById = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of approvalLabelsQuery.data ?? []) {
+      const label =
+        row.approvalReference?.trim() ||
+        row.requirementCode?.trim() ||
+        "";
+      if (label) map.set(row.id, label);
+    }
+    return map;
+  }, [approvalLabelsQuery.data]);
+
+  function formatApprovalOptionLabel(
+    approvalId: string,
+    freeUnits: number,
+    starred: boolean,
+  ): string {
+    const human = approvalLabelById.get(approvalId);
+    const base = human
+      ? `${human} (آزاد: ${freeUnits})`
+      : `مجوز ظرفیت (آزاد: ${freeUnits})`;
+    return starred ? `★ ${base}` : base;
+  }
+
+  const sourceTeamId = sourcePrimaryQuery.data?.teamId ?? "";
+  const sourceJobTitleId = sourcePrimaryQuery.data?.jobTitleId ?? "";
+  const sourceLadderId = sourcePrimaryQuery.data?.ladderId ?? "";
+  const sourceGradeId = sourcePrimaryQuery.data?.gradeId ?? "";
+
+  const sourceTeamQuery = api.organization.get.useQuery(
+    { id: sourceTeamId },
+    {
+      enabled:
+        Boolean(sourcePrimaryQuery.data) &&
+        /^[0-9a-f-]{36}$/i.test(sourceTeamId),
+    },
+  );
+  const sourceJobTitleQuery = api.jobReference.getJobTitle.useQuery(
+    { id: sourceJobTitleId },
+    {
+      enabled:
+        Boolean(sourcePrimaryQuery.data) &&
+        /^[0-9a-f-]{36}$/i.test(sourceJobTitleId),
+    },
+  );
+  const sourceLadderQuery = api.jobReference.getLadder.useQuery(
+    { id: sourceLadderId },
+    {
+      enabled:
+        Boolean(sourcePrimaryQuery.data) &&
+        /^[0-9a-f-]{36}$/i.test(sourceLadderId),
+    },
+  );
+  const sourceGradeQuery = api.jobReference.getGrade.useQuery(
+    { id: sourceGradeId },
+    {
+      enabled:
+        Boolean(sourcePrimaryQuery.data) &&
+        /^[0-9a-f-]{36}$/i.test(sourceGradeId),
+    },
+  );
+
+  const sourceTeamLabel = sourceTeamQuery.data
+    ? formatCodeName(sourceTeamQuery.data.code, sourceTeamQuery.data.nameFa)
+    : null;
+  const sourceJobTitleLabel = sourceJobTitleQuery.data
+    ? formatCodeName(
+        sourceJobTitleQuery.data.code,
+        sourceJobTitleQuery.data.nameFa,
+      )
+    : null;
+  const sourceLadderLabel = sourceLadderQuery.data
+    ? formatCodeName(
+        sourceLadderQuery.data.code,
+        sourceLadderQuery.data.nameFa,
+      )
+    : null;
+  const sourceGradeLabel = sourceGradeQuery.data
+    ? formatCodeName(sourceGradeQuery.data.code, sourceGradeQuery.data.nameFa)
+    : null;
+  const sourceTeamDisplay = resolveSourceLabel(sourceTeamLabel, sourceTeamQuery);
+  const sourceJobTitleDisplay = resolveSourceLabel(
+    sourceJobTitleLabel,
+    sourceJobTitleQuery,
+  );
+  const sourceLadderDisplay = resolveSourceLabel(
+    sourceLadderLabel,
+    sourceLadderQuery,
+  );
+  const sourceGradeDisplay = resolveSourceLabel(
+    sourceGradeLabel,
+    sourceGradeQuery,
   );
 
   const dictionaryQuery = api.person.listDictionary.useQuery(undefined, {
@@ -455,7 +746,7 @@ export function PersonnelEventForm({
       }
       if (isTerminationType(eventType)) {
         if (!employmentId.trim()) {
-          setErrorMsg("برای خاتمه، شناسه همکاری باز الزامی است.");
+          setErrorMsg("برای خاتمه، همکاری باز الزامی است.");
           return false;
         }
         if (!terminationReason.trim()) {
@@ -465,7 +756,7 @@ export function PersonnelEventForm({
       }
       if (isTransferType(eventType)) {
         if (!employmentId.trim()) {
-          setErrorMsg("برای انتقال، شناسه همکاری باز الزامی است.");
+          setErrorMsg("برای انتقال، همکاری باز الزامی است.");
           return false;
         }
         if (
@@ -483,13 +774,13 @@ export function PersonnelEventForm({
       }
       if (isJobLevelType(eventType)) {
         if (!employmentId.trim()) {
-          setErrorMsg("برای تغییر شغلی، شناسه همکاری باز الزامی است.");
+          setErrorMsg("برای تغییر شغلی، همکاری باز الزامی است.");
           return false;
         }
       }
       if (isCompensationType(eventType)) {
         if (!employmentId.trim()) {
-          setErrorMsg("برای تغییر جبران‌خدمت/قرارداد، شناسه همکاری الزامی است.");
+          setErrorMsg("برای تغییر جبران‌خدمت/قرارداد، همکاری الزامی است.");
           return false;
         }
         if (
@@ -543,17 +834,18 @@ export function PersonnelEventForm({
       setDemoDraftSaved(true);
       setStatusMsg("پیش‌نویس ذخیره شد (غیررسمی — وضعیت فعلی تغییر نکرد).");
       lastSavedRef.current = {
-        personId,
-        employmentId,
+        person: toEntitySnap(person),
+        employment: toEntitySnap(employment),
+        primaryAssignment: toEntitySnap(primaryAssignment),
         eventType,
         effectiveDate,
         collaborationType,
-        teamId,
-        organizationalRoleId,
-        jobTitleId,
-        ladderId,
-        gradeId,
-        seniorityId,
+        team: toEntitySnap(team),
+        organizationalRole: toEntitySnap(organizationalRole),
+        jobTitle: toEntitySnap(jobTitle),
+        ladder: toEntitySnap(ladder),
+        grade: toEntitySnap(grade),
+        seniority: toEntitySnap(seniority),
         clearSeniority,
         preferredApprovalId,
         terminationReason,
@@ -575,16 +867,18 @@ export function PersonnelEventForm({
       return false;
     }
   }, [
-    personId,
-    employmentId,
+    person,
+    employment,
+    primaryAssignment,
     eventType,
     effectiveDate,
     collaborationType,
-    teamId,
-    organizationalRoleId,
-    jobTitleId,
-    ladderId,
-    gradeId,
+    team,
+    organizationalRole,
+    jobTitle,
+    ladder,
+    grade,
+    seniority,
     terminationReason,
     compensationAmount,
     clearSeniority,
@@ -632,17 +926,37 @@ export function PersonnelEventForm({
     personIdRef.current = personId;
   });
 
-  /** Inbound `?person=` while mounted — leave-guard before swap; never silent wipe (AC #6). */
+  /** Inbound `?person=` while mounted — leave-guard before swap; never silent wipe (AC #8). */
   React.useEffect(() => {
     const inbound = initialPersonId?.trim() ?? "";
     if (inbound === personIdRef.current) return;
     if (inboundReconcileRef.current) return;
 
+    const applyInboundPerson = (id: string) => {
+      const gen = ++inboundHydrateGenRef.current;
+      if (!id) {
+        setPerson(null);
+        lastSavedRef.current = { ...lastSavedRef.current, person: null };
+        return;
+      }
+      void hydratePersonValue(id).then((value) => {
+        if (gen !== inboundHydrateGenRef.current) return;
+        const current = personRef.current;
+        // Do not overwrite a different manual selection.
+        if (current && current.id !== id) return;
+        const token = value ?? { id, code: "", labelFa: "پرسنل" };
+        setPerson(token);
+        lastSavedRef.current = {
+          ...lastSavedRef.current,
+          person: toEntitySnap(token),
+        };
+      });
+    };
+
     if (!dirtyRef.current) {
       queueMicrotask(() => {
         if (inbound === personIdRef.current || dirtyRef.current) return;
-        setPersonId(inbound);
-        lastSavedRef.current = { ...lastSavedRef.current, personId: inbound };
+        applyInboundPerson(inbound);
       });
       return;
     }
@@ -663,8 +977,7 @@ export function PersonnelEventForm({
     void leaveGuard.requestNavigation(targetHref).then((ok) => {
       inboundReconcileRef.current = false;
       if (ok) {
-        setPersonId(inbound);
-        lastSavedRef.current = { ...lastSavedRef.current, personId: inbound };
+        applyInboundPerson(inbound);
         return;
       }
       router.replace(stayHref);
@@ -849,19 +1162,27 @@ export function PersonnelEventForm({
         onChange={() => setDirty(true)}
       >
         <FormSection title="شناسه‌ها">
-          <FormField label="شناسه فرد" htmlFor={`${formId}-person`} required>
-            <Input
-              value={personId}
-              onChange={(e) => setPersonId(e.target.value)}
-              required
-              dir="ltr"
-              autoComplete="off"
+          <FormField label="فرد" htmlFor={`${formId}-person`} required>
+            <EntityPicker
+              id={`${formId}-person`}
+              search={personSearch}
+              value={person}
+              onValueChange={onPersonChange}
+              scopeNoteFa="جستجو با کد پرسنلی یا نام"
+              placeholder="کد یا نام پرسنل…"
+              aria-required
             />
           </FormField>
+          {person ? (
+            <TechnicalDetailDisclosure
+              value={person.id}
+              valueLabelFa="شناسهٔ فنی فرد"
+            />
+          ) : null}
           <FormField
             label={
               <>
-                شناسه همکاری
+                همکاری
                 {!(
                   isTerminationType(eventType) ||
                   isTransferType(eventType) ||
@@ -880,17 +1201,37 @@ export function PersonnelEventForm({
               isCompensationType(eventType)
             }
           >
-            <Input
-              value={employmentId}
-              onChange={(e) => setEmploymentId(e.target.value)}
-              dir="ltr"
-              autoComplete="off"
-              required={
+            <EntityPicker
+              id={`${formId}-employment`}
+              search={employmentSearch}
+              value={employmentCascade.value}
+              onValueChange={onEmploymentChange}
+              disabled={employmentCascade.disabled}
+              disabledReasonFa={employmentCascade.disabledReasonFa}
+              scopeNoteFa="سوابق همکاری فرد انتخاب‌شده"
+              placeholder="تاریخ یا نوع همکاری…"
+              aria-required={
                 isTerminationType(eventType) ||
                 isTransferType(eventType) ||
                 isJobLevelType(eventType) ||
                 isCompensationType(eventType)
               }
+            />
+          </FormField>
+          <FormField
+            label="انتصاب اولیه"
+            htmlFor={`${formId}-primary-assignment`}
+            help="انتخاب انتصاب، همکاری متناظر را هماهنگ می‌کند."
+          >
+            <EntityPicker
+              id={`${formId}-primary-assignment`}
+              search={primaryAssignmentSearch}
+              value={primaryAssignmentCascade.value}
+              onValueChange={onPrimaryAssignmentChange}
+              disabled={primaryAssignmentCascade.disabled}
+              disabledReasonFa={primaryAssignmentCascade.disabledReasonFa}
+              scopeNoteFa="انتصاب‌های اولیه فرد انتخاب‌شده"
+              placeholder="تیم، عنوان یا تاریخ…"
             />
           </FormField>
         </FormSection>
@@ -945,39 +1286,102 @@ export function PersonnelEventForm({
                 autoComplete="off"
               />
             </FormField>
-            {(
-              [
-                ["teamId", "شناسه تیم", teamId, setTeamId],
-                [
-                  "organizationalRoleId",
-                  "شناسه نقش سازمانی",
-                  organizationalRoleId,
-                  setOrganizationalRoleId,
-                ],
-                ["jobTitleId", "شناسه عنوان شغلی", jobTitleId, setJobTitleId],
-                ["ladderId", "شناسه لدر", ladderId, setLadderId],
-                ["gradeId", "شناسه گرید", gradeId, setGradeId],
-                ["seniorityId", "شناسه ارشدیت (اختیاری)", seniorityId, setSeniorityId],
-              ] as const
-            ).map(([key, label, value, setter]) => (
-              <FormField
-                key={key}
-                label={label}
-                htmlFor={`${formId}-${key}`}
-                required={key !== "seniorityId"}
-              >
-                <Input
-                  value={value}
-                  onChange={(e) => {
-                    setter(e.target.value);
-                    setDirty(true);
-                  }}
-                  required={key !== "seniorityId"}
-                  dir="ltr"
-                  autoComplete="off"
-                />
-              </FormField>
-            ))}
+            <FormField label="تیم" htmlFor={`${formId}-team`} required>
+              <EntityPicker
+                id={`${formId}-team`}
+                search={orgUnitSearch}
+                value={team}
+                onValueChange={(next) => {
+                  setTeam(next);
+                  setDirty(true);
+                }}
+                scopeNoteFa="واحدهای سازمانی قابل‌مشاهده"
+                placeholder="کد یا نام تیم…"
+                aria-required
+              />
+            </FormField>
+            <FormField
+              label="نقش سازمانی"
+              htmlFor={`${formId}-role`}
+              required
+            >
+              <EntityPicker
+                id={`${formId}-role`}
+                search={roleSearch}
+                value={organizationalRole}
+                onValueChange={(next) => {
+                  setOrganizationalRole(next);
+                  setDirty(true);
+                }}
+                scopeNoteFa="مراجع نقش سازمانی"
+                placeholder="کد یا نام نقش…"
+                aria-required
+              />
+            </FormField>
+            <FormField
+              label="عنوان شغلی"
+              htmlFor={`${formId}-job-title`}
+              required
+            >
+              <EntityPicker
+                id={`${formId}-job-title`}
+                search={jobTitleSearch}
+                value={jobTitle}
+                onValueChange={(next) => {
+                  setJobTitle(next);
+                  setDirty(true);
+                }}
+                scopeNoteFa="مراجع عنوان شغلی"
+                placeholder="کد یا نام عنوان…"
+                aria-required
+              />
+            </FormField>
+            <FormField label="لدر" htmlFor={`${formId}-ladder`} required>
+              <EntityPicker
+                id={`${formId}-ladder`}
+                search={ladderSearch}
+                value={ladder}
+                onValueChange={onLadderChange}
+                scopeNoteFa="مراجع لدر"
+                placeholder="کد یا نام لدر…"
+                aria-required
+              />
+            </FormField>
+            <FormField label="گرید" htmlFor={`${formId}-grade`} required>
+              <EntityPicker
+                id={`${formId}-grade`}
+                search={gradeSearch}
+                value={gradeCascade.value}
+                onValueChange={onGradeChange}
+                disabled={gradeCascade.disabled}
+                disabledReasonFa={gradeCascade.disabledReasonFa}
+                scopeNoteFa="گریدهای لدر انتخاب‌شده"
+                placeholder="کد یا نام گرید…"
+                aria-required
+              />
+            </FormField>
+            <FormField
+              label="ارشدیت (اختیاری)"
+              htmlFor={`${formId}-seniority`}
+            >
+              <EntityPicker
+                id={`${formId}-seniority`}
+                search={senioritySearch}
+                value={seniority}
+                onValueChange={(next) => {
+                  setSeniority(next);
+                  setDirty(true);
+                }}
+                scopeNoteFa="مراجع ارشدیت"
+                placeholder="کد یا نام ارشدیت…"
+              />
+            </FormField>
+            {team ? (
+              <TechnicalDetailDisclosure
+                value={team.id}
+                valueLabelFa="شناسهٔ فنی تیم"
+              />
+            ) : null}
             <HeadcountCapacityPanel
               used={capacityQuery.data?.used ?? 0}
               reserved={capacityQuery.data?.reserved ?? 0}
@@ -1013,8 +1417,11 @@ export function PersonnelEventForm({
                   <option value="">پیش‌فرض خودکار</option>
                   {compatibleApprovalsQuery.data.map((c, i) => (
                     <option key={c.approvalId} value={c.approvalId}>
-                      {i === 0 ? "★ " : ""}
-                      {c.approvalId.slice(0, 8)}… (آزاد: {c.freeUnits})
+                      {formatApprovalOptionLabel(
+                        c.approvalId,
+                        c.freeUnits,
+                        i === 0,
+                      )}
                     </option>
                   ))}
                 </select>
@@ -1026,7 +1433,7 @@ export function PersonnelEventForm({
         {isTerminationType(eventType) ? (
           <FormSection title="واقعیت‌های حداقل خاتمه همکاری">
             <p className="text-caption text-text-tertiary">
-              شناسه همکاری باز را بالا وارد کنید. دلیل خاتمه باید کد کوتاه باشد
+              همکاری باز را بالا انتخاب کنید. دلیل خاتمه باید کد کوتاه باشد
               (مثلاً contract_ended) — نه متن آزاد حساس.
             </p>
             <FormField
@@ -1053,7 +1460,7 @@ export function PersonnelEventForm({
         {isTransferType(eventType) ? (
           <FormSection title="واقعیت‌های انتقال (مقصد)">
             <p className="text-caption text-text-tertiary">
-              شناسه همکاری باز را بالا وارد کنید. مقصد باید با انتصاب اولیه فعلی
+              همکاری باز را بالا انتخاب کنید. مقصد باید با انتصاب اولیه فعلی
               متفاوت باشد. ظرفیت مقصد قبل از نهایی‌سازی نمایش داده می‌شود.
             </p>
             {sourcePrimaryQuery.isFetching ? (
@@ -1070,21 +1477,20 @@ export function PersonnelEventForm({
                 <dl className="grid gap-1 text-caption">
                   <div className="flex gap-2">
                     <dt className="text-text-tertiary shrink-0">تیم</dt>
-                    <dd className="text-identifier truncate" dir="ltr">
-                      {sourcePrimaryQuery.data.teamId}
+                    <dd className="truncate">
+                      {sourceTeamDisplay}
                     </dd>
                   </div>
                   <div className="flex gap-2">
                     <dt className="text-text-tertiary shrink-0">عنوان</dt>
-                    <dd className="text-identifier truncate" dir="ltr">
-                      {sourcePrimaryQuery.data.jobTitleId}
+                    <dd className="truncate">
+                      {sourceJobTitleDisplay}
                     </dd>
                   </div>
                   <div className="flex gap-2">
                     <dt className="text-text-tertiary shrink-0">لدر / گرید</dt>
-                    <dd className="text-identifier truncate" dir="ltr">
-                      {sourcePrimaryQuery.data.ladderId.slice(0, 8)}… /{" "}
-                      {sourcePrimaryQuery.data.gradeId.slice(0, 8)}…
+                    <dd className="truncate">
+                      {sourceLadderDisplay} / {sourceGradeDisplay}
                     </dd>
                   </div>
                   <div className="flex gap-2">
@@ -1101,49 +1507,110 @@ export function PersonnelEventForm({
                 انتصاب اولیه مبدأ برای این همکاری در تاریخ مؤثر یافت نشد.
               </p>
             ) : null}
-            {(
-              [
-                ["teamId", "شناسه تیم مقصد", teamId, setTeamId],
-                [
-                  "organizationalRoleId",
-                  "شناسه نقش سازمانی مقصد",
-                  organizationalRoleId,
-                  setOrganizationalRoleId,
-                ],
-                [
-                  "jobTitleId",
-                  "شناسه عنوان شغلی مقصد",
-                  jobTitleId,
-                  setJobTitleId,
-                ],
-                ["ladderId", "شناسه لدر مقصد", ladderId, setLadderId],
-                ["gradeId", "شناسه گرید مقصد", gradeId, setGradeId],
-                [
-                  "seniorityId",
-                  "شناسه ارشدیت مقصد (اختیاری)",
-                  seniorityId,
-                  setSeniorityId,
-                ],
-              ] as const
-            ).map(([key, label, value, setter]) => (
-              <FormField
-                key={key}
-                label={label}
-                htmlFor={`${formId}-xfer-${key}`}
-                required={key !== "seniorityId"}
-              >
-                <Input
-                  value={value}
-                  onChange={(e) => {
-                    setter(e.target.value);
-                    setDirty(true);
-                  }}
-                  required={key !== "seniorityId"}
-                  dir="ltr"
-                  autoComplete="off"
-                />
-              </FormField>
-            ))}
+            <FormField label="تیم مقصد" htmlFor={`${formId}-xfer-team`} required>
+              <EntityPicker
+                id={`${formId}-xfer-team`}
+                search={orgUnitSearch}
+                value={team}
+                onValueChange={(next) => {
+                  setTeam(next);
+                  setDirty(true);
+                }}
+                scopeNoteFa="واحدهای سازمانی قابل‌مشاهده"
+                placeholder="کد یا نام تیم…"
+                aria-required
+              />
+            </FormField>
+            <FormField
+              label="نقش سازمانی مقصد"
+              htmlFor={`${formId}-xfer-role`}
+              required
+            >
+              <EntityPicker
+                id={`${formId}-xfer-role`}
+                search={roleSearch}
+                value={organizationalRole}
+                onValueChange={(next) => {
+                  setOrganizationalRole(next);
+                  setDirty(true);
+                }}
+                scopeNoteFa="مراجع نقش سازمانی"
+                placeholder="کد یا نام نقش…"
+                aria-required
+              />
+            </FormField>
+            <FormField
+              label="عنوان شغلی مقصد"
+              htmlFor={`${formId}-xfer-job-title`}
+              required
+            >
+              <EntityPicker
+                id={`${formId}-xfer-job-title`}
+                search={jobTitleSearch}
+                value={jobTitle}
+                onValueChange={(next) => {
+                  setJobTitle(next);
+                  setDirty(true);
+                }}
+                scopeNoteFa="مراجع عنوان شغلی"
+                placeholder="کد یا نام عنوان…"
+                aria-required
+              />
+            </FormField>
+            <FormField
+              label="لدر مقصد"
+              htmlFor={`${formId}-xfer-ladder`}
+              required
+            >
+              <EntityPicker
+                id={`${formId}-xfer-ladder`}
+                search={ladderSearch}
+                value={ladder}
+                onValueChange={onLadderChange}
+                scopeNoteFa="مراجع لدر"
+                placeholder="کد یا نام لدر…"
+                aria-required
+              />
+            </FormField>
+            <FormField
+              label="گرید مقصد"
+              htmlFor={`${formId}-xfer-grade`}
+              required
+            >
+              <EntityPicker
+                id={`${formId}-xfer-grade`}
+                search={gradeSearch}
+                value={gradeCascade.value}
+                onValueChange={onGradeChange}
+                disabled={gradeCascade.disabled}
+                disabledReasonFa={gradeCascade.disabledReasonFa}
+                scopeNoteFa="گریدهای لدر انتخاب‌شده"
+                placeholder="کد یا نام گرید…"
+                aria-required
+              />
+            </FormField>
+            <FormField
+              label="ارشدیت مقصد (اختیاری)"
+              htmlFor={`${formId}-xfer-seniority`}
+            >
+              <EntityPicker
+                id={`${formId}-xfer-seniority`}
+                search={senioritySearch}
+                value={seniority}
+                onValueChange={(next) => {
+                  setSeniority(next);
+                  setDirty(true);
+                }}
+                scopeNoteFa="مراجع ارشدیت"
+                placeholder="کد یا نام ارشدیت…"
+              />
+            </FormField>
+            {team ? (
+              <TechnicalDetailDisclosure
+                value={team.id}
+                valueLabelFa="شناسهٔ فنی تیم مقصد"
+              />
+            ) : null}
             <HeadcountCapacityPanel
               used={capacityQuery.data?.used ?? 0}
               reserved={capacityQuery.data?.reserved ?? 0}
@@ -1179,8 +1646,11 @@ export function PersonnelEventForm({
                   <option value="">پیش‌فرض خودکار</option>
                   {compatibleApprovalsQuery.data.map((c, i) => (
                     <option key={c.approvalId} value={c.approvalId}>
-                      {i === 0 ? "★ " : ""}
-                      {c.approvalId.slice(0, 8)}… (آزاد: {c.freeUnits})
+                      {formatApprovalOptionLabel(
+                        c.approvalId,
+                        c.freeUnits,
+                        i === 0,
+                      )}
                     </option>
                   ))}
                 </select>
@@ -1205,71 +1675,85 @@ export function PersonnelEventForm({
                 <dl className="grid gap-1 text-caption">
                   <div className="flex gap-2">
                     <dt className="text-text-tertiary shrink-0">تیم</dt>
-                    <dd className="text-identifier truncate" dir="ltr">
-                      {sourcePrimaryQuery.data.teamId}
-                    </dd>
+                    <dd className="truncate">{sourceTeamDisplay}</dd>
                   </div>
                   <div className="flex gap-2">
                     <dt className="text-text-tertiary shrink-0">عنوان</dt>
-                    <dd className="text-identifier truncate" dir="ltr">
-                      {sourcePrimaryQuery.data.jobTitleId}
-                    </dd>
+                    <dd className="truncate">{sourceJobTitleDisplay}</dd>
                   </div>
                   <div className="flex gap-2">
                     <dt className="text-text-tertiary shrink-0">لدر / گرید</dt>
-                    <dd className="text-identifier truncate" dir="ltr">
-                      {sourcePrimaryQuery.data.ladderId.slice(0, 8)}… /{" "}
-                      {sourcePrimaryQuery.data.gradeId.slice(0, 8)}…
+                    <dd className="truncate">
+                      {sourceLadderDisplay} / {sourceGradeDisplay}
                     </dd>
                   </div>
                 </dl>
               </div>
             ) : null}
             {eventType === "OrganizationalRoleChanged" ? (
-              <FormField label="شناسه نقش سازمانی جدید" htmlFor={`${formId}-auto-field-2`}>
-                    <Input
-                  value={organizationalRoleId}
-                  onChange={(e) => {
-                    setOrganizationalRoleId(e.target.value);
+              <FormField
+                label="نقش سازمانی جدید"
+                htmlFor={`${formId}-auto-field-2`}
+                required
+              >
+                <EntityPicker
+                  id={`${formId}-auto-field-2`}
+                  search={roleSearch}
+                  value={organizationalRole}
+                  onValueChange={(next) => {
+                    setOrganizationalRole(next);
                     setDirty(true);
                   }}
-                  required
-                  dir="ltr"
-                  autoComplete="off"
+                  scopeNoteFa="مراجع نقش سازمانی"
+                  placeholder="کد یا نام نقش…"
+                  aria-required
                 />
-                  </FormField>
+              </FormField>
             ) : null}
             {eventType === "JobTitleChanged" ? (
-              <FormField label="شناسه عنوان شغلی جدید" htmlFor={`${formId}-auto-field-3`}>
-                    <Input
-                  value={jobTitleId}
-                  onChange={(e) => {
-                    setJobTitleId(e.target.value);
+              <FormField
+                label="عنوان شغلی جدید"
+                htmlFor={`${formId}-auto-field-3`}
+                required
+              >
+                <EntityPicker
+                  id={`${formId}-auto-field-3`}
+                  search={jobTitleSearch}
+                  value={jobTitle}
+                  onValueChange={(next) => {
+                    setJobTitle(next);
                     setDirty(true);
                   }}
-                  required
-                  dir="ltr"
-                  autoComplete="off"
+                  scopeNoteFa="مراجع عنوان شغلی"
+                  placeholder="کد یا نام عنوان…"
+                  aria-required
                 />
-                  </FormField>
+              </FormField>
             ) : null}
             {eventType === "SeniorityChanged" ? (
               <div className="space-y-3">
                 <FormField
-                  label="شناسه ارشدیت جدید"
+                  label="ارشدیت جدید"
                   htmlFor={`${formId}-seniority`}
-                  help="مقدار را وارد کنید یا پاک‌کردن صریح را علامت بزنید؛ خالیِ دست‌نخورده پذیرفته نمی‌شود."
+                  help="مقدار را انتخاب کنید یا پاک‌کردن صریح را علامت بزنید؛ خالیِ دست‌نخورده پذیرفته نمی‌شود."
                 >
-                  <Input
-                    value={seniorityId}
-                    onChange={(e) => {
-                      setSeniorityId(e.target.value);
-                      if (e.target.value.trim()) setClearSeniority(false);
+                  <EntityPicker
+                    id={`${formId}-seniority`}
+                    search={senioritySearch}
+                    value={seniority}
+                    onValueChange={(next) => {
+                      setSeniority(next);
+                      if (next) setClearSeniority(false);
                       setDirty(true);
                     }}
                     disabled={clearSeniority}
-                    dir="ltr"
-                    autoComplete="off"
+                    disabledReasonFa={
+                      clearSeniority
+                        ? "پاک‌کردن ارشدیت فعال است."
+                        : undefined
+                    }
+                    scopeNoteFa="مراجع ارشدیت"
+                    placeholder="کد یا نام ارشدیت…"
                   />
                 </FormField>
                 <label className="flex items-center gap-2 text-body">
@@ -1278,7 +1762,7 @@ export function PersonnelEventForm({
                     checked={clearSeniority}
                     onChange={(e) => {
                       setClearSeniority(e.target.checked);
-                      if (e.target.checked) setSeniorityId("");
+                      if (e.target.checked) setSeniority(null);
                       setDirty(true);
                     }}
                   />
@@ -1290,44 +1774,51 @@ export function PersonnelEventForm({
             eventType === "GradeChanged" ||
             eventType === "PromotionRecorded" ? (
               <>
-                {(eventType === "LadderChanged" ||
-                  eventType === "PromotionRecorded") && (
-                  <FormField
-                    label={
-                      <>
-                        شناسه لدر
-                        {eventType === "LadderChanged" ? " جدید" : " (اختیاری)"}
-                      </>
-                    }
-                    htmlFor={`${formId}-ladder`}
-                    required={eventType === "LadderChanged"}
-                  >
-                    <Input
-                      value={ladderId}
-                      onChange={(e) => {
-                        setLadderId(e.target.value);
-                        setDirty(true);
-                      }}
-                      required={eventType === "LadderChanged"}
-                      dir="ltr"
-                      autoComplete="off"
-                    />
-                  </FormField>
-                )}
                 <FormField
-                  label="شناسه گرید جدید"
+                  label={
+                    <>
+                      لدر
+                      {eventType === "LadderChanged"
+                        ? " جدید"
+                        : eventType === "PromotionRecorded"
+                          ? " (اختیاری)"
+                          : ""}
+                    </>
+                  }
+                  htmlFor={`${formId}-ladder`}
+                  required={
+                    eventType === "LadderChanged" ||
+                    eventType === "GradeChanged"
+                  }
+                >
+                  <EntityPicker
+                    id={`${formId}-ladder`}
+                    search={ladderSearch}
+                    value={ladder}
+                    onValueChange={onLadderChange}
+                    scopeNoteFa="مراجع لدر"
+                    placeholder="کد یا نام لدر…"
+                    aria-required={
+                      eventType === "LadderChanged" ||
+                      eventType === "GradeChanged"
+                    }
+                  />
+                </FormField>
+                <FormField
+                  label="گرید جدید"
                   htmlFor={`${formId}-grade`}
                   required
                 >
-                  <Input
-                    value={gradeId}
-                    onChange={(e) => {
-                      setGradeId(e.target.value);
-                      setDirty(true);
-                    }}
-                    required
-                    dir="ltr"
-                    autoComplete="off"
+                  <EntityPicker
+                    id={`${formId}-grade`}
+                    search={gradeSearch}
+                    value={gradeCascade.value}
+                    onValueChange={onGradeChange}
+                    disabled={gradeCascade.disabled}
+                    disabledReasonFa={gradeCascade.disabledReasonFa}
+                    scopeNoteFa="گریدهای لدر انتخاب‌شده"
+                    placeholder="کد یا نام گرید…"
+                    aria-required
                   />
                 </FormField>
               </>
@@ -1369,8 +1860,11 @@ export function PersonnelEventForm({
                       <option value="">پیش‌فرض خودکار</option>
                       {compatibleApprovalsQuery.data.map((c, i) => (
                         <option key={c.approvalId} value={c.approvalId}>
-                          {i === 0 ? "★ " : ""}
-                          {c.approvalId.slice(0, 8)}… (آزاد: {c.freeUnits})
+                          {formatApprovalOptionLabel(
+                            c.approvalId,
+                            c.freeUnits,
+                            i === 0,
+                          )}
                         </option>
                       ))}
                     </select>

@@ -1,3 +1,8 @@
+## Deferred from: code review of 8-4-personnel-event-form-identifier-first-retrofit.md (2026-07-31)
+
+- Unused hydrate helpers in `personnel-event-entity-helpers.ts` (`hydrateOrgUnitValue`, job/ladder/grade/role/seniority/PA) ? not wired; snapshot restore uses `fromEntitySnap` only. Cleanup or wire later if draft rehydrate from bare UUIDs is needed.
+- PA?employment sync issues two `listSelectablePrimaryAssignments` round-trips (`employmentIdForPrimaryAssignment` then `hydrateEmploymentValue`) ? optimize after request-generation race fix.
+
 ## Deferred from: code review of 7-8-authoritative-evaluation-snapshot-integrity.md (2026-07-30)
 
 - UI مدیریت expire/supersede برای `evaluation.snapshot.manage` سیم‌کشی نشده (`evaluation-snapshot-honesty.tsx`) — MVP ops honesty counts only; manage seed موجود است برای repair بعدی

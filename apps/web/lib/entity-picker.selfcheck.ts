@@ -132,17 +132,88 @@ assert.match(
   "person router must expose listSelectablePrimaryAssignments",
 );
 
-// 8.4 boundary: personnel-event-form still uses raw UUID Inputs
+// 8.4: personnel-event-form wires EntityPicker; no free-text UUID entity Inputs
+assert.ok(
+  exists("components/entity-picker/technical-detail-disclosure.tsx"),
+  "TechnicalDetailDisclosure module must exist",
+);
+assert.match(
+  indexSrc,
+  /TechnicalDetailDisclosure/,
+  "barrel must export TechnicalDetailDisclosure",
+);
+
 const eventForm = read("components/personnel/personnel-event-form.tsx");
 assert.match(
   eventForm,
-  /teamId|ladderId|personId/,
-  "personnel-event-form UUID fields remain for Story 8.4 retrofit",
+  /EntityPicker/,
+  "personnel-event-form must consume EntityPicker (8.4)",
+);
+assert.match(
+  eventForm,
+  /TechnicalDetailDisclosure|technical-detail-disclosure/,
+  "personnel-event-form must reference technical-detail-disclosure",
+);
+assert.match(
+  eventForm,
+  /useEntityPickerCascade/,
+  "personnel-event-form must wire cascade for dependents",
+);
+assert.match(
+  eventForm,
+  /createPersonSearch|createOrgUnitSearch|createGradeSearch|createEmploymentSearch/,
+  "personnel-event-form must use entity-picker resolvers",
+);
+// Heuristic: no free-text Input bound to entity UUID entry (legacy labels + value bindings).
+assert.doesNotMatch(
+  eventForm,
+  /label=["']شناسه فرد["'][\s\S]{0,200}<Input/,
+  "no free-text UUID Input for person (heuristic)",
 );
 assert.doesNotMatch(
   eventForm,
-  /EntityPicker/,
-  "personnel-event-form must not consume EntityPicker yet (8.4)",
+  /شناسه تیم[\s\S]{0,120}<Input/,
+  "no free-text UUID Input for team (heuristic)",
+);
+assert.doesNotMatch(
+  eventForm,
+  /شناسه لدر[\s\S]{0,120}<Input/,
+  "no free-text UUID Input for ladder (heuristic)",
+);
+assert.doesNotMatch(
+  eventForm,
+  /شناسه گرید[\s\S]{0,120}<Input/,
+  "no free-text UUID Input for grade (heuristic)",
+);
+assert.doesNotMatch(
+  eventForm,
+  /شناسه همکاری[\s\S]{0,200}<Input/,
+  "no free-text UUID Input for employment (heuristic)",
+);
+assert.doesNotMatch(
+  eventForm,
+  /value=\{(personId|employmentId|teamId|ladderId|gradeId|organizationalRoleId|jobTitleId|seniorityId)\}/,
+  "no Input/select value bound to raw entity id strings (heuristic)",
+);
+assert.match(
+  eventForm,
+  /createOrganizationalRoleSearch/,
+  "personnel-event-form must wire role resolver",
+);
+assert.match(
+  eventForm,
+  /createJobTitleSearch/,
+  "personnel-event-form must wire job title resolver",
+);
+assert.match(
+  eventForm,
+  /createSenioritySearch/,
+  "personnel-event-form must wire seniority resolver",
+);
+assert.doesNotMatch(
+  eventForm,
+  /approvalId\.slice\(0,\s*8\)/,
+  "approval options must not use truncated UUID as primary identity",
 );
 
 const resolvers = read("components/entity-picker/resolvers.ts");

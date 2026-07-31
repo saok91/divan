@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-07-31T14:40:00+03:30
+# last_updated: 2026-07-31T15:45:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-07-31T14:40:00+03:30
+last_updated: 2026-07-31T15:45:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -139,7 +139,7 @@ development_status:
   8-1-interaction-system-audit-control-contract: done
   8-2-visual-design-language-layout-system: done
   8-3-entity-picker-primitive-code-resolvers: done
-  8-4-personnel-event-form-identifier-first-retrofit: backlog
+  8-4-personnel-event-form-identifier-first-retrofit: done
   8-5-remaining-uuid-inputs-retrofit: backlog
   8-6-governed-table-readability-upgrade: backlog
   8-7-row-action-affordance-dead-click-elimination: backlog

@@ -11,6 +11,11 @@ export type UseEntityPickerCascadeResult = {
   onValueChange: (next: EntityPickerValue) => void;
   disabled: boolean;
   disabledReasonFa: string | undefined;
+  /**
+   * Align parent tracking to `parentId` without clearing the child.
+   * Call before restoring parent + child together (e.g. Discard snapshot).
+   */
+  alignParentId: (parentId: string | null) => void;
 };
 
 /**
@@ -43,6 +48,11 @@ export function useEntityPickerCascade(
 
   const prevParentId = useRef<string | null | undefined>(undefined);
   const [clearedReason, setClearedReason] = useState<string | undefined>();
+
+  const alignParentId = useCallback((parentId: string | null) => {
+    prevParentId.current = parentId;
+    setClearedReason(undefined);
+  }, []);
 
   useEffect(() => {
     const nextId = parent?.id ?? null;
@@ -77,5 +87,6 @@ export function useEntityPickerCascade(
     },
     disabled,
     disabledReasonFa,
+    alignParentId,
   };
 }
