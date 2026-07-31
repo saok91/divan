@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { EvaluationSnapshotHonestyLine } from "@/components/operations/evaluation-snapshot-honesty";
 import { LaunchArtifactPanel } from "@/components/operations/launch-artifact-panel";
 import { OperationsHealthPanel } from "@/components/operations/operations-health-panel";
+import { PageHeader } from "@/components/page-header";
 import { auth } from "@/auth";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
@@ -22,10 +23,25 @@ export default async function OperationsPage() {
   assertPageAccess(session.user.coarseRole, "/operations");
 
   return (
-    <div className="space-y-10">
-      <OperationsHealthPanel />
-      <EvaluationSnapshotHonestyLine />
-      <LaunchArtifactPanel />
+    <div className="bg-surface-page text-text-primary">
+      <PageHeader
+        breadcrumb={
+          <span>
+            دیوان
+            <span className="mx-1 text-text-tertiary" aria-hidden>
+              /
+            </span>
+            عملیات
+          </span>
+        }
+        title="عملیات"
+        purpose="سلامت پلتفرم، ثبت artifact راه‌اندازی، و صداقت snapshot ارزیابی."
+      />
+      <div className="space-y-10 px-content-padding-inline pb-6">
+        <OperationsHealthPanel />
+        <EvaluationSnapshotHonestyLine />
+        <LaunchArtifactPanel />
+      </div>
     </div>
   );
 }

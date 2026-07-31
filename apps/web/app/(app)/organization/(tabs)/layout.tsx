@@ -9,7 +9,10 @@ export default function OrganizationTabsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SurfaceSectionTabsLayout surface={SURFACE}>
+    <SurfaceSectionTabsLayout
+      surface={SURFACE}
+      purpose="سلسله‌مراتب، نقش‌ها و مرجع‌های شغلی سازمان."
+    >
       {children}
     </SurfaceSectionTabsLayout>
   );

@@ -76,6 +76,7 @@ const ALLOWED_FILE_HINTS = [
   "personnel-quick-create-dialog.tsx",
   "personnel-quick-edit-modal.tsx",
   "jalali-date-picker.tsx",
+  "dev/gallery/page.tsx",
 ];
 
 const CANCEL_LABEL_RE =
@@ -170,8 +171,12 @@ function classifyGhost(file: string, src: string, index: number): GhostHit {
     };
   }
 
-  // Form footers without DialogFooter wrapper (personnel-event-form)
-  if (cancelish && /border-t border-border/.test(beforeWide)) {
+  // Form footers without DialogFooter wrapper (FormFooter / data-slot only)
+  if (
+    cancelish &&
+    (/FormFooter|data-slot="form-footer"/.test(beforeWide) ||
+      /FormFooter|data-slot="form-footer"/.test(afterWide.slice(0, 200)))
+  ) {
     return {
       file: rel,
       index,

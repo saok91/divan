@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { CorrectionCasesPanel } from "@/components/correction-cases/correction-cases-panel";
+import { PageHeader } from "@/components/page-header";
 import { auth } from "@/auth";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
@@ -16,5 +17,25 @@ export default async function CorrectionCasesPage() {
   }
   assertPageAccess(session.user.coarseRole, "/correction-cases");
 
-  return <CorrectionCasesPanel />;
+  return (
+    <div className="bg-surface-page text-text-primary">
+      <PageHeader
+        id="correction-cases-heading"
+        breadcrumb={
+          <span>
+            دیوان
+            <span className="mx-1 text-text-tertiary" aria-hidden>
+              /
+            </span>
+            پرونده‌های اصلاح
+          </span>
+        }
+        title="پرونده‌های اصلاح"
+        purpose="درخواست‌های اصلاح دادهٔ موضوع خارجی."
+      />
+      <div className="px-content-padding-inline pb-6">
+        <CorrectionCasesPanel />
+      </div>
+    </div>
+  );
 }

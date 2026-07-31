@@ -13,7 +13,7 @@ export default async function AccessBreakGlassPage() {
   assertPageAccess(session.user.coarseRole, "/access");
 
   return (
-    <div className="p-6">
+    <div className="px-content-padding-inline py-4">
       <AccessBreakGlassPanel currentAccountId={session.user.accountId} />
     </div>
   );

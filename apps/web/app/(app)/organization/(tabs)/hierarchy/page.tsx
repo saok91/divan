@@ -16,7 +16,7 @@ export default async function OrganizationHierarchyPage() {
   assertPageAccess(session.user.coarseRole, "/organization");
 
   return (
-    <div className="p-6">
+    <div className="px-content-padding-inline py-4">
       <OrgHierarchyPanel />
     </div>
   );

@@ -437,17 +437,12 @@ export function CorrectionCasesPanel() {
 
   return (
     <section
-      className="mx-auto max-w-5xl space-y-6 p-4 text-foreground"
-      aria-labelledby={`${formId}-heading`}
+      className="mx-auto max-w-5xl space-y-6 text-text-primary"
+      aria-labelledby="correction-cases-heading"
     >
-      <header className="space-y-2">
-        <h1 id={`${formId}-heading`} className="text-heading-md">
-          {operationalCopy.correctionCaseHeading}
-        </h1>
-        <p className="text-body text-muted-foreground">
-          {operationalCopy.correctionCaseIntro}
-        </p>
-      </header>
+      <p className="text-body text-text-secondary">
+        {operationalCopy.correctionCaseIntro}
+      </p>
 
       {actionError ? (
         <p className="text-body text-destructive" role="alert">

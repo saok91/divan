@@ -15,9 +15,9 @@ export default async function PersonnelEventsBulkImportPage() {
   assertPageAccess(session.user.coarseRole, "/personnel-events");
 
   return (
-    <div className="space-y-2 p-6">
+    <div className="space-y-2">
       <SectionTabPlaceholder />
-      <p className="text-caption text-muted-foreground">
+      <p className="text-caption text-text-secondary px-content-padding-inline">
         ورود گروهی روزمرهٔ رویدادها بعداً تکمیل می‌شود. ویزارد پیشرفته در «ورود
         داده» باقی می‌ماند.
       </p>

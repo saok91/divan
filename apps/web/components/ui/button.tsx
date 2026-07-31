@@ -40,17 +40,17 @@ const buttonVariants = cva(
         rowAction:
           "border border-control-border bg-background text-foreground hover:bg-muted rounded-sm disabled:bg-disabled-surface disabled:text-disabled-foreground disabled:border-hairline",
         destructive:
-          "bg-destructive text-white hover:brightness-95 rounded-md border border-transparent disabled:bg-disabled-surface disabled:text-disabled-foreground disabled:border-hairline",
+          "bg-destructive text-destructive-foreground hover:brightness-95 rounded-md border border-transparent disabled:bg-disabled-surface disabled:text-disabled-foreground disabled:border-hairline",
         ghost:
           "hover:bg-muted rounded-md border border-transparent disabled:text-disabled-foreground",
         link: "text-primary underline-offset-4 hover:underline border-transparent disabled:text-disabled-foreground",
       },
       size: {
-        default: "h-8 px-4 py-2",
-        sm: "h-7 px-3",
-        xs: "h-6 px-2 text-caption",
+        default: "h-control-height px-4 py-2",
+        sm: "h-control-height-sm px-3",
+        xs: "h-control-height-xs px-2 text-caption",
         lg: "h-10 px-6",
-        icon: "size-8",
+        icon: "size-control-height",
       },
     },
     defaultVariants: {

@@ -25,7 +25,11 @@ export default async function PersonnelTabsLayout({
     : SURFACE.tabs.filter((t) => t.id !== "dictionary");
 
   return (
-    <SurfaceSectionTabsLayout surface={SURFACE} tabs={tabs}>
+    <SurfaceSectionTabsLayout
+      surface={SURFACE}
+      tabs={tabs}
+      purpose="جستجو، افزودن و مدیریت اطلاعات افراد."
+    >
       {children}
     </SurfaceSectionTabsLayout>
   );

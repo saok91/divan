@@ -17,16 +17,17 @@ export default async function PersonnelEventsRegisterPage() {
   assertPageAccess(session.user.coarseRole, "/personnel-events");
 
   return (
-    <div className="p-6">
-      <Suspense
-        fallback={
-          <p className="text-body text-muted-foreground" role="status">
-            در حال بارگذاری فرم رویداد…
-          </p>
-        }
-      >
-        <PersonnelEventFormHost />
-      </Suspense>
-    </div>
+    <Suspense
+      fallback={
+        <p
+          className="text-body text-text-secondary px-content-padding-inline py-4"
+          role="status"
+        >
+          در حال بارگذاری فرم رویداد…
+        </p>
+      }
+    >
+      <PersonnelEventFormHost />
+    </Suspense>
   );
 }

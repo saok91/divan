@@ -19,7 +19,7 @@ export default async function HeadcountCapacityPage() {
   assertPageAccess(session.user.coarseRole, "/headcount");
 
   return (
-    <div className="space-y-10 p-6">
+    <div className="space-y-10 px-content-padding-inline py-4">
       <HeadcountApprovalPanel />
       <HeadcountExemptionPanel />
       <HeadcountOverridePanel />

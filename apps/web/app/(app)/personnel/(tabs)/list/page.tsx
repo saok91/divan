@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { FullBleedTableHost } from "@/components/layout/panel-section";
 import { PersonnelListPanel } from "@/components/personnel/personnel-list-panel";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
@@ -17,8 +18,8 @@ export default async function PersonnelListPage() {
   assertPageAccess(session.user.coarseRole, "/personnel");
 
   return (
-    <div className="p-6">
+    <FullBleedTableHost className="py-4">
       <PersonnelListPanel />
-    </div>
+    </FullBleedTableHost>
   );
 }

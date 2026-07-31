@@ -9,7 +9,10 @@ export default function AccessTabsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SurfaceSectionTabsLayout surface={SURFACE}>
+    <SurfaceSectionTabsLayout
+      surface={SURFACE}
+      purpose="اعطای دسترسی، نقش‌ها، محدوده‌ها و دسترسی اضطراری."
+    >
       {children}
     </SurfaceSectionTabsLayout>
   );

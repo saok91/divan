@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AuditInvestigationPanel } from "@/components/audit/audit-investigation-panel";
+import { PageHeader } from "@/components/page-header";
 import { auth } from "@/auth";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
@@ -16,5 +17,25 @@ export default async function AuditPage() {
   }
   assertPageAccess(session.user.coarseRole, "/audit");
 
-  return <AuditInvestigationPanel />;
+  return (
+    <div className="bg-surface-page text-text-primary">
+      <PageHeader
+        id="audit-investigation-heading"
+        breadcrumb={
+          <span>
+            دیوان
+            <span className="mx-1 text-text-tertiary" aria-hidden>
+              /
+            </span>
+            ممیزی
+          </span>
+        }
+        title="ممیزی"
+        purpose="جست‌وجو و بررسی ردپای حاکمیتی."
+      />
+      <div className="px-content-padding-inline pb-6">
+        <AuditInvestigationPanel />
+      </div>
+    </div>
+  );
 }

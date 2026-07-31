@@ -3,6 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  FormField,
+  FormFooter,
+  FormLayout,
+  FormSection,
+} from "@/components/form-layout";
+import { Panel } from "@/components/layout/panel-section";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import {
   useLeaveGuardOptional,
@@ -26,7 +33,6 @@ import {
   formatChainLinksFa,
 } from "@/lib/personnel-event-timeline";
 import { api } from "@/lib/trpc/client";
-import { cn } from "@/lib/utils";
 
 type Conflict = {
   code: string;
@@ -822,34 +828,28 @@ export function PersonnelEventForm({
         : "تأیید اصلاح رویداد";
 
   return (
-    <section
-      className="mx-auto max-w-4xl space-y-6"
-      aria-labelledby={`${formId}-title`}
-    >
+    <FormLayout aria-labelledby={`${formId}-title`}>
       <header className="space-y-1">
-        <h2 id={`${formId}-title`} className="text-title-medium">
+        <h2 id={`${formId}-title`} className="text-heading">
           فرم رویداد پرسنلی
         </h2>
-        <p className="text-body text-muted-foreground">
+        <p className="text-caption text-text-secondary">
           ذخیره پیش‌نویس وضعیت فعلی را تغییر نمی‌دهد. نهایی‌سازی رویداد معتبر
           می‌سازد. لغو/بازگشت/اصلاح اصل را پاک نمی‌کند.
         </p>
       </header>
 
+      <Panel>
       <form
-        className="space-y-5"
+        className="space-y-form-section-gap"
         onSubmit={(e) => {
           e.preventDefault();
           void saveDraft();
         }}
         onChange={() => setDirty(true)}
       >
-        <fieldset className="space-y-3">
-          <legend className="text-label-medium">شناسه‌ها</legend>
-          <label className="block space-y-1">
-            <span className="text-label-medium">
-              شناسه فرد <span className="text-destructive">*</span>
-            </span>
+        <FormSection title="شناسه‌ها">
+          <FormField label="شناسه فرد" htmlFor={`${formId}-person`} required>
             <Input
               value={personId}
               onChange={(e) => setPersonId(e.target.value)}
@@ -857,19 +857,29 @@ export function PersonnelEventForm({
               dir="ltr"
               autoComplete="off"
             />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-label-medium">
-              شناسه همکاری
-              {isTerminationType(eventType) ||
+          </FormField>
+          <FormField
+            label={
+              <>
+                شناسه همکاری
+                {!(
+                  isTerminationType(eventType) ||
+                  isTransferType(eventType) ||
+                  isJobLevelType(eventType) ||
+                  isCompensationType(eventType)
+                )
+                  ? " (اختیاری)"
+                  : null}
+              </>
+            }
+            htmlFor={`${formId}-employment`}
+            required={
+              isTerminationType(eventType) ||
               isTransferType(eventType) ||
               isJobLevelType(eventType) ||
-              isCompensationType(eventType) ? (
-                <span className="text-destructive"> *</span>
-              ) : (
-                " (اختیاری)"
-              )}
-            </span>
+              isCompensationType(eventType)
+            }
+          >
             <Input
               value={employmentId}
               onChange={(e) => setEmploymentId(e.target.value)}
@@ -881,26 +891,14 @@ export function PersonnelEventForm({
                 isJobLevelType(eventType) ||
                 isCompensationType(eventType)
               }
-              aria-required={
-                isTerminationType(eventType) ||
-                isTransferType(eventType) ||
-                isJobLevelType(eventType) ||
-                isCompensationType(eventType)
-                  ? true
-                  : undefined
-              }
             />
-          </label>
-        </fieldset>
+          </FormField>
+        </FormSection>
 
-        <fieldset className="space-y-3">
-          <legend className="text-label-medium">رویداد</legend>
-          <label className="block space-y-1">
-            <span className="text-label-medium" id={`${formId}-event-type`}>
-              نوع رویداد <span className="text-destructive">*</span>
-            </span>
+        <FormSection title="رویداد">
+          <FormField label="نوع رویداد" htmlFor={`${formId}-event-type`} required>
             <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="flex h-control-height w-full rounded-md border border-control-border bg-surface px-3 text-body"
               value={eventType}
               onChange={(e) => {
                 setEventType(e.target.value);
@@ -908,7 +906,6 @@ export function PersonnelEventForm({
                 setDirty(true);
               }}
               required
-              aria-labelledby={`${formId}-event-type`}
             >
               {EVENT_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -916,14 +913,13 @@ export function PersonnelEventForm({
                 </option>
               ))}
             </select>
-          </label>
-          <div className="space-y-1">
-            <span className="text-label-medium">
-              تاریخ مؤثر <span className="text-destructive">*</span>
-            </span>
-            <p className="text-xs text-muted-foreground">
-              متمایز از زمان ثبت/نهایی‌سازی — فقط روز تقویمی.
-            </p>
+          </FormField>
+          <FormField
+            label="تاریخ مؤثر"
+            htmlFor={`${formId}-effective-date`}
+            required
+            help="متمایز از زمان ثبت/نهایی‌سازی — فقط روز تقویمی."
+          >
             <JalaliDatePicker
               aria-label="تاریخ مؤثر"
               value={effectiveDate || undefined}
@@ -932,18 +928,12 @@ export function PersonnelEventForm({
                 setDirty(true);
               }}
             />
-          </div>
-        </fieldset>
+          </FormField>
+        </FormSection>
 
         {isStartReturnType(eventType) ? (
-          <fieldset className="space-y-3">
-            <legend className="text-label-medium">
-              واقعیت‌های حداقل شروع/بازگشت
-            </legend>
-            <label className="block space-y-1">
-              <span className="text-label-medium" id={`${formId}-collab`}>
-                نوع همکاری <span className="text-destructive">*</span>
-              </span>
+          <FormSection title="واقعیت‌های حداقل شروع/بازگشت">
+            <FormField label="نوع همکاری" htmlFor={`${formId}-collab`} required>
               <Input
                 value={collaborationType}
                 onChange={(e) => {
@@ -952,10 +942,9 @@ export function PersonnelEventForm({
                 }}
                 required
                 dir="ltr"
-                aria-labelledby={`${formId}-collab`}
                 autoComplete="off"
               />
-            </label>
+            </FormField>
             {(
               [
                 ["teamId", "شناسه تیم", teamId, setTeamId],
@@ -971,13 +960,12 @@ export function PersonnelEventForm({
                 ["seniorityId", "شناسه ارشدیت (اختیاری)", seniorityId, setSeniorityId],
               ] as const
             ).map(([key, label, value, setter]) => (
-              <label key={key} className="block space-y-1">
-                <span className="text-label-medium" id={`${formId}-${key}`}>
-                  {label}
-                  {key !== "seniorityId" ? (
-                    <span className="text-destructive"> *</span>
-                  ) : null}
-                </span>
+              <FormField
+                key={key}
+                label={label}
+                htmlFor={`${formId}-${key}`}
+                required={key !== "seniorityId"}
+              >
                 <Input
                   value={value}
                   onChange={(e) => {
@@ -986,10 +974,9 @@ export function PersonnelEventForm({
                   }}
                   required={key !== "seniorityId"}
                   dir="ltr"
-                  aria-labelledby={`${formId}-${key}`}
                   autoComplete="off"
                 />
-              </label>
+              </FormField>
             ))}
             <HeadcountCapacityPanel
               used={capacityQuery.data?.used ?? 0}
@@ -1011,16 +998,12 @@ export function PersonnelEventForm({
               }
             />
             {compatibleApprovalsQuery.data?.length ? (
-              <label className="block space-y-1">
-                <span
-                  className="text-label-medium"
-                  id={`${formId}-pref-apr-sr`}
-                >
-                  مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)
-                </span>
+              <FormField
+                label="مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)"
+                htmlFor={`${formId}-pref-apr-sr`}
+              >
                 <select
-                  aria-labelledby={`${formId}-pref-apr-sr`}
-                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  className="border-control-border bg-surface h-control-height w-full rounded-md border px-3 text-body"
                   value={preferredApprovalId}
                   onChange={(e) => {
                     setPreferredApprovalId(e.target.value);
@@ -1035,27 +1018,23 @@ export function PersonnelEventForm({
                     </option>
                   ))}
                 </select>
-              </label>
+              </FormField>
             ) : null}
-          </fieldset>
+          </FormSection>
         ) : null}
 
         {isTerminationType(eventType) ? (
-          <fieldset className="space-y-3">
-            <legend className="text-label-medium">
-              واقعیت‌های حداقل خاتمه همکاری
-            </legend>
-            <p className="text-xs text-muted-foreground">
+          <FormSection title="واقعیت‌های حداقل خاتمه همکاری">
+            <p className="text-caption text-text-tertiary">
               شناسه همکاری باز را بالا وارد کنید. دلیل خاتمه باید کد کوتاه باشد
               (مثلاً contract_ended) — نه متن آزاد حساس.
             </p>
-            <label className="block space-y-1">
-              <span
-                className="text-label-medium"
-                id={`${formId}-termination-reason`}
-              >
-                کد دلیل خاتمه <span className="text-destructive">*</span>
-              </span>
+            <FormField
+              label="کد دلیل خاتمه"
+              htmlFor={`${formId}-termination-reason`}
+              required
+              help="نمونه‌ها: contract_ended، resignation، dismissal"
+            >
               <Input
                 value={terminationReason}
                 onChange={(e) => {
@@ -1064,63 +1043,52 @@ export function PersonnelEventForm({
                 }}
                 required
                 dir="ltr"
-                aria-labelledby={`${formId}-termination-reason`}
-                aria-describedby={`${formId}-termination-reason-hint`}
                 autoComplete="off"
                 placeholder="contract_ended"
               />
-              <span
-                id={`${formId}-termination-reason-hint`}
-                className="text-xs text-muted-foreground"
-              >
-                نمونه‌ها: contract_ended، resignation، dismissal
-              </span>
-            </label>
-          </fieldset>
+            </FormField>
+          </FormSection>
         ) : null}
 
         {isTransferType(eventType) ? (
-          <fieldset className="space-y-3">
-            <legend className="text-label-medium">
-              واقعیت‌های انتقال (مقصد)
-            </legend>
-            <p className="text-xs text-muted-foreground">
+          <FormSection title="واقعیت‌های انتقال (مقصد)">
+            <p className="text-caption text-text-tertiary">
               شناسه همکاری باز را بالا وارد کنید. مقصد باید با انتصاب اولیه فعلی
               متفاوت باشد. ظرفیت مقصد قبل از نهایی‌سازی نمایش داده می‌شود.
             </p>
             {sourcePrimaryQuery.isFetching ? (
-              <p className="text-sm text-muted-foreground" role="status">
+              <p className="text-body text-text-secondary" role="status">
                 در حال بارگذاری انتصاب اولیه مبدأ…
               </p>
             ) : sourcePrimaryQuery.data ? (
               <div
-                className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                className="rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-body"
                 role="region"
                 aria-label="خلاصه انتصاب اولیه مبدأ"
               >
-                <p className="text-label-medium mb-2">انتصاب اولیه فعلی (مبدأ)</p>
-                <dl className="grid gap-1 text-xs">
+                <p className="text-field-label mb-2">انتصاب اولیه فعلی (مبدأ)</p>
+                <dl className="grid gap-1 text-caption">
                   <div className="flex gap-2">
-                    <dt className="text-muted-foreground shrink-0">تیم</dt>
-                    <dd className="font-mono truncate" dir="ltr">
+                    <dt className="text-text-tertiary shrink-0">تیم</dt>
+                    <dd className="text-identifier truncate" dir="ltr">
                       {sourcePrimaryQuery.data.teamId}
                     </dd>
                   </div>
                   <div className="flex gap-2">
-                    <dt className="text-muted-foreground shrink-0">عنوان</dt>
-                    <dd className="font-mono truncate" dir="ltr">
+                    <dt className="text-text-tertiary shrink-0">عنوان</dt>
+                    <dd className="text-identifier truncate" dir="ltr">
                       {sourcePrimaryQuery.data.jobTitleId}
                     </dd>
                   </div>
                   <div className="flex gap-2">
-                    <dt className="text-muted-foreground shrink-0">لدر / گرید</dt>
-                    <dd className="font-mono truncate" dir="ltr">
+                    <dt className="text-text-tertiary shrink-0">لدر / گرید</dt>
+                    <dd className="text-identifier truncate" dir="ltr">
                       {sourcePrimaryQuery.data.ladderId.slice(0, 8)}… /{" "}
                       {sourcePrimaryQuery.data.gradeId.slice(0, 8)}…
                     </dd>
                   </div>
                   <div className="flex gap-2">
-                    <dt className="text-muted-foreground shrink-0">شروع</dt>
+                    <dt className="text-text-tertiary shrink-0">شروع</dt>
                     <dd className="tabular-nums" dir="ltr">
                       {sourcePrimaryQuery.data.startDate}
                     </dd>
@@ -1129,7 +1097,7 @@ export function PersonnelEventForm({
               </div>
             ) : employmentId.trim() &&
               /^[0-9a-f-]{36}$/i.test(employmentId.trim()) ? (
-              <p className="text-sm text-muted-foreground" role="status">
+              <p className="text-body text-text-secondary" role="status">
                 انتصاب اولیه مبدأ برای این همکاری در تاریخ مؤثر یافت نشد.
               </p>
             ) : null}
@@ -1158,13 +1126,12 @@ export function PersonnelEventForm({
                 ],
               ] as const
             ).map(([key, label, value, setter]) => (
-              <label key={key} className="block space-y-1">
-                <span className="text-label-medium" id={`${formId}-xfer-${key}`}>
-                  {label}
-                  {key !== "seniorityId" ? (
-                    <span className="text-destructive"> *</span>
-                  ) : null}
-                </span>
+              <FormField
+                key={key}
+                label={label}
+                htmlFor={`${formId}-xfer-${key}`}
+                required={key !== "seniorityId"}
+              >
                 <Input
                   value={value}
                   onChange={(e) => {
@@ -1173,10 +1140,9 @@ export function PersonnelEventForm({
                   }}
                   required={key !== "seniorityId"}
                   dir="ltr"
-                  aria-labelledby={`${formId}-xfer-${key}`}
                   autoComplete="off"
                 />
-              </label>
+              </FormField>
             ))}
             <HeadcountCapacityPanel
               used={capacityQuery.data?.used ?? 0}
@@ -1198,13 +1164,12 @@ export function PersonnelEventForm({
               }
             />
             {compatibleApprovalsQuery.data?.length ? (
-              <label className="block space-y-1">
-                <span className="text-label-medium" id={`${formId}-pref-apr`}>
-                  مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)
-                </span>
+              <FormField
+                label="مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)"
+                htmlFor={`${formId}-pref-apr`}
+              >
                 <select
-                  aria-labelledby={`${formId}-pref-apr`}
-                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  className="border-control-border bg-surface h-control-height w-full rounded-md border px-3 text-body"
                   value={preferredApprovalId}
                   onChange={(e) => {
                     setPreferredApprovalId(e.target.value);
@@ -1219,43 +1184,40 @@ export function PersonnelEventForm({
                     </option>
                   ))}
                 </select>
-              </label>
+              </FormField>
             ) : null}
-          </fieldset>
+          </FormSection>
         ) : null}
 
         {isJobLevelType(eventType) ? (
-          <fieldset className="space-y-3">
-            <legend className="text-label-medium">
-              تغییر واقعیت‌های شغلی / سطحی
-            </legend>
-            <p className="text-xs text-muted-foreground">
+          <FormSection title="تغییر واقعیت‌های شغلی / سطحی">
+            <p className="text-caption text-text-tertiary">
               تیم ثابت می‌ماند. برای جابه‌جایی تیم از TransferRecorded استفاده
               کنید. ارتقا فقط نتیجه نهایی گرید (± لدر) است — بدون گردش درخواست.
             </p>
             {sourcePrimaryQuery.data ? (
               <div
-                className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                className="rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-body"
                 role="region"
                 aria-label="خلاصه انتصاب اولیه فعلی"
               >
-                <p className="text-label-medium mb-2">انتصاب اولیه فعلی</p>
-                <dl className="grid gap-1 text-xs">
+                <p className="text-field-label mb-2">انتصاب اولیه فعلی</p>
+                <dl className="grid gap-1 text-caption">
                   <div className="flex gap-2">
-                    <dt className="text-muted-foreground shrink-0">تیم</dt>
-                    <dd className="font-mono truncate" dir="ltr">
+                    <dt className="text-text-tertiary shrink-0">تیم</dt>
+                    <dd className="text-identifier truncate" dir="ltr">
                       {sourcePrimaryQuery.data.teamId}
                     </dd>
                   </div>
                   <div className="flex gap-2">
-                    <dt className="text-muted-foreground shrink-0">عنوان</dt>
-                    <dd className="font-mono truncate" dir="ltr">
+                    <dt className="text-text-tertiary shrink-0">عنوان</dt>
+                    <dd className="text-identifier truncate" dir="ltr">
                       {sourcePrimaryQuery.data.jobTitleId}
                     </dd>
                   </div>
                   <div className="flex gap-2">
-                    <dt className="text-muted-foreground shrink-0">لدر / گرید</dt>
-                    <dd className="font-mono truncate" dir="ltr">
+                    <dt className="text-text-tertiary shrink-0">لدر / گرید</dt>
+                    <dd className="text-identifier truncate" dir="ltr">
                       {sourcePrimaryQuery.data.ladderId.slice(0, 8)}… /{" "}
                       {sourcePrimaryQuery.data.gradeId.slice(0, 8)}…
                     </dd>
@@ -1264,9 +1226,8 @@ export function PersonnelEventForm({
               </div>
             ) : null}
             {eventType === "OrganizationalRoleChanged" ? (
-              <label className="block space-y-1">
-                <span className="text-label-medium">شناسه نقش سازمانی جدید</span>
-                <Input
+              <FormField label="شناسه نقش سازمانی جدید" htmlFor={`${formId}-auto-field-2`}>
+                    <Input
                   value={organizationalRoleId}
                   onChange={(e) => {
                     setOrganizationalRoleId(e.target.value);
@@ -1276,12 +1237,11 @@ export function PersonnelEventForm({
                   dir="ltr"
                   autoComplete="off"
                 />
-              </label>
+                  </FormField>
             ) : null}
             {eventType === "JobTitleChanged" ? (
-              <label className="block space-y-1">
-                <span className="text-label-medium">شناسه عنوان شغلی جدید</span>
-                <Input
+              <FormField label="شناسه عنوان شغلی جدید" htmlFor={`${formId}-auto-field-3`}>
+                    <Input
                   value={jobTitleId}
                   onChange={(e) => {
                     setJobTitleId(e.target.value);
@@ -1291,12 +1251,15 @@ export function PersonnelEventForm({
                   dir="ltr"
                   autoComplete="off"
                 />
-              </label>
+                  </FormField>
             ) : null}
             {eventType === "SeniorityChanged" ? (
               <div className="space-y-3">
-                <label className="block space-y-1">
-                  <span className="text-label-medium">شناسه ارشدیت جدید</span>
+                <FormField
+                  label="شناسه ارشدیت جدید"
+                  htmlFor={`${formId}-seniority`}
+                  help="مقدار را وارد کنید یا پاک‌کردن صریح را علامت بزنید؛ خالیِ دست‌نخورده پذیرفته نمی‌شود."
+                >
                   <Input
                     value={seniorityId}
                     onChange={(e) => {
@@ -1307,17 +1270,9 @@ export function PersonnelEventForm({
                     disabled={clearSeniority}
                     dir="ltr"
                     autoComplete="off"
-                    aria-describedby={`${formId}-seniority-hint`}
                   />
-                  <span
-                    id={`${formId}-seniority-hint`}
-                    className="text-xs text-muted-foreground"
-                  >
-                    مقدار را وارد کنید یا پاک‌کردن صریح را علامت بزنید؛ خالیِ
-                    دست‌نخورده پذیرفته نمی‌شود.
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
+                </FormField>
+                <label className="flex items-center gap-2 text-body">
                   <input
                     type="checkbox"
                     checked={clearSeniority}
@@ -1337,11 +1292,16 @@ export function PersonnelEventForm({
               <>
                 {(eventType === "LadderChanged" ||
                   eventType === "PromotionRecorded") && (
-                  <label className="block space-y-1">
-                    <span className="text-label-medium">
-                      شناسه لدر
-                      {eventType === "LadderChanged" ? " جدید" : " (اختیاری)"}
-                    </span>
+                  <FormField
+                    label={
+                      <>
+                        شناسه لدر
+                        {eventType === "LadderChanged" ? " جدید" : " (اختیاری)"}
+                      </>
+                    }
+                    htmlFor={`${formId}-ladder`}
+                    required={eventType === "LadderChanged"}
+                  >
                     <Input
                       value={ladderId}
                       onChange={(e) => {
@@ -1352,10 +1312,13 @@ export function PersonnelEventForm({
                       dir="ltr"
                       autoComplete="off"
                     />
-                  </label>
+                  </FormField>
                 )}
-                <label className="block space-y-1">
-                  <span className="text-label-medium">شناسه گرید جدید</span>
+                <FormField
+                  label="شناسه گرید جدید"
+                  htmlFor={`${formId}-grade`}
+                  required
+                >
                   <Input
                     value={gradeId}
                     onChange={(e) => {
@@ -1366,7 +1329,7 @@ export function PersonnelEventForm({
                     dir="ltr"
                     autoComplete="off"
                   />
-                </label>
+                </FormField>
               </>
             ) : null}
             {isJobCapacityType(eventType) ? (
@@ -1391,16 +1354,12 @@ export function PersonnelEventForm({
                   }
                 />
                 {compatibleApprovalsQuery.data?.length ? (
-                  <label className="block space-y-1">
-                    <span
-                      className="text-label-medium"
-                      id={`${formId}-job-pref-apr`}
-                    >
-                      مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)
-                    </span>
+                  <FormField
+                    label="مجوز ظرفیت (پیش‌فرض: قدیمی‌ترین سازگار)"
+                    htmlFor={`${formId}-job-pref-apr`}
+                  >
                     <select
-                      aria-labelledby={`${formId}-job-pref-apr`}
-                      className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                      className="border-control-border bg-surface h-control-height w-full rounded-md border px-3 text-body"
                       value={preferredApprovalId}
                       onChange={(e) => {
                         setPreferredApprovalId(e.target.value);
@@ -1415,31 +1374,34 @@ export function PersonnelEventForm({
                         </option>
                       ))}
                     </select>
-                  </label>
+                  </FormField>
                 ) : null}
               </>
             ) : null}
-          </fieldset>
+          </FormSection>
         ) : null}
 
         {isCompensationType(eventType) ? (
-          <fieldset className="space-y-3">
-            <legend className="text-label-medium">
-              {eventType === "CompensationChanged"
+          <FormSection
+            title={
+              eventType === "CompensationChanged"
                 ? "تغییر جبران‌خدمت"
-                : "تغییر قرارداد"}
-            </legend>
-            <p className="text-xs text-muted-foreground">
+                : "تغییر قرارداد"
+            }
+          >
+            <p className="text-caption text-text-tertiary">
               مبلغ هرگز در payload پیش‌نویس ذخیره نمی‌شود — کانال حساس جداگانه.
               نهایی‌سازی نیازمند مجوز compensation.write است.
             </p>
             {eventType === "CompensationChanged" ? (
               <>
                 {showCompField("compensation.amount") ? (
-                  <label className="block space-y-1">
-                    <span className="text-label-medium">
-                      مبلغ <span className="text-destructive">*</span>
-                    </span>
+                  <FormField
+                    label="مبلغ"
+                    htmlFor={`${formId}-comp-amount`}
+                    required
+                    help="فقط در کانال حساس؛ کلید amount در payload مجاز نیست."
+                  >
                     <Input
                       value={compensationAmount}
                       onChange={(e) => {
@@ -1450,19 +1412,11 @@ export function PersonnelEventForm({
                       dir="ltr"
                       inputMode="decimal"
                       autoComplete="off"
-                      aria-describedby={`${formId}-amount-hint`}
                     />
-                    <span
-                      id={`${formId}-amount-hint`}
-                      className="text-xs text-muted-foreground"
-                    >
-                      فقط در کانال حساس؛ کلید amount در payload مجاز نیست.
-                    </span>
-                  </label>
+                  </FormField>
                 ) : null}
                 {showCompField("compensation.currency") ? (
-                  <label className="block space-y-1">
-                    <span className="text-label-medium">کد ارز</span>
+                  <FormField label="کد ارز" htmlFor={`${formId}-currency`}>
                     <Input
                       value={currency}
                       onChange={(e) => {
@@ -1472,11 +1426,10 @@ export function PersonnelEventForm({
                       dir="ltr"
                       autoComplete="off"
                     />
-                  </label>
+                  </FormField>
                 ) : null}
                 {showCompField("compensation.change_type") ? (
-                  <label className="block space-y-1">
-                    <span className="text-label-medium">نوع تغییر</span>
+                  <FormField label="نوع تغییر" htmlFor={`${formId}-change-type`}>
                     <Input
                       value={changeType}
                       onChange={(e) => {
@@ -1486,12 +1439,12 @@ export function PersonnelEventForm({
                       dir="ltr"
                       autoComplete="off"
                     />
-                  </label>
+                  </FormField>
                 ) : null}
                 {!showCompField("compensation.amount") &&
                 !showCompField("compensation.currency") &&
                 !showCompField("compensation.change_type") ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-caption text-text-tertiary">
                     هیچ فیلد جبران‌خدمت در دیکشنری داده فعال نیست.
                   </p>
                 ) : null}
@@ -1499,8 +1452,7 @@ export function PersonnelEventForm({
             ) : (
               <>
                 {showCompField("contract.contract_type") ? (
-                  <label className="block space-y-1">
-                    <span className="text-label-medium">نوع قرارداد</span>
+                  <FormField label="نوع قرارداد" htmlFor={`${formId}-auto-field-7`}>
                     <Input
                       value={contractType}
                       onChange={(e) => {
@@ -1510,11 +1462,10 @@ export function PersonnelEventForm({
                       dir="ltr"
                       autoComplete="off"
                     />
-                  </label>
+                  </FormField>
                 ) : null}
                 {showCompField("contract.collaboration_type") ? (
-                  <label className="block space-y-1">
-                    <span className="text-label-medium">نوع همکاری</span>
+                  <FormField label="نوع همکاری" htmlFor={`${formId}-auto-field-8`}>
                     <Input
                       value={collaborationType}
                       onChange={(e) => {
@@ -1524,27 +1475,27 @@ export function PersonnelEventForm({
                       dir="ltr"
                       autoComplete="off"
                     />
-                  </label>
+                  </FormField>
                 ) : null}
                 {!showCompField("contract.contract_type") &&
                 !showCompField("contract.collaboration_type") ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-caption text-text-tertiary">
                     فیلدهای قرارداد فعال در دیکشنری یافت نشد.
                   </p>
                 ) : null}
               </>
             )}
-          </fieldset>
+          </FormSection>
         ) : null}
 
         {activeConflicts.length > 0 ? (
           <div className="space-y-2">
-            <h3 className="text-label-medium">تعارض‌ها</h3>
+            <h3 className="text-field-label">تعارض‌ها</h3>
             <ConflictList conflicts={activeConflicts} />
             {warningsNeedingAck.map((w) => (
               <label
                 key={w.code}
-                className="flex items-start gap-2 text-sm"
+                className="flex items-start gap-2 text-body"
               >
                 <input
                   type="checkbox"
@@ -1566,47 +1517,42 @@ export function PersonnelEventForm({
               </label>
             ))}
             {needsOverride ? (
-              <label className="block space-y-1">
-                <span className="text-label-medium" id={`${formId}-override`}>
-                  دلیل Override (فقط HR Admin){" "}
-                  <span className="text-destructive">*</span>
-                </span>
+              <>
                 {hasScheduledException ? (
                   <div className="mb-2">
                     <StatusBadge status="Exception" />
                   </div>
                 ) : null}
-                <Input
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  aria-labelledby={`${formId}-override`}
-                  aria-required
-                  autoComplete="off"
-                />
-                <span className="text-xs text-muted-foreground">
-                  ظرفیت یا محدودیت دیگر نیازمند تأیید صریح و ثبت ممیزی است.
-                </span>
-              </label>
+                <FormField
+                  label="دلیل Override (فقط HR Admin)"
+                  htmlFor={`${formId}-override`}
+                  required
+                  help="ظرفیت یا محدودیت دیگر نیازمند تأیید صریح و ثبت ممیزی است."
+                >
+                  <Input
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                    aria-required
+                    autoComplete="off"
+                  />
+                </FormField>
+              </>
             ) : null}
           </div>
         ) : null}
 
         {errorMsg ? (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-body text-destructive">
             {errorMsg}
           </p>
         ) : null}
         {statusMsg ? (
-          <p role="status" className="text-sm text-muted-foreground">
+          <p role="status" className="text-body text-text-secondary">
             {statusMsg}
           </p>
         ) : null}
 
-        <footer
-          className={cn(
-            "flex flex-wrap items-center gap-2 border-t border-border pt-4",
-          )}
-        >
+        <FormFooter>
           <Button
             type="button"
             variant="ghost"
@@ -1650,29 +1596,30 @@ export function PersonnelEventForm({
           >
             نهایی‌سازی
           </Button>
-        </footer>
+        </FormFooter>
       </form>
+      </Panel>
 
       {personId.trim() ? (
         <section
-          className="space-y-3 border-t border-border pt-6"
+          className="space-y-3 border-t border-hairline pt-6"
           aria-labelledby={`${formId}-events`}
         >
-          <h3 id={`${formId}-events`} className="text-label-medium">
+          <h3 id={`${formId}-events`} className="text-field-label">
             رویدادهای معتبر (نمایش وضعیت حل‌شده)
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-text-tertiary">
             زمان‌بندی‌شده تا تاریخ مؤثر وضعیت فعلی را تغییر نمی‌دهد. جدول زمانی
             کامل در Epic ۵.۳.
           </p>
           {eventsQuery.isLoading ? (
             <p role="status">در حال بارگذاری…</p>
           ) : eventsQuery.isError ? (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-body text-destructive">
               {eventsQuery.error.message || "بارگذاری رویدادها ناموفق بود."}
             </p>
           ) : (eventsQuery.data?.length ?? 0) === 0 ? (
-            <p className="text-sm text-muted-foreground">رویدادی ثبت نشده است.</p>
+            <p className="text-body text-text-secondary">رویدادی ثبت نشده است.</p>
           ) : (
             <ul className="space-y-3" role="list">
               {eventsQuery.data?.map((row) => {
@@ -1693,21 +1640,21 @@ export function PersonnelEventForm({
                 return (
                   <li
                     key={row.event.id}
-                    className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3"
+                    className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline pb-3"
                   >
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={badge} />
-                        <span className="text-sm font-medium" dir="ltr">
+                        <span className="text-body-medium" dir="ltr">
                           {row.event.eventType}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground" dir="ltr">
+                      <p className="text-caption text-text-tertiary" dir="ltr">
                         {row.event.id.slice(0, 8)}… · مؤثر{" "}
                         {row.event.effectiveDate}
                       </p>
                       {chainHint ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-caption text-text-tertiary">
                           زنجیره: {chainHint}
                         </p>
                       ) : null}
@@ -1784,7 +1731,7 @@ export function PersonnelEventForm({
                 یا حذف مستقیم نیست.
               </p>
             )}
-            <p className="text-muted-foreground">
+            <p className="text-text-secondary">
               تاریخ مؤثر: {effectiveDate || "—"} · نوع: {eventType}
               {isTerminationType(eventType)
                 ? ` · دلیل: ${terminationReason || "—"}`
@@ -1834,7 +1781,7 @@ export function PersonnelEventForm({
             <p>
               این رویداد تاریخچه را پاک نمی‌کند؛ اصلاح مرتبط ثبت می‌شود.
             </p>
-            <p className="text-muted-foreground" dir="ltr">
+            <p className="text-text-secondary" dir="ltr">
               هدف: {lifecycleEventId}
             </p>
           </div>
@@ -1851,6 +1798,6 @@ export function PersonnelEventForm({
         busy={lifecycleBusy}
         onConfirm={onLifecycleConfirm}
       />
-    </section>
+    </FormLayout>
   );
 }

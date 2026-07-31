@@ -9,7 +9,10 @@ export default function HeadcountTabsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SurfaceSectionTabsLayout surface={SURFACE}>
+    <SurfaceSectionTabsLayout
+      surface={SURFACE}
+      purpose="ظرفیت، ایجاد درخواست و ورود گروهی هدکانت."
+    >
       {children}
     </SurfaceSectionTabsLayout>
   );

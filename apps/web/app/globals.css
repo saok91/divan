@@ -4,21 +4,22 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* shadcn content-canvas tokens (light) */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* shadcn content-canvas tokens (light) — aligned to 2026-07-31 neutrals */
+  --background: #ffffff;
+  --foreground: #11142a;
+  --card: #ffffff;
+  --card-foreground: #11142a;
+  --popover: #ffffff;
+  --popover-foreground: #11142a;
+  --secondary: #fafbfc;
+  --secondary-foreground: #11142a;
+  --muted: #fafbfc;
+  --muted-foreground: #4a4f63;
+  --destructive: #c92a2a;
+  --destructive-foreground: #ffffff;
+  --border: #e8eaef;
+  --input: #d2d5df;
+  --ring: #006dff;
 
   /* DESIGN.md brand — light
    * primary nudged #006FFF → #006DFF so secondary (#FFF on primary) ≥ 4.5:1 */
@@ -36,6 +37,22 @@
   --disabled-surface: #f9fafb;
   --disabled-foreground: #b8bcc8;
   --hairline: #e8eaef;
+
+  /* Neutral scale (Story 8.2 / ux-divan-2026-07-31) */
+  --surface-page: #f4f5f8;
+  --surface: #ffffff;
+  --surface-subtle: #fafbfc;
+  --hairline-strong: #dcdfe7;
+  --text-primary: #11142a;
+  --text-secondary: #4a4f63;
+  --text-tertiary: #8a8f9e;
+  --row-hover: #f2f4f8;
+  --selection-tint: #eaf3ff;
+  --selection-tint-border: #c7deff;
+  --skeleton: #e9eaf0;
+  --keycap-background: #eef1f6;
+  --destructive-background: #fff5f5;
+  --dirty-border: #e09e00;
 
   /* Banner tokens — DESIGN.md {stale-banner} / {break-glass-banner} */
   --stale-banner-background: #fff3bf;
@@ -59,38 +76,48 @@
   --status-badge-override-bg: #fff3bf;
   --status-badge-override-fg: #862e00;
 
-  /* Spacing + radius (DESIGN.md + 2026-07-19 delta) */
+  /* Spacing + radius (DESIGN.md 2026-07-31 — supersedes 4b.1 44/24 forward) */
   --chrome-height: 56px;
   --banner-stack-height: 0px;
   --sidebar-width: 240px;
   --sidebar-width-collapsed: 64px;
   --sidebar-current-width: var(--sidebar-width);
-  --section-tabs-height: 44px;
-  --content-padding-inline: 24px;
+  --section-tabs-height: 30px;
+  --content-padding-inline: 16px;
+  --nav-item-height: 30px;
   --filter-row-height: 36px;
   --tree-indent: 16px;
   --table-row-compact: 40px;
+  --table-row-dense: 32px;
   --table-row-comfortable: 48px;
-  --form-section-gap: 24px;
+  --table-header-height: 28px;
+  --control-height-xs: 24px;
+  --control-height-sm: 28px;
+  --control-height: 32px;
+  --form-label-column: 168px;
+  --form-field-gap: 14px;
+  --form-section-gap: 12px;
+  --drawer-width: 480px;
   --radius: 6px;
 }
 
 .dark {
   /* shadcn content-canvas tokens (dark) */
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: #0a1138;
+  --foreground: #e6e9f5;
+  --card: #0a1138;
+  --card-foreground: #e6e9f5;
+  --popover: #0a1138;
+  --popover-foreground: #e6e9f5;
+  --secondary: #131c4a;
+  --secondary-foreground: #e6e9f5;
+  --muted: #131c4a;
+  --muted-foreground: #9aa1c0;
+  --destructive: #c92a2a;
+  --destructive-foreground: #ffffff;
+  --border: #232c5e;
+  --input: #232c5e;
+  --ring: #1e6fe0;
 
   /* DESIGN.md brand — dark (chrome stays navy; never white/light sidebar)
    * primary nudged #4D9FFF → #1E6FE0 so secondary (#FFF on primary) ≥ 4.5:1 */
@@ -108,6 +135,22 @@
   --disabled-surface: #0a1138;
   --disabled-foreground: #9aa1c0;
   --hairline: #232c5e;
+
+  /* Neutral scale — dark (keep hierarchy; DESIGN maps some roles to surface-dark) */
+  --surface-page: #030825;
+  --surface: #0a1138;
+  --surface-subtle: #0d1542;
+  --hairline-strong: #232c5e;
+  --text-primary: #e6e9f5;
+  --text-secondary: #9aa1c0;
+  --text-tertiary: #6e7594;
+  --row-hover: #131c4a;
+  --selection-tint: #152456;
+  --selection-tint-border: #3a4a8a;
+  --skeleton: #232c5e;
+  --keycap-background: #131c4a;
+  --destructive-background: #2a1218;
+  --dirty-border: #fbc470;
 
   --stale-banner-background: #3d3200;
   --stale-banner-foreground: #ffe066;
@@ -147,6 +190,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -158,6 +202,20 @@
   --color-disabled-surface: var(--disabled-surface);
   --color-disabled-foreground: var(--disabled-foreground);
   --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-surface-page: var(--surface-page);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-row-hover: var(--row-hover);
+  --color-selection-tint: var(--selection-tint);
+  --color-selection-tint-border: var(--selection-tint-border);
+  --color-skeleton: var(--skeleton);
+  --color-keycap-background: var(--keycap-background);
+  --color-destructive-background: var(--destructive-background);
+  --color-dirty-border: var(--dirty-border);
   --color-stale-banner-background: var(--stale-banner-background);
   --color-stale-banner-foreground: var(--stale-banner-foreground);
   --color-stale-banner-border: var(--stale-banner-border);
@@ -179,11 +237,20 @@
   --spacing-sidebar-current-width: var(--sidebar-current-width);
   --spacing-section-tabs-height: var(--section-tabs-height);
   --spacing-content-padding-inline: var(--content-padding-inline);
+  --spacing-nav-item-height: var(--nav-item-height);
   --spacing-filter-row-height: var(--filter-row-height);
   --spacing-tree-indent: var(--tree-indent);
   --spacing-table-row-compact: var(--table-row-compact);
+  --spacing-table-row-dense: var(--table-row-dense);
   --spacing-table-row-comfortable: var(--table-row-comfortable);
+  --spacing-table-header-height: var(--table-header-height);
+  --spacing-control-height-xs: var(--control-height-xs);
+  --spacing-control-height-sm: var(--control-height-sm);
+  --spacing-control-height: var(--control-height);
+  --spacing-form-label-column: var(--form-label-column);
+  --spacing-form-field-gap: var(--form-field-gap);
   --spacing-form-section-gap: var(--form-section-gap);
+  --spacing-drawer-width: var(--drawer-width);
 }
 
 @layer base {
@@ -192,49 +259,73 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-size: 14px;
+    @apply bg-surface-page text-text-primary font-sans antialiased;
+    font-size: 13px;
     font-weight: 400;
-    line-height: 1.6;
+    line-height: 1.55;
   }
 }
 
 @layer utilities {
   .text-heading {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 17px;
+    font-weight: 800;
     line-height: 1.3;
+    letter-spacing: -0.01em;
   }
 
   .text-heading-sm {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 12.5px;
+    font-weight: 800;
     line-height: 1.35;
   }
 
   .text-body {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 400;
-    line-height: 1.6;
+    line-height: 1.55;
   }
 
   .text-body-medium {
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.6;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.55;
   }
 
   .text-caption {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 400;
     line-height: 1.5;
   }
 
   .text-tabular {
-    font-size: 14px;
+    font-size: 12.5px;
     font-weight: 500;
     line-height: 1.4;
     font-variant-numeric: tabular-nums;
+  }
+
+  .text-column-header {
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+  }
+
+  .text-field-label {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .text-identifier {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.4;
+    direction: ltr;
+    unicode-bidi: isolate;
   }
 
   .focus-ring-chrome {

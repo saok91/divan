@@ -11,7 +11,10 @@ export default function PersonnelEventsTabsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SurfaceSectionTabsLayout surface={SURFACE}>
+    <SurfaceSectionTabsLayout
+      surface={SURFACE}
+      purpose="ثبت، پیش‌نویس و نهایی‌سازی رویدادهای پرسنلی."
+    >
       {children}
     </SurfaceSectionTabsLayout>
   );

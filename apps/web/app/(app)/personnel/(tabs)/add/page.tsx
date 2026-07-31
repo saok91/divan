@@ -12,7 +12,7 @@ export default async function PersonnelAddPage() {
   assertPageAccess(session.user.coarseRole, "/personnel");
 
   return (
-    <div className="p-6">
+    <div className="px-content-padding-inline py-4">
       <PersonnelAddPanel />
     </div>
   );

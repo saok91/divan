@@ -36,7 +36,7 @@ export default async function PersonnelDictionaryPage() {
   }
 
   return (
-    <div className="space-y-2 p-6">
+    <div className="space-y-2 px-content-padding-inline py-4">
       <PersonnelDictionaryPanel />
       <PersonnelLifecyclePanel />
     </div>

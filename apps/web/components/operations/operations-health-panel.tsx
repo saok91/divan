@@ -165,9 +165,9 @@ export function OperationsHealthPanel() {
   if (healthQuery.isLoading) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
-        <h1 className="text-title text-foreground">
+        <h2 className="text-heading-sm text-text-primary">
           {operationalCopy.opsHealthHeading}
-        </h1>
+        </h2>
         <p className="mt-2 text-body text-muted-foreground" role="status">
           {operationalCopy.opsHealthLoading}
         </p>
@@ -181,9 +181,9 @@ export function OperationsHealthPanel() {
   if (healthQuery.isError) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
-        <h1 className="text-title text-foreground">
+        <h2 className="text-heading-sm text-text-primary">
           {operationalCopy.opsHealthHeading}
-        </h1>
+        </h2>
         <p className="mt-4 text-body text-destructive" role="alert">
           {trpcErrorMessage(
             healthQuery.error,
@@ -198,9 +198,9 @@ export function OperationsHealthPanel() {
   if (!snapshot) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
-        <h1 className="text-title text-foreground">
+        <h2 className="text-heading-sm text-text-primary">
           {operationalCopy.opsHealthHeading}
-        </h1>
+        </h2>
         <p className="mt-4 text-body text-destructive" role="alert">
           {operationalCopy.opsHealthLoadError}
         </p>
@@ -211,9 +211,9 @@ export function OperationsHealthPanel() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       <header className="mb-6">
-        <h1 className="text-title text-foreground">
+        <h2 className="text-heading-sm text-text-primary">
           {operationalCopy.opsHealthHeading}
-        </h1>
+        </h2>
         <p className="mt-2 text-body text-muted-foreground">
           {operationalCopy.opsHealthIntro}
         </p>

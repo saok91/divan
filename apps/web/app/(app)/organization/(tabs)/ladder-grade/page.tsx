@@ -11,7 +11,7 @@ export default async function OrganizationLadderGradePage() {
   }
   assertPageAccess(session.user.coarseRole, "/organization");
   return (
-    <div className="p-6">
+    <div className="px-content-padding-inline py-4">
       <OrgLadderGradePanel />
     </div>
   );

@@ -366,14 +366,6 @@ export function AuditInvestigationPanel() {
       className="space-y-4"
       aria-labelledby="audit-investigation-heading"
     >
-      <header className="space-y-1">
-        <h1 id="audit-investigation-heading" className="text-title">
-          ممیزی
-        </h1>
-        <p className="text-body text-muted-foreground">
-          {operationalCopy.auditSearchHeading}
-        </p>
-      </header>
 
       {searchQuery.isError ? (
         <p className="text-body text-destructive" role="alert">

@@ -111,11 +111,11 @@ export function SectionTabs({
               aria-controls={panelId}
               tabIndex={inTabOrder ? 0 : -1}
               className={cn(
-                "inline-flex h-full shrink-0 items-center whitespace-nowrap border-b-2 px-4 text-body transition-colors",
+                "inline-flex h-full shrink-0 items-center whitespace-nowrap border-b-2 px-4 text-body-medium transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 selected
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                  ? "border-chrome text-text-primary"
+                  : "border-transparent text-text-secondary hover:text-text-primary",
               )}
               onKeyDown={(event) => onTabKeyDown(event, index)}
               onNavigate={(event) => {

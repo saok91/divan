@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 
 import { PersonProfileView } from "@/components/personnel/person-profile-view";
+import { PageHeader } from "@/components/page-header";
 import { auth } from "@/auth";
 import { assertPageAccess } from "@/lib/assert-page-access";
 import { getSessionContext } from "@divan/identity-access";
@@ -55,8 +56,27 @@ export default async function PersonnelProfilePage({
   }
 
   return (
-    <div className="p-6">
-      <PersonProfileView personId={personId} />
+    <div className="bg-surface-page text-text-primary">
+      <PageHeader
+        breadcrumb={
+          <span>
+            دیوان
+            <span className="mx-1 text-text-tertiary" aria-hidden>
+              /
+            </span>
+            پرسنل
+            <span className="mx-1 text-text-tertiary" aria-hidden>
+              /
+            </span>
+            پروفایل
+          </span>
+        }
+        title="پروفایل فرد"
+        purpose="وضعیت جاری فرد در محدودهٔ دسترسی شما."
+      />
+      <div className="px-content-padding-inline py-4">
+        <PersonProfileView personId={personId} />
+      </div>
     </div>
   );
 }

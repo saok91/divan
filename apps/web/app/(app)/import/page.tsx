@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { ImportWizard } from "@/components/import/import-wizard";
+import { PageHeader } from "@/components/page-header";
 import { auth } from "@/auth";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
@@ -17,15 +18,23 @@ export default async function ImportPage() {
   assertPageAccess(session.user.coarseRole, "/import");
 
   return (
-    <div className="mx-auto max-w-[90rem] space-y-4 bg-background p-6 text-foreground">
-      <div className="space-y-1">
-        <h1 className="text-heading">ورود داده</h1>
-        <p className="text-body text-muted-foreground">
-          ویزارد کنترل‌شدهٔ واردسازی: شناسایی → اعتبارسنجی → پیش‌نمایش → تأیید
-          پیش‌نویس. اجرای قطعی تولید در داستان ۶٫۲ است.
-        </p>
+    <div className="mx-auto max-w-[90rem] space-y-4 bg-surface-page text-text-primary">
+      <PageHeader
+        breadcrumb={
+          <span>
+            دیوان
+            <span className="mx-1 text-text-tertiary" aria-hidden>
+              /
+            </span>
+            ورود داده
+          </span>
+        }
+        title="ورود داده"
+        purpose="ویزارد کنترل‌شدهٔ واردسازی: شناسایی → اعتبارسنجی → پیش‌نمایش → تأیید پیش‌نویس."
+      />
+      <div className="px-content-padding-inline pb-6">
+        <ImportWizard />
       </div>
-      <ImportWizard />
     </div>
   );
 }

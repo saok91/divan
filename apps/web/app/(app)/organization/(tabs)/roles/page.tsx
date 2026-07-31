@@ -11,7 +11,7 @@ export default async function OrganizationRolesPage() {
   }
   assertPageAccess(session.user.coarseRole, "/organization");
   return (
-    <div className="p-6">
+    <div className="px-content-padding-inline py-4">
       <OrgRolesPanel />
     </div>
   );

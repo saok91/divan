@@ -226,12 +226,11 @@ export function PersonProfileView({ personId }: PersonProfileViewProps) {
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <h1 className="text-title">پروفایل فرد</h1>
         {displayName ? (
-          <p className="text-title-sm text-muted-foreground">{displayName}</p>
+          <p className="text-heading-sm text-text-secondary">{displayName}</p>
         ) : null}
         <p className="flex flex-wrap items-center gap-2 text-body">
-          <span className="text-muted-foreground">نوع نما:</span>
+          <span className="text-text-secondary">نوع نما:</span>
           <span
             className={cn(
               "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
