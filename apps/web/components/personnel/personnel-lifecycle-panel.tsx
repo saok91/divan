@@ -10,6 +10,7 @@ import {
   createPersonSearch,
   type EntityPickerValue,
 } from "@/components/entity-picker";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -212,6 +213,9 @@ export function PersonnelLifecyclePanel() {
         <h2 id={`${formId}-lifecycle-heading`} className="text-heading-sm">
           {operationalCopy.lifecycleHeading}
         </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <GlossaryTerm termKey="legalHold" />
+        </div>
         <p className="text-caption text-muted-foreground">
           {operationalCopy.lifecycleIntro}
         </p>

@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 
 import { PersonProfileSensitivityIcon } from "@/components/personnel/person-profile-sensitivity-icon";
+import { CorrectionRequestCta } from "@/components/personnel/correction-request-cta";
 import { PersonnelEventTimeline } from "@/components/personnel/personnel-event-timeline";
 import { RecalcPendingMark } from "@/components/personnel/recalc-pending-mark";
 import { StatusBadge } from "@/components/personnel/status-badge";
@@ -11,6 +12,7 @@ import { useLeaveGuardOptional } from "@/components/leave-guard";
 import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSession } from "next-auth/react";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -137,12 +139,17 @@ export function PersonProfileView({
   focusEventId,
 }: PersonProfileViewProps) {
   const leaveGuard = useLeaveGuardOptional();
+  const { data: session, status: sessionStatus } = useSession();
+  // Client-safe role gate — do not import @divan/identity-access (pulls pg into browser).
+  // Both /access and dictionary lifecycle are hr_admin-only in ROLE_NAV_HREFS / page gate.
+  const isHrAdmin =
+    sessionStatus === "authenticated" &&
+    session?.user?.coarseRole === "hr_admin";
   const stateQuery = api.person.getCurrentState.useQuery({ personId });
   const fieldsQuery = api.person.listEnabledFields.useQuery();
   const dictQuery = api.person.listDictionary.useQuery();
   const priorQuery = api.person.listPriorEmployments.useQuery({ personId });
   const labelsQuery = api.person.getProfileLabels.useQuery({ personId });
-  const correctionCapsQuery = api.correctionCase.capabilities.useQuery();
 
   const coldLoad =
     stateQuery.isLoading ||
@@ -268,12 +275,10 @@ export function PersonProfileView({
     "نوع همکاری قراردادی",
   );
 
-  const canOpenCorrection = correctionCapsQuery.data?.write === true;
-  const correctionCapsLoading = correctionCapsQuery.isLoading;
-  const correctionCapsFailed = correctionCapsQuery.isError;
+  const canOpenAccess = isHrAdmin;
+  const canOpenLifecycle = isHrAdmin;
 
-  function navigateCorrection() {
-    const href = `/correction-cases?person=${encodeURIComponent(personId)}&open=1`;
+  function navigateGuarded(href: string) {
     if (leaveGuard) {
       void leaveGuard.requestNavigation(href);
       return;
@@ -309,34 +314,37 @@ export function PersonProfileView({
             </p>
           </div>
           <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
-            {canOpenCorrection ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={navigateCorrection}
-              >
-                {operationalCopy.profileCorrectionRequestCta}
-              </Button>
-            ) : correctionCapsFailed ? (
-              <FeedbackMessage kind="error">
-                {operationalCopy.correctionCaseCapabilitiesError}
-              </FeedbackMessage>
-            ) : (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled
-                disabledReason={
-                  correctionCapsLoading
-                    ? operationalCopy.actionPending
-                    : operationalCopy.profileCorrectionRequestDenied
-                }
-              >
-                {operationalCopy.profileCorrectionRequestCta}
-              </Button>
-            )}
+            <CorrectionRequestCta personId={personId} />
+            {canOpenAccess ? (
+              <div className="flex flex-col items-stretch gap-1 sm:items-end">
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  size="sm"
+                  onClick={() => navigateGuarded("/access/people")}
+                >
+                  {operationalCopy.profileAccessManageCta}
+                </Button>
+                <p className="max-w-xs text-caption text-text-tertiary sm:text-end">
+                  {operationalCopy.profileAccessManageHint}
+                </p>
+              </div>
+            ) : null}
+            {canOpenLifecycle ? (
+              <div className="flex flex-col items-stretch gap-1 sm:items-end">
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  size="sm"
+                  onClick={() => navigateGuarded("/personnel/dictionary")}
+                >
+                  {operationalCopy.profileLifecycleManageCta}
+                </Button>
+                <p className="max-w-xs text-caption text-text-tertiary sm:text-end">
+                  {operationalCopy.profileLifecycleManageHint}
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
         {state.baselineDisclosure.limited ||
@@ -631,6 +639,7 @@ export function PersonProfileView({
           <PersonnelEventTimeline
             personId={personId}
             focusEventId={focusEventId}
+            showCorrectionCta={false}
           />
         </div>
       </ProfileSection>

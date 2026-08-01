@@ -44,15 +44,18 @@ assert.match(profilePage, /searchParams/);
 assert.match(profilePage, /focusEventId/);
 
 const profileView = read("components/personnel/person-profile-view.tsx");
-assert.match(profileView, /profileCorrectionRequestCta/);
-assert.match(profileView, /correction-cases\?person=/);
+assert.match(profileView, /CorrectionRequestCta/);
 assert.match(profileView, /focusEventId/);
-assert.match(profileView, /correctionCase\.capabilities/);
+assert.match(profileView, /profileAccessManageCta/);
+assert.match(profileView, /profileLifecycleManageCta/);
+assert.match(profileView, /showCorrectionCta=\{false\}/);
 
 const timeline = read("components/personnel/personnel-event-timeline.tsx");
 assert.match(timeline, /focusEventId/);
 assert.match(timeline, /scrollIntoView/);
 assert.match(timeline, /profileEventFocusMissing/);
+assert.match(timeline, /CorrectionRequestCta/);
+assert.match(timeline, /showCorrectionCta/);
 
 const row = read("components/personnel/event-timeline-row.tsx");
 assert.match(row, /id=\{`event-\$\{row\.event\.id\}`\}/);
@@ -107,5 +110,11 @@ assert.match(reportRun, /listHref|personnelListReconcileHref/);
 
 const copy = read("lib/operational-copy.ts");
 assert.match(copy, /profileCorrectionRequestCta:\s*"ثبت درخواست اصلاح"/);
+assert.match(copy, /correctionCaseHeading:\s*"اصلاح اطلاعات"/);
+assert.match(copy, /correctionCasePurpose:/);
+
+const cta = read("components/personnel/correction-request-cta.tsx");
+assert.match(cta, /profileCorrectionRequestCta/);
+assert.match(cta, /correction-cases\?person=/);
 
 console.log("drill-through.selfcheck: ok");

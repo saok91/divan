@@ -12,6 +12,7 @@ import {
 } from "@/components/access/access-people-helpers";
 import { AccessSection } from "@/components/access/access-section";
 import { AccessStatusMessage } from "@/components/access/access-status-message";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import {
@@ -268,6 +269,9 @@ export function AccessPeoplePanel() {
           ابتدا حساب‌ها را ببینید؛ نقش‌ها، محدوده‌ها و وضعیت از همین جدول خوانده
           می‌شود.
         </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <GlossaryTerm termKey="organizationalScope" />
+        </div>
       </header>
 
       {actionError ? (

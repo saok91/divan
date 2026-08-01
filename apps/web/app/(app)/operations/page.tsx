@@ -6,6 +6,7 @@ import { OperationsHealthPanel } from "@/components/operations/operations-health
 import { PageHeader } from "@/components/page-header";
 import { auth } from "@/auth";
 import { assertPageAccess } from "@/lib/assert-page-access";
+import { operationalCopy } from "@/lib/operational-copy";
 
 /**
  * Operations health surface (Story 7.2 / FR-45 / UJ-5) +
@@ -35,7 +36,7 @@ export default async function OperationsPage() {
           </span>
         }
         title="عملیات"
-        purpose="مانیتورینگ سلامت سرویس و صف بازمحاسبه برای SysAdmin — بدون محتوای HR."
+        purpose={operationalCopy.operationsSurfacePurpose}
       />
       <div className="space-y-10 px-content-padding-inline pb-6">
         <OperationsHealthPanel />

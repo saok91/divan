@@ -742,3 +742,9 @@
 
 - `actorPermissionFingerprint` hashes PermissionSet only (not `organizationalScopeCodes`) — mirrors Story 5.1 `personnel-scoped-search`; scope shrink on continuation does not invalidate snapshot membership
 - Missing `DATABASE_URL` / event pool mapped to `outcome: "denied"` + `accessDeniedTitle` — same fail-closed messaging pattern as person search; infra vs access distinction deferred
+
+## Deferred from: code review of 9-8-governance-surface-discoverability.md (2026-08-02)
+
+- Audit-trust deep link only shown when status is red/degraded (operations-health-panel.tsx) — pre-existing visibility gate; 9.8 only swapped Link for leave-guard Button.
+- Governance discoverability selfcheck asserts purpose keys only via `length > 0` — structural presence only; content contract not encoded.
+- Touched ops/audit/lifecycle panels still use raw `<p role="alert">` in places — pre-existing FeedbackMessage inconsistency outside the new leave-guard deep-link change.

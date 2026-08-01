@@ -15,7 +15,7 @@ const SURFACE_LABELS: Record<string, string> = {
   "/import": "ورود داده",
   "/audit": "ممیزی",
   "/operations": "عملیات",
-  "/correction-cases": "پرونده‌های اصلاح",
+  "/correction-cases": "اصلاح اطلاعات",
 };
 
 function announceForPath(pathname: string): string {

@@ -72,6 +72,10 @@ assert.deepEqual(
 );
 assert.equal(NAV_CATALOG[1]?.label, "اطلاعات پرسنلی");
 assert.equal(NAV_CATALOG[2]?.label, "رویدادهای پرسنلی");
+assert.equal(
+  NAV_CATALOG.find((i) => i.href === "/correction-cases")?.label,
+  "اصلاح اطلاعات",
+);
 
 for (const role of Object.keys(EXPECTED_LANDINGS) as CoarseRole[]) {
   assert.equal(getRoleLandingPath(role), EXPECTED_LANDINGS[role], role);

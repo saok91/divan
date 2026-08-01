@@ -22,7 +22,7 @@ export const NAV_CATALOG: readonly NavItem[] = Object.freeze([
   { href: "/access", label: "دسترسی‌ها" },
   { href: "/audit", label: "ممیزی" },
   { href: "/operations", label: "عملیات" },
-  { href: "/correction-cases", label: "پرونده‌های اصلاح" },
+  { href: "/correction-cases", label: "اصلاح اطلاعات" },
 ]);
 
 /** Role → permitted catalog hrefs (exact Epic-1 coarse matrix + events). */

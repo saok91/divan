@@ -173,6 +173,7 @@ const REQUIRED_SCRIPTS = [
   "selfcheck:operational-copy",
   "selfcheck:a11y-floor",
   "selfcheck:drill-through",
+  "selfcheck:governance-discoverability",
 ] as const;
 
 function runWebScript(script: string): void {

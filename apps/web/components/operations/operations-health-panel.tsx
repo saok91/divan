@@ -6,13 +6,15 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 
+import { useLeaveGuardOptional } from "@/components/leave-guard";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
+import { useSession } from "next-auth/react";
 
 type SectionStatus =
   | "ok"
@@ -157,10 +159,23 @@ function trpcErrorMessage(_err: unknown, fallback: string): string {
 }
 
 export function OperationsHealthPanel() {
+  const leaveGuard = useLeaveGuardOptional();
+  const { data: session } = useSession();
+  // Client-safe SoD gate — do not widen ROLE_NAV_HREFS; /audit is audit_reviewer-only.
+  const canOpenAuditTrust = session?.user?.coarseRole === "audit_reviewer";
   const healthQuery = api.operations.getHealth.useQuery(undefined, {
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   });
+
+  function navigateAuditTrustReview() {
+    const href = "/audit?trust=review";
+    if (leaveGuard) {
+      void leaveGuard.requestNavigation(href);
+      return;
+    }
+    window.location.assign(href);
+  }
 
   if (healthQuery.isLoading) {
     return (
@@ -294,12 +309,22 @@ export function OperationsHealthPanel() {
             </p>
           ) : null}
           <p className="text-body">
-            <Link
-              href="/audit?trust=review"
-              className="underline underline-offset-4"
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto p-0 text-body underline underline-offset-4"
+              onClick={
+                canOpenAuditTrust ? navigateAuditTrustReview : undefined
+              }
+              disabled={!canOpenAuditTrust}
+              disabledReason={
+                canOpenAuditTrust
+                  ? undefined
+                  : operationalCopy.auditTrustReviewRequiresAuditor
+              }
             >
               {operationalCopy.auditTrustReviewDeepLink}
-            </Link>
+            </Button>
           </p>
         </div>
       ) : null}

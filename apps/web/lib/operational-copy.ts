@@ -522,10 +522,10 @@ export const operationalCopy = {
   opsGateNote:
     "مسیر SysAdmin فقط هویت/پیکربندی/سلامت است؛ محتوای HR نیازمند break-glass است.",
 
-  /** Data lifecycle / legal hold / disposal (Story 7.3 / FR-50). */
+  /** Data lifecycle / legal hold / disposal (Story 7.3 / FR-50; Story 9.8 discoverability). */
   lifecycleHeading: "نگهداری قانونی و حذف",
   lifecycleIntro:
-    "نگهداری قانونی حذف را مسدود می‌کند؛ حذف فقط روی مقادیر عملیاتی و خروجی‌های مدیریت‌شده اعمال می‌شود — نه حذف ردیف ممیزی.",
+    "نگهداری قانونی حذف را مسدود می‌کند؛ حذف فقط روی مقادیر عملیاتی و خروجی‌های مدیریت‌شده اعمال می‌شود — نه حذف ردیف ممیزی. از پروفایل فرد می‌توان به این سطح رسید؛ محدودهٔ فرد را اینجا انتخاب کنید.",
   lifecycleLoading: "در حال بارگذاری چرخهٔ عمر…",
   lifecycleLoadError: "بارگذاری چرخهٔ عمر ممکن نشد.",
   lifecycleActionFailed: "عملیات چرخهٔ عمر انجام نشد.",
@@ -597,12 +597,15 @@ export const operationalCopy = {
   auditTrustLastVerification: "آخرین راستی‌آزمایی",
   auditTrustRunIntegrity: "اجرای راستی‌آزمایی تمامیت",
 
-  /** External data-subject correction cases (Story 7.5 / FR-53). */
-  correctionCaseHeading: "پرونده‌های اصلاح",
+  /** External data-subject correction cases (Story 7.5 / FR-53; Story 9.8 IA). */
+  correctionCaseHeading: "اصلاح اطلاعات",
+  /** Purpose: holds + who raises + who closes (UX-DR37 / Key Flow ۴). */
+  correctionCasePurpose:
+    "رسیدگی به درخواست اصلاح دادهٔ فرد صاحب‌داده؛ ادمین منابع انسانی با تصمیم و شواهد پرونده را می‌بندد.",
   correctionCaseIntro:
-    "پیگیری محدود درخواست‌های شفافیت/اصلاح خارجی — بدون خودخدمتی کارمند و بدون مدیریت عمومی اسناد.",
-  correctionCaseLoading: "در حال بارگذاری پرونده‌های اصلاح…",
-  correctionCaseLoadError: "بارگذاری پرونده‌های اصلاح ممکن نشد.",
+    "درخواست اصلاح داده از صاحب‌دادهٔ خارجی؛ ثبت و بستن با تصمیم و شواهد توسط ادمین منابع انسانی — نه خودخدمتی کارمند و نه مدیریت عمومی اسناد.",
+  correctionCaseLoading: "در حال بارگذاری اصلاح اطلاعات…",
+  correctionCaseLoadError: "بارگذاری اصلاح اطلاعات ممکن نشد.",
   correctionCaseActionFailed: "عملیات پرونده اصلاح انجام نشد.",
   correctionCaseDenied: "دسترسی ندارید.",
   correctionCaseEmpty: "پرونده اصلاحی ثبت نشده.",
@@ -667,13 +670,30 @@ export const operationalCopy = {
   correctionCaseEvidenceKindInternal: "داخلی",
   correctionCaseEvidenceKindOther: "سایر",
   correctionCaseEvidenceUri: "مرجع/URI",
-  correctionCaseCapabilitiesError: "بارگذاری مجوزهای پرونده اصلاح ممکن نشد.",
-  /** Story 9.7 — profile contextual entry into correction cases. */
+  correctionCaseCapabilitiesError: "بارگذاری مجوزهای اصلاح اطلاعات ممکن نشد.",
+  /** Story 9.7 / 9.8 — profile + timeline contextual entry into correction cases. */
   profileCorrectionRequestCta: "ثبت درخواست اصلاح",
   profileCorrectionRequestDenied:
     "برای ثبت درخواست اصلاح به مجوز نوشتن پرونده اصلاح نیاز دارید.",
   profileEventFocusMissing:
     "رویداد در بازهٔ قابل نمایش نیست. در صورت نیاز «بارگذاری بیشتر» را بزنید یا از فهرست رویدادها باز کنید.",
+  /** Story 9.8 — other governance contextual entries from person profile. */
+  profileAccessManageCta: "مدیریت دسترسی‌ها",
+  profileAccessManageHint:
+    "اعطای نقش، محدوده و شکست‌شیشه روی حساب‌های کاربری در سطح دسترسی‌ها انجام می‌شود — نه از روی پروفایل فرد.",
+  profileLifecycleManageCta: "نگهداری قانونی و حذف",
+  profileLifecycleManageHint:
+    "نگهداری قانونی حذف را مسدود می‌کند؛ مدیریت از فرهنگ‌دادهٔ پرسنلی است (پیش‌پر شدن فرد در این مسیر نیست).",
+  accessSurfacePurpose:
+    "چه کسی نقش، محدودهٔ سازمانی و دسترسی اضطراری را برای کدام حساب اعطا یا لغو می‌کند.",
+  auditSurfacePurpose:
+    "بازبین مستقل شواهد قابل‌انتساب را برای تحقیق فیلتر و جزئیات بررسی می‌کند.",
+  operationsSurfacePurpose:
+    "سلامت سرویس، صف بازمحاسبه و آرتیفکت‌های پرتاب برای SysAdmin — بدون مرور محتوای HR.",
+  lifecycleHostPurpose:
+    "نگهداری قانونی حذف را مسدود می‌کند؛ حذف فقط عملیاتی/خروجی است — نه پاک‌کردن ردیف ممیزی.",
+  auditTrustReviewRequiresAuditor:
+    "باز کردن این مسیر نیازمند نقش بازبین ممیزی است؛ SysAdmin به سطح ممیزی دسترسی ندارد.",
   publicationPublishCta: "انتشار به‌عنوان تصمیم رسمی",
   publicationPublishConfirm:
     "آیا این گزارش را به‌عنوان تصمیم سازمانی رسمی منتشر می‌کنید؟ محتوای تصمیم پس از انتشار بازنویسی نمی‌شود.",

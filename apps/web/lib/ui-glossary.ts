@@ -59,6 +59,21 @@ export const uiGlossary = {
     definitionFa:
       "تاریخ کسب‌وکاری که تغییر وضعیت از آن اعمال می‌شود؛ متمایز از زمان ثبت و نهایی‌سازی.",
   },
+  correctionCase: {
+    termFa: "اصلاح اطلاعات",
+    definitionFa:
+      "رسیدگی به درخواست اصلاح دادهٔ صاحب‌دادهٔ خارجی؛ ادمین منابع انسانی با تصمیم و شواهد پرونده را می‌بندد — نه خودخدمتی کارمند.",
+  },
+  legalHold: {
+    termFa: "نگهداری قانونی",
+    definitionFa:
+      "مسدودسازی حذف تا آزادسازی؛ حذف فقط روی مقادیر عملیاتی و خروجی‌های مدیریت‌شده است و ردیف ممیزی را پاک نمی‌کند.",
+  },
+  auditInvestigation: {
+    termFa: "ممیزی",
+    definitionFa:
+      "تحقیق شواهد قابل‌انتساب توسط بازبین مستقل — جدا از عملیات روزمرهٔ منابع انسانی.",
+  },
 } as const satisfies Record<string, UiGlossaryEntry>;
 
 export type UiGlossaryKey = keyof typeof uiGlossary;

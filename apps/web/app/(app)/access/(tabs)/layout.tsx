@@ -1,5 +1,6 @@
 import { SurfaceSectionTabsLayout } from "@/components/surface-section-tabs-layout";
 import { SECTION_TAB_SURFACES } from "@/lib/section-tab-surfaces";
+import { operationalCopy } from "@/lib/operational-copy";
 
 const SURFACE = SECTION_TAB_SURFACES.find((s) => s.root === "/access")!;
 
@@ -11,7 +12,7 @@ export default function AccessTabsLayout({
   return (
     <SurfaceSectionTabsLayout
       surface={SURFACE}
-      purpose="مدیریت اعطای نقش، محدودهٔ سازمانی و دسترسی اضطراری برای ادمین دسترسی."
+      purpose={operationalCopy.accessSurfacePurpose}
     >
       {children}
     </SurfaceSectionTabsLayout>

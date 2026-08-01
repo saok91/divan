@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { EventTimelineRow } from "@/components/personnel/event-timeline-row";
+import { CorrectionRequestCta } from "@/components/personnel/correction-request-cta";
 import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,6 +30,12 @@ type PersonnelEventTimelineProps = {
   personId: string;
   /** Story 9.7 — honor `?event=` with scroll + highlight. */
   focusEventId?: string;
+  /**
+   * Story 9.8 — correction CTA in timeline chrome.
+   * Profile already mounts `CorrectionRequestCta` in the header; pass false there
+   * to avoid twin controls / capabilities queries on the same page.
+   */
+  showCorrectionCta?: boolean;
 };
 
 function TimelineSkeleton() {
@@ -75,10 +82,17 @@ function prefersReducedMotion(): boolean {
 export function PersonnelEventTimeline({
   personId,
   focusEventId,
+  showCorrectionCta = true,
 }: PersonnelEventTimelineProps) {
   const [limit, setLimit] = React.useState(TIMELINE_PAGE_SIZE);
   const [focusMissing, setFocusMissing] = React.useState(false);
   const focusAttemptedRef = React.useRef(false);
+
+  const correctionCta = showCorrectionCta ? (
+    <div className="flex flex-wrap justify-end">
+      <CorrectionRequestCta personId={personId} />
+    </div>
+  ) : null;
 
   const timelineQuery = api.personnelEvent.listForPerson.useQuery(
     { personId, limit },
@@ -146,20 +160,29 @@ export function PersonnelEventTimeline({
   ]);
 
   if (timelineQuery.isPending && !timelineQuery.data) {
-    return <TimelineSkeleton />;
+    return (
+      <div className="space-y-4">
+        {correctionCta}
+        <TimelineSkeleton />
+      </div>
+    );
   }
 
   if (timelineQuery.isError) {
     return (
-      <FeedbackMessage kind="error">
-        {timelineErrorMessage(timelineQuery.error.message)}
-      </FeedbackMessage>
+      <div className="space-y-4">
+        {correctionCta}
+        <FeedbackMessage kind="error">
+          {timelineErrorMessage(timelineQuery.error.message)}
+        </FeedbackMessage>
+      </div>
     );
   }
 
   if (rows.length === 0) {
     return (
       <div className="space-y-3">
+        {correctionCta}
         {focusEventId ? (
           <FeedbackMessage kind="info">
             {operationalCopy.profileEventFocusMissing}
@@ -189,6 +212,8 @@ export function PersonnelEventTimeline({
 
   return (
     <div className="space-y-4">
+      {correctionCta}
+
       {lifecycleCapsQuery.isError ? (
         <FeedbackMessage kind="error">
           {LIFECYCLE_CAPS_LOAD_ERROR_FA}

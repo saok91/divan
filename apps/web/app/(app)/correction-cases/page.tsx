@@ -6,10 +6,11 @@ import { PageHeader } from "@/components/page-header";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { auth } from "@/auth";
 import { assertPageAccess } from "@/lib/assert-page-access";
+import { operationalCopy } from "@/lib/operational-copy";
 
 /**
- * External data-subject correction cases (Story 7.5 / FR-53; Story 9.7 URL prefill).
- * Suspense: useSearchParams for ?person=&open=1 from profile CTA.
+ * External data-subject correction cases (Story 7.5 / FR-53; Story 9.7 URL prefill; Story 9.8 IA).
+ * Suspense: useSearchParams for ?person=&open=1 from profile/timeline CTA.
  */
 export default async function CorrectionCasesPage() {
   const session = await auth();
@@ -28,17 +29,17 @@ export default async function CorrectionCasesPage() {
             <span className="mx-1 text-text-tertiary" aria-hidden>
               /
             </span>
-            پرونده‌های اصلاح
+            {operationalCopy.correctionCaseHeading}
           </span>
         }
-        title="پرونده‌های اصلاح"
-        purpose="پیگیری درخواست‌های شفافیت و اصلاح دادهٔ موضوع خارجی برای تیم حاکمیت داده."
+        title={operationalCopy.correctionCaseHeading}
+        purpose={operationalCopy.correctionCasePurpose}
       />
       <div className="px-content-padding-inline pb-6">
         <Suspense
           fallback={
             <FeedbackMessage kind="loading">
-              در حال بارگذاری پرونده‌های اصلاح…
+              {operationalCopy.correctionCaseLoading}
             </FeedbackMessage>
           }
         >

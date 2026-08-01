@@ -16,6 +16,7 @@ import {
   createPersonSearch,
   type EntityPickerValue,
 } from "@/components/entity-picker";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import {
@@ -543,6 +544,9 @@ export function AuditInvestigationPanel() {
       className="space-y-4"
       aria-labelledby="audit-investigation-heading"
     >
+      <div className="flex flex-wrap items-center gap-2">
+        <GlossaryTerm termKey="auditInvestigation" />
+      </div>
 
       {searchQuery.isError ? (
         <p className="text-body text-destructive" role="alert">

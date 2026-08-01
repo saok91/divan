@@ -17,6 +17,7 @@ import {
   createPersonSearch,
   type EntityPickerValue,
 } from "@/components/entity-picker";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import { Button } from "@/components/ui/button";
@@ -552,9 +553,14 @@ export function CorrectionCasesPanel() {
       className="mx-auto max-w-5xl space-y-6 text-text-primary"
       aria-labelledby="correction-cases-heading"
     >
-      <p className="text-body text-text-secondary">
-        {operationalCopy.correctionCaseIntro}
-      </p>
+      <header className="space-y-2">
+        <p className="text-body text-text-secondary">
+          {operationalCopy.correctionCaseIntro}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <GlossaryTerm termKey="correctionCase" />
+        </div>
+      </header>
 
       {actionError ? (
         <FeedbackMessage kind="error">{actionError}</FeedbackMessage>
