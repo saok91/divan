@@ -1,12 +1,15 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { FullBleedTableHost } from "@/components/layout/panel-section";
 import { PersonnelEventsListPanel } from "@/components/personnel/personnel-events-list-panel";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 /**
- * رویدادها tab — scaffold governed table (Story 4b.7). Full catalogue = Epic 5+.
+ * رویدادها tab — real catalogue (Story 9.6 / 9.7 URL hydrate).
+ * Suspense: useSearchParams for reconcile filter presets.
  */
 export default async function PersonnelEventsEventsPage() {
   const session = await auth();
@@ -17,7 +20,15 @@ export default async function PersonnelEventsEventsPage() {
 
   return (
     <FullBleedTableHost className="py-4">
-      <PersonnelEventsListPanel />
+      <Suspense
+        fallback={
+          <FeedbackMessage kind="loading">
+            در حال بارگذاری فهرست رویدادها…
+          </FeedbackMessage>
+        }
+      >
+        <PersonnelEventsListPanel />
+      </Suspense>
     </FullBleedTableHost>
   );
 }

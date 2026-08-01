@@ -1,3 +1,7 @@
+## Deferred from: code review of 9-7-profile-access-cross-surface-drill-through.md (2026-08-02)
+
+- Local `isUuid` helper remains in `personnel-quick-edit-modal.tsx` beside shared `@/lib/is-uuid` — pre-existing parallel helper; unify on a later cleanup pass.
+
 ## Deferred from: code review of 9-3-bulk-entry-personnel-events-headcount.md (2026-08-01)
 
 - Multi-row FR-38 absolute atomicity for PE/HC day-to-day bulk cutover ? accepted `domainOutsideTx` (nested TX deadlock); honesty+harden path instead of saga/shared-TX redesign. Follow-up architecture if product requires true multi-row all-or-nothing across PE finalize / HC activate.
@@ -675,8 +679,8 @@
 ## Deferred from: code review of 5-4-core-launch-dashboard.md (2026-07-25)
 
 - N+1 `listEmploymentsForPerson` per authorized subject for active-person count ? NFR-2 provisional ?5s envelope; optimize with batch/projector read when AR-NFR / scale demands
-- Full reconcile deep-link query presets (`asOf` / trend range / team) on `/personnel/list` and `/personnel-events/events` ? capacity already passes `teamId`; extend when those surfaces accept shared filter params
-- Interactive team-capacity sort control (by membership vs capacity) ? launch card sorts server-side by membership for `topTeamId` only
+- ~~Full reconcile deep-link query presets (`asOf` / trend range / team) on `/personnel/list` and `/personnel-events/events` — capacity already passes `teamId`; extend when those surfaces accept shared filter params~~ **Closed by Story 9.7** (`teamId` / `eventType` / `effectiveFrom`/`effectiveTo` on events; `teamId` on list + capacity hydrate; reporting `reconcileHref` builders enriched). Residual: `asOf` query on operational lists not wired (not required by 9.7 minimum contract).
+- Interactive team-capacity sort control (by membership vs capacity) — launch card sorts server-side by membership for `topTeamId` only
 
 ## Deferred from: code review of 5-5-launch-report-catalogue.md (2026-07-25)
 

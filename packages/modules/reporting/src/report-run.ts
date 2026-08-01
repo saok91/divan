@@ -51,6 +51,11 @@ import {
   MSG_DASHBOARD_HEADCOUNT_CONSERVATION_FA,
 } from "./headcount-conservation";
 import {
+  capacityReconcileHref,
+  eventsReconcileHref,
+  personnelListReconcileHref,
+} from "./reconcile-href";
+import {
   LAUNCH_REPORT_DEFINITIONS,
   MSG_REPORT_IMPORT_BATCH_UNAVAILABLE_FA,
   reportRequiresEffectiveDateRange,
@@ -626,6 +631,31 @@ export async function assembleReportRun(
 
   const rangeStart = filter.rangeStart?.trim() ?? "";
   const rangeEnd = filter.rangeEnd?.trim() ?? "";
+  const listHref = personnelListReconcileHref({ teamId: filter.teamId });
+  const capacityHref = capacityReconcileHref({ teamId: filter.teamId });
+  const eventsHref = eventsReconcileHref({
+    teamId: filter.teamId,
+    effectiveFrom: rangeStart || undefined,
+    effectiveTo: rangeEnd || undefined,
+  });
+  const startsHref = eventsReconcileHref({
+    teamId: filter.teamId,
+    eventType: PRODUCT_START_EVENT_TYPE,
+    effectiveFrom: rangeStart || undefined,
+    effectiveTo: rangeEnd || undefined,
+  });
+  const terminationsHref = eventsReconcileHref({
+    teamId: filter.teamId,
+    eventType: PRODUCT_TERMINATION_EVENT_TYPE,
+    effectiveFrom: rangeStart || undefined,
+    effectiveTo: rangeEnd || undefined,
+  });
+  const transfersHref = eventsReconcileHref({
+    teamId: filter.teamId,
+    eventType: PRODUCT_TRANSFER_EVENT_TYPE,
+    effectiveFrom: rangeStart || undefined,
+    effectiveTo: rangeEnd || undefined,
+  });
 
   const personColumns: ReportColumnDef[] = [
     { id: "personnelCode", headerFa: "کد پرسنلی" },
@@ -645,7 +675,7 @@ export async function assembleReportRun(
           subjectIds.length,
           {
             columns: personColumns,
-            reconcileHref: "/personnel/list",
+            reconcileHref: listHref,
             reconcileLabelFa: "فهرست پرسنل",
           },
         );
@@ -659,7 +689,7 @@ export async function assembleReportRun(
         lastCalculatedAt,
         asOf: filter.asOf,
         populationVolume: subjectIds.length,
-        reconcileHref: "/personnel/list",
+        reconcileHref: listHref,
         reconcileLabelFa: "فهرست پرسنل",
       };
     }
@@ -680,7 +710,7 @@ export async function assembleReportRun(
               { id: "employmentCount", headerFa: "تعداد اشتغال" },
               { id: "allEnded", headerFa: "همه خاتمه‌یافته" },
             ],
-            reconcileHref: "/personnel/list",
+            reconcileHref: listHref,
             reconcileLabelFa: "فهرست پرسنل",
           },
         );
@@ -698,7 +728,7 @@ export async function assembleReportRun(
         lastCalculatedAt,
         asOf: filter.asOf,
         populationVolume: subjectIds.length,
-        reconcileHref: "/personnel/list",
+        reconcileHref: listHref,
         reconcileLabelFa: "فهرست پرسنل",
       };
     }
@@ -867,9 +897,7 @@ export async function assembleReportRun(
         lastCalculatedAt,
         asOf: filter.asOf,
         populationVolume: subjectIds.length,
-        reconcileHref: filter.teamId
-          ? `/headcount/capacity?teamId=${encodeURIComponent(filter.teamId)}`
-          : "/headcount/capacity",
+        reconcileHref: capacityHref,
         reconcileLabelFa: "ظرفیت و جذب",
       };
     }
@@ -884,7 +912,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           subjectIds.length,
           {
-            reconcileHref: "/personnel/list",
+            reconcileHref: listHref,
             reconcileLabelFa: "فهرست پرسنل",
           },
         );
@@ -920,7 +948,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           subjectIds.length,
           {
-            reconcileHref: `/personnel/list?teamId=${encodeURIComponent(teamId)}`,
+            reconcileHref: personnelListReconcileHref({ teamId }),
             reconcileLabelFa: "فهرست پرسنل",
           },
         );
@@ -955,7 +983,7 @@ export async function assembleReportRun(
         lastCalculatedAt,
         asOf: filter.asOf,
         populationVolume: subjectIds.length,
-        reconcileHref: `/personnel/list?teamId=${encodeURIComponent(teamId)}`,
+        reconcileHref: personnelListReconcileHref({ teamId }),
         reconcileLabelFa: "فهرست پرسنل",
       };
     }
@@ -985,7 +1013,7 @@ export async function assembleReportRun(
         lastCalculatedAt,
         asOf: filter.asOf,
         populationVolume: subjectIds.length,
-        reconcileHref: "/personnel/list",
+        reconcileHref: listHref,
         reconcileLabelFa: "فهرست پرسنل",
       };
     }
@@ -1000,7 +1028,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           subjectIds.length,
           {
-            reconcileHref: "/headcount/capacity",
+            reconcileHref: capacityHref,
             reconcileLabelFa: "ظرفیت و جذب",
           },
         );
@@ -1021,7 +1049,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           subjectIds.length,
           {
-            reconcileHref: "/headcount/capacity",
+            reconcileHref: capacityHref,
             reconcileLabelFa: "ظرفیت و جذب",
           },
         );
@@ -1035,7 +1063,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           subjectIds.length,
           {
-            reconcileHref: "/headcount/capacity",
+            reconcileHref: capacityHref,
             reconcileLabelFa: "ظرفیت و جذب",
           },
         );
@@ -1065,7 +1093,7 @@ export async function assembleReportRun(
         lastCalculatedAt,
         asOf: filter.asOf,
         populationVolume: subjectIds.length,
-        reconcileHref: "/headcount/capacity",
+        reconcileHref: capacityHref,
         reconcileLabelFa: "ظرفیت و جذب",
       };
     }
@@ -1124,7 +1152,7 @@ export async function assembleReportRun(
             subjectIds.length,
             {
               columns: eventColumns,
-              reconcileHref: "/personnel-events/events",
+              reconcileHref: startsHref,
               reconcileLabelFa: "رویدادهای پرسنلی",
             },
           );
@@ -1139,7 +1167,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           asOf: filter.asOf,
           populationVolume: subjectIds.length,
-          reconcileHref: "/personnel-events/events",
+          reconcileHref: startsHref,
           reconcileLabelFa: "رویدادهای پرسنلی",
         };
       }
@@ -1166,7 +1194,7 @@ export async function assembleReportRun(
             subjectIds.length,
             {
               columns: eventColumns,
-              reconcileHref: "/personnel-events/events",
+              reconcileHref: terminationsHref,
               reconcileLabelFa: "رویدادهای پرسنلی",
             },
           );
@@ -1181,7 +1209,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           asOf: filter.asOf,
           populationVolume: subjectIds.length,
-          reconcileHref: "/personnel-events/events",
+          reconcileHref: terminationsHref,
           reconcileLabelFa: "رویدادهای پرسنلی",
         };
       }
@@ -1203,7 +1231,7 @@ export async function assembleReportRun(
             subjectIds.length,
             {
               columns: eventColumns,
-              reconcileHref: "/personnel-events/events",
+              reconcileHref: transfersHref,
               reconcileLabelFa: "رویدادهای پرسنلی",
             },
           );
@@ -1217,7 +1245,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           asOf: filter.asOf,
           populationVolume: subjectIds.length,
-          reconcileHref: "/personnel-events/events",
+          reconcileHref: transfersHref,
           reconcileLabelFa: "رویدادهای پرسنلی",
         };
       }
@@ -1254,7 +1282,7 @@ export async function assembleReportRun(
             subjectIds.length,
             {
               columns: eventColumns,
-              reconcileHref: "/personnel-events/events",
+              reconcileHref: eventsHref,
               reconcileLabelFa: "رویدادهای پرسنلی",
             },
           );
@@ -1268,7 +1296,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           asOf: filter.asOf,
           populationVolume: subjectIds.length,
-          reconcileHref: "/personnel-events/events",
+          reconcileHref: eventsHref,
           reconcileLabelFa: "رویدادهای پرسنلی",
         };
       }
@@ -1315,7 +1343,7 @@ export async function assembleReportRun(
             subjectIds.length,
             {
               columns: eventColumns,
-              reconcileHref: "/personnel-events/events",
+              reconcileHref: eventsHref,
               reconcileLabelFa: "رویدادهای پرسنلی",
             },
           );
@@ -1333,7 +1361,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           asOf: filter.asOf,
           populationVolume: subjectIds.length,
-          reconcileHref: "/personnel-events/events",
+          reconcileHref: eventsHref,
           reconcileLabelFa: "رویدادهای پرسنلی",
         };
       }
@@ -1389,7 +1417,7 @@ export async function assembleReportRun(
             subjectIds.length,
             {
               columns: eventColumns,
-              reconcileHref: "/personnel-events/events",
+              reconcileHref: eventsHref,
               reconcileLabelFa: "رویدادهای پرسنلی",
             },
           );
@@ -1406,7 +1434,7 @@ export async function assembleReportRun(
           lastCalculatedAt,
           asOf: filter.asOf,
           populationVolume: subjectIds.length,
-          reconcileHref: "/personnel-events/events",
+          reconcileHref: eventsHref,
           reconcileLabelFa: "رویدادهای پرسنلی",
         };
       }

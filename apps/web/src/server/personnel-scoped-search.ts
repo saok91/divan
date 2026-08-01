@@ -49,6 +49,8 @@ import {
   getOrganizationalRoleById,
   getPersonDb,
   isPersonUuid,
+  listTeamMembersAsOf,
+  ManagementRelationshipError,
   projectPersonnelListRow,
   rowMatchesPersonnelQuery,
   type PersonnelListLabelBundle,
@@ -144,12 +146,14 @@ function personnelPaginationPayload(input: {
   normalizedQuery?: string;
   sortKey?: string;
   pageSize: number;
+  teamId?: string;
 }): Record<string, unknown> {
   return {
     channel: input.channel,
     normalizedQuery: input.normalizedQuery?.trim() || null,
     sortKey: input.sortKey?.trim() || null,
     pageSize: input.pageSize,
+    teamId: input.teamId?.trim() || null,
   };
 }
 
@@ -161,6 +165,7 @@ function assertPaginationTokenMatches(
     normalizedQuery?: string;
     sortKey?: string;
     pageSize: number;
+    teamId?: string;
   },
 ): void {
   if (snapshot.kind !== "pagination") {
@@ -425,6 +430,8 @@ export async function projectAuthorizedPersonnelRows(input: {
   subjectIds: readonly string[];
   accountId: string;
   hasCompensationRead: boolean;
+  /** Optional team membership filter (Story 9.7 reconcile hydrate). */
+  teamId?: string;
 }): Promise<{ rows: PersonnelListRowDto[]; truncated: boolean }> {
   const uuidIds = [...new Set(input.subjectIds.filter(isPersonUuid))];
   if (uuidIds.length === 0) return { rows: [], truncated: false };
@@ -463,10 +470,18 @@ export async function projectAuthorizedPersonnelRows(input: {
   const presentStates = states.filter(
     (s): s is NonNullable<(typeof states)[number]> => s != null,
   );
-  const okStates = presentStates.filter(
+  let okStates = presentStates.filter(
     (s): s is Extract<(typeof presentStates)[number], { ok: true }> =>
       s.ok === true,
   );
+
+  const teamFilter = input.teamId?.trim();
+  if (teamFilter) {
+    okStates = okStates.filter((s) => {
+      const teamId = s.teamMembership?.teamId ?? s.primaryAssignment?.teamId;
+      return teamId === teamFilter;
+    });
+  }
 
   const labels = await resolveLabelsForStates(presentStates);
   const rows = okStates.map((s) => projectPersonnelListRow(s, labels));
@@ -568,6 +583,8 @@ export type RunPersonnelScopedSearchInput = {
   evaluationSnapshotId?: string;
   /** Opaque sort key — part of the pagination snapshot fingerprint. */
   sortKey?: string;
+  /** Story 9.7 — optional team membership filter for reconcile hydrate. */
+  teamId?: string;
 };
 
 /**
@@ -642,6 +659,7 @@ export async function runPersonnelScopedSearch(
         normalizedQuery: input.normalizedQuery,
         sortKey: input.sortKey,
         pageSize,
+        teamId: input.teamId,
       });
 
       const livePermFp = await actorPermissionFingerprint(input.actorAccountId);
@@ -660,6 +678,7 @@ export async function runPersonnelScopedSearch(
         subjectIds: pageIds,
         accountId: input.actorAccountId,
         hasCompensationRead,
+        // Membership already frozen with teamId in the snapshot fingerprint.
       });
 
       if (pageIds.length > 0 && projected.rows.length !== pageIds.length) {
@@ -680,6 +699,7 @@ export async function runPersonnelScopedSearch(
             normalizedQuery: input.normalizedQuery?.trim() || null,
             asOf: currentAsOfDate(),
             fieldIds,
+            teamId: input.teamId,
           })
         : null;
 
@@ -798,10 +818,31 @@ export async function runPersonnelScopedSearch(
     });
   }
 
+  // Story 9.7 — intersect team membership before project/cap (report-run pattern)
+  // so reconcile team filters do not false-empty after volume-capped retrieval.
+  let subjectIds = [...retrieval.subjectIds];
+  const teamFilter = input.teamId?.trim();
+  if (teamFilter && subjectIds.length > 0) {
+    try {
+      const onTeam = await listTeamMembersAsOf(teamFilter, currentAsOfDate(), {
+        includeManager: true,
+      });
+      const teamSet = new Set(onTeam);
+      subjectIds = subjectIds.filter((id) => teamSet.has(id));
+    } catch (err) {
+      if (err instanceof ManagementRelationshipError) {
+        subjectIds = [];
+      } else {
+        throw err;
+      }
+    }
+  }
+
   const projected = await projectAuthorizedPersonnelRows({
-    subjectIds: retrieval.subjectIds,
+    subjectIds,
     accountId: input.actorAccountId,
     hasCompensationRead,
+    teamId: input.teamId,
   });
 
   let rows = projected.rows;
@@ -819,6 +860,7 @@ export async function runPersonnelScopedSearch(
         normalizedQuery: q ?? null,
         asOf: currentAsOfDate(),
         fieldIds,
+        teamId: input.teamId,
       })
     : null;
 
@@ -836,6 +878,7 @@ export async function runPersonnelScopedSearch(
         normalizedQuery: q,
         sortKey: input.sortKey,
         pageSize,
+        teamId: input.teamId,
       }),
       attribution: {
         actorAccountId: input.actorAccountId,

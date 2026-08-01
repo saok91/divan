@@ -6,7 +6,13 @@
 
 import * as React from "react";
 import { keepPreviousData } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 
+import {
+  EntityPicker,
+  createOrgUnitSearch,
+  type EntityPickerValue,
+} from "@/components/entity-picker";
 import { ExportArtifactPanel } from "@/components/export/export-artifact-panel";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
@@ -15,11 +21,14 @@ import type { PersonnelListRow } from "@/components/personnel/personnel-list-typ
 import { PersonnelQuickCreateDialog } from "@/components/personnel/personnel-quick-create-dialog";
 import { PersonnelQuickEditModal } from "@/components/personnel/personnel-quick-edit-modal";
 import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { RowActionCluster } from "@/components/ui/row-action-overflow";
 import { CalendarPlus, Pencil } from "lucide-react";
 import { operationalCopy } from "@/lib/operational-copy";
+import { profileHref } from "@/lib/personnel-profile-href";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
+import { isUuid } from "@/lib/is-uuid";
 
 export type { PersonnelListRow } from "@/components/personnel/personnel-list-types";
 
@@ -163,7 +172,10 @@ function buildColumns(
  */
 export function PersonnelListPanel() {
   const leaveGuard = useLeaveGuardOptional();
+  const searchParams = useSearchParams();
   const utils = api.useUtils();
+  const formId = React.useId();
+  const urlHydratedKeyRef = React.useRef<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editRow, setEditRow] = React.useState<PersonnelListRow | null>(null);
   const [page, setPage] = React.useState(1);
@@ -171,7 +183,70 @@ export function PersonnelListPanel() {
     string | undefined
   >(undefined);
   const snapshotTokenRef = React.useRef<string | undefined>(undefined);
+  const [teamFilter, setTeamFilter] =
+    React.useState<EntityPickerValue | null>(null);
+  const [filterHintFa, setFilterHintFa] = React.useState<string | null>(null);
   const pageSize = 25;
+
+  const teamsQuery = api.organization.list.useQuery({ includeInactive: false });
+  const teamIds = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const u of teamsQuery.data ?? []) {
+      if (u.unitType === "TEAM") set.add(u.id);
+    }
+    return set;
+  }, [teamsQuery.data]);
+  const baseOrgSearch = React.useMemo(() => createOrgUnitSearch(), []);
+  const teamSearch = React.useMemo(
+    () => async (normalizedQuery: string) => {
+      const opts = await baseOrgSearch(normalizedQuery);
+      if (teamIds.size === 0) return [];
+      return opts.filter((o) => teamIds.has(o.id));
+    },
+    [baseOrgSearch, teamIds],
+  );
+
+  const searchKey = searchParams.toString();
+  React.useEffect(() => {
+    if (urlHydratedKeyRef.current === searchKey) return;
+    if (teamsQuery.isLoading) return;
+    const teamId = searchParams.get("teamId")?.trim();
+    if (!teamId) {
+      urlHydratedKeyRef.current = searchKey;
+      return;
+    }
+    if (teamsQuery.isError) {
+      setFilterHintFa(operationalCopy.orgListError);
+      return;
+    }
+    urlHydratedKeyRef.current = searchKey;
+    if (!isUuid(teamId)) {
+      setFilterHintFa("شناسه تیم در فیلتر URL معتبر نیست.");
+      return;
+    }
+    const unit = (teamsQuery.data ?? []).find((u) => u.id === teamId);
+    if (!unit || unit.unitType !== "TEAM") {
+      setFilterHintFa("شناسه تیم در فیلتر URL معتبر نیست یا در محدوده نیست.");
+      return;
+    }
+    setFilterHintFa(null);
+    setTeamFilter({
+      id: unit.id,
+      code: unit.code,
+      labelFa: unit.nameFa,
+    });
+    setPage(1);
+    snapshotTokenRef.current = undefined;
+    setEvaluationSnapshotId(undefined);
+  }, [
+    searchKey,
+    searchParams,
+    teamsQuery.data,
+    teamsQuery.isLoading,
+    teamsQuery.isError,
+  ]);
+
+  const appliedTeamId = teamFilter?.id;
 
   const searchQuery = api.person.search.useQuery(
     {
@@ -179,6 +254,7 @@ export function PersonnelListPanel() {
       page,
       pageSize,
       evaluationSnapshotId,
+      teamId: appliedTeamId,
     },
     { placeholderData: keepPreviousData },
   );
@@ -250,8 +326,7 @@ export function PersonnelListPanel() {
     setEditRow(row);
   }
 
-  function navigateRegister(personId: string) {
-    const href = `/personnel-events/register?person=${encodeURIComponent(personId)}`;
+  function navigate(href: string) {
     if (leaveGuard) {
       void leaveGuard.requestNavigation(href);
       return;
@@ -259,11 +334,29 @@ export function PersonnelListPanel() {
     window.location.assign(href);
   }
 
+  function navigateProfile(personId: string) {
+    navigate(profileHref(personId));
+  }
+
+  function navigateRegister(personId: string) {
+    navigate(
+      `/personnel-events/register?person=${encodeURIComponent(personId)}`,
+    );
+  }
+
   async function invalidateList() {
     setPage(1);
     snapshotTokenRef.current = undefined;
     setEvaluationSnapshotId(undefined);
     await utils.person.search.invalidate();
+  }
+
+  function applyTeamFilter(next: EntityPickerValue | null) {
+    setTeamFilter(next);
+    setFilterHintFa(null);
+    setPage(1);
+    snapshotTokenRef.current = undefined;
+    setEvaluationSnapshotId(undefined);
   }
 
   function goToServerPage(next: number) {
@@ -298,23 +391,59 @@ export function PersonnelListPanel() {
       </header>
 
       {searchQuery.isError ? (
-        <p className="text-body text-destructive" role="alert">
+        <FeedbackMessage kind="error">
           {searchQuery.error.message || operationalCopy.accessDeniedTitle}
-        </p>
+        </FeedbackMessage>
       ) : null}
 
       {statusMessage ? (
-        <p className="text-body text-muted-foreground" role="status">
+        <FeedbackMessage kind={suppressed ? "error" : "info"}>
           {statusMessage}
-        </p>
+        </FeedbackMessage>
       ) : null}
 
-      {!suppressed &&
-      rows.some((r) => r.disposalLimited) ? (
-        <p className="text-body text-muted-foreground" role="status">
+      {!suppressed && rows.some((r) => r.disposalLimited) ? (
+        <FeedbackMessage kind="info">
           {operationalCopy.lifecycleListDisposalLimited}
-        </p>
+        </FeedbackMessage>
       ) : null}
+
+      {filterHintFa ? (
+        <FeedbackMessage kind="info">{filterHintFa}</FeedbackMessage>
+      ) : null}
+
+      <div
+        className="flex flex-wrap items-end gap-3"
+        role="search"
+        aria-label="فیلتر فهرست پرسنل"
+      >
+        <div className="min-w-[14rem] flex-1 space-y-1.5">
+          <span className="text-label" id={`${formId}-team-label`}>
+            تیم
+          </span>
+          <EntityPicker
+            aria-labelledby={`${formId}-team-label`}
+            value={teamFilter}
+            onValueChange={applyTeamFilter}
+            search={teamSearch}
+            placeholder="همه تیم‌ها"
+            disabled={teamsQuery.isLoading}
+            disabledReasonFa={
+              teamsQuery.isLoading ? operationalCopy.actionPending : undefined
+            }
+          />
+        </div>
+        {teamFilter ? (
+          <Button
+            type="button"
+            variant="tertiary"
+            size="sm"
+            onClick={() => applyTeamFilter(null)}
+          >
+            پاک کردن فیلتر تیم
+          </Button>
+        ) : null}
+      </div>
 
       <GovernedDataTable
           aria-label="فهرست پرسنل"
@@ -371,7 +500,8 @@ export function PersonnelListPanel() {
               ]}
             />
           )}
-          onRowClick={(row) => openEdit(row)}
+          onRowClick={(row) => navigateProfile(row.id)}
+          rowActivateLabel="باز کردن پروفایل کامل"
         />
 
       {!suppressed && totalInSnapshot != null && totalInSnapshot > pageSize ? (

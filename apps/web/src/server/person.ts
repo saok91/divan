@@ -234,6 +234,8 @@ export const personRouter = createTRPCRouter({
           /** Continuation token from a prior page===1 response. */
           evaluationSnapshotId: z.string().min(1).optional(),
           sortKey: z.string().max(100).optional(),
+          /** Story 9.7 — team membership filter from reconcile deep-links. */
+          teamId: z.string().uuid().optional(),
         })
         .optional(),
     )
@@ -250,6 +252,7 @@ export const personRouter = createTRPCRouter({
           pageSize: input?.pageSize,
           evaluationSnapshotId: input?.evaluationSnapshotId,
           sortKey: input?.sortKey,
+          teamId: input?.teamId,
         });
         return {
           ...result,

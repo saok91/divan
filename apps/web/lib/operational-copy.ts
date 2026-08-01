@@ -668,6 +668,12 @@ export const operationalCopy = {
   correctionCaseEvidenceKindOther: "سایر",
   correctionCaseEvidenceUri: "مرجع/URI",
   correctionCaseCapabilitiesError: "بارگذاری مجوزهای پرونده اصلاح ممکن نشد.",
+  /** Story 9.7 — profile contextual entry into correction cases. */
+  profileCorrectionRequestCta: "ثبت درخواست اصلاح",
+  profileCorrectionRequestDenied:
+    "برای ثبت درخواست اصلاح به مجوز نوشتن پرونده اصلاح نیاز دارید.",
+  profileEventFocusMissing:
+    "رویداد در بازهٔ قابل نمایش نیست. در صورت نیاز «بارگذاری بیشتر» را بزنید یا از فهرست رویدادها باز کنید.",
   publicationPublishCta: "انتشار به‌عنوان تصمیم رسمی",
   publicationPublishConfirm:
     "آیا این گزارش را به‌عنوان تصمیم سازمانی رسمی منتشر می‌کنید؟ محتوای تصمیم پس از انتشار بازنویسی نمی‌شود.",

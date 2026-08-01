@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { EventTimelineRow } from "@/components/personnel/event-timeline-row";
 import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Skeleton } from "@/components/ui/skeleton";
 import { operationalCopy } from "@/lib/operational-copy";
 import {
@@ -26,6 +27,8 @@ const LIFECYCLE_CAPS_LOAD_ERROR_FA =
 
 type PersonnelEventTimelineProps = {
   personId: string;
+  /** Story 9.7 — honor `?event=` with scroll + highlight. */
+  focusEventId?: string;
 };
 
 function TimelineSkeleton() {
@@ -60,12 +63,22 @@ function timelineErrorMessage(message: string | undefined): string {
   return TIMELINE_LOAD_ERROR_FA;
 }
 
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 /**
- * Profile timeline host at `#personnel-timeline-entry` (Story 5.3).
+ * Profile timeline host at `#personnel-timeline-entry` (Story 5.3 / 9.7).
  * Cold-load is independent of profile section queries.
  */
-export function PersonnelEventTimeline({ personId }: PersonnelEventTimelineProps) {
+export function PersonnelEventTimeline({
+  personId,
+  focusEventId,
+}: PersonnelEventTimelineProps) {
   const [limit, setLimit] = React.useState(TIMELINE_PAGE_SIZE);
+  const [focusMissing, setFocusMissing] = React.useState(false);
+  const focusAttemptedRef = React.useRef(false);
 
   const timelineQuery = api.personnelEvent.listForPerson.useQuery(
     { personId, limit },
@@ -83,22 +96,77 @@ export function PersonnelEventTimeline({ personId }: PersonnelEventTimelineProps
   const canCorrect =
     !lifecycleCapsQuery.isError && lifecycleCapsQuery.data?.correct === true;
 
+  const rows = timelineQuery.data ?? [];
+  const focusPresent =
+    Boolean(focusEventId) && rows.some((r) => r.event.id === focusEventId);
+
+  React.useEffect(() => {
+    focusAttemptedRef.current = false;
+    setFocusMissing(false);
+  }, [focusEventId, personId]);
+
+  React.useEffect(() => {
+    if (!focusEventId || timelineQuery.isPending || timelineQuery.isError) {
+      return;
+    }
+    if (focusPresent) {
+      setFocusMissing(false);
+      if (focusAttemptedRef.current) return;
+      const el = document.getElementById(`event-${focusEventId}`);
+      // Do not latch until the row is in the DOM — first paint can race the effect.
+      if (!el) return;
+      focusAttemptedRef.current = true;
+      el.scrollIntoView({
+        block: "nearest",
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+      });
+      if (typeof el.focus === "function") {
+        el.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    const hitPageCeiling = rows.length >= limit;
+    const canLoadMore = hitPageCeiling && limit < TIMELINE_MAX_LIMIT;
+    if (canLoadMore && !timelineQuery.isFetching) {
+      setLimit((prev) => Math.min(prev + TIMELINE_PAGE_SIZE, TIMELINE_MAX_LIMIT));
+      return;
+    }
+    if (!timelineQuery.isFetching) {
+      setFocusMissing(true);
+    }
+  }, [
+    focusEventId,
+    focusPresent,
+    limit,
+    rows.length,
+    timelineQuery.isPending,
+    timelineQuery.isError,
+    timelineQuery.isFetching,
+  ]);
+
   if (timelineQuery.isPending && !timelineQuery.data) {
     return <TimelineSkeleton />;
   }
 
   if (timelineQuery.isError) {
     return (
-      <p role="alert" className="text-body text-destructive">
+      <FeedbackMessage kind="error">
         {timelineErrorMessage(timelineQuery.error.message)}
-      </p>
+      </FeedbackMessage>
     );
   }
 
-  const rows = timelineQuery.data ?? [];
   if (rows.length === 0) {
     return (
-      <p className="text-body text-muted-foreground">{TIMELINE_EMPTY_COPY_FA}</p>
+      <div className="space-y-3">
+        {focusEventId ? (
+          <FeedbackMessage kind="info">
+            {operationalCopy.profileEventFocusMissing}
+          </FeedbackMessage>
+        ) : null}
+        <FeedbackMessage kind="empty">{TIMELINE_EMPTY_COPY_FA}</FeedbackMessage>
+      </div>
     );
   }
 
@@ -122,9 +190,15 @@ export function PersonnelEventTimeline({ personId }: PersonnelEventTimelineProps
   return (
     <div className="space-y-4">
       {lifecycleCapsQuery.isError ? (
-        <p role="alert" className="text-body text-destructive">
+        <FeedbackMessage kind="error">
           {LIFECYCLE_CAPS_LOAD_ERROR_FA}
-        </p>
+        </FeedbackMessage>
+      ) : null}
+
+      {focusMissing ? (
+        <FeedbackMessage kind="info">
+          {operationalCopy.profileEventFocusMissing}
+        </FeedbackMessage>
       ) : null}
 
       {boundary ? (
@@ -147,6 +221,7 @@ export function PersonnelEventTimeline({ personId }: PersonnelEventTimelineProps
             <EventTimelineRow
               key={row.event.id}
               row={row}
+              highlighted={focusEventId === row.event.id}
               showSameDayRegistrationHint={shouldShowSameDayRegistrationHint(
                 previousEffectiveDate,
                 row.event.effectiveDate,
@@ -182,7 +257,9 @@ export function PersonnelEventTimeline({ personId }: PersonnelEventTimelineProps
       ) : null}
 
       {atMaxAndFull ? (
-        <p className="text-xs text-muted-foreground">{TIMELINE_TRUNCATED_COPY_FA}</p>
+        <FeedbackMessage kind="info">
+          {TIMELINE_TRUNCATED_COPY_FA}
+        </FeedbackMessage>
       ) : null}
     </div>
   );

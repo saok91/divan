@@ -8,6 +8,7 @@
 import * as React from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Eye, UserRound } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 import {
   EntityPicker,
@@ -32,8 +33,10 @@ import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { EVENT_TYPE_OPTIONS } from "@/lib/personnel-event-timeline";
+import { profileHref } from "@/lib/personnel-profile-href";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+import { isUuid } from "@/lib/is-uuid";
 
 type EventLifecycleStatus =
   | "Draft"
@@ -131,14 +134,16 @@ const COLUMNS: GovernedColumn<EventListRow>[] = [
   },
 ];
 
-function profileHref(personId: string, eventId?: string): string {
-  const base = `/personnel/profile/${encodeURIComponent(personId)}`;
-  if (!eventId) return base;
-  return `${base}?event=${encodeURIComponent(eventId)}`;
-}
-
 function draftRegisterHref(personId: string): string {
   return `/personnel-events/register?person=${encodeURIComponent(personId)}`;
+}
+
+function firstParam(
+  params: URLSearchParams,
+  key: string,
+): string | undefined {
+  const v = params.get(key)?.trim();
+  return v || undefined;
 }
 
 /**
@@ -146,7 +151,9 @@ function draftRegisterHref(personId: string): string {
  */
 export function PersonnelEventsListPanel() {
   const leaveGuard = useLeaveGuardOptional();
+  const searchParams = useSearchParams();
   const formId = React.useId();
+  const urlHydratedKeyRef = React.useRef<string | null>(null);
 
   const teamsQuery = api.organization.list.useQuery({ includeInactive: false });
   const teamIds = React.useMemo(() => {
@@ -185,6 +192,105 @@ export function PersonnelEventsListPanel() {
   const snapshotTokenRef = React.useRef<string | undefined>(undefined);
   const [filterHintFa, setFilterHintFa] = React.useState<string | null>(null);
   const pageSize = 25;
+
+  const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  // Story 9.7 — hydrate reconcile query presets; re-run when searchParams change.
+  const searchKey = searchParams.toString();
+  React.useEffect(() => {
+    if (urlHydratedKeyRef.current === searchKey) return;
+    if (teamsQuery.isLoading) return;
+
+    const teamId = firstParam(searchParams, "teamId");
+    const eventTypeRaw = firstParam(searchParams, "eventType") ?? "";
+    const effectiveFromRaw = firstParam(searchParams, "effectiveFrom");
+    const effectiveToRaw = firstParam(searchParams, "effectiveTo");
+    const personId = firstParam(searchParams, "person");
+
+    const hasTeamPreset = Boolean(teamId);
+    if (hasTeamPreset && teamsQuery.isError) {
+      setFilterHintFa(operationalCopy.orgListError);
+      return;
+    }
+
+    urlHydratedKeyRef.current = searchKey;
+
+    const hints: string[] = [];
+
+    let knownEventType = "";
+    if (eventTypeRaw) {
+      if (EVENT_TYPE_OPTIONS.some((o) => o.value === eventTypeRaw)) {
+        knownEventType = eventTypeRaw;
+      } else {
+        hints.push("نوع رویداد در فیلتر URL ناشناخته نادیده گرفته شد.");
+      }
+    }
+
+    let teamValue: EntityPickerValue | null = null;
+    if (teamId) {
+      if (!isUuid(teamId)) {
+        hints.push("شناسه تیم در فیلتر URL معتبر نیست.");
+      } else {
+        const unit = (teamsQuery.data ?? []).find((u) => u.id === teamId);
+        if (unit && unit.unitType === "TEAM") {
+          teamValue = {
+            id: unit.id,
+            code: unit.code,
+            labelFa: unit.nameFa,
+          };
+        } else {
+          hints.push(
+            "شناسه تیم در فیلتر URL معتبر نیست یا در محدوده نیست.",
+          );
+        }
+      }
+    }
+
+    let effectiveFrom = effectiveFromRaw;
+    let effectiveTo = effectiveToRaw;
+    if (effectiveFrom && !DATE_ONLY_RE.test(effectiveFrom)) {
+      hints.push("تاریخ «از» در فیلتر URL معتبر نیست.");
+      effectiveFrom = undefined;
+    }
+    if (effectiveTo && !DATE_ONLY_RE.test(effectiveTo)) {
+      hints.push("تاریخ «تا» در فیلتر URL معتبر نیست.");
+      effectiveTo = undefined;
+    }
+    if (effectiveFrom && effectiveTo && effectiveFrom > effectiveTo) {
+      hints.push("تاریخ «از» نباید بعد از تاریخ «تا» باشد.");
+      effectiveFrom = undefined;
+      effectiveTo = undefined;
+    }
+
+    let personValue: EntityPickerValue | null = null;
+    if (personId && isUuid(personId)) {
+      personValue = { id: personId, code: "", labelFa: "فرد از پیوند" };
+    }
+
+    setFilterHintFa(hints.length > 0 ? hints.join(" ") : null);
+    setDraftEventType(knownEventType);
+    setDraftFrom(effectiveFrom);
+    setDraftTo(effectiveTo);
+    setDraftTeam(teamValue);
+    setDraftPerson(personValue);
+    setApplied({
+      eventType: knownEventType,
+      status: "",
+      effectiveFrom,
+      effectiveTo,
+      teamId: teamValue?.id,
+      personId: personValue?.id,
+    });
+    setPage(1);
+    snapshotTokenRef.current = undefined;
+    setEvaluationSnapshotId(undefined);
+  }, [
+    searchKey,
+    searchParams,
+    teamsQuery.data,
+    teamsQuery.isLoading,
+    teamsQuery.isError,
+  ]);
 
   const searchQuery = api.personnelEvent.search.useQuery(
     {
@@ -258,7 +364,7 @@ export function PersonnelEventsListPanel() {
       navigate(draftRegisterHref(row.personId));
       return;
     }
-    navigate(profileHref(row.personId, row.id));
+    navigate(profileHref(row.personId, { eventId: row.id }));
   }
 
   function openPerson(row: EventListRow) {

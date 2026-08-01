@@ -67,6 +67,8 @@ export function computePersonnelExportSnapshotHash(input: {
   normalizedQuery?: string | null;
   asOf: string;
   fieldIds: readonly string[];
+  /** Story 9.7 — include team reconcile filter in export identity. */
+  teamId?: string | null;
 }): string {
   return computeExportSnapshotHash({
     sourceSurface: "personnel_list",
@@ -75,6 +77,7 @@ export function computePersonnelExportSnapshotHash(input: {
       normalizedQuery: input.normalizedQuery ?? null,
       asOf: input.asOf,
       fieldIds: [...input.fieldIds],
+      teamId: input.teamId?.trim() || null,
     },
     fieldIds: input.fieldIds,
     asOf: input.asOf,

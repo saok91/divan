@@ -224,6 +224,19 @@ const mandatoryConsumers: { rel: string; needle: RegExp }[] = [
     needle: /onRowClick/,
   },
   {
+    // Story 9.7 UX-DR30: row click opens full profile; quick-edit stays a row action.
+    rel: "components/personnel/personnel-list-panel.tsx",
+    needle: /onRowClick=\{\(row\)\s*=>\s*navigateProfile/,
+  },
+  {
+    rel: "components/personnel/personnel-list-panel.tsx",
+    needle: /from "@\/lib\/personnel-profile-href"/,
+  },
+  {
+    rel: "components/personnel/personnel-list-panel.tsx",
+    needle: /navigateProfile\(row\.id\)/,
+  },
+  {
     rel: "components/personnel/personnel-events-list-panel.tsx",
     needle: /RowActionCluster/,
   },

@@ -43,6 +43,11 @@ import {
   type TrendBucket,
   type TrendGranularity,
 } from "./workforce-events";
+import {
+  capacityReconcileHref,
+  eventsReconcileHref,
+  personnelListReconcileHref,
+} from "./reconcile-href";
 
 export type DashboardMetricOutcome =
   | "allowed"
@@ -306,7 +311,8 @@ export async function assembleDashboardSnapshot(
   cards.push(
     cardBase("active_persons", "allowed", {
       value: activeCount,
-      reconcileHref: "/personnel/list",
+      // Omit teamId — figure is cohort-wide; filtered detail would not match the number.
+      reconcileHref: personnelListReconcileHref({}),
       reconcileLabelFa: "فهرست پرسنل",
     }),
   );
@@ -389,7 +395,7 @@ export async function assembleDashboardSnapshot(
               reserved: agg.reserved,
               free: agg.free,
             },
-            reconcileHref: "/headcount/capacity",
+            reconcileHref: capacityReconcileHref({ teamId: filter.teamId }),
             reconcileLabelFa: "ظرفیت و جذب",
           }),
         );
@@ -413,9 +419,7 @@ export async function assembleDashboardSnapshot(
             topTeamId: teams[0]?.teamId ?? null,
             topTeamMembers: teams[0]?.teamMembershipCount ?? 0,
           },
-          reconcileHref: filter.teamId
-            ? `/headcount/capacity?teamId=${encodeURIComponent(filter.teamId)}`
-            : "/headcount/capacity",
+          reconcileHref: capacityReconcileHref({ teamId: filter.teamId }),
           reconcileLabelFa: "جزئیات ظرفیت تیم",
         }),
       );
@@ -466,7 +470,11 @@ export async function assembleDashboardSnapshot(
           rangeStart: filter.trendRangeStart,
           rangeEnd: filter.trendRangeEnd,
         },
-        reconcileHref: "/personnel-events/events",
+        // Omit teamId — events loaded for full subjectIds cohort, not team-narrowed.
+        reconcileHref: eventsReconcileHref({
+          effectiveFrom: filter.trendRangeStart,
+          effectiveTo: filter.trendRangeEnd,
+        }),
         reconcileLabelFa: "رویدادهای پرسنلی",
       }),
     );
@@ -481,7 +489,10 @@ export async function assembleDashboardSnapshot(
           rangeEnd: filter.trendRangeEnd,
         },
         trend,
-        reconcileHref: "/personnel-events/events",
+        reconcileHref: eventsReconcileHref({
+          effectiveFrom: filter.trendRangeStart,
+          effectiveTo: filter.trendRangeEnd,
+        }),
         reconcileLabelFa: "روند رویدادها",
       }),
     );
@@ -512,7 +523,7 @@ export async function assembleDashboardSnapshot(
           warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
           freeSource: historical?.ok === true ? "historical" : "approval_slots",
         },
-        reconcileHref: "/headcount/capacity",
+        reconcileHref: capacityReconcileHref({ teamId: filter.teamId }),
         reconcileLabelFa: "ظرفیت باز و نزدیک انقضا",
       }),
     );

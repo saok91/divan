@@ -6,6 +6,7 @@
  */
 
 import { vanillaApi } from "@/lib/trpc/vanilla";
+import { profileHref } from "@/lib/personnel-profile-href";
 
 export type PersonnelSearchHit = {
   id: string;
@@ -20,10 +21,6 @@ export type PersonnelSearchParams = {
   /** Latin-normalized query for matching (digits stripped/normalized). */
   normalizedQuery: string;
 };
-
-function profileHref(personId: string): string {
-  return `/personnel/profile/${encodeURIComponent(personId)}`;
-}
 
 /**
  * Same permission-safe server search as فهرست پرسنل (`person.search`).

@@ -18,6 +18,7 @@ import {
   formatJalaliDisplayFromGregorian,
 } from "@/lib/jalali";
 import { toPersianDigits } from "@/lib/persian-digits";
+import { cn } from "@/lib/utils";
 
 export type EventTimelineRowData = {
   event: {
@@ -45,6 +46,8 @@ type EventTimelineRowProps = {
   canCancel: boolean;
   canReverse: boolean;
   canCorrect: boolean;
+  /** Story 9.7 — `?event=` focus ring / aria-current. */
+  highlighted?: boolean;
   onLifecycleSuccess?: () => void;
 };
 
@@ -64,6 +67,7 @@ export function EventTimelineRow({
   canCancel,
   canReverse,
   canCorrect,
+  highlighted = false,
   onLifecycleSuccess,
 }: EventTimelineRowProps) {
   const badge: StatusBadgeKind = isStatusBadgeKind(row.resolvedStatus)
@@ -91,7 +95,14 @@ export function EventTimelineRow({
 
   return (
     <li
-      className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4 last:border-b-0"
+      id={`event-${row.event.id}`}
+      tabIndex={highlighted ? -1 : undefined}
+      aria-current={highlighted ? "true" : undefined}
+      className={cn(
+        "flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4 last:border-b-0 outline-none",
+        highlighted &&
+          "rounded-md ring-2 ring-accent ring-offset-2 ring-offset-background",
+      )}
       data-origin={origin}
     >
       <div className="min-w-0 flex-1 space-y-1.5">

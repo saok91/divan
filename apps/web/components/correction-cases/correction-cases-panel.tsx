@@ -7,6 +7,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 
 import {
   EntityPicker,
@@ -27,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
 import { RowActionButton } from "@/components/ui/row-action-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +37,7 @@ import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
+import { isUuid } from "@/lib/is-uuid";
 
 function PersonIdentityCell({ personId }: { personId: string }) {
   const q = api.person.getById.useQuery(
@@ -228,11 +231,16 @@ const COLUMNS: GovernedColumn<CaseRow>[] = [
 
 export function CorrectionCasesPanel() {
   const formId = React.useId();
+  const searchParams = useSearchParams();
   const utils = api.useUtils();
+  const urlHydratedKeyRef = React.useRef<string | null>(null);
   const [breachedOnly, setBreachedOnly] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [dialog, setDialog] = React.useState<DialogKind>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
+  const [urlAccessHintFa, setUrlAccessHintFa] = React.useState<string | null>(
+    null,
+  );
   const confirmTriggerRef = React.useRef<HTMLElement | null>(null);
 
   const [requestRef, setRequestRef] = React.useState("");
@@ -283,6 +291,40 @@ export function CorrectionCasesPanel() {
     { enabled: Boolean(selectedId) },
   );
   const capsQuery = api.correctionCase.capabilities.useQuery();
+
+  // Story 9.7 — hydrate ?person= (+ optional open=1) from profile CTA.
+  const searchKey = searchParams.toString();
+  React.useEffect(() => {
+    if (urlHydratedKeyRef.current === searchKey) return;
+    if (capsQuery.isLoading) return;
+
+    const personId = searchParams.get("person")?.trim();
+    const wantOpen = searchParams.get("open") === "1";
+
+    if (wantOpen && capsQuery.isError) {
+      setUrlAccessHintFa(operationalCopy.correctionCaseCapabilitiesError);
+      return;
+    }
+
+    urlHydratedKeyRef.current = searchKey;
+
+    if (personId && isUuid(personId)) {
+      setPerson({ id: personId, code: "", labelFa: "فرد از پیوند پروفایل" });
+    }
+
+    if (!wantOpen) return;
+    if (capsQuery.data?.write === true) {
+      setDialog("open");
+      return;
+    }
+    setUrlAccessHintFa(operationalCopy.profileCorrectionRequestDenied);
+  }, [
+    searchKey,
+    searchParams,
+    capsQuery.data,
+    capsQuery.isError,
+    capsQuery.isLoading,
+  ]);
 
   const openMutation = api.correctionCase.open.useMutation({
     onSuccess: async (res) => {
@@ -515,9 +557,11 @@ export function CorrectionCasesPanel() {
       </p>
 
       {actionError ? (
-        <p className="text-body text-destructive" role="alert">
-          {actionError}
-        </p>
+        <FeedbackMessage kind="error">{actionError}</FeedbackMessage>
+      ) : null}
+
+      {urlAccessHintFa ? (
+        <FeedbackMessage kind="error">{urlAccessHintFa}</FeedbackMessage>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -537,8 +581,20 @@ export function CorrectionCasesPanel() {
             size="sm"
             disabled={busy}
             onClick={(e) => openDialog("open", e.currentTarget)}
-          
             disabledReason={operationalCopy.actionPending}
+          >
+            {operationalCopy.correctionCaseOpen}
+          </Button>
+        ) : capsQuery.isError ? (
+          <FeedbackMessage kind="error">
+            {operationalCopy.correctionCaseCapabilitiesError}
+          </FeedbackMessage>
+        ) : !capsQuery.isLoading ? (
+          <Button
+            type="button"
+            size="sm"
+            disabled
+            disabledReason={operationalCopy.profileCorrectionRequestDenied}
           >
             {operationalCopy.correctionCaseOpen}
           </Button>

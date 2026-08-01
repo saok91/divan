@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { RowActionCluster } from "@/components/ui/row-action-overflow";
 import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
+import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -151,8 +152,16 @@ function captureFocusTrigger(preferred?: HTMLElement | null): HTMLElement | null
 
 /**
  * هدکانت tab — one GovernedDataTable of approvals + record-drawer (Story 9.4).
+ * Story 9.7 — optional initialTeamId from reconcile `?teamId=`.
  */
-export function HeadcountApprovalsTable() {
+export function HeadcountApprovalsTable({
+  initialTeamId,
+  teamIdMalformed = false,
+}: {
+  initialTeamId?: string;
+  /** Story 9.7 — non-UUID `?teamId=` from reconcile URL. */
+  teamIdMalformed?: boolean;
+} = {}) {
   const router = useRouter();
   const leaveGuard = useLeaveGuardOptional();
   const utils = api.useUtils();
@@ -163,9 +172,54 @@ export function HeadcountApprovalsTable() {
   );
   const [drawerTrigger, setDrawerTrigger] =
     React.useState<HTMLElement | null>(null);
+  const [teamIdFilter, setTeamIdFilter] = React.useState<string | undefined>(
+    undefined,
+  );
+  const [teamFilterHintFa, setTeamFilterHintFa] = React.useState<string | null>(
+    null,
+  );
 
-  const listQuery = api.headcount.listApprovals.useQuery();
+  const listQuery = api.headcount.listApprovals.useQuery(
+    teamIdFilter ? { teamId: teamIdFilter } : undefined,
+  );
   const teamsQuery = api.organization.list.useQuery({ includeInactive: false });
+
+  React.useEffect(() => {
+    if (teamIdMalformed) {
+      setTeamIdFilter(undefined);
+      setTeamFilterHintFa("شناسه تیم در فیلتر URL معتبر نیست.");
+      return;
+    }
+    if (!initialTeamId) {
+      setTeamIdFilter(undefined);
+      setTeamFilterHintFa(null);
+      return;
+    }
+    if (teamsQuery.isLoading) return;
+    if (teamsQuery.isError) {
+      setTeamIdFilter(undefined);
+      setTeamFilterHintFa(operationalCopy.orgListError);
+      return;
+    }
+    const unit = (teamsQuery.data ?? []).find(
+      (u) => u.id === initialTeamId && u.unitType === "TEAM",
+    );
+    if (!unit) {
+      setTeamIdFilter(undefined);
+      setTeamFilterHintFa(
+        "شناسه تیم در فیلتر URL معتبر نیست یا در محدوده نیست.",
+      );
+      return;
+    }
+    setTeamIdFilter(initialTeamId);
+    setTeamFilterHintFa(null);
+  }, [
+    initialTeamId,
+    teamIdMalformed,
+    teamsQuery.data,
+    teamsQuery.isLoading,
+    teamsQuery.isError,
+  ]);
 
   const teamById = React.useMemo(() => {
     const map = new Map<
@@ -268,6 +322,16 @@ export function HeadcountApprovalsTable() {
     <FullBleedTableHost className="space-y-3 py-4">
       {actionError ? (
         <FeedbackMessage kind="error">{actionError}</FeedbackMessage>
+      ) : null}
+
+      {teamFilterHintFa ? (
+        <FeedbackMessage kind="info">{teamFilterHintFa}</FeedbackMessage>
+      ) : null}
+
+      {teamIdFilter ? (
+        <FeedbackMessage kind="info">
+          فهرست برای تیم انتخاب‌شده از پیوند reconcile فیلتر شده است.
+        </FeedbackMessage>
       ) : null}
 
       {listQuery.isError ? (

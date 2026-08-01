@@ -7,7 +7,11 @@ import { PersonProfileSensitivityIcon } from "@/components/personnel/person-prof
 import { PersonnelEventTimeline } from "@/components/personnel/personnel-event-timeline";
 import { RecalcPendingMark } from "@/components/personnel/recalc-pending-mark";
 import { StatusBadge } from "@/components/personnel/status-badge";
+import { useLeaveGuardOptional } from "@/components/leave-guard";
+import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Skeleton } from "@/components/ui/skeleton";
+import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -34,6 +38,8 @@ const PROFILE_LOAD_ERROR_FA = "بارگذاری پروفایل ممکن نشد. 
 
 type PersonProfileViewProps = {
   personId: string;
+  /** When set, timeline scrolls/highlights this event (`?event=`). */
+  focusEventId?: string;
 };
 
 function ProfileSection({
@@ -123,15 +129,20 @@ function profileErrorMessage(message: string | undefined): string {
 }
 
 /**
- * Permission-filtered Person profile host (Story 5.2 / FR-34 / UX-DR8).
+ * Permission-filtered Person profile host (Story 5.2 / FR-34 / UX-DR8; Story 9.7 CTA).
  * Consumes getCurrentPersonState + prior employments — no parallel SoT.
  */
-export function PersonProfileView({ personId }: PersonProfileViewProps) {
+export function PersonProfileView({
+  personId,
+  focusEventId,
+}: PersonProfileViewProps) {
+  const leaveGuard = useLeaveGuardOptional();
   const stateQuery = api.person.getCurrentState.useQuery({ personId });
   const fieldsQuery = api.person.listEnabledFields.useQuery();
   const dictQuery = api.person.listDictionary.useQuery();
   const priorQuery = api.person.listPriorEmployments.useQuery({ personId });
   const labelsQuery = api.person.getProfileLabels.useQuery({ personId });
+  const correctionCapsQuery = api.correctionCase.capabilities.useQuery();
 
   const coldLoad =
     stateQuery.isLoading ||
@@ -146,42 +157,42 @@ export function PersonProfileView({ personId }: PersonProfileViewProps) {
 
   if (stateQuery.isError) {
     return (
-      <p role="alert" className="text-body text-destructive">
+      <FeedbackMessage kind="error">
         {profileErrorMessage(stateQuery.error.message)}
-      </p>
+      </FeedbackMessage>
     );
   }
 
   if (fieldsQuery.isError) {
     return (
-      <p role="alert" className="text-body text-destructive">
+      <FeedbackMessage kind="error">
         {profileErrorMessage(fieldsQuery.error.message)}
-      </p>
+      </FeedbackMessage>
     );
   }
 
   if (labelsQuery.isError) {
     return (
-      <p role="alert" className="text-body text-destructive">
+      <FeedbackMessage kind="error">
         {profileErrorMessage(labelsQuery.error.message)}
-      </p>
+      </FeedbackMessage>
     );
   }
 
   if (dictQuery.isError) {
     return (
-      <p role="alert" className="text-body text-destructive">
+      <FeedbackMessage kind="error">
         {profileErrorMessage(dictQuery.error.message)}
-      </p>
+      </FeedbackMessage>
     );
   }
 
   const state = stateQuery.data;
   if (!state) {
     return (
-      <p role="alert" className="text-body text-destructive">
+      <FeedbackMessage kind="error">
         بارگذاری وضعیت فرد ممکن نشد.
-      </p>
+      </FeedbackMessage>
     );
   }
 
@@ -257,47 +268,88 @@ export function PersonProfileView({ personId }: PersonProfileViewProps) {
     "نوع همکاری قراردادی",
   );
 
+  const canOpenCorrection = correctionCapsQuery.data?.write === true;
+  const correctionCapsLoading = correctionCapsQuery.isLoading;
+  const correctionCapsFailed = correctionCapsQuery.isError;
+
+  function navigateCorrection() {
+    const href = `/correction-cases?person=${encodeURIComponent(personId)}&open=1`;
+    if (leaveGuard) {
+      void leaveGuard.requestNavigation(href);
+      return;
+    }
+    window.location.assign(href);
+  }
+
   return (
     <div className="space-y-8">
-      <header className="space-y-2">
-        {displayName ? (
-          <p className="text-heading-sm text-text-secondary">{displayName}</p>
-        ) : null}
-        <p className="flex flex-wrap items-center gap-2 text-body">
-          <span className="text-text-secondary">نوع نما:</span>
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-              state.viewSemantics === "planned"
-                ? "status-badge-scheduled"
-                : state.viewSemantics === "historical"
-                  ? "bg-muted text-muted-foreground"
-                  : "status-badge-effective",
+      <header className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-2">
+            {displayName ? (
+              <p className="text-heading-sm text-text-secondary">{displayName}</p>
+            ) : null}
+            <p className="flex flex-wrap items-center gap-2 text-body">
+              <span className="text-text-secondary">نوع نما:</span>
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                  state.viewSemantics === "planned"
+                    ? "status-badge-scheduled"
+                    : state.viewSemantics === "historical"
+                      ? "bg-muted text-muted-foreground"
+                      : "status-badge-effective",
+                )}
+              >
+                {VIEW_SEMANTICS_LABEL_FA[state.viewSemantics]}
+              </span>
+              <span className="text-muted-foreground" dir="ltr">
+                {toPersianDigits(state.asOf)}
+              </span>
+            </p>
+          </div>
+          <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
+            {canOpenCorrection ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={navigateCorrection}
+              >
+                {operationalCopy.profileCorrectionRequestCta}
+              </Button>
+            ) : correctionCapsFailed ? (
+              <FeedbackMessage kind="error">
+                {operationalCopy.correctionCaseCapabilitiesError}
+              </FeedbackMessage>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled
+                disabledReason={
+                  correctionCapsLoading
+                    ? operationalCopy.actionPending
+                    : operationalCopy.profileCorrectionRequestDenied
+                }
+              >
+                {operationalCopy.profileCorrectionRequestCta}
+              </Button>
             )}
-          >
-            {VIEW_SEMANTICS_LABEL_FA[state.viewSemantics]}
-          </span>
-          <span className="text-muted-foreground" dir="ltr">
-            {toPersianDigits(state.asOf)}
-          </span>
-        </p>
+          </div>
+        </div>
         {state.baselineDisclosure.limited ||
         !state.baselineDisclosure.configured ? (
-          <p
-            role="alert"
-            className="text-body text-amber-800 dark:text-amber-200"
-          >
+          <FeedbackMessage kind="info">
             {state.baselineDisclosure.messageFa}
-          </p>
+          </FeedbackMessage>
         ) : null}
         {state.disposalDisclosure.limited &&
         state.disposalDisclosure.messageFa ? (
-          <p
-            role="alert"
-            className="text-body text-amber-800 dark:text-amber-200"
-          >
+          <FeedbackMessage kind="info">
             {state.disposalDisclosure.messageFa}
-          </p>
+          </FeedbackMessage>
         ) : null}
       </header>
 
@@ -576,7 +628,10 @@ export function PersonProfileView({ personId }: PersonProfileViewProps) {
 
       <ProfileSection title="گاه‌شمار رویدادهای پرسنلی" className="border-t border-border pt-6">
         <div id="personnel-timeline-entry" className="space-y-2">
-          <PersonnelEventTimeline personId={personId} />
+          <PersonnelEventTimeline
+            personId={personId}
+            focusEventId={focusEventId}
+          />
         </div>
       </ProfileSection>
 

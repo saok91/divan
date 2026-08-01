@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { operationalCopy } from "@/lib/operational-copy";
+import { profileHref } from "@/lib/personnel-profile-href";
 import { api } from "@/lib/trpc/client";
 
 type PersonFieldKey = "givenName" | "familyName" | "mobilePhone";
@@ -38,16 +39,10 @@ type PersonnelQuickEditModalProps = {
   onSaved: (person: SavedPerson) => void;
 };
 
-const PROFILE_HREF_PREFIX = "/personnel/profile/";
-
 function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     id,
   );
-}
-
-function profileHref(personId: string): string {
-  return `${PROFILE_HREF_PREFIX}${encodeURIComponent(personId)}`;
 }
 
 /**
