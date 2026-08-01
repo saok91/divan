@@ -1,25 +1,19 @@
-import { PageHeader } from "@/components/page-header";
-import { ReportCataloguePanel } from "@/components/reports/report-catalogue-panel";
+import { redirect } from "next/navigation";
 
-export default function ReportsPage() {
-  return (
-    <div className="mx-auto max-w-[90rem] space-y-4 bg-surface-page text-text-primary">
-      <PageHeader
-        breadcrumb={
-          <span>
-            دیوان
-            <span className="mx-1 text-text-tertiary" aria-hidden>
-              /
-            </span>
-            گزارش‌ها
-          </span>
-        }
-        title="گزارش‌ها"
-        purpose="کاتالوگ گزارش‌های راه‌اندازی با فیلتر مشترک سازمان و زمان — مشاهده فقط؛ خروجی حاکمیتی در داستان ۶٫۵."
-      />
-      <div className="px-content-padding-inline pb-6">
-        <ReportCataloguePanel />
-      </div>
-    </div>
-  );
+import { auth } from "@/auth";
+import { assertPageAccess } from "@/lib/assert-page-access";
+import { defaultTabHref, SECTION_TAB_SURFACES } from "@/lib/section-tab-surfaces";
+
+const SURFACE = SECTION_TAB_SURFACES.find((s) => s.root === "/reports");
+
+export default async function ReportsIndexPage() {
+  if (!SURFACE) {
+    redirect("/dashboard");
+  }
+  const session = await auth();
+  if (!session?.user?.accountId || !session.user.coarseRole) {
+    redirect("/login");
+  }
+  assertPageAccess(session.user.coarseRole, "/reports");
+  redirect(defaultTabHref(SURFACE));
 }

@@ -28,7 +28,9 @@ import {
   reportRequiresEffectiveDateRange,
   requireLaunchReportCatalogue,
   type LaunchReportKey,
+  type ReportDefinitionHook,
   type ReportRunResult,
+  type ReportSubject,
 } from "@divan/reporting";
 import { parseDateOnly } from "@divan/temporal-engine";
 import { TRPCError } from "@trpc/server";
@@ -230,6 +232,10 @@ function mapReportError(err: unknown): never {
 export type ReportCatalogueEntry = {
   key: LaunchReportKey;
   titleFa: string;
+  purposeFa: string;
+  subject: ReportSubject;
+  runnable: boolean;
+  accessRequirementFa?: string;
 };
 
 export type ReportCatalogueResponse = {
@@ -237,6 +243,32 @@ export type ReportCatalogueResponse = {
   populationAuthzMode: "fixture-fail-closed" | "uuid-registry";
   populationDisclosureFa: string | null;
 };
+
+function accessRequirementFaFor(def: ReportDefinitionHook): string {
+  const parts: string[] = [];
+  if (def.requiresOrganizationRead) parts.push("خواندن سازمان");
+  if (def.requiresHeadcountApprovalRead) parts.push("تأیید ظرفیت");
+  if (def.requiresCompensationRead) parts.push("جبران خدمت");
+  return parts.length > 0
+    ? `نیازمند دسترسی: ${parts.join(" / ")}`
+    : "نیازمند دسترسی گزارش";
+}
+
+function isReportRunnable(
+  def: ReportDefinitionHook,
+  caps: {
+    hasOrganizationRead: boolean;
+    hasHeadcountApprovalRead: boolean;
+    hasCompensationRead: boolean;
+  },
+): boolean {
+  if (def.requiresCompensationRead && !caps.hasCompensationRead) return false;
+  if (def.requiresOrganizationRead && !caps.hasOrganizationRead) return false;
+  if (def.requiresHeadcountApprovalRead && !caps.hasHeadcountApprovalRead) {
+    return false;
+  }
+  return true;
+}
 
 export type ReportRunResponse = ReportRunResult & {
   populationAuthzMode: "fixture-fail-closed" | "uuid-registry";
@@ -256,25 +288,35 @@ export type ReportRunResponse = ReportRunResult & {
   exportSnapshotHash: string | null;
 };
 
+/**
+ * Full launch catalogue with locked-with-requirement entries (Story 9.5).
+ * Soft-omit alone is insufficient — non-runnable keys state accessRequirementFa.
+ */
 function catalogueForCaps(caps: {
   hasOrganizationRead: boolean;
   hasHeadcountApprovalRead: boolean;
   hasCompensationRead: boolean;
 }): ReportCatalogueEntry[] {
   requireLaunchReportCatalogue();
-  return LAUNCH_REPORT_DEFINITIONS.filter((d) => {
-    if (d.requiresCompensationRead && !caps.hasCompensationRead) return false;
-    if (d.requiresOrganizationRead && !caps.hasOrganizationRead) return false;
-    if (d.requiresHeadcountApprovalRead && !caps.hasHeadcountApprovalRead) {
-      return false;
-    }
-    return true;
-  }).map((d) => ({ key: d.key, titleFa: d.titleFa }));
+  return LAUNCH_REPORT_DEFINITIONS.map((d) => {
+    const runnable = isReportRunnable(d, caps);
+    return {
+      key: d.key,
+      titleFa: d.titleFa,
+      purposeFa: d.purposeFa,
+      subject: d.subject,
+      runnable,
+      ...(runnable
+        ? {}
+        : { accessRequirementFa: accessRequirementFaFor(d) }),
+    };
+  });
 }
 
 export const reportRouter = createTRPCRouter({
   /**
-   * Soft-permission catalogue — omit keys the actor cannot run (no disabled theater).
+   * Full launch catalogue — locked keys include accessRequirementFa (Story 9.5).
+   * Run path remains fail-closed for unauthorized keys.
    */
   catalogue: governedProcedure
     .meta({
@@ -390,13 +432,16 @@ export const reportRouter = createTRPCRouter({
           ctx.session.accountId,
         );
 
-        // Soft-omit: do not run forbidden keys (no disabled theater payload).
-        const visible = catalogueForCaps({
-          hasOrganizationRead,
-          hasHeadcountApprovalRead,
-          hasCompensationRead,
-        });
-        if (!visible.some((r) => r.key === reportKey)) {
+        // Fail-closed: unauthorized keys denied server-side (UI must not enable click-to-fail).
+        const def = LAUNCH_REPORT_DEFINITIONS.find((d) => d.key === reportKey);
+        if (
+          !def ||
+          !isReportRunnable(def, {
+            hasOrganizationRead,
+            hasHeadcountApprovalRead,
+            hasCompensationRead,
+          })
+        ) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: operationalCopy.accessDeniedTitle,

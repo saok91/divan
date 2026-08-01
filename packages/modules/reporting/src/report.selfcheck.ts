@@ -53,7 +53,10 @@ const catalogue = requireLaunchReportCatalogue();
 assert.equal(catalogue.length, LAUNCH_REQUIRED_REPORT_KEYS.length);
 for (const key of LAUNCH_REQUIRED_REPORT_KEYS) {
   assert.equal(isLaunchReportKey(key), true);
-  assert.ok(catalogue.some((d) => d.key === key));
+  const def = catalogue.find((d) => d.key === key);
+  assert.ok(def, `missing definition for ${key}`);
+  assert.ok(def.subject, `missing subject for ${key}`);
+  assert.ok(def.purposeFa.trim().length > 0, `missing purposeFa for ${key}`);
 }
 assert.ok(
   LAUNCH_REQUIRED_REPORT_KEYS.includes("import_batch_outcomes"),

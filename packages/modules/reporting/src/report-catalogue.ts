@@ -2,6 +2,8 @@
  * AR-REPORTING-pluggable report catalogue (Story 5.5 / FR-36).
  * Launch-required keys are hardcoded; do not invent cohort thresholds or
  * silently drop FR-36 scenarios without explicit PRD change.
+ *
+ * Subject + purposeFa (Story 9.5) — presentation metadata only; keys unchanged.
  */
 
 export const LAUNCH_REQUIRED_REPORT_KEYS = [
@@ -23,64 +25,132 @@ export const LAUNCH_REQUIRED_REPORT_KEYS = [
 
 export type LaunchReportKey = (typeof LAUNCH_REQUIRED_REPORT_KEYS)[number];
 
+/** UX subject tabs for the reports workspace (Story 9.5 / UX-DR33). */
+export const REPORT_SUBJECTS = [
+  "personnel",
+  "organization",
+  "events",
+  "capacity",
+  "data-entry",
+] as const;
+
+export type ReportSubject = (typeof REPORT_SUBJECTS)[number];
+
 export type ReportDefinitionHook = {
   key: LaunchReportKey;
   titleFa: string;
-  /** When true, catalogue soft-omits unless actor holds compensation.read. */
+  /** Section-tab subject grouping (Story 9.5). */
+  subject: ReportSubject;
+  /** One-line operator-facing purpose under the rail name. */
+  purposeFa: string;
+  /** When true, catalogue marks non-runnable unless actor holds compensation.read. */
   requiresCompensationRead?: boolean;
-  /** When true, catalogue soft-omits unless actor holds organization.read. */
+  /** When true, catalogue marks non-runnable unless actor holds organization.read. */
   requiresOrganizationRead?: boolean;
-  /** When true, catalogue soft-omits unless actor holds headcount approval read. */
+  /** When true, catalogue marks non-runnable unless actor holds headcount approval read. */
   requiresHeadcountApprovalRead?: boolean;
 };
 
 /** Owner-approved launch defaults — not AR-REPORTING freeze. */
 export const LAUNCH_REPORT_DEFINITIONS: readonly ReportDefinitionHook[] = [
-  { key: "active_persons", titleFa: "افراد فعال" },
-  { key: "all_persons", titleFa: "همه افراد (شامل خاتمه‌یافته)" },
+  {
+    key: "active_persons",
+    titleFa: "افراد فعال",
+    subject: "personnel",
+    purposeFa: "فهرست افراد فعال در محدوده دسترسی شما",
+  },
+  {
+    key: "all_persons",
+    titleFa: "همه افراد (شامل خاتمه‌یافته)",
+    subject: "personnel",
+    purposeFa: "همه افراد شامل خاتمه‌یافته در محدوده دسترسی",
+  },
   {
     key: "org_state",
     titleFa: "وضعیت جاری سازمان",
+    subject: "organization",
+    purposeFa: "وضعیت جاری واحدهای سازمانی قابل‌مشاهده",
     requiresOrganizationRead: true,
   },
   {
     key: "team_membership_manager",
     titleFa: "اعضای هر تیم و مدیر میانی",
+    subject: "organization",
+    purposeFa: "اعضای هر تیم و مدیر میانی در ساختار سازمان",
     requiresOrganizationRead: true,
   },
-  { key: "distributions", titleFa: "توزیع نقش، عنوان، گرید و همکاری" },
-  { key: "starts", titleFa: "شروع‌ها" },
-  { key: "terminations", titleFa: "خاتمه‌ها" },
-  { key: "transfers", titleFa: "جابه‌جایی تیم" },
+  {
+    key: "distributions",
+    titleFa: "توزیع نقش، عنوان، گرید و همکاری",
+    subject: "personnel",
+    purposeFa: "توزیع نقش، عنوان شغلی، گرید و نوع همکاری",
+  },
+  {
+    key: "starts",
+    titleFa: "شروع‌ها",
+    subject: "events",
+    purposeFa: "شروع‌های اشتغال در بازهٔ انتخابی",
+  },
+  {
+    key: "terminations",
+    titleFa: "خاتمه‌ها",
+    subject: "events",
+    purposeFa: "خاتمه‌های اشتغال در بازهٔ انتخابی",
+  },
+  {
+    key: "transfers",
+    titleFa: "جابه‌جایی تیم",
+    subject: "events",
+    purposeFa: "جابه‌جایی تیم در بازهٔ انتخابی",
+  },
   {
     key: "role_grade_compensation_changes",
     titleFa: "تغییر نقش، گرید و جبران خدمت",
+    subject: "events",
+    purposeFa: "تغییرات نقش، گرید و جبران خدمت در بازه",
     requiresCompensationRead: true,
   },
   {
     key: "headcount_approvals_capacity",
     titleFa: "تأیید ظرفیت و ظرفیت مصرف‌شده/آزاد",
+    subject: "capacity",
+    purposeFa: "تأیید ظرفیت و ظرفیت مصرف‌شده یا آزاد",
     requiresOrganizationRead: true,
     requiresHeadcountApprovalRead: true,
   },
   {
     key: "overrides",
     titleFa: "استثناهای ظرفیت",
+    subject: "capacity",
+    purposeFa: "استثناهای ظرفیت هدکانت در محدوده دسترسی",
     requiresHeadcountApprovalRead: true,
   },
-  { key: "scheduled", titleFa: "رویدادهای زمان‌بندی‌شده" },
+  {
+    key: "scheduled",
+    titleFa: "رویدادهای زمان‌بندی‌شده",
+    subject: "events",
+    purposeFa: "رویدادهای زمان‌بندی‌شده که هنوز مؤثر نشده‌اند",
+  },
   {
     key: "corrected_cancelled_reversed",
     titleFa: "رویدادهای اصلاح / لغو / معکوس",
+    subject: "events",
+    purposeFa: "رویدادهای اصلاح‌شده، لغو یا معکوس‌شده",
   },
   {
     key: "import_batch_outcomes",
     titleFa: "نتیجه دسته‌های واردسازی",
+    subject: "data-entry",
+    purposeFa: "نتیجه دسته‌های واردسازی داده",
   },
 ] as const;
 
 export function isLaunchReportKey(key: string): key is LaunchReportKey {
   return (LAUNCH_REQUIRED_REPORT_KEYS as readonly string[]).includes(key);
+}
+
+export function isReportSubject(value: string): value is ReportSubject {
+  return (REPORT_SUBJECTS as readonly string[]).includes(value);
 }
 
 /** Event / Effective-Date measure keys — require rangeStart + rangeEnd. */
@@ -131,8 +201,17 @@ export function requireLaunchReportCatalogue(): readonly ReportDefinitionHook[] 
     if (!found) {
       throw new Error(`missing_launch_report_definition:${key}`);
     }
+    if (!found.subject || !found.purposeFa.trim()) {
+      throw new Error(`incomplete_launch_report_metadata:${key}`);
+    }
   }
   return LAUNCH_REPORT_DEFINITIONS;
+}
+
+export function reportsForSubject(
+  subject: ReportSubject,
+): readonly ReportDefinitionHook[] {
+  return LAUNCH_REPORT_DEFINITIONS.filter((d) => d.subject === subject);
 }
 
 export const MSG_REPORT_IMPORT_BATCH_UNAVAILABLE_FA =

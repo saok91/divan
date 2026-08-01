@@ -23,12 +23,16 @@ export {
   MSG_REPORT_IMPORT_BATCH_UNAVAILABLE_FA,
   REPORT_KEYS_REQUIRING_EFFECTIVE_RANGE,
   REPORT_KEYS_TEAM_POPULATION_INTERSECT,
+  REPORT_SUBJECTS,
   isLaunchReportKey,
+  isReportSubject,
   reportRequiresEffectiveDateRange,
   reportUsesTeamPopulationIntersect,
+  reportsForSubject,
   requireLaunchReportCatalogue,
   type LaunchReportKey,
   type ReportDefinitionHook,
+  type ReportSubject,
 } from "./report-catalogue";
 
 export {

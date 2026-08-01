@@ -16,7 +16,7 @@ const panelSrc = readFileSync(
   "utf8",
 );
 const catalogueSrc = readFileSync(
-  join(here, "../../components/reports/report-catalogue-panel.tsx"),
+  join(here, "../../components/reports/report-workspace.tsx"),
   "utf8",
 );
 const copySrc = readFileSync(

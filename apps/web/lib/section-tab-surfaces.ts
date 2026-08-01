@@ -128,6 +128,31 @@ export const SECTION_TAB_SURFACES: readonly SectionTabSurface[] = [
       },
     ],
   },
+  {
+    root: "/reports",
+    surfaceLabel: "گزارش‌ها",
+    ariaLabel: "بخش‌های گزارش‌ها",
+    defaultTabId: "personnel",
+    tabs: [
+      { id: "personnel", label: "نیروی انسانی", href: "/reports/personnel" },
+      {
+        id: "organization",
+        label: "سازمان",
+        href: "/reports/organization",
+      },
+      { id: "events", label: "رویدادها", href: "/reports/events" },
+      {
+        id: "capacity",
+        label: "ظرفیت و جذب",
+        href: "/reports/capacity",
+      },
+      {
+        id: "data-entry",
+        label: "ورود داده",
+        href: "/reports/data-entry",
+      },
+    ],
+  },
 ] as const;
 
 /** Placeholder copy for tab shells until 4b.5–4b.7 fill content. */

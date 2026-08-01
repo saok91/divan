@@ -279,7 +279,7 @@ const mustNotGhost = [
   "components/access/access-people-panel.tsx",
   "components/access/entitlement-grants-panel.tsx",
   "components/audit/audit-investigation-panel.tsx",
-  "components/reports/report-catalogue-panel.tsx",
+  "components/reports/report-workspace.tsx",
   "components/leave-guard/leave-guard-dialog.tsx",
 ];
 

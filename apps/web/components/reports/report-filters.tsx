@@ -11,6 +11,7 @@ import {
   JalaliDatePicker,
   type JalaliDatePickerHandle,
 } from "@/components/jalali-date-picker";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { operationalCopy } from "@/lib/operational-copy";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,8 @@ export type ReportFiltersProps = {
   value: ReportFilterState;
   onApply: (next: ReportFilterState) => void;
   disabled?: boolean;
+  /** Primary submit label — workspace uses «اجرا» (Story 9.5). */
+  submitLabel?: string;
 };
 
 /**
@@ -38,6 +41,7 @@ export function ReportFilters({
   value,
   onApply,
   disabled,
+  submitLabel = "اعمال فیلتر",
 }: ReportFiltersProps) {
   const formId = React.useId();
   const asOfRef = React.useRef<JalaliDatePickerHandle>(null);
@@ -93,6 +97,18 @@ export function ReportFilters({
       };
     });
   }, [parentTeamId, teamHydrate.data]);
+
+  React.useEffect(() => {
+    setEvaluationMode(value.evaluationMode);
+    setAsOfDate(value.asOfDate);
+    setRangeStart(value.rangeStart);
+    setRangeEnd(value.rangeEnd);
+  }, [
+    value.evaluationMode,
+    value.asOfDate,
+    value.rangeStart,
+    value.rangeEnd,
+  ]);
 
   return (
     <form
@@ -248,13 +264,13 @@ export function ReportFilters({
           "disabled:opacity-50",
         )}
       >
-        اعمال فیلتر
+        {submitLabel}
       </button>
 
       {formError ? (
-        <p role="alert" className="w-full text-body text-destructive">
+        <FeedbackMessage kind="error" className="w-full">
           {formError}
-        </p>
+        </FeedbackMessage>
       ) : null}
     </form>
   );

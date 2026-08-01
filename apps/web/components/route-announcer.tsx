@@ -12,7 +12,6 @@ import {
 /** Non-tabbed surfaces only — tabbed labels come from section-tab-surfaces. */
 const SURFACE_LABELS: Record<string, string> = {
   "/dashboard": "داشبورد",
-  "/reports": "گزارش‌ها",
   "/import": "ورود داده",
   "/audit": "ممیزی",
   "/operations": "عملیات",

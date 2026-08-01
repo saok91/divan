@@ -240,7 +240,7 @@ const mandatoryConsumers: { rel: string; needle: RegExp }[] = [
     needle: /RowActionButton/,
   },
   {
-    rel: "components/reports/report-catalogue-panel.tsx",
+    rel: "components/reports/report-workspace.tsx",
     needle: /RowActionButton/,
   },
 ];
