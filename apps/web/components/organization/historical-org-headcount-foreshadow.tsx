@@ -22,20 +22,34 @@ const VIEW_SEMANTICS_LABEL_FA: Record<
   planned: "برنامه‌ریزی‌شده",
 };
 
+type HistoricalOrgHeadcountForeshadowProps = {
+  /** Prefill team from approval row context (Story 9.4 drawer). */
+  initialTeam?: EntityPickerValue;
+  /** Compact chrome when embedded in record-drawer. */
+  embedded?: boolean;
+};
+
 /**
  * Optional foreshadow of org/headcount as-of counts (Story 4.11 / FR-27).
  * Not Approval admin UI (→ 4.12) or dashboard (→ 5.4).
  */
-export function HistoricalOrgHeadcountForeshadow() {
+export function HistoricalOrgHeadcountForeshadow({
+  initialTeam = null,
+  embedded = false,
+}: HistoricalOrgHeadcountForeshadowProps) {
   const formId = React.useId();
   const asOfPickerRef = React.useRef<JalaliDatePickerHandle>(null);
-  const [team, setTeam] = React.useState<EntityPickerValue>(null);
+  const [team, setTeam] = React.useState<EntityPickerValue>(initialTeam);
   const [asOf, setAsOf] = React.useState<string | undefined>(undefined);
   const orgUnitSearch = React.useMemo(() => createOrgUnitSearch(), []);
   const [submitted, setSubmitted] = React.useState<{
     asOf: string;
     teamId?: string;
   } | null>(null);
+
+  React.useEffect(() => {
+    setTeam(initialTeam ?? null);
+  }, [initialTeam]);
 
   const query = api.organization.getHistoricalCounts.useQuery(
     {
@@ -47,14 +61,21 @@ export function HistoricalOrgHeadcountForeshadow() {
 
   return (
     <section className="space-y-4" aria-labelledby={`${formId}-heading`}>
-      <div className="space-y-1">
-        <h2 id={`${formId}-heading`} className="text-title-sm font-semibold">
-          شمارش سازمان و ظرفیت (تاریخی)
-        </h2>
-        <p className="text-body text-muted-foreground">
+      {embedded ? (
+        <p className="text-caption text-muted-foreground">
           پیش‌نمایش فقط‌خواندنی عضویت تیم و ظرفیت — نه داشبورد کامل و نه تأیید ظرفیت.
         </p>
-      </div>
+      ) : (
+        <div className="space-y-1">
+          <h2 id={`${formId}-heading`} className="text-title-sm font-semibold">
+            شمارش سازمان و ظرفیت (تاریخی)
+          </h2>
+          <p className="text-body text-muted-foreground">
+            پیش‌نمایش فقط‌خواندنی عضویت تیم و ظرفیت — نه داشبورد کامل و نه تأیید ظرفیت.
+          </p>
+        </div>
+      )}
+      {embedded ? <h2 id={`${formId}-heading`} className="sr-only">بازسازی تاریخی</h2> : null}
 
       <form
         className="flex flex-wrap items-end gap-3"

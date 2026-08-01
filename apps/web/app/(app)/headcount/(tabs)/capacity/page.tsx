@@ -1,14 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { HeadcountApprovalPanel } from "@/components/headcount/approval-panel";
-import { HeadcountExemptionPanel } from "@/components/headcount/exemption-panel";
-import { HeadcountOverridePanel } from "@/components/headcount/override-panel";
-import { HistoricalOrgHeadcountForeshadow } from "@/components/organization/historical-org-headcount-foreshadow";
+import { HeadcountApprovalsTable } from "@/components/headcount/headcount-approvals-table";
 import { assertPageAccess } from "@/lib/assert-page-access";
 
 /**
- * Default headcount tab — existing approval / exemption / override UI (Story 4b.2).
+ * Default headcount tab — one approvals GovernedDataTable (Story 9.4 / UX-DR34).
  */
 export default async function HeadcountCapacityPage() {
   const session = await auth();
@@ -18,12 +15,5 @@ export default async function HeadcountCapacityPage() {
 
   assertPageAccess(session.user.coarseRole, "/headcount");
 
-  return (
-    <div className="space-y-10 px-content-padding-inline py-4">
-      <HeadcountApprovalPanel />
-      <HeadcountExemptionPanel />
-      <HeadcountOverridePanel />
-      <HistoricalOrgHeadcountForeshadow />
-    </div>
-  );
+  return <HeadcountApprovalsTable />;
 }

@@ -237,8 +237,14 @@ const surfaceInventory: { rel: string; label: string; allowTechnicalInput?: bool
     rel: "components/personnel/current-person-state-foreshadow.tsx",
     label: "current-person-state-foreshadow",
   },
-  { rel: "components/headcount/exemption-panel.tsx", label: "exemption-panel" },
-  { rel: "components/headcount/override-panel.tsx", label: "override-panel" },
+  {
+    rel: "components/headcount/headcount-approval-record-drawer.tsx",
+    label: "headcount-approval-record-drawer",
+  },
+  {
+    rel: "components/headcount/headcount-approval-create-form.tsx",
+    label: "headcount-approval-create-form",
+  },
   {
     rel: "components/correction-cases/correction-cases-panel.tsx",
     label: "correction-cases-panel",
@@ -319,11 +325,13 @@ assert.match(
   "audit actor default must use createAccountSearch",
 );
 
-const exemptionPanel = read("components/headcount/exemption-panel.tsx");
+const exemptionDrawer = read(
+  "components/headcount/headcount-approval-record-drawer.tsx",
+);
 assert.match(
-  exemptionPanel,
+  exemptionDrawer,
   /useEntityPickerCascade|createPrimaryAssignmentSearch/,
-  "exemption must cascade person → primary assignment",
+  "exemption drawer must cascade person → primary assignment",
 );
 
 const lifecyclePanel = read("components/personnel/personnel-lifecycle-panel.tsx");
