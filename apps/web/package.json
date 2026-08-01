@@ -36,6 +36,7 @@
     "selfcheck:a11y-floor": "tsx lib/a11y-floor.selfcheck.ts",
     "selfcheck:headcount-ia": "tsx components/headcount/headcount-ia.selfcheck.ts",
     "selfcheck:reports-ia": "tsx components/reports/reports-ia.selfcheck.ts",
+    "selfcheck:personnel-events-list": "tsx lib/personnel-events-list.selfcheck.ts",
     "selfcheck:design-qa": "tsx lib/design-qa.selfcheck.ts"
   },
   "dependencies": {

@@ -410,3 +410,50 @@ export async function listOpenDraftsForPerson(
   });
   return rows.map(mapDraft);
 }
+
+/**
+ * Batched open drafts for an already-scoped person id set (Story 9.6).
+ * Forbidden: N+1 `listOpenDraftsForPerson` per person.
+ */
+export async function listOpenDraftsForPersons(
+  personIds: string[],
+  opts: { take?: number; db?: PrismaClient } = {},
+): Promise<PersonnelEventDraftRecord[]> {
+  const db = opts.db ?? getPersonDb();
+  const unique = [
+    ...new Set(
+      personIds.map((id) => id.trim()).filter((id) => id.length > 0),
+    ),
+  ];
+  if (unique.length === 0) return [];
+  const take =
+    opts.take != null && Number.isFinite(opts.take) && opts.take > 0
+      ? Math.floor(opts.take)
+      : undefined;
+  const rows = await db.personnelEventDraft.findMany({
+    where: {
+      personId: { in: unique },
+      status: { in: ["open", "pending_review"] },
+    },
+    orderBy: { updatedAt: "desc" },
+    ...(take != null ? { take } : {}),
+  });
+  return rows.map(mapDraft);
+}
+
+/** Batch load drafts by id (UI pagination continuation). */
+export async function listDraftsByIds(
+  draftIds: string[],
+  db: PrismaClient = getPersonDb(),
+): Promise<PersonnelEventDraftRecord[]> {
+  const unique = [
+    ...new Set(
+      draftIds.map((id) => id.trim()).filter((id) => id.length > 0),
+    ),
+  ];
+  if (unique.length === 0) return [];
+  const rows = await db.personnelEventDraft.findMany({
+    where: { id: { in: unique } },
+  });
+  return rows.map(mapDraft);
+}

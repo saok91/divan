@@ -95,6 +95,15 @@ assert.doesNotMatch(
   /Soft-fail \(\§6\): a bind failure must not block/,
 );
 
+const eventSearchSrc = readFileSync(
+  join(here, "./personnel-event-search.ts"),
+  "utf8",
+);
+assert.match(eventSearchSrc, /beginEvaluationSnapshot/);
+assert.match(eventSearchSrc, /kind:\s*["']pagination["']/);
+assert.match(eventSearchSrc, /EVAL_SNAPSHOT_REF_CHANGED/);
+assert.match(eventSearchSrc, /personnel_event_search/);
+
 const panelSrc = readFileSync(
   join(here, "../../components/personnel/personnel-list-panel.tsx"),
   "utf8",

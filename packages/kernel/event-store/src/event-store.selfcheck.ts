@@ -15,6 +15,8 @@ import {
   appendAccessEvent,
   appendBusinessEvent,
   BusinessEventValidationError,
+  listBusinessEventsByIds,
+  listBusinessEventsForPersons,
   withTransaction,
 } from "./index";
 
@@ -252,6 +254,115 @@ async function main() {
       false,
       "no deleteBusinessEvent API",
     );
+
+    // --- Story 9.6: multi-person UI list order + person scope + limit clamp ---
+    const personA = randomUUID();
+    const personB = randomUUID();
+    const personC = randomUUID();
+    const actor = "clselfcheck000000000000001";
+    const mk = async (
+      personId: string,
+      eventType: string,
+      effectiveDate: string,
+      registeredAt: Date,
+    ) => {
+      const { id } = await appendBusinessEvent(pool, {
+        correlationId: randomUUID(),
+        eventType,
+        personId,
+        effectiveDate,
+        registeredBy: actor,
+        registeredAt,
+        status: "Effective",
+        finalizedBy: actor,
+        finalizedAt: registeredAt,
+      });
+      return id;
+    };
+    const idLate = await mk(
+      personA,
+      "TransferRecorded",
+      "2026-07-20",
+      new Date("2026-07-21T10:00:00.000Z"),
+    );
+    const idMid = await mk(
+      personB,
+      "EmploymentStarted",
+      "2026-07-15",
+      new Date("2026-07-16T10:00:00.000Z"),
+    );
+    const idEarly = await mk(
+      personA,
+      "CompensationChanged",
+      "2026-07-01",
+      new Date("2026-07-02T10:00:00.000Z"),
+    );
+    // Out of scope person — must never appear when not in personIds
+    await mk(
+      personC,
+      "EmploymentTerminated",
+      "2026-07-25",
+      new Date("2026-07-26T10:00:00.000Z"),
+    );
+
+    const listed = await listBusinessEventsForPersons(pool, [personA, personB], {
+      limit: 10,
+    });
+    assert.equal(listed.truncated, false);
+    assert.deepEqual(
+      listed.rows.map((r) => r.id),
+      [idLate, idMid, idEarly],
+      "UI order: effective_date DESC, registered_at DESC, event_type ASC, id DESC",
+    );
+    assert.ok(
+      listed.rows.every((r) => r.personId === personA || r.personId === personB),
+    );
+    assert.equal(
+      listed.rows.some((r) => r.personId === personC),
+      false,
+      "unscoped person must not appear",
+    );
+
+    const emptyScope = await listBusinessEventsForPersons(pool, [], {
+      limit: 10,
+    });
+    assert.deepEqual(emptyScope.rows, []);
+    assert.equal(emptyScope.truncated, false);
+
+    const typeFiltered = await listBusinessEventsForPersons(
+      pool,
+      [personA, personB],
+      { eventTypes: ["TransferRecorded"], limit: 10 },
+    );
+    assert.deepEqual(
+      typeFiltered.rows.map((r) => r.id),
+      [idLate],
+    );
+
+    const clamped = await listBusinessEventsForPersons(pool, [personA, personB], {
+      limit: 1,
+    });
+    assert.equal(clamped.rows.length, 1);
+    assert.equal(clamped.truncated, true);
+    assert.equal(clamped.rows[0]?.id, idLate);
+
+    const whitespaceTypes = await listBusinessEventsForPersons(
+      pool,
+      [personA, personB],
+      { eventTypes: ["  ", "\t"], limit: 10 },
+    );
+    assert.deepEqual(whitespaceTypes.rows, []);
+    assert.equal(whitespaceTypes.truncated, false);
+
+    const byIds = await listBusinessEventsByIds(pool, [
+      idLate,
+      idEarly,
+      randomUUID(),
+    ]);
+    assert.equal(byIds.length, 2);
+    assert.ok(byIds.some((r) => r.id === idLate));
+    assert.ok(byIds.some((r) => r.id === idEarly));
+    assert.deepEqual(await listBusinessEventsByIds(pool, []), []);
 
     console.log("event-store.selfcheck: ok");
   } finally {

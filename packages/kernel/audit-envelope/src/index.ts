@@ -474,6 +474,44 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       action: "write",
       organizationalScope: "org:selfcheck",
     },
+    // Story 4.2–4.3 / 9.6 — personnel event draft/finalize/lifecycle
+    // (PermissionSet seed alone is insufficient; envelope needs exact tuples.)
+    {
+      permission: "personnel_event.draft",
+      dataCategory: "identity.person",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "personnel_event.draft",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "personnel_event.finalize",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "personnel_event.cancel",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "personnel_event.reverse",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
+    {
+      permission: "personnel_event.correct",
+      dataCategory: "identity.person",
+      action: "write",
+      organizationalScope: "org:selfcheck",
+    },
     // Story 3.5 — Organization hierarchy (coarse role is never an allow key)
     {
       permission: "organization.read",

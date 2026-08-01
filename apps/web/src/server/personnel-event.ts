@@ -52,6 +52,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { assertPersonInScopedPopulation } from "./personnel-scoped-search";
+import {
+  runPersonnelEventSearch,
+  type PersonnelEventSearchResult,
+} from "./personnel-event-search";
 import { ensureRecalcEnqueueRegistered } from "./recalc-enqueue";
 import { createTRPCRouter, governedProcedure } from "./trpc";
 
@@ -497,6 +501,75 @@ export const personnelEventRouter = createTRPCRouter({
               corrections: links.corrections.map((e) => e.id),
             },
           };
+        });
+      } catch (err) {
+        mapPersonnelEventError(err);
+      }
+    }),
+
+  /**
+   * Org-wide permission-safe event catalogue (Story 9.6).
+   * Does not replace listForPerson (timeline SoT).
+   */
+  search: governedProcedure
+    .meta({ ...draftReadMeta, operation: "personnel_event.search" })
+    .input(
+      z
+        .object({
+          page: z.number().int().min(1).optional(),
+          pageSize: z.number().int().min(1).max(100).optional(),
+          evaluationSnapshotId: z.string().min(1).optional(),
+          eventTypes: z.array(z.string().min(1)).max(32).optional(),
+          statuses: z
+            .array(
+              z.enum([
+                "Draft",
+                "Scheduled",
+                "Effective",
+                "Cancelled",
+                "Reversed",
+              ]),
+            )
+            .max(8)
+            .optional(),
+          effectiveFrom: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional(),
+          effectiveTo: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional(),
+          teamId: z.string().uuid().optional(),
+          personId: z.string().uuid().optional(),
+        })
+        .refine(
+          (v) =>
+            !v.effectiveFrom ||
+            !v.effectiveTo ||
+            v.effectiveFrom <= v.effectiveTo,
+          {
+            message: "effectiveFrom must be on or before effectiveTo",
+            path: ["effectiveTo"],
+          },
+        )
+        .optional(),
+    )
+    .query(async ({ ctx, input }): Promise<PersonnelEventSearchResult> => {
+      try {
+        return await runPersonnelEventSearch({
+          actorAccountId: ctx.session.accountId,
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          correlationId: ctx.correlationId,
+          page: input?.page,
+          pageSize: input?.pageSize,
+          evaluationSnapshotId: input?.evaluationSnapshotId,
+          eventTypes: input?.eventTypes,
+          statuses: input?.statuses,
+          effectiveFrom: input?.effectiveFrom,
+          effectiveTo: input?.effectiveTo,
+          teamId: input?.teamId,
+          personId: input?.personId,
         });
       } catch (err) {
         mapPersonnelEventError(err);

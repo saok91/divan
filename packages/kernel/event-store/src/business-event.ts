@@ -631,6 +631,148 @@ export async function listBusinessEventsForPerson(
   return result.rows.map(mapBusinessRow);
 }
 
+/** UI catalogue order twin of `listBusinessEventsForPerson` — never ForApply. */
+const UI_LIST_ORDER_BY =
+  "effective_date DESC, registered_at DESC, event_type ASC, id DESC";
+
+/** Hard clamp for org-wide UI catalogue (Story 9.6) — never unbounded. */
+export const BUSINESS_EVENTS_UI_LIST_LIMIT_DEFAULT = 500;
+export const BUSINESS_EVENTS_UI_LIST_LIMIT_MAX = 500;
+
+export type ListBusinessEventsForPersonsOpts = {
+  eventTypes?: string[];
+  /** Storage-column status filter (optional). Resolved-lifecycle filter is caller's job. */
+  storageStatuses?: BusinessEventStatus[];
+  /** Inclusive date-only YYYY-MM-DD. */
+  effectiveFrom?: string;
+  /** Inclusive date-only YYYY-MM-DD. */
+  effectiveTo?: string;
+  /** Hard clamp; default/max 500. */
+  limit?: number;
+};
+
+/**
+ * Org-wide UI catalogue over an **already-scoped** person id set (Story 9.6).
+ * Caller must not pass unscoped ids. Empty personIds → empty (never SELECT all).
+ * Sort: UI DESC twin of person list — never reuse ForApply order.
+ */
+export async function listBusinessEventsForPersons(
+  db: PgQueryable,
+  personIds: string[],
+  opts: ListBusinessEventsForPersonsOpts = {},
+): Promise<{ rows: BusinessEventRecord[]; truncated: boolean }> {
+  const unique = [
+    ...new Set(
+      personIds.map((id) => id.trim()).filter((id) => id.length > 0),
+    ),
+  ];
+  for (const id of unique) {
+    assertUuid("personId", "invalid_person_id", id);
+  }
+  if (unique.length === 0) {
+    return { rows: [], truncated: false };
+  }
+
+  const limit = Math.min(
+    Math.max(opts.limit ?? BUSINESS_EVENTS_UI_LIST_LIMIT_DEFAULT, 1),
+    BUSINESS_EVENTS_UI_LIST_LIMIT_MAX,
+  );
+
+  const params: unknown[] = [unique];
+  const clauses: string[] = [
+    `event_class = 'business'`,
+    `person_id = ANY($1::uuid[])`,
+  ];
+
+  if (opts.eventTypes && opts.eventTypes.length > 0) {
+    const types = [
+      ...new Set(
+        opts.eventTypes.map((t) => t.trim()).filter((t) => t.length > 0),
+      ),
+    ];
+    if (types.length === 0) {
+      // Caller passed only whitespace — treat as empty filter hit, not unfiltered.
+      return { rows: [], truncated: false };
+    }
+    for (const t of types) {
+      assertValidBusinessEventType(t);
+    }
+    params.push(types);
+    clauses.push(`event_type = ANY($${params.length}::text[])`);
+  }
+
+  if (opts.storageStatuses && opts.storageStatuses.length > 0) {
+    const statuses = [...new Set(opts.storageStatuses)];
+    params.push(statuses);
+    clauses.push(`status = ANY($${params.length}::text[])`);
+  }
+
+  const from = opts.effectiveFrom?.trim();
+  if (from) {
+    const parsed = parseDateOnly(from);
+    if (!parsed.ok) {
+      throw new BusinessEventValidationError(
+        "invalid_effective_date",
+        `effectiveFrom must be YYYY-MM-DD (${parsed.reason})`,
+      );
+    }
+    params.push(parsed.value);
+    clauses.push(`effective_date >= $${params.length}::date`);
+  }
+
+  const to = opts.effectiveTo?.trim();
+  if (to) {
+    const parsed = parseDateOnly(to);
+    if (!parsed.ok) {
+      throw new BusinessEventValidationError(
+        "invalid_effective_date",
+        `effectiveTo must be YYYY-MM-DD (${parsed.reason})`,
+      );
+    }
+    params.push(parsed.value);
+    clauses.push(`effective_date <= $${params.length}::date`);
+  }
+
+  params.push(limit + 1);
+  const result = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE ${clauses.join(" AND ")}
+     ORDER BY ${UI_LIST_ORDER_BY}
+     LIMIT $${params.length}`,
+    params,
+  );
+  const truncated = result.rows.length > limit;
+  const rows = (truncated ? result.rows.slice(0, limit) : result.rows).map(
+    mapBusinessRow,
+  );
+  return { rows, truncated };
+}
+
+/**
+ * Batch load business events by id (UI pagination continuation).
+ * Preserves no caller order — caller reorders against frozen membership.
+ */
+export async function listBusinessEventsByIds(
+  db: PgQueryable,
+  eventIds: string[],
+): Promise<BusinessEventRecord[]> {
+  const unique = [
+    ...new Set(
+      eventIds.map((id) => id.trim()).filter((id) => id.length > 0),
+    ),
+  ];
+  for (const id of unique) {
+    assertUuid("eventId", "invalid_event_id", id);
+  }
+  if (unique.length === 0) return [];
+  const result = await db.query<KernelBusinessRow>(
+    `SELECT ${BUSINESS_SELECT} FROM kernel_events
+     WHERE event_class = 'business' AND id = ANY($1::uuid[])`,
+    [unique],
+  );
+  return result.rows.map(mapBusinessRow);
+}
+
 /**
  * Authoritative apply / reconstruct load order (Story 4.4 / FR-18).
  * SQL twin of `@divan/temporal-engine` `orderBusinessEventsForApply` —

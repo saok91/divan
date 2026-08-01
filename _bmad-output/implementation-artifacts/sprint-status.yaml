@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-08-02T00:50:00+03:30
+# last_updated: 2026-08-02T01:35:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-08-02T00:50:00+03:30
+last_updated: 2026-08-02T01:30:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -156,7 +156,7 @@ development_status:
   9-3-bulk-entry-personnel-events-headcount: done
   9-4-capacity-hiring-ia-restructure: done
   9-5-reports-section-tabs-workspace: done
-  9-6-personnel-events-list-real-data: backlog
+  9-6-personnel-events-list-real-data: done
   9-7-profile-access-cross-surface-drill-through: backlog
   9-8-governance-surface-discoverability: backlog
   9-9-no-dead-end-ia-gate: backlog
@@ -537,7 +537,7 @@ action_items:
   - epic: 8
     action: "Implement personnel-events list rowActions per 8.7 deferral in Story 9.6"
     owner: "Amelia + Sally"
-    status: open
+    status: done
   - epic: 8
     action: "Prefer batched identity DTOs when expanding correction/audit-style lists (retire per-row hydrate fan-out)"
     owner: "Amelia + Winston"

@@ -487,6 +487,19 @@ export async function getPersonById(
   return row ? mapPerson(row) : null;
 }
 
+/** Batched person hydrate — never N+1 `getPersonById` per row (Story 9.6). */
+export async function getPersonsByIds(
+  ids: string[],
+  db: PrismaClient = getPersonDb(),
+): Promise<PersonRecord[]> {
+  const unique = [
+    ...new Set(ids.map((id) => id.trim()).filter((id) => id.length > 0)),
+  ];
+  if (unique.length === 0) return [];
+  const rows = await db.person.findMany({ where: { id: { in: unique } } });
+  return rows.map(mapPerson);
+}
+
 export async function getPersonByPersonnelCode(
   personnelCode: string,
   db: PrismaClient = getPersonDb(),

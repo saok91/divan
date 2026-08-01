@@ -733,3 +733,8 @@
 ## Deferred from: code review of 9-2-shared-bulk-entry-flow.md (2026-08-01)
 
 - Day-to-day selfcheck never exercises composed tRPC promote?commit failure/retry path ? domain selfcheck covers in-process commit; expand when integration/tRPC composition tests are added for migration
+
+## Deferred from: code review of 9-6-personnel-events-list-real-data.md (2026-08-02)
+
+- `actorPermissionFingerprint` hashes PermissionSet only (not `organizationalScopeCodes`) — mirrors Story 5.1 `personnel-scoped-search`; scope shrink on continuation does not invalidate snapshot membership
+- Missing `DATABASE_URL` / event pool mapped to `outcome: "denied"` + `accessDeniedTitle` — same fail-closed messaging pattern as person search; infra vs access distinction deferred

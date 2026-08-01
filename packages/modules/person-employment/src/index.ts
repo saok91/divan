@@ -183,6 +183,7 @@ export {
   createPerson,
   updatePersonIdentity,
   getPersonById,
+  getPersonsByIds,
   getPersonByPersonnelCode,
   listPersons,
   listPersonsForScopedSearch,
@@ -586,6 +587,8 @@ export {
   updateDraft,
   deleteDraft,
   listOpenDraftsForPerson,
+  listOpenDraftsForPersons,
+  listDraftsByIds,
   assertDraftEditable,
   stripClientTrustedHeadcountOverrideFields,
 } from "./personnel-event-draft";

@@ -224,6 +224,14 @@ const mandatoryConsumers: { rel: string; needle: RegExp }[] = [
     needle: /onRowClick/,
   },
   {
+    rel: "components/personnel/personnel-events-list-panel.tsx",
+    needle: /RowActionCluster/,
+  },
+  {
+    rel: "components/personnel/personnel-events-list-panel.tsx",
+    needle: /onRowClick/,
+  },
+  {
     rel: "components/access/access-people-panel.tsx",
     needle: /RowActionCluster/,
   },
