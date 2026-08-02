@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-08-03T00:30:00+03:30
+# last_updated: 2026-08-03T00:45:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,13 +41,13 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-08-03T00:30:00+03:30
+last_updated: 2026-08-03T00:45:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
-# Epic 8 retrospective → done 2026-07-31 (experience foundation closed; Epic 9 prep encodes)
+# Epic 9 retrospective → done 2026-08-03 (operational surfaces + IA closed; Epic 10 prep encodes)
 
 development_status:
   epic-1: done
@@ -161,7 +161,7 @@ development_status:
   9-8-governance-surface-discoverability: done
   9-9-no-dead-end-ia-gate: done
   9-10-dashboard-report-visual-quality: done
-  epic-9-retrospective: optional
+  epic-9-retrospective: done
 
   epic-10: backlog
   10-1-governed-settings-registry-store: backlog
@@ -530,18 +530,22 @@ action_items:
     action: "Close FeedbackMessage / PendingSurface adoption on panels touched in Epic 9"
     owner: "Amelia + Sally"
     status: open
+    note: "Epic 9 retro — closed on rewritten panels; long-tail ops/audit raw <p> still open; succeeded by Epic 9 action #4"
   - epic: 8
     action: "Migrate residual 8.2 typography hotspots when next touching those panels"
     owner: "Amelia + Sally"
     status: open
+    note: "Epic 9 retro — not systematically closed; succeeded by Epic 9 action #5"
   - epic: 8
     action: "Implement personnel-events list rowActions per 8.7 deferral in Story 9.6"
     owner: "Amelia + Sally"
     status: done
+    resolved_in: "9-6-personnel-events-list-real-data.md (RowActionCluster + leave-guard honesty)"
   - epic: 8
     action: "Prefer batched identity DTOs when expanding correction/audit-style lists (retire per-row hydrate fan-out)"
     owner: "Amelia + Winston"
-    status: open
+    status: in-progress
+    note: "Epic 9.6 batched person hydrate; correction/audit N+1 still open; succeeded by Epic 9 action #7"
   - epic: 8
     action: "Revisit Button forwardRef if Tooltip/overflow focus bugs reproduce on new row actions"
     owner: "Amelia"
@@ -549,8 +553,50 @@ action_items:
   - epic: 8
     action: "Keep AR-* fail-closed; do not invent freeze numbers; Epic 9 remains presentation/IA over unchanged domain rules"
     owner: "Mary + John"
-    status: open
+    status: done
+    resolved_in: "Epic 9 Gates 9.1–9.10 held fail-closed (presentation/IA); succeeded by Epic 9 AR fail-closed for Epic 10"
   - epic: 8
     action: "Carry forward still-open Epic 7 production-honesty and security items (SoD, list IDOR, AD-6, Baseline projector, PopulationPort, mutation IDOR, Vitest, leave-guard logout, person-create dedupe, enforcement-matrix DoD, honesty boundary doc)"
+    owner: "Winston / Amelia+Sally / Paige+Winston / Mary"
+    status: open
+  - epic: 9
+    action: "Mark epic-9-retrospective done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-9-retro-2026-08-03.md + sprint-status epic-9/epic-9-retrospective"
+  - epic: 9
+    action: "Encode into Story 10.1+ create-story: mandatory selfcheck:design-qa; registry/resolver fail-closed + FR45; first-touch FeedbackMessage / FormLayout / EntityPicker; wave-1 must not widen permission/retention/export/audit boundaries; Settings nav must satisfy no-dead-end once introduced"
+    owner: "Amelia + Winston + Sally"
+    status: open
+  - epic: 9
+    action: "Publish Settings amendment to product ownership note for Epic 10 kickoff"
+    owner: "Paige + Sally + Mary"
+    status: open
+  - epic: 9
+    action: "Close FeedbackMessage / PendingSurface adoption on settings and any ops/audit panels touched in Epic 10"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 9
+    action: "Migrate residual typography hotspots when next touching those panels"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 9
+    action: "Encode deep-link / one-shot URL hydrate + cascade-clear kit notes into Story 10.2 settings tab routing"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 9
+    action: "Prefer batched identity DTOs when expanding correction/audit/settings-adjacent lists"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 9
+    action: "Document PE/HC bulk multi-row atomicity honesty boundary (or named architecture follow-up) before treating day-to-day bulk as launch-critical"
+    owner: "Winston + Amelia + Mary"
+    status: open
+  - epic: 9
+    action: "Keep AR-* fail-closed; do not invent freeze numbers; Epic 10 must not claim LG-complete while Epic 7 carry-ins remain open"
+    owner: "Mary + John"
+    status: open
+  - epic: 9
+    action: "Carry forward still-open Epic 7/8 production-honesty and security items (SoD, list IDOR, AD-6, Baseline projector, PopulationPort, mutation IDOR, Vitest, leave-guard logout, person-create dedupe, enforcement-matrix DoD, honesty boundary doc, Button forwardRef, composed tRPC authorize selfchecks)"
     owner: "Winston / Amelia+Sally / Paige+Winston / Mary"
     status: open
