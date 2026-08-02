@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS reporting.export_artifact (
   scope_json              JSONB NOT NULL,
   field_ids               JSONB NOT NULL,
   source_surface          TEXT NOT NULL
-                            CHECK (source_surface IN ('report', 'personnel_list')),
+                            CHECK (source_surface IN ('report', 'personnel_list', 'settings_inventory')),
   source_key              TEXT,
   filters_snapshot        JSONB NOT NULL,
   snapshot_hash           TEXT NOT NULL,

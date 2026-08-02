@@ -8,6 +8,19 @@ import type {
   SettingsScalar,
 } from "./types";
 
+/** Banned fragments for registry key / allowlist hygiene (Story 10.4). */
+const BANNED_REGISTRY_SECRET_FRAGMENTS = [
+  "password",
+  "secret",
+  "token",
+  "private_key",
+  "connection_string",
+  "database_url",
+  "bind_password",
+  "tls_ca",
+  "bind_dn",
+] as const;
+
 const CORRECTION_ATTACHMENT_ALLOWLIST = [
   "pdf",
   "png",
@@ -318,6 +331,289 @@ export const GOVERNED_SETTINGS_REGISTRY = [
     blastRadiusFa: "جابه‌جایی حالت هویت مسیر ورود و وابستگی به LDAP را عوض می‌کند.",
     boundaryClass: "security_posture",
   },
+  // --- Story 10.4 RO infrastructure / security inventory (non-secret) ---
+  {
+    key: "identity.ldap_configured",
+    labelFa: "پیکربندی LDAP",
+    descriptionFa:
+      "آیا متغیرهای لازم LDAP برای اتصال تنظیم شده‌اند (بدون نمایش URL/رمز).",
+    valueType: "boolean",
+    unitFa: null,
+    range: null,
+    allowlist: null,
+    defaultValue: false,
+    editability: "read_only_with_evidence",
+    owningDomain: "infrastructure",
+    changePathFa:
+      "فقط با استقرار Infra و تنظیم متغیرهای LDAP؛ از این سطح قابل تغییر نیست.",
+    highImpact: true,
+    blastRadiusFa: "فعال‌سازی LDAP مسیر احراز هویت را وابسته به دایرکتوری می‌کند.",
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "identity.ldap_url_scheme",
+    labelFa: "طرح URL دایرکتوری LDAP",
+    descriptionFa: "فقط طرح اتصال (ldap|ldaps|unset) — بدون افشای میزبان یا اعتبارنامه.",
+    valueType: "string",
+    unitFa: null,
+    range: null,
+    allowlist: ["ldap", "ldaps", "unset"],
+    defaultValue: "unset",
+    editability: "read_only_with_evidence",
+    owningDomain: "infrastructure",
+    changePathFa:
+      "تغییر طرح از طریق LDAP_URL در استقرار Infra؛ ادمین اپلیکیشن ویرایش نمی‌کند.",
+    highImpact: true,
+    blastRadiusFa: "جابه‌جایی ldap↔ldaps الزامات TLS را عوض می‌کند.",
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "identity.ldap_tls_reject_unauthorized",
+    labelFa: "رد گواهی TLS نامعتبر LDAP",
+    descriptionFa:
+      "وضعیت rejectUnauthorized برای TLS دایرکتوری (پیش‌فرض true مگر صریحاً false).",
+    valueType: "boolean",
+    unitFa: null,
+    range: null,
+    allowlist: null,
+    defaultValue: true,
+    editability: "read_only_with_evidence",
+    owningDomain: "infrastructure",
+    changePathFa:
+      "تغییر از طریق LDAP_TLS_REJECT_UNAUTHORIZED در استقرار Infra؛ بدون ویرایش ادمین.",
+    highImpact: true,
+    blastRadiusFa: "خاموش کردن رد گواهی نامعتبر سطح اعتماد TLS را کاهش می‌دهد.",
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "identity.ldap_connect_timeout_ms",
+    labelFa: "مهلت اتصال LDAP",
+    descriptionFa: "مهلت اتصال به دایرکتوری بر حسب میلی‌ثانیه.",
+    valueType: "number",
+    unitFa: "میلی‌ثانیه",
+    range: { min: 100, max: 120_000 },
+    allowlist: null,
+    defaultValue: 10_000,
+    editability: "read_only_with_evidence",
+    owningDomain: "infrastructure",
+    changePathFa:
+      "تغییر از طریق LDAP_CONNECT_TIMEOUT_MS در استقرار Infra؛ بدون ویرایش ادمین.",
+    highImpact: false,
+    blastRadiusFa: null,
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "identity.ldap_create_mapping_mode",
+    labelFa: "حالت نگاشت ایجاد حساب LDAP",
+    descriptionFa:
+      "آیا نگاشت create-on-first-login پیکربندی شده (forbidden|mapped) — بدون افشای محتوا.",
+    valueType: "string",
+    unitFa: null,
+    range: null,
+    allowlist: ["forbidden", "mapped"],
+    defaultValue: "forbidden",
+    editability: "read_only_with_evidence",
+    owningDomain: "infrastructure",
+    changePathFa:
+      "تغییر از طریق LDAP_CREATE_MAPPING_JSON در استقرار Infra؛ بدون ویرایش ادمین.",
+    highImpact: true,
+    blastRadiusFa: "فعال‌سازی mapped اجازهٔ ایجاد حساب هنگام اولین ورود را می‌دهد.",
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.inference_bulk_enabled",
+    labelFa: "فعال بودن کنترل حجم استنتاج",
+    descriptionFa:
+      "وضعیت موثر قلاب‌های inference/bulk (موقت DEMO تا انجماد AR-ACCESS) — نه مبنای پرتاب.",
+    valueType: "boolean",
+    unitFa: null,
+    range: null,
+    allowlist: null,
+    defaultValue: true,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "تغییر از طریق AUDIT_INFERENCE_BULK_ENABLED و NODE_ENV در استقرار؛ فقط با استقرار قابل تغییر است.",
+    highImpact: true,
+    blastRadiusFa: "خاموش کردن قلاب‌ها مسیرهای حفاظت‌شده را fail-closed می‌کند.",
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.inference_bulk_min_cohort",
+    labelFa: "حداقل اندازهٔ هم‌گروه استنتاج",
+    descriptionFa:
+      "آستانهٔ DEMO/DISABLED برای small-cohort — مقادیر انجماد AR-REPORTING نیست.",
+    valueType: "number",
+    unitFa: "عدد",
+    range: { min: 0, max: Number.MAX_SAFE_INTEGER },
+    allowlist: null,
+    defaultValue: 3,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "آستانه‌ها فقط با استقرار/انتشار کد قلاب‌های audit-envelope تغییر می‌کنند.",
+    highImpact: true,
+    blastRadiusFa: "کاهش آستانه سرکوب هم‌گروه کوچک را شل می‌کند.",
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.inference_bulk_max_volume_per_request",
+    labelFa: "سقف حجم درخواست استنتاج",
+    descriptionFa: "سقف DEMO/DISABLED حجم در هر درخواست — نه عدد انجماد AR-ACCESS.",
+    valueType: "number",
+    unitFa: "عدد",
+    range: { min: 0, max: 1_000_000 },
+    allowlist: null,
+    defaultValue: 10,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "آستانه‌ها فقط با استقرار/انتشار کد قلاب‌های audit-envelope تغییر می‌کنند.",
+    highImpact: true,
+    blastRadiusFa: null,
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.inference_bulk_max_volume_per_window",
+    labelFa: "سقف حجم پنجرهٔ استنتاج",
+    descriptionFa: "سقف DEMO/DISABLED حجم در پنجرهٔ زمانی — نه عدد انجماد AR-ACCESS.",
+    valueType: "number",
+    unitFa: "عدد",
+    range: { min: 0, max: 1_000_000 },
+    allowlist: null,
+    defaultValue: 20,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "آستانه‌ها فقط با استقرار/انتشار کد قلاب‌های audit-envelope تغییر می‌کنند.",
+    highImpact: true,
+    blastRadiusFa: null,
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.trust_enforce",
+    labelFa: "اجبار پیکربندی اعتماد ممیزی",
+    descriptionFa:
+      "اگر فعال باشد، نبود آستانه‌های اعتماد fail-closed است (موقت تا انجماد AR-AUDIT).",
+    valueType: "boolean",
+    unitFa: null,
+    range: null,
+    allowlist: null,
+    defaultValue: false,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "تغییر از طریق DIVAN_AUDIT_TRUST_ENFORCE در استقرار Infra؛ فقط با استقرار قابل تغییر است.",
+    highImpact: true,
+    blastRadiusFa: "فعال‌سازی enforce بدون knobs کامل سامانه را fail-closed می‌کند.",
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.trust_max_clock_skew_ms",
+    labelFa: "حداکثر انحراف ساعت اعتماد ممیزی",
+    descriptionFa: "حد |ساعت اپ − ساعت DB| قبل از ناهنجاری ساعت (موقت).",
+    valueType: "number",
+    unitFa: "میلی‌ثانیه",
+    range: { min: 1, max: 24 * 60 * 60 * 1000 },
+    allowlist: null,
+    defaultValue: 120_000,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "تغییر از طریق DIVAN_AUDIT_TRUST_MAX_CLOCK_SKEW_MS در استقرار؛ بدون ویرایش ادمین.",
+    highImpact: true,
+    blastRadiusFa: null,
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.trust_verification_window_hours",
+    labelFa: "پنجرهٔ تأیید یکپارچگی ممیزی",
+    descriptionFa: "پنجرهٔ lookback تأیید یکپارچگی بر حسب ساعت (موقت).",
+    valueType: "number",
+    unitFa: "ساعت",
+    range: { min: 1, max: 24 * 30 },
+    allowlist: null,
+    defaultValue: 24,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "تغییر از طریق DIVAN_AUDIT_TRUST_VERIFICATION_WINDOW_HOURS در استقرار؛ بدون ویرایش ادمین.",
+    highImpact: true,
+    blastRadiusFa: null,
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.trust_suspend_ttl_ms",
+    labelFa: "عمر تعلیق اعتماد ممیزی",
+    descriptionFa:
+      "TTL تعلیق خودکار؛ ۰ یعنی بدون انقضای خودکار (معادل none).",
+    valueType: "number",
+    unitFa: "میلی‌ثانیه",
+    range: { min: 0, max: 30 * 24 * 60 * 60 * 1000 },
+    allowlist: null,
+    defaultValue: 0,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "تغییر از طریق DIVAN_AUDIT_TRUST_SUSPEND_TTL_MS در استقرار؛ بدون ویرایش ادمین.",
+    highImpact: false,
+    blastRadiusFa: null,
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "audit.envelope_category_count",
+    labelFa: "تعداد دستهٔ ثبت‌شدهٔ پاکت ممیزی",
+    descriptionFa:
+      "تعداد شناسه‌های دسته در رجیستری کد (وضعیت مسیر دسته — بدون ویرایش موازی).",
+    valueType: "number",
+    unitFa: "عدد",
+    range: { min: 0, max: 10_000 },
+    allowlist: null,
+    defaultValue: 25,
+    editability: "read_only_with_evidence",
+    owningDomain: "audit_integrity",
+    changePathFa:
+      "فقط با استقرار/انتشار کد categories در audit-envelope قابل تغییر است.",
+    highImpact: false,
+    blastRadiusFa: null,
+    boundaryClass: "security_posture",
+  },
+  {
+    key: "infra.pg_pool_max",
+    labelFa: "حداکثر اتصال استخر Postgres",
+    descriptionFa:
+      "سقف اتصال استخر اشتراکی pg — بدون نمایش رشتهٔ اتصال. بدون DIVAN_PG_POOL_MAX مقدار مؤثر در توسعه ۵ و در تولید ۱۰ است (هم‌تراز defaultPoolMax).",
+    valueType: "number",
+    unitFa: "اتصال",
+    range: { min: 1, max: 200 },
+    allowlist: null,
+    defaultValue: 5,
+    editability: "read_only_with_evidence",
+    owningDomain: "infrastructure",
+    changePathFa:
+      "تغییر از طریق DIVAN_PG_POOL_MAX در استقرار Infra و راه‌اندازی مجدد فرایند؛ بدون ویرایش ادمین.",
+    highImpact: true,
+    blastRadiusFa: "افزایش سقف فشار روی max_connections پایگاه را بالا می‌برد.",
+    boundaryClass: "operational",
+  },
+  {
+    key: "infra.baseline_boundary_date",
+    labelFa: "تاریخ مرز Baseline",
+    descriptionFa:
+      "تاریخ فقط‌روز مرز Baseline؛ unset یعنی پیکربندی نشده (بدون epoch جعلی).",
+    valueType: "string",
+    unitFa: null,
+    range: null,
+    allowlist: null,
+    defaultValue: "unset",
+    editability: "read_only_with_evidence",
+    owningDomain: "infrastructure",
+    changePathFa:
+      "تغییر از طریق DIVAN_BASELINE_BOUNDARY_DATE در استقرار Infra؛ بدون ویرایش ادمین.",
+    highImpact: true,
+    blastRadiusFa: "جابه‌جایی مرز سیاست تداخل رویدادهای پیش از مرز را عوض می‌کند.",
+    boundaryClass: "operational",
+  },
 ] as const satisfies readonly SettingsParameterDefinition[];
 
 export type GovernedSettingsKey =
@@ -343,7 +639,9 @@ export class GovernedSettingsError extends Error {
 }
 
 export function requireGovernedSettingsRegistry(): readonly SettingsParameterDefinition[] {
-  for (const def of GOVERNED_SETTINGS_REGISTRY as readonly SettingsParameterDefinition[]) {
+  const defs =
+    GOVERNED_SETTINGS_REGISTRY as readonly SettingsParameterDefinition[];
+  for (const def of defs) {
     if (
       def.editability === "read_only_with_evidence" &&
       (def.changePathFa == null || def.changePathFa.trim() === "")
@@ -361,6 +659,23 @@ export function requireGovernedSettingsRegistry(): readonly SettingsParameterDef
         "SETTINGS_INVALID_DEFINITION",
         `پارامتر امنیتی باید فقط‌خواندنی باشد: ${def.key}`,
       );
+    }
+    const keyLower = def.key.toLowerCase();
+    if (BANNED_REGISTRY_SECRET_FRAGMENTS.some((f) => keyLower.includes(f))) {
+      throw new GovernedSettingsError(
+        "SETTINGS_INVALID_DEFINITION",
+        `کلید شبیه secret در رجیستری: ${def.key}`,
+      );
+    }
+    if (def.allowlist) {
+      for (const item of def.allowlist) {
+        if (/PASSWORD|SECRET|DATABASE_URL|LDAP_TLS_CA|LDAP_BIND_PASSWORD/i.test(item)) {
+          throw new GovernedSettingsError(
+            "SETTINGS_INVALID_DEFINITION",
+            `allowlist شبیه secret برای ${def.key}`,
+          );
+        }
+      }
     }
   }
   return GOVERNED_SETTINGS_REGISTRY;

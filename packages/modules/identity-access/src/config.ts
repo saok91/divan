@@ -5,34 +5,62 @@ import {
   DEV_DEFAULT_IDLE_TIMEOUT_SECONDS,
   type CoarseRole,
 } from "./types";
+import {
+  isSettingsCacheWarmed,
+  parseIdentityProviderMode,
+  parseSessionTimeoutSeconds,
+  resolveSettingNumber,
+  resolveSettingString,
+} from "@divan/app-settings";
 
 /**
  * Active identity provider. Seeded is for local/dev/CI only.
  * Unknown values do NOT silently fall back to seeded (freeze: no silent seed path).
  * Returns null when IDENTITY_PROVIDER is set to an unsupported value.
+ *
+ * After settings warm: registered key via resolver (AD-7). Unknown env still null.
  */
 export function getIdentityProvider(
   env: NodeJS.ProcessEnv = process.env,
 ): IdentityProvider | null {
-  const raw = (env.IDENTITY_PROVIDER ?? "seeded").trim().toLowerCase();
-  if (raw === "ldap") return "ldap";
-  if (raw === "seeded") return "seeded";
-  return null;
+  const raw = env.IDENTITY_PROVIDER;
+  if (raw !== undefined && raw.trim() !== "") {
+    const parsed = parseIdentityProviderMode(raw);
+    if (parsed === null) return null;
+  }
+
+  if (isSettingsCacheWarmed()) {
+    const mode = resolveSettingString("identity.provider_mode").value;
+    if (mode === "ldap" || mode === "seeded") return mode;
+    return null;
+  }
+
+  const fallback = parseIdentityProviderMode(raw ?? "seeded");
+  return fallback;
 }
 
 /**
  * Session idle/absolute timeout hooks (NFR7 substrate).
- * Reads env; falls back to documented dev defaults — do not claim AR-IDENTITY compliance.
+ * After warm: resolver SoT for registered keys. Pre-warm: same binders as overlay.
  */
 export function getSessionTimeoutConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): SessionTimeoutConfig {
+  if (isSettingsCacheWarmed()) {
+    return {
+      idleTimeoutSeconds: resolveSettingNumber("session.idle_timeout_seconds")
+        .value,
+      absoluteTimeoutSeconds: resolveSettingNumber(
+        "session.absolute_timeout_seconds",
+      ).value,
+    };
+  }
   return {
-    idleTimeoutSeconds: parsePositiveInt(
+    idleTimeoutSeconds: parseSessionTimeoutSeconds(
       env.AUTH_SESSION_IDLE_TIMEOUT_SECONDS,
       DEV_DEFAULT_IDLE_TIMEOUT_SECONDS,
     ),
-    absoluteTimeoutSeconds: parsePositiveInt(
+    absoluteTimeoutSeconds: parseSessionTimeoutSeconds(
       env.AUTH_SESSION_ABSOLUTE_TIMEOUT_SECONDS,
       DEV_DEFAULT_ABSOLUTE_TIMEOUT_SECONDS,
     ),
@@ -42,6 +70,7 @@ export function getSessionTimeoutConfig(
 /**
  * LDAP connection settings — values come only from Infra/AR-IDENTITY sign-off.
  * Do not hardcode org topology. Missing/invalid required keys → treat as unavailable.
+ * Secrets stay on env — never registered in settings inventory.
  */
 export type LdapConfig = {
   url: string;

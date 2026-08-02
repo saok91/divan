@@ -1,3 +1,8 @@
+## Deferred from: code review of 10-4-readonly-infrastructure-security-inventory.md (2026-08-03)
+
+- Inventory/export selfchecks are mostly source-regex + warm — no real create/download/reauth/secret-byte exercise; deepen when export E2E harness exists.
+- Dual secret deny lists (`registry.ts` BANNED_REGISTRY_SECRET_FRAGMENTS vs `inventory-redaction.ts`) — consolidate on a later hygiene pass.
+
 ## Deferred from: code review of 10-3-editable-parameter-wave-1.md (2026-08-03)
 
 - Reuse of `SETTINGS_INVALID_DEFINITION` for invalid user-supplied values (vs bad registry definitions) — pre-existing error-code enum shape in app-settings; split codes later if ops/monitoring needs distinct signals.

@@ -14,12 +14,19 @@ type DivanDbGlobal = {
 
 const globalForDb = globalThis as typeof globalThis & DivanDbGlobal;
 
-function defaultPoolMax(): number {
-  const fromEnv = Number(process.env.DIVAN_PG_POOL_MAX);
+function defaultPoolMax(env: NodeJS.ProcessEnv = process.env): number {
+  const fromEnv = Number(env.DIVAN_PG_POOL_MAX);
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
   // Dev/Turbopack HMR used to spawn many module-local pools; keep the shared
   // process budget small so Postgres `max_connections` is not exhausted.
-  return process.env.NODE_ENV === "production" ? 10 : 5;
+  return env.NODE_ENV === "production" ? 10 : 5;
+}
+
+/** Pure helper for settings inventory binder (Story 10.4) — no pool required. */
+export function resolveDefaultPoolMax(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  return defaultPoolMax(env);
 }
 
 /**

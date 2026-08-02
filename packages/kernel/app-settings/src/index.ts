@@ -39,6 +39,7 @@ export {
 export {
   MSG_SETTINGS_CONFIG_DEGRADED_FA,
   MSG_SETTINGS_STORE_UNAVAILABLE_FA,
+  applyEnvironmentOverlay,
   getSettingsConfigurationDetailFa,
   getSettingsDegradedKeys,
   invalidateSettingsCache,
@@ -47,10 +48,12 @@ export {
   isSettingsStoreUnavailable,
   resetSettingsCacheForTests,
   resolveSetting,
+  resolveSettingBoolean,
   resolveSettingNumber,
   resolveSettingString,
   resolveSettingStringList,
   warmSettingsCache,
+  warmSettingsCacheFromEnvOnly,
 } from "./resolver";
 
 export {
@@ -58,6 +61,34 @@ export {
   invalidSettingsValueMessageFa,
   validateSettingsValue,
 } from "./validate";
+
+export {
+  ENV_BINDINGS,
+  DISABLED_INFERENCE_MIN_COHORT_SENTINEL,
+  bindAuditTrustEffective,
+  bindBaselineBoundaryDate,
+  bindEnvelopeCategoryCount,
+  bindInferenceBulkEffective,
+  bindPgPoolMax,
+  getEnvBinding,
+  isLdapConfigured,
+  listEnvBoundKeys,
+  parseIdentityProviderMode,
+  parseLdapConnectTimeoutMs,
+  parseLdapCreateMappingMode,
+  parseLdapTlsRejectUnauthorized,
+  parseLdapUrlScheme,
+  parseSessionTimeoutSeconds,
+} from "./env-bindings";
+
+export {
+  BANNED_SECRET_PATTERNS,
+  assertRegistryFreeOfSecrets,
+  isSecretShapedKey,
+  serializeInventoryValueForKey,
+  serializeSettingsInventoryValue,
+  valueLooksLikeSecret,
+} from "./inventory-redaction";
 
 export {
   MSG_SETTINGS_CONFIG_NOT_WARMED_FA,

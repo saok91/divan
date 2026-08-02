@@ -22,15 +22,19 @@ import {
   getSettingsDegradedKeys,
   getSettingsParameter,
   invalidateSettingsCache,
+  isSecretShapedKey,
   isSettingsConfigurationDegraded,
   listAdminEditableKeys,
   requireGovernedSettingsRegistry,
   resetSettingsCacheForTests,
   resolveSetting,
   resolveSettingNumber,
+  serializeSettingsInventoryValue,
   upsertOverride,
   validateSettingsValue,
+  valueLooksLikeSecret,
   warmSettingsCache,
+  warmSettingsCacheFromEnvOnly,
 } from "./index";
 
 // --- Pure: registry completeness ---
@@ -56,6 +60,22 @@ const requiredKeys = [
   "session.idle_timeout_seconds",
   "session.absolute_timeout_seconds",
   "identity.provider_mode",
+  "identity.ldap_configured",
+  "identity.ldap_url_scheme",
+  "identity.ldap_tls_reject_unauthorized",
+  "identity.ldap_connect_timeout_ms",
+  "identity.ldap_create_mapping_mode",
+  "audit.inference_bulk_enabled",
+  "audit.inference_bulk_min_cohort",
+  "audit.inference_bulk_max_volume_per_request",
+  "audit.inference_bulk_max_volume_per_window",
+  "audit.trust_enforce",
+  "audit.trust_max_clock_skew_ms",
+  "audit.trust_verification_window_hours",
+  "audit.trust_suspend_ttl_ms",
+  "audit.envelope_category_count",
+  "infra.pg_pool_max",
+  "infra.baseline_boundary_date",
 ] as const;
 
 for (const key of requiredKeys) {
@@ -101,7 +121,7 @@ assert.deepEqual(
 assert.equal(validateSettingsValue(allowlistDefPure, []), null);
 assert.equal(validateSettingsValue(allowlistDefPure, ["exe"]), null);
 
-// --- Pure: resolve before warm → code default, no throw ---
+// --- Pure: resolve before warm â†’ code default, no throw ---
 resetSettingsCacheForTests();
 const preWarm = resolveSettingNumber("import.max_file_bytes");
 assert.equal(preWarm.value, 5 * 1024 * 1024);
@@ -124,7 +144,7 @@ assert.ok(
 );
 assert.ok(
   !listAdminEditableKeys().includes("export.custody_bulk_row_threshold"),
-  "export custody threshold must stay read_only (Gate — no export boundary widen)",
+  "export custody threshold must stay read_only (Gate â€” no export boundary widen)",
 );
 assert.equal(
   getSettingsParameter("export.custody_bulk_row_threshold").editability,
@@ -136,13 +156,77 @@ for (const def of GOVERNED_SETTINGS_REGISTRY) {
   if (def.boundaryClass === "security_posture") {
     assert.equal(def.editability, "read_only_with_evidence", def.key);
   }
+  if (def.editability === "read_only_with_evidence") {
+    assert.ok(def.changePathFa && def.changePathFa.trim().length > 0, def.key);
+  }
 }
+
+// --- Pure: environment source + secret denial (Story 10.4) ---
+resetSettingsCacheForTests();
+await warmSettingsCacheFromEnvOnly({
+  AUTH_SESSION_IDLE_TIMEOUT_SECONDS: "3600",
+  NODE_ENV: "development",
+});
+const idleEnv = resolveSettingNumber("session.idle_timeout_seconds");
+assert.equal(idleEnv.value, 3600);
+assert.equal(idleEnv.source, "environment");
+assert.equal(idleEnv.degraded, false);
+
+resetSettingsCacheForTests();
+await warmSettingsCacheFromEnvOnly({ NODE_ENV: "development" });
+const idleDefault = resolveSettingNumber("session.idle_timeout_seconds");
+assert.equal(idleDefault.value, 8 * 60 * 60);
+assert.equal(idleDefault.source, "code_default");
+
+resetSettingsCacheForTests();
+await warmSettingsCacheFromEnvOnly({
+  AUTH_SESSION_IDLE_TIMEOUT_SECONDS: "not-a-number",
+  NODE_ENV: "development",
+});
+const idleInvalid = resolveSettingNumber("session.idle_timeout_seconds");
+assert.equal(idleInvalid.value, 8 * 60 * 60);
+assert.equal(idleInvalid.source, "code_default");
+assert.equal(idleInvalid.degraded, true);
+assert.ok(getSettingsDegradedKeys().includes("session.idle_timeout_seconds"));
+
+assert.ok(domainHasAuditIntegrity());
+assert.ok(!isSecretShapedKey("session.idle_timeout_seconds"));
+assert.ok(isSecretShapedKey("ldap.bind_password"));
+assert.ok(valueLooksLikeSecret("postgresql://user:pass@localhost/db"));
+assert.ok(valueLooksLikeSecret("-----BEGIN PRIVATE KEY-----"));
+const idleDef = getSettingsParameter("session.idle_timeout_seconds");
+assert.equal(serializeSettingsInventoryValue(idleDef, 3600), 3600);
+assert.throws(
+  () => serializeSettingsInventoryValue(idleDef, "LDAP_BIND_PASSWORD=secret"),
+  (err: unknown) =>
+    err instanceof GovernedSettingsError &&
+    err.code === "SETTINGS_INVALID_DEFINITION",
+);
+
+assert.ok(
+  !listAdminEditableKeys().includes("audit.trust_enforce"),
+  "audit trust must stay RO",
+);
+assert.ok(
+  !listAdminEditableKeys().includes("infra.pg_pool_max"),
+  "pool max must stay RO",
+);
+assert.equal(
+  getSettingsParameter("infra.baseline_boundary_date").defaultValue,
+  "unset",
+);
 
 console.log("app-settings pure gates: ok");
 
+function domainHasAuditIntegrity(): boolean {
+  return GOVERNED_SETTINGS_REGISTRY.some(
+    (d) => d.owningDomain === "audit_integrity",
+  );
+}
+
 const url = process.env.DATABASE_URL?.trim();
 if (!url) {
-  console.log("DATABASE_URL unset — skipping store/resolver DB gates");
+  console.log("DATABASE_URL unset â€” skipping store/resolver DB gates");
   process.exit(0);
 }
 
@@ -155,7 +239,7 @@ try {
   );
   if (!probe.rows[0]?.reg) {
     console.log(
-      "app_settings.parameter_override missing — apply 022_governed_settings.sql; skipping DB gates",
+      "app_settings.parameter_override missing â€” apply 022_governed_settings.sql; skipping DB gates",
     );
     process.exit(0);
   }
@@ -169,7 +253,7 @@ try {
   assert.equal(baseline.value, 5 * 1024 * 1024);
   assert.equal(baseline.source, "code_default");
 
-  // Override → auto re-warm → store value
+  // Override â†’ auto re-warm â†’ store value
   await upsertOverride(pool, {
     parameterKey: "import.max_file_bytes",
     value: 2 * 1024 * 1024,
@@ -181,7 +265,7 @@ try {
   assert.equal(overridden.source, "store");
   assert.equal(overridden.degraded, false);
 
-  // Hot path: raw SQL under cache — resolve stays stale until invalidate
+  // Hot path: raw SQL under cache â€” resolve stays stale until invalidate
   await pool.query(
     `UPDATE app_settings.parameter_override
         SET value_json = $1::jsonb
@@ -198,7 +282,7 @@ try {
   await invalidateSettingsCache(pool);
   assert.equal(resolveSettingNumber("import.max_file_bytes").value, 3 * 1024 * 1024);
 
-  // OOR / empty string_list / RO → reject before write (Story 10.3)
+  // OOR / empty string_list / RO â†’ reject before write (Story 10.3)
   const beforeReject = resolveSettingNumber("import.max_file_bytes").value;
   await assert.rejects(
     () =>
@@ -240,7 +324,7 @@ try {
       err.code === "SETTINGS_INVALID_DEFINITION",
   );
 
-  // Delete override → code default restored without restart
+  // Delete override â†’ code default restored without restart
   await deleteOverride(pool, "import.max_file_bytes");
   const afterDelete = resolveSettingNumber("import.max_file_bytes");
   assert.equal(afterDelete.value, 5 * 1024 * 1024);

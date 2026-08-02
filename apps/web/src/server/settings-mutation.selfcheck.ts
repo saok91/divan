@@ -64,6 +64,19 @@ const custody = getSettingsParameter("export.custody_bulk_row_threshold");
 assert.equal(custody.editability, "read_only_with_evidence");
 assert.ok(!listAdminEditableKeys().includes(custody.key));
 
+for (const key of [
+  "session.idle_timeout_seconds",
+  "identity.ldap_configured",
+  "audit.trust_enforce",
+  "audit.inference_bulk_enabled",
+  "infra.pg_pool_max",
+  "infra.baseline_boundary_date",
+] as const) {
+  const def = getSettingsParameter(key);
+  assert.equal(def.editability, "read_only_with_evidence", key);
+  assert.ok(!listAdminEditableKeys().includes(key), key);
+}
+
 // --- Pure: role domain deny for write-relevant keys ---
 assert.equal(
   roleMaySeeDomain("hr_admin", "access_session"),
@@ -112,8 +125,22 @@ assert.match(rowSrc, /SettingsParameterEditor/);
 assert.match(rowSrc, /read_only_with_evidence/);
 assert.match(panelSrc, /FeedbackMessage/);
 assert.match(panelSrc, /onRowUpdated/);
+assert.match(panelSrc, /exportInventory/);
+assert.match(panelSrc, /settingsInventoryExportCta/);
+assert.match(routerSrc, /exportInventory:\s*governedProcedure/);
+assert.match(routerSrc, /settings\.inventory\.view/);
+assert.match(routerSrc, /settings\.inventory\.export/);
+assert.match(routerSrc, /createExportArtifact/);
+assert.match(routerSrc, /settings_inventory/);
+assert.match(routerSrc, /serializeSettingsInventoryValue/);
 assert.doesNotMatch(editorSrc, /مشاهده در ممیزی/);
 assert.doesNotMatch(panelSrc, /مشاهده در ممیزی/);
+assert.ok(
+  !listAdminEditableKeys().some((k) =>
+    /password|secret|database_url|bind_dn|tls_ca/i.test(k),
+  ),
+  "no secret-shaped admin keys",
+);
 
 // --- Copy honesty ---
 assert.ok(operationalCopy.settingsReasonHelp.includes("۱۰"));

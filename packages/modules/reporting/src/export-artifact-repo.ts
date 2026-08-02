@@ -10,7 +10,10 @@ import type { Pool, PoolClient } from "@divan/db";
 
 export type PgQueryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
-export type ExportSourceSurface = "report" | "personnel_list";
+export type ExportSourceSurface =
+  | "report"
+  | "personnel_list"
+  | "settings_inventory";
 export type ExportFormat = "csv" | "xlsx";
 export type ExportArtifactState =
   | "pending"

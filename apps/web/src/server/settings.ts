@@ -1,14 +1,16 @@
 /**
- * Governed settings tRPC (Story 10.2–10.3 / FR-60).
- * Thin web: compose registry + resolver + store mutations.
+ * Governed settings tRPC (Story 10.2–10.4 / FR-60).
+ * Thin web: compose registry + resolver + store mutations + RO inventory export.
  * Apply/reset validate via shared parse; RO keys never mutate via this router.
  */
 
 import {
+  DEV_DEMO_CATEGORIES,
   MSG_SETTINGS_DENIED_FA,
   SETTINGS_CONFIGURATION_DATA_CATEGORY,
   SETTINGS_READ_PERMISSION,
   SETTINGS_WRITE_PERMISSION,
+  loadCategoryRegistry,
 } from "@divan/audit-envelope";
 import {
   GOVERNED_SETTINGS_REGISTRY,
@@ -22,16 +24,31 @@ import {
   loadAllOverrides,
   MSG_SETTINGS_STORE_UNAVAILABLE_FA,
   resolveSetting,
+  serializeSettingsInventoryValue,
   upsertOverride,
   warmSettingsCache,
+  warmSettingsCacheFromEnvOnly,
   type SettingsOwningDomain,
   type SettingsParameterDefinition,
   type SettingsScalar,
 } from "@divan/app-settings";
 import { getSharedPgPool, type Pool } from "@divan/db";
 import { appendAccessEvent } from "@divan/event-store";
-import type { CoarseRole } from "@divan/identity-access";
+import {
+  currentAsOfDate,
+  reauthorizeForQueuedOrArtifactWork,
+  type CoarseRole,
+} from "@divan/identity-access";
 import { getPersonDb } from "@divan/person-employment";
+import {
+  ExportError,
+  computeExportSnapshotHash,
+  createExportArtifact,
+  downloadExportArtifact,
+  getExportArtifactById,
+  panelDtoFromArtifact,
+  type ExportFieldDef,
+} from "@divan/reporting";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -77,6 +94,46 @@ const settingsValueSchema = z.union([
   z.array(z.string().min(1)).min(1),
 ]);
 
+/** Domains whose inventory view/export is security-relevant (Story 10.4 AC #5). */
+const SECURITY_INVENTORY_DOMAINS = new Set<SettingsOwningDomain>([
+  "access_session",
+  "audit_integrity",
+  "infrastructure",
+]);
+
+const INVENTORY_EXPORT_FIELDS: readonly ExportFieldDef[] = Object.freeze([
+  {
+    id: "key",
+    headerFa: "کلید",
+    dataCategory: SETTINGS_CONFIGURATION_DATA_CATEGORY,
+  },
+  {
+    id: "labelFa",
+    headerFa: "برچسب",
+    dataCategory: SETTINGS_CONFIGURATION_DATA_CATEGORY,
+  },
+  {
+    id: "domain",
+    headerFa: "دامنه",
+    dataCategory: SETTINGS_CONFIGURATION_DATA_CATEGORY,
+  },
+  {
+    id: "value",
+    headerFa: "مقدار موثر",
+    dataCategory: SETTINGS_CONFIGURATION_DATA_CATEGORY,
+  },
+  {
+    id: "source",
+    headerFa: "منبع",
+    dataCategory: SETTINGS_CONFIGURATION_DATA_CATEGORY,
+  },
+  {
+    id: "changePathFa",
+    headerFa: "مسیر تغییر",
+    dataCategory: SETTINGS_CONFIGURATION_DATA_CATEGORY,
+  },
+]);
+
 let settingsPool: Pool | null = null;
 
 /** Returns null when DATABASE_URL is absent — callers fail closed to code defaults. */
@@ -86,6 +143,31 @@ function tryGetSettingsPool(): Pool | null {
   if (!url) return null;
   settingsPool = getSharedPgPool(url);
   return settingsPool;
+}
+
+function categoryRegistryForExport() {
+  try {
+    return loadCategoryRegistry();
+  } catch {
+    return DEV_DEMO_CATEGORIES;
+  }
+}
+
+function makeExportReauth(accountId: string, actorScopeCodes: string[]) {
+  return (input: {
+    accountId: string;
+    populationChannel: "export";
+    objectIds?: string[];
+    actorScopeCodes?: string[];
+    asOfDate?: string;
+  }) =>
+    reauthorizeForQueuedOrArtifactWork({
+      accountId: input.accountId || accountId,
+      populationChannel: "export",
+      objectIds: input.objectIds,
+      actorScopeCodes: input.actorScopeCodes ?? actorScopeCodes,
+      asOfDate: input.asOfDate,
+    });
 }
 
 /**
@@ -168,9 +250,12 @@ async function denySettings(input: {
   });
 }
 
-function serializeValue(value: SettingsScalar): string | number | boolean | string[] {
-  if (Array.isArray(value)) return [...value];
-  return value as string | number | boolean;
+function serializeValue(
+  def: SettingsParameterDefinition,
+  value: SettingsScalar,
+): string | number | boolean | string[] {
+  // Fail closed on secret-shaped registry mistakes (list + export share helper).
+  return serializeSettingsInventoryValue(def, value);
 }
 
 function toRowDto(
@@ -178,13 +263,18 @@ function toRowDto(
   overrideMeta?: { updatedBy: string | null; updatedAt: string } | null,
 ): SettingsParameterRowDto {
   const resolved = resolveSetting(def.key);
+  const defaultForDto =
+    def.editability === "read_only_with_evidence" &&
+    resolved.source === "code_default"
+      ? resolved.value
+      : def.defaultValue;
   return {
     key: def.key,
     labelFa: def.labelFa,
     descriptionFa: def.descriptionFa,
     unitFa: def.unitFa,
-    value: serializeValue(resolved.value),
-    defaultValue: serializeValue(def.defaultValue),
+    value: serializeValue(def, resolved.value),
+    defaultValue: serializeValue(def, defaultForDto),
     source: resolved.source,
     range: def.range,
     allowlist: def.allowlist,
@@ -219,6 +309,9 @@ async function listRowsForDomain(
       detailFa =
         getSettingsConfigurationDetailFa() ?? MSG_SETTINGS_STORE_UNAVAILABLE_FA;
     }
+  } else {
+    // No DB — still overlay env for honest inventory (Story 10.4).
+    await warmSettingsCacheFromEnvOnly();
   }
 
   let overrideByKey = new Map<
@@ -343,6 +436,41 @@ async function gateSettingsMutation(input: {
   return { def, pool };
 }
 
+function collectInventoryDefsForRole(
+  coarseRole: CoarseRole,
+): SettingsParameterDefinition[] {
+  const visible = new Set(visibleDomainsForRole(coarseRole));
+  return GOVERNED_SETTINGS_REGISTRY.filter(
+    (d) =>
+      d.editability === "read_only_with_evidence" &&
+      visible.has(d.owningDomain),
+  ) as SettingsParameterDefinition[];
+}
+
+function mapExportError(err: unknown): never {
+  if (err instanceof ExportError) {
+    const code =
+      err.code === "EXPORT_DENIED" ||
+      err.code === "REAUTH_FAILED" ||
+      err.code === "SENSITIVE_EXPORT_DENIED"
+        ? "FORBIDDEN"
+        : err.code === "ARTIFACT_NOT_FOUND"
+          ? "NOT_FOUND"
+          : "BAD_REQUEST";
+    throw new TRPCError({
+      code,
+      message: err.messageFa,
+      cause: err,
+    });
+  }
+  if (err instanceof TRPCError) throw err;
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: operationalCopy.settingsInventoryExportError,
+    cause: err,
+  });
+}
+
 export const settingsRouter = createTRPCRouter({
   listByDomain: governedProcedure
     .meta({
@@ -379,6 +507,22 @@ export const settingsRouter = createTRPCRouter({
 
       try {
         const listed = await listRowsForDomain(input.domain);
+
+        if (SECURITY_INVENTORY_DOMAINS.has(input.domain)) {
+          // AC #5: security-relevant inventory view must be audited — fail closed.
+          await appendSettingsAccessEvent({
+            correlationId: ctx.correlationId,
+            actorAccountId: ctx.session.accountId,
+            outcome: "allow",
+            reason: "inventory_view",
+            operation: "settings.inventory.view",
+            payload: {
+              domain: input.domain,
+              parameterKeys: listed.rows.map((r) => r.key),
+            },
+          });
+        }
+
         return { domain: input.domain, ...listed };
       } catch (err) {
         if (err instanceof TRPCError) throw err;
@@ -414,6 +558,238 @@ export const settingsRouter = createTRPCRouter({
       return {
         domains: [...visibleDomainsForRole(coarseRole)],
       };
+    }),
+
+  exportInventory: governedProcedure
+    .meta({
+      permission: SETTINGS_READ_PERMISSION,
+      dataCategory: SETTINGS_CONFIGURATION_DATA_CATEGORY,
+      action: "export",
+      organizationalScope: "org:selfcheck",
+      operation: "settings.inventory.export",
+      sensitive: true,
+    })
+    .input(
+      z.object({
+        format: z.enum(["csv", "xlsx"]).default("csv"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const operation = "settings.inventory.export";
+      const soft = await actorHoldsSettingsRead(ctx.session.accountId);
+      if (!soft) {
+        await denySettings({
+          correlationId: ctx.correlationId,
+          actorAccountId: ctx.session.accountId,
+          operation,
+        });
+      }
+
+      const coarseRole = ctx.session.coarseRole as CoarseRole;
+      const pool = tryGetSettingsPool();
+      if (!pool) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: operationalCopy.settingsInventoryExportUnavailable,
+        });
+      }
+
+      try {
+        await warmSettingsCache(pool);
+      } catch {
+        // continue with fail-closed defaults
+      }
+
+      const defs = collectInventoryDefsForRole(coarseRole);
+      if (defs.length === 0) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: MSG_SETTINGS_DENIED_FA,
+        });
+      }
+
+      const asOf = currentAsOfDate();
+      const filtersSnapshot = {
+        purpose: "settings.inventory",
+        domains: [...new Set(defs.map((d) => d.owningDomain))],
+        keys: defs.map((d) => d.key),
+      };
+      const fieldIds = INVENTORY_EXPORT_FIELDS.map((f) => f.id);
+      const reviewedSnapshotHash = computeExportSnapshotHash({
+        sourceSurface: "settings_inventory",
+        sourceKey: "settings.inventory",
+        filters: filtersSnapshot,
+        fieldIds,
+        asOf,
+      });
+
+      let rows: Array<{
+        id: string;
+        cells: Record<string, string | number | null>;
+      }>;
+      try {
+        rows = defs.map((def) => {
+          const resolved = resolveSetting(def.key);
+          const safeValue = serializeSettingsInventoryValue(def, resolved.value);
+          const cellValue =
+            typeof safeValue === "boolean"
+              ? safeValue
+                ? "true"
+                : "false"
+              : typeof safeValue === "string" || typeof safeValue === "number"
+                ? safeValue
+                : JSON.stringify(safeValue);
+          return {
+            id: def.key,
+            cells: {
+              key: def.key,
+              labelFa: def.labelFa,
+              domain: def.owningDomain,
+              value: cellValue,
+              source: resolved.source,
+              changePathFa: def.changePathFa ?? "",
+            },
+          };
+        });
+      } catch (err) {
+        if (err instanceof GovernedSettingsError) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: operationalCopy.settingsInventoryExportError,
+            cause: err,
+          });
+        }
+        throw err;
+      }
+
+      try {
+        const created = await createExportArtifact(pool, {
+          ownerAccountId: ctx.session.accountId,
+          purpose: "settings.inventory",
+          sourceSurface: "settings_inventory",
+          sourceKey: "settings.inventory",
+          filtersSnapshot,
+          reviewedSnapshotHash,
+          asOf,
+          format: input.format,
+          fields: INVENTORY_EXPORT_FIELDS,
+          rows,
+          categoryRegistry: categoryRegistryForExport(),
+          holdsCategoryExport: () => true,
+          reauth: makeExportReauth(
+            ctx.session.accountId,
+            ctx.session.organizationalScopeCodes,
+          ),
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          objectIds: [],
+          correlationId: ctx.correlationId,
+        });
+
+        try {
+          await appendSettingsAccessEvent({
+            correlationId: ctx.correlationId,
+            actorAccountId: ctx.session.accountId,
+            outcome: "allow",
+            reason: "inventory_export",
+            operation,
+            payload: {
+              parameterKeys: defs.map((d) => d.key),
+              format: input.format,
+              artifactId: created.artifact.id,
+            },
+          });
+        } catch {
+          // Artifact exists; soft-fail append must not undo create.
+        }
+
+        return panelDtoFromArtifact(created.artifact, {
+          omittedSensitiveIds: created.omittedSensitiveIds,
+          custodyBoundaryFa: created.custodyBoundaryFa,
+        });
+      } catch (err) {
+        mapExportError(err);
+      }
+    }),
+
+  downloadInventoryExport: governedProcedure
+    .meta({
+      permission: SETTINGS_READ_PERMISSION,
+      dataCategory: SETTINGS_CONFIGURATION_DATA_CATEGORY,
+      action: "export",
+      organizationalScope: "org:selfcheck",
+      operation: "settings.inventory.export.download",
+      sensitive: true,
+    })
+    .input(
+      z.object({
+        artifactId: z.string().uuid(),
+        recipient: z.string().trim().min(1).max(200),
+        destinationClass: z
+          .enum(["local_download", "shared_drive", "email", "other"])
+          .default("local_download"),
+        custodyAck: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const soft = await actorHoldsSettingsRead(ctx.session.accountId);
+      if (!soft) {
+        await denySettings({
+          correlationId: ctx.correlationId,
+          actorAccountId: ctx.session.accountId,
+          operation: "settings.inventory.export.download",
+        });
+      }
+
+      const pool = tryGetSettingsPool();
+      if (!pool) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: operationalCopy.settingsInventoryExportUnavailable,
+        });
+      }
+
+      try {
+        const existing = await getExportArtifactById(pool, input.artifactId);
+        if (
+          !existing ||
+          existing.ownerAccountId !== ctx.session.accountId ||
+          existing.sourceSurface !== "settings_inventory"
+        ) {
+          throw new ExportError(
+            "ARTIFACT_NOT_FOUND",
+            operationalCopy.exportArtifactNotFound,
+          );
+        }
+
+        const result = await downloadExportArtifact(pool, {
+          artifactId: input.artifactId,
+          retrieverAccountId: ctx.session.accountId,
+          recipient: input.recipient.trim(),
+          destinationClass: input.destinationClass,
+          custodyAck: input.custodyAck,
+          reauth: makeExportReauth(
+            ctx.session.accountId,
+            ctx.session.organizationalScopeCodes,
+          ),
+          actorScopeCodes: ctx.session.organizationalScopeCodes,
+          objectIds: [],
+          correlationId: ctx.correlationId,
+        });
+
+        return {
+          artifactId: result.artifact.id,
+          filename: result.contentFilename,
+          contentType: result.contentType,
+          contentBase64: result.contentBytes.toString("base64"),
+          custodyBoundaryFa: result.custodyBoundaryFa,
+          retrievalId: result.retrievalId,
+          classificationFa: result.artifact.classificationFa,
+          handlingFa: result.artifact.handlingFa,
+          expiresAt: result.artifact.expiresAt,
+        };
+      } catch (err) {
+        mapExportError(err);
+      }
     }),
 
   applyParameter: governedProcedure
@@ -491,8 +867,8 @@ export const settingsRouter = createTRPCRouter({
             parameterKey: def.key,
             action: "apply",
             reason: input.reason,
-            previousValue: serializeValue(previous),
-            newValue: serializeValue(parsed),
+            previousValue: serializeValue(def, previous),
+            newValue: serializeValue(def, parsed),
           },
         });
       } catch {
@@ -566,7 +942,7 @@ export const settingsRouter = createTRPCRouter({
             parameterKey: def.key,
             action: "reset",
             reason: input.reason,
-            previousValue: serializeValue(previous),
+            previousValue: serializeValue(def, previous),
           },
         });
       } catch {

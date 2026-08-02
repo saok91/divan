@@ -54,14 +54,15 @@ assert.deepEqual([...domainsForRole("hr_operator")], []);
 assert.deepEqual([...domainsForRole("manager")], []);
 assert.deepEqual([...domainsForRole("audit_reviewer")], []);
 
-assert.equal(registryKeyCountForDomain("audit_integrity"), 0);
-assert.equal(domainHasRegistryKeys("audit_integrity"), false);
+assert.ok(registryKeyCountForDomain("audit_integrity") > 0);
+assert.equal(domainHasRegistryKeys("audit_integrity"), true);
 assert.ok(domainHasRegistryKeys("general_display"));
 assert.ok(domainHasRegistryKeys("import_export"));
+assert.ok(domainHasRegistryKeys("infrastructure"));
 
 assert.ok(
-  !visibleDomainsForRole("system_admin").includes("audit_integrity"),
-  "capabilities-facing visibleDomains must omit empty domains",
+  visibleDomainsForRole("system_admin").includes("audit_integrity"),
+  "system_admin must see audit_integrity once inventory keys exist",
 );
 
 const hrTabs = visibleSettingsTabsForRole("hr_admin");
@@ -75,7 +76,7 @@ const sysTabs = visibleSettingsTabsForRole("system_admin");
 assert.ok(sysTabs.every((t) => t.id !== "data-retention"));
 assert.ok(sysTabs.every((t) => t.id !== "import-export"));
 assert.ok(sysTabs.every((t) => t.id !== "capacity-hiring"));
-assert.ok(sysTabs.every((t) => t.id !== "audit-integrity"), "empty domain omitted");
+assert.ok(sysTabs.some((t) => t.id === "audit-integrity"), "inventory keys surface tab");
 assert.ok(sysTabs.some((t) => t.id === "general-display"));
 assert.ok(sysTabs.some((t) => t.id === "infrastructure"));
 

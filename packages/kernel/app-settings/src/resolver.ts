@@ -1,13 +1,14 @@
 /**
  * Single cached governed-settings resolver (Story 10.1 / AD-7 / FR-45).
  *
- * Boot/warm loads store once → validate → cache.
- * Hot resolve path is sync + cache-only (no DB).
+ * Boot/warm loads store once → validate → env overlay for RO bindings → cache.
+ * Hot resolve path is sync + cache-only (no DB; no per-request process.env).
  * Invalid / missing / unavailable → code default + degraded.
  */
 
 import type { Pool, PoolClient } from "pg";
 
+import { ENV_BINDINGS } from "./env-bindings";
 import {
   getCodeDefault,
   getSettingsParameter,
@@ -118,25 +119,94 @@ function applyValidatedOverrides(
 }
 
 /**
- * Warm (or re-warm) the process-local cache from the store.
- * Store unavailable → all code defaults + degraded (no throw).
+ * Overlay env-bound RO keys after code defaults + store admin_editable.
+ * Capture env once at warm — hot resolve never re-reads process.env.
  */
-export async function warmSettingsCache(db: PgQueryable): Promise<void> {
+export function applyEnvironmentOverlay(
+  entries: Map<string, CacheEntry>,
+  degradedKeys: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): { entries: Map<string, CacheEntry>; degradedKeys: string[] } {
+  const next = new Map(entries);
+  const degraded = [...degradedKeys];
+
+  for (const binding of ENV_BINDINGS) {
+    let def: SettingsParameterDefinition;
+    try {
+      def = getSettingsParameter(binding.key);
+    } catch {
+      continue;
+    }
+    if (def.editability === "admin_editable") continue;
+
+    const result = binding.bind(def, env);
+    if (!result.ok) {
+      if (result.reason === "invalid") {
+        if (!degraded.includes(binding.key)) degraded.push(binding.key);
+        const cur = next.get(binding.key);
+        if (cur) {
+          const inventoryValue = result.inventoryValue;
+          next.set(binding.key, {
+            value:
+              inventoryValue !== undefined
+                ? inventoryValue
+                : getCodeDefault(binding.key),
+            source:
+              inventoryValue !== undefined && binding.emitEnvironmentSource
+                ? "environment"
+                : "code_default",
+            degraded: true,
+          });
+        }
+      }
+      // missing → leave seeded code_default (or store — but RO never store)
+      continue;
+    }
+
+    const source: SettingsValueSource =
+      result.fromEnv && binding.emitEnvironmentSource
+        ? "environment"
+        : "code_default";
+    next.set(binding.key, {
+      value: result.value,
+      source,
+      degraded: false,
+    });
+  }
+
+  return { entries: next, degradedKeys: degraded };
+}
+
+/**
+ * Warm (or re-warm) the process-local cache from the store + env snapshot.
+ * Store unavailable → all code defaults + degraded (no throw), then env overlay.
+ */
+export async function warmSettingsCache(
+  db: PgQueryable,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
   const run = async () => {
     requireGovernedSettingsRegistry();
     try {
       const rows = await loadAllOverrides(db);
-      const { entries, degradedKeys } = applyValidatedOverrides(rows);
-      state.entries = entries;
-      state.degradedKeys = degradedKeys;
-      state.degraded = degradedKeys.length > 0;
+      const applied = applyValidatedOverrides(rows);
+      const overlaid = applyEnvironmentOverlay(
+        applied.entries,
+        applied.degradedKeys,
+        env,
+      );
+      state.entries = overlaid.entries;
+      state.degradedKeys = overlaid.degradedKeys;
+      state.degraded = overlaid.degradedKeys.length > 0;
       state.detailFa =
-        degradedKeys.length > 0 ? MSG_SETTINGS_CONFIG_DEGRADED_FA : null;
+        overlaid.degradedKeys.length > 0 ? MSG_SETTINGS_CONFIG_DEGRADED_FA : null;
       state.storeUnavailable = false;
       state.warmed = true;
     } catch {
-      state.entries = seedCodeDefaults(true);
-      state.degradedKeys = [];
+      const seeded = seedCodeDefaults(true);
+      const overlaid = applyEnvironmentOverlay(seeded, [], env);
+      state.entries = overlaid.entries;
+      state.degradedKeys = overlaid.degradedKeys;
       state.degraded = true;
       state.detailFa = MSG_SETTINGS_STORE_UNAVAILABLE_FA;
       state.storeUnavailable = true;
@@ -144,6 +214,30 @@ export async function warmSettingsCache(db: PgQueryable): Promise<void> {
     }
   };
 
+  warmQueue = warmQueue.then(run, run);
+  await warmQueue;
+}
+
+/**
+ * Warm from env only (no DB) — tests / early boot inventory.
+ * Still marks warmed so resolveSetting* is sync/cache-only afterward.
+ * `storeUnavailable` stays true — there is no settings store in this path.
+ */
+export async function warmSettingsCacheFromEnvOnly(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  const run = async () => {
+    requireGovernedSettingsRegistry();
+    const seeded = seedCodeDefaults(false);
+    const overlaid = applyEnvironmentOverlay(seeded, [], env);
+    state.entries = overlaid.entries;
+    state.degradedKeys = overlaid.degradedKeys;
+    state.degraded = overlaid.degradedKeys.length > 0;
+    state.detailFa =
+      overlaid.degradedKeys.length > 0 ? MSG_SETTINGS_CONFIG_DEGRADED_FA : null;
+    state.storeUnavailable = true;
+    state.warmed = true;
+  };
   warmQueue = warmQueue.then(run, run);
   await warmQueue;
 }
@@ -212,7 +306,12 @@ export function resolveSetting<T extends SettingsScalar = SettingsScalar>(
     key,
     value: entry.value as T,
     source: entry.source,
-    degraded: entry.degraded || (state.warmed && state.degraded && entry.source === "code_default" && state.degradedKeys.includes(key)),
+    degraded:
+      entry.degraded ||
+      (state.warmed &&
+        state.degraded &&
+        entry.source === "code_default" &&
+        state.degradedKeys.includes(key)),
   };
 }
 
@@ -235,6 +334,19 @@ export function resolveSettingString(key: string): ResolvedSetting<string> {
     return {
       key,
       value: getCodeDefault(key) as string,
+      source: "code_default",
+      degraded: true,
+    };
+  }
+  return resolved;
+}
+
+export function resolveSettingBoolean(key: string): ResolvedSetting<boolean> {
+  const resolved = resolveSetting<boolean>(key);
+  if (typeof resolved.value !== "boolean") {
+    return {
+      key,
+      value: getCodeDefault(key) as boolean,
       source: "code_default",
       degraded: true,
     };

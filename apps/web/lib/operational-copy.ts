@@ -730,6 +730,16 @@ export const operationalCopy = {
   settingsCancel: "انصراف",
   settingsEditDisabledStore: "تا برقراری مخزن، ویرایش ممکن نیست.",
   settingsConfirmUnderstood: "شعاع اثر را خواندم و تأیید می‌کنم",
+  settingsInventorySectionHint:
+    "کنترل‌شده در زیرساخت — خروجی شامل کل موجودی فقط‌خواندنی قابل‌دید نقش است (نه فقط این تب).",
+  settingsInventoryExportCta: "خروجی موجودی تنظیمات",
+  settingsInventoryExportDialogHint:
+    "پس از آماده‌سازی، دریافت فایل تحت چرخهٔ حضانت و تأیید مجدد FR52 انجام می‌شود.",
+  settingsInventoryExportSuccess:
+    "خروجی موجودی دریافت شد.",
+  settingsInventoryExportError: "ایجاد خروجی موجودی تنظیمات ممکن نشد.",
+  settingsInventoryExportUnavailable:
+    "بدون پایگاه داده، خروجی موجودی تنظیمات ممکن نیست.",
   lifecycleHostPurpose:
     "نگهداری قانونی حذف را مسدود می‌کند؛ حذف فقط عملیاتی/خروجی است — نه پاک‌کردن ردیف ممیزی.",
   auditTrustReviewRequiresAuditor:
