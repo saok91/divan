@@ -11,6 +11,11 @@ import {
   operationalCopy,
   staleRecalcMessage,
 } from "./operational-copy";
+import {
+  CHART_CATEGORICAL_DARK,
+  CHART_CATEGORICAL_LIGHT,
+  assertChartPaletteClean,
+} from "./chart-tokens";
 
 function srgbToLinear(channel: number): number {
   const c = channel / 255;
@@ -93,14 +98,19 @@ assertAA("light break-glass banner", "#1864ab", "#e7f5ff");
 assertAA("dark stale banner", "#ffe066", "#3d3200");
 assertAA("dark break-glass banner", "#a5d8ff", "#1a3a5c");
 
-// --- Chart categorical on canvas (DESIGN 8.10-A1 cyan nudge) ---
-const CHART_LIGHT = ["#1B3BBB", "#087A90", "#C2255C", "#7048E8", "#495057"] as const;
-const CHART_DARK = ["#6C8CFF", "#3BC9DB", "#F06595", "#A98BFF", "#ADB5BD"] as const;
+// --- Chart categorical on canvas (DESIGN 8.10-A1; SoT = chart-tokens.ts) ---
+assertChartPaletteClean(CHART_CATEGORICAL_LIGHT, "light categorical");
+assertChartPaletteClean(CHART_CATEGORICAL_DARK, "dark categorical");
+assert.equal(
+  CHART_CATEGORICAL_LIGHT[1].toUpperCase(),
+  "#087A90",
+  "series-2 cyan must be #087A90 (8.10-A1), not #0B8FA8",
+);
 
-for (const [i, hex] of CHART_LIGHT.entries()) {
+for (const [i, hex] of CHART_CATEGORICAL_LIGHT.entries()) {
   assertAA(`light chart series ${i + 1}`, hex, LIGHT_SURFACE);
 }
-for (const [i, hex] of CHART_DARK.entries()) {
+for (const [i, hex] of CHART_CATEGORICAL_DARK.entries()) {
   assertAA(`dark chart series ${i + 1}`, hex, DARK_SURFACE);
 }
 

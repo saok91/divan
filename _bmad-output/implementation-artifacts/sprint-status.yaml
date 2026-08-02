@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-08-02T23:55:00+03:30
+# last_updated: 2026-08-03T00:30:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-08-02T23:55:00+03:30
+last_updated: 2026-08-03T00:30:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -150,7 +150,7 @@ development_status:
   8-10-design-qa-consistency-accessibility-gate: done
   epic-8-retrospective: done
 
-  epic-9: in-progress
+  epic-9: done
   9-1-sample-workbook-generation-template-catalogue: done
   9-2-shared-bulk-entry-flow: done
   9-3-bulk-entry-personnel-events-headcount: done
@@ -160,7 +160,7 @@ development_status:
   9-7-profile-access-cross-surface-drill-through: done
   9-8-governance-surface-discoverability: done
   9-9-no-dead-end-ia-gate: done
-  9-10-dashboard-report-visual-quality: backlog
+  9-10-dashboard-report-visual-quality: done
   epic-9-retrospective: optional
 
   epic-10: backlog

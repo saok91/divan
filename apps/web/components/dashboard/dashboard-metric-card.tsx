@@ -2,10 +2,12 @@
 
 import * as React from "react";
 
+import { useLeaveGuardOptional } from "@/components/leave-guard/leave-guard-context";
+import { Panel } from "@/components/layout/panel-section";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { cn } from "@/lib/utils";
-import { useLeaveGuardOptional } from "@/components/leave-guard/leave-guard-context";
 
 export type DashboardMetricCardProps = {
   titleFa: string;
@@ -21,12 +23,16 @@ export type DashboardMetricCardProps = {
   detailsLines?: string[];
   reconcileHref?: string;
   reconcileLabelFa?: string;
+  /** ISO / display timestamp — visible on allowed and banner-adjacent cards. */
+  lastCalculatedAt?: string | null;
+  /** Optional chart slot (workforce trend / dual-series). */
+  chart?: React.ReactNode;
   className?: string;
 };
 
 /**
- * UX-DR15 metric card: heading-sm name, heading value (Persian digits),
- * caption reconciliation link; suppress ≠ empty ≠ zero.
+ * UX-DR15 metric surface: Panel/hairline posture (8.2), FeedbackMessage outcomes,
+ * lastCalc, suppress ≠ empty ≠ zero (Story 9.10).
  */
 export function DashboardMetricCard({
   titleFa,
@@ -36,6 +42,8 @@ export function DashboardMetricCard({
   detailsLines,
   reconcileHref,
   reconcileLabelFa,
+  lastCalculatedAt,
+  chart,
   className,
 }: DashboardMetricCardProps) {
   const leaveGuard = useLeaveGuardOptional();
@@ -46,39 +54,31 @@ export function DashboardMetricCard({
   let body: React.ReactNode;
   if (outcome === "suppressed") {
     body = (
-      <p role="status" aria-live="polite" className="text-heading text-foreground">
+      <FeedbackMessage kind="info">
         {messageFa || operationalCopy.suppressedCohort}
-      </p>
+      </FeedbackMessage>
     );
   } else if (outcome === "empty") {
     body = (
-      <p
-        role="status"
-        aria-live="polite"
-        className="text-body text-muted-foreground"
-      >
+      <FeedbackMessage kind="empty">
         {messageFa || operationalCopy.emptyDashboardScope}
-      </p>
+      </FeedbackMessage>
     );
   } else if (outcome === "pending") {
     body = (
-      <p
-        role="status"
-        aria-live="polite"
-        className="text-body text-text-tertiary"
-      >
+      <FeedbackMessage kind="pending" className="opacity-70">
         {messageFa || operationalCopy.figureRecalculating}
-      </p>
+      </FeedbackMessage>
     );
   } else if (outcome === "error") {
     body = (
-      <p role="alert" className="text-body text-destructive">
+      <FeedbackMessage kind="error">
         {messageFa || operationalCopy.dashboardLoadError}
-      </p>
+      </FeedbackMessage>
     );
   } else {
     body = (
-      <p className="text-heading tabular-nums text-foreground">
+      <p className="text-heading text-tabular text-foreground tabular-nums">
         {value == null ? "—" : toPersianDigits(value)}
       </p>
     );
@@ -91,13 +91,21 @@ export function DashboardMetricCard({
     void leaveGuard.requestNavigation(reconcileHref);
   };
 
+  const lastCalc =
+    lastCalculatedAt != null && lastCalculatedAt !== "" ? (
+      <p className="text-caption text-muted-foreground">
+        آخرین محاسبه:{" "}
+        <span className="text-tabular tabular-nums" dir="ltr">
+          {toPersianDigits(lastCalculatedAt)}
+        </span>
+      </p>
+    ) : null;
+
   return (
-    <article
+    <Panel
       aria-labelledby={headingId}
-      tabIndex={0}
       className={cn(
-        "flex flex-col gap-2 rounded-md border border-border bg-background p-4",
-        "outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex flex-col gap-2 border-b border-hairline p-4 outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
     >
@@ -105,6 +113,7 @@ export function DashboardMetricCard({
         {titleFa}
       </h3>
       {body}
+      {outcome === "allowed" && chart ? chart : null}
       {outcome === "allowed" && detailsLines && detailsLines.length > 0 ? (
         <ul className="space-y-0.5 text-caption text-muted-foreground">
           {detailsLines.map((line, index) => (
@@ -121,6 +130,7 @@ export function DashboardMetricCard({
           {reconcileLabelFa}
         </a>
       ) : null}
-    </article>
+      {lastCalc}
+    </Panel>
   );
 }

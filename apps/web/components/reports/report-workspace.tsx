@@ -8,6 +8,8 @@ import type { ReportSubject } from "@divan/reporting/catalogue";
 import { FileSearch } from "lucide-react";
 
 import { ExportArtifactPanel } from "@/components/export/export-artifact-panel";
+import { CategoricalBarChart } from "@/components/charts";
+import { extractReportCategoricalDistribution } from "@/components/charts/report-chart-distribution";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import { useLeaveGuardOptional } from "@/components/leave-guard";
@@ -517,6 +519,28 @@ function ReportWorkspaceInner({ subject }: ReportWorkspaceProps) {
         ) : null}
 
         {metaRow}
+
+        {runQuery.data &&
+        runIntent &&
+        outcome === "allowed" &&
+        !suppressed
+          ? (() => {
+              const buckets = extractReportCategoricalDistribution(
+                runQuery.data.reportKey,
+                runQuery.data.columns,
+                runQuery.data.rows,
+              );
+              if (!buckets) return null;
+              return (
+                <CategoricalBarChart
+                  aria-label={`نمودار ${runQuery.data.titleFa}`}
+                  seriesLabel="تعداد"
+                  data={buckets}
+                  className="border-b border-hairline pb-4"
+                />
+              );
+            })()
+          : null}
 
         {runQuery.data &&
         runIntent &&

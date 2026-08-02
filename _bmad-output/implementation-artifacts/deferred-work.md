@@ -1,3 +1,9 @@
+## Deferred from: code review of 9-10-dashboard-report-visual-quality.md (2026-08-03)
+
+- Sequential palette has no dark-theme override in `globals.css` — AC #1 does not require dark sequential; revisit if dark heatmaps ship.
+- Negative series values invert outside `[0, max]` plot scale — current dashboard starts/terminations SoT is non-negative; harden if signed metrics are charted later.
+- Keyboard/touch chart tooltips deferred — mouse-only hover kept for thin SVG chrome; dashboard captions + report GDT remain value SoT for non-pointer users.
+
 ## Deferred from: code review of 9-7-profile-access-cross-surface-drill-through.md (2026-08-02)
 
 - Local `isUuid` helper remains in `personnel-quick-edit-modal.tsx` beside shared `@/lib/is-uuid` — pre-existing parallel helper; unify on a later cleanup pass.

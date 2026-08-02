@@ -84,6 +84,21 @@
   --status-badge-override-bg: #fff3bf;
   --status-badge-override-fg: #862e00;
 
+  /* DESIGN chart tokens (Story 9.10 / UX-DR40) — light categorical + sequential */
+  --chart-categorical-1: #1b3bbb;
+  --chart-categorical-2: #087a90;
+  --chart-categorical-3: #c2255c;
+  --chart-categorical-4: #7048e8;
+  --chart-categorical-5: #495057;
+  --chart-sequential-1: #e8f1ff;
+  --chart-sequential-2: #c2dbff;
+  --chart-sequential-3: #8fbeff;
+  --chart-sequential-4: #4d9bff;
+  --chart-sequential-5: #0f7bff;
+  --chart-sequential-6: #0a4fcc;
+  --chart-sequential-7: #051061;
+  --chart-gridline: #e8eaef;
+
   /* Spacing + radius (DESIGN.md 2026-07-31 — supersedes 4b.1 44/24 forward) */
   --chrome-height: 56px;
   --banner-stack-height: 0px;
@@ -181,6 +196,14 @@
   --status-badge-draft-fg: #ffe066;
   --status-badge-override-bg: #3d1a2e;
   --status-badge-override-fg: #ffb3d1;
+
+  /* DESIGN chart tokens — dark categorical; sequential ramp unchanged */
+  --chart-categorical-1: #6c8cff;
+  --chart-categorical-2: #3bc9db;
+  --chart-categorical-3: #f06595;
+  --chart-categorical-4: #a98bff;
+  --chart-categorical-5: #adb5bd;
+  --chart-gridline: #232c5e;
 }
 
 @theme inline {
@@ -231,6 +254,20 @@
   --color-break-glass-banner-background: var(--break-glass-banner-background);
   --color-break-glass-banner-foreground: var(--break-glass-banner-foreground);
   --color-break-glass-banner-border: var(--break-glass-banner-border);
+
+  --color-chart-categorical-1: var(--chart-categorical-1);
+  --color-chart-categorical-2: var(--chart-categorical-2);
+  --color-chart-categorical-3: var(--chart-categorical-3);
+  --color-chart-categorical-4: var(--chart-categorical-4);
+  --color-chart-categorical-5: var(--chart-categorical-5);
+  --color-chart-sequential-1: var(--chart-sequential-1);
+  --color-chart-sequential-2: var(--chart-sequential-2);
+  --color-chart-sequential-3: var(--chart-sequential-3);
+  --color-chart-sequential-4: var(--chart-sequential-4);
+  --color-chart-sequential-5: var(--chart-sequential-5);
+  --color-chart-sequential-6: var(--chart-sequential-6);
+  --color-chart-sequential-7: var(--chart-sequential-7);
+  --color-chart-gridline: var(--chart-gridline);
 
   --font-sans: var(--font-yekan-bakh), "Yekan Bakh Fa-En", Tahoma, Arial,
     sans-serif;

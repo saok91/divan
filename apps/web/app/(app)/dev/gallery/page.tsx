@@ -54,6 +54,15 @@ import {
 } from "@/components/ui/table";
 import { toastBackground } from "@/components/ui/toast";
 import { operationalCopy } from "@/lib/operational-copy";
+import {
+  CHART_CATEGORICAL_DARK,
+  CHART_CATEGORICAL_LIGHT,
+  CHART_SEQUENTIAL,
+} from "@/lib/chart-tokens";
+import {
+  CategoricalBarChart,
+  CategoricalLineChart,
+} from "@/components/charts";
 
 import { EntityPickerGalleryDemos } from "./entity-picker-demos";
 
@@ -461,6 +470,75 @@ export default function DevGalleryPage() {
           >
             نمایش toast پس‌زمینه
           </Button>
+        </div>
+      </section>
+
+      <section
+        className="space-y-4 px-content-padding-inline"
+        aria-labelledby="gallery-charts"
+        data-slot="gallery-charts"
+      >
+        <h2 id="gallery-charts" className="text-heading-sm">
+          Chart tokens &amp; chrome (Story 9.10 / UX-DR40)
+        </h2>
+        <p className="text-caption text-muted-foreground">
+          Categorical (theme-aware) · sequential ramp · sample line/bar using
+          shared SVG chrome. Gold/status hues never appear as series.
+        </p>
+        <div className="space-y-2">
+          <p className="text-field-label">Categorical swatches (CSS vars)</p>
+          <div className="flex flex-wrap gap-2">
+            {CHART_CATEGORICAL_LIGHT.map((_, i) => (
+              <div
+                key={i}
+                className="flex h-8 w-16 items-center justify-center rounded-sm text-caption text-chrome-foreground"
+                style={{
+                  backgroundColor: `var(--chart-categorical-${i + 1})`,
+                }}
+                title={`categorical-${i + 1}`}
+              >
+                {i + 1}
+              </div>
+            ))}
+          </div>
+          <p className="text-caption text-muted-foreground" dir="ltr">
+            light SoT: {CHART_CATEGORICAL_LIGHT.join(", ")} · dark SoT:{" "}
+            {CHART_CATEGORICAL_DARK.join(", ")}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <p className="text-field-label">Sequential ramp</p>
+          <div className="flex flex-wrap gap-1">
+            {CHART_SEQUENTIAL.map((hex, i) => (
+              <div
+                key={hex}
+                className="h-8 w-10 rounded-sm border border-hairline"
+                style={{ backgroundColor: `var(--chart-sequential-${i + 1})` }}
+                title={hex}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="max-w-xl space-y-4 border-t border-hairline pt-4">
+          <CategoricalLineChart
+            aria-label="نمونه روند"
+            seriesLabels={["شروع", "خاتمه"]}
+            points={[
+              { label: "1403-07", values: [4, 2] },
+              { label: "1403-08", values: [6, 3] },
+              { label: "1403-09", values: [5, 5] },
+              { label: "1403-10", values: [8, 4] },
+            ]}
+          />
+          <CategoricalBarChart
+            aria-label="نمونه توزیع"
+            seriesLabel="تعداد"
+            data={[
+              { label: "نقش", value: 12 },
+              { label: "گرید", value: 8 },
+              { label: "همکاری", value: 5 },
+            ]}
+          />
         </div>
       </section>
     </div>

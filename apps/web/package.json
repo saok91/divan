@@ -34,6 +34,7 @@
     "selfcheck:feedback": "tsx lib/feedback.selfcheck.ts",
     "selfcheck:operational-copy": "tsx lib/operational-copy.selfcheck.ts",
     "selfcheck:a11y-floor": "tsx lib/a11y-floor.selfcheck.ts",
+    "selfcheck:chart-visual": "tsx lib/chart-visual.selfcheck.ts",
     "selfcheck:headcount-ia": "tsx components/headcount/headcount-ia.selfcheck.ts",
     "selfcheck:reports-ia": "tsx components/reports/reports-ia.selfcheck.ts",
     "selfcheck:personnel-events-list": "tsx lib/personnel-events-list.selfcheck.ts",

@@ -172,6 +172,7 @@ const REQUIRED_SCRIPTS = [
   "selfcheck:feedback",
   "selfcheck:operational-copy",
   "selfcheck:a11y-floor",
+  "selfcheck:chart-visual",
   "selfcheck:drill-through",
   "selfcheck:governance-discoverability",
   "selfcheck:no-dead-end-ia",

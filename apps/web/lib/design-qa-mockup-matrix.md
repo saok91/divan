@@ -8,12 +8,12 @@ Result values: `pass` | `fixed` | `amendment` (required non-empty for gate).
 | Personnel list | `direction-a-dense-console.html` | `/personnel/list` + gallery FullBleedTableHost | pass | Dense console chrome, PageHeader, governed table density match Direction A; light/dark via theme + gallery |
 | Personnel event form | `direction-a-dense-console.html` | `/personnel-events/register` (`PersonnelEventFormHost`) | pass | FormLayout + FormFooter + EntityPicker identifier-first; Cancel · Save draft · Finalize order held by 8.4 |
 | Person profile | `screens-bulk-entry-profile.html` (profile sections) | `/personnel/profile/[personId]` | amendment | Sectioned profile + status badges; residual ad-hoc title classes deferred to Epic 9 polish (8.2 hotspot) — not silent pass |
-| Reports workspace | `screens-reports-capacity.html` | `/reports/*` subject tabs + rail/params/run/meta (9.5) | pass | Story **9.5** subject tabs + rail/params/run/meta/export; charts → 9.10 |
-| Dashboard | Direction A / capacity screens | `/dashboard` | pass | Metric cards + stale banner tokens; chart series colors gated via DESIGN categorical (cyan AA nudge — see amendments) |
+| Reports workspace | `screens-reports-capacity.html` | `/reports/*` subject tabs + rail/params/run/meta (9.5) | pass | Story **9.5** IA + Story **9.10** optional categorical chart companion (shared SVG chrome) above GovernedDataTable for `distributions` / `org_state` plus generic `count`+label shape (skips list-id columns); table remains SoT |
+| Dashboard | Direction A / capacity screens | `/dashboard` | pass | Story **9.10**: Panel/hairline metric cards + FeedbackMessage + lastCalc; `workforce_trend` / `starts_terminations` use shared chart chrome; DESIGN categorical CSS tokens |
 | Headcount + drawer | `screens-reports-capacity.html` | `/headcount/*` governed table + row record-drawer (9.4) | pass | Story **9.4** IA: one approvals GovernedDataTable on هدکانت; create FormLayout on ایجاد; exemptions/overrides/historical in 480px Sheet record-drawer; Escape + focus return; drawer focus trap covered by a11y probes |
 | Bulk-entry wizard | `screens-bulk-entry-profile.html` | `/personnel/*/bulk-import`, `/personnel-events/*/bulk-import`, `/headcount/*/bulk-import` | pass | Story **9.3** domain templates + validators + cutover wiring on shared five-step flow (person / TransferRecorded / headcount approval) |
 | Settings | `screens-settings.html` | no production settings route yet | amendment | Epic **10.1–10.2** owns settings registry/surface; mock retained as target — amendment recorded |
-| Chart palettes | `chart-palettes.html` | DESIGN `chart.categorical` + dashboard/report consumers | fixed | Light series-2 cyan `#0B8FA8` → `#087A90` for ≥4.5:1 on white canvas (spine amendment 8.10-A1); mockups synced to `#087A90`; dark categorical unchanged |
+| Chart palettes | `chart-palettes.html` | DESIGN `chart.categorical` + dashboard/report consumers | fixed | Light series-2 cyan `#087A90` (8.10-A1); Story **9.10** wired CSS `--chart-*` + runtime consumers (dashboard + reports + `/dev/gallery`); dark categorical unchanged |
 
 ## Light / dark parity
 

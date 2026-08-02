@@ -5,11 +5,17 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { todayDateOnlyTehran } from "@divan/temporal-engine";
 
 import {
+  CategoricalBarChart,
+  CategoricalLineChart,
+} from "@/components/charts";
+import {
   DashboardFilters,
   type DashboardFilterState,
 } from "@/components/dashboard/dashboard-filters";
 import { DashboardMetricCard } from "@/components/dashboard/dashboard-metric-card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/layout/panel-section";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import { api } from "@/lib/trpc/client";
@@ -66,6 +72,7 @@ function detailLinesForCard(card: {
       );
       break;
     case "starts_terminations":
+      // Chart is primary viz — captions remain secondary for non-mouse access.
       lines.push(
         `شروع: ${toPersianDigits(Number(d.starts ?? 0))}`,
         `خاتمه: ${toPersianDigits(Number(d.terminations ?? 0))}`,
@@ -73,13 +80,8 @@ function detailLinesForCard(card: {
       );
       break;
     case "workforce_trend":
-      if (card.trend && card.trend.length > 0) {
-        for (const b of card.trend.slice(-6)) {
-          lines.push(
-            `${toPersianDigits(b.bucketKey)} — شروع ${toPersianDigits(b.starts)} / خاتمه ${toPersianDigits(b.terminations)}`,
-          );
-        }
-      } else {
+      // Chart is primary; short caption only when buckets exist.
+      if (!card.trend || card.trend.length === 0) {
         lines.push("در این بازه سطلی ثبت نشده.");
       }
       break;
@@ -94,6 +96,50 @@ function detailLinesForCard(card: {
       break;
   }
   return lines.length > 0 ? lines : undefined;
+}
+
+function chartForCard(card: {
+  key: string;
+  outcome: string;
+  messageFa?: string;
+  details?: Record<string, number | string | boolean | null>;
+  trend?: { bucketKey: string; starts: number; terminations: number; net: number }[];
+}): React.ReactNode {
+  if (card.outcome !== "allowed") return null;
+
+  if (card.key === "workforce_trend" && card.trend && card.trend.length > 0) {
+    return (
+      <CategoricalLineChart
+        aria-label="روند نیروی کار"
+        seriesLabels={["شروع", "خاتمه"]}
+        points={card.trend.map((b) => ({
+          label: b.bucketKey,
+          values: [b.starts, b.terminations],
+        }))}
+      />
+    );
+  }
+
+  if (card.key === "starts_terminations" && card.details) {
+    const startsRaw = Number(card.details.starts ?? 0);
+    const terminationsRaw = Number(card.details.terminations ?? 0);
+    const starts = Number.isFinite(startsRaw) ? startsRaw : 0;
+    const terminations = Number.isFinite(terminationsRaw)
+      ? terminationsRaw
+      : 0;
+    return (
+      <CategoricalBarChart
+        aria-label="شروع و خاتمه"
+        seriesLabel="تعداد"
+        data={[
+          { label: "شروع", value: starts },
+          { label: "خاتمه", value: terminations },
+        ]}
+      />
+    );
+  }
+
+  return null;
 }
 
 const GRID_CLASS =
@@ -148,18 +194,20 @@ export function DashboardPanel() {
     visibleCards.length > 0 &&
     visibleCards.every((c) => c.outcome === "suppressed");
 
+  const lastCalcAt = query.data?.lastCalculatedAt ?? null;
+
   const lastCalcFooter =
-    query.data?.lastCalculatedAt != null ? (
+    lastCalcAt != null ? (
       <p className="text-caption text-muted-foreground">
         آخرین محاسبه:{" "}
-        <span className="tabular-nums" dir="ltr">
-          {toPersianDigits(query.data.lastCalculatedAt)}
+        <span className="text-tabular tabular-nums" dir="ltr">
+          {toPersianDigits(lastCalcAt)}
         </span>
-        {query.data.asOf ? (
+        {query.data?.asOf ? (
           <>
             {" "}
             · مبنا:{" "}
-            <span className="tabular-nums">
+            <span className="text-tabular tabular-nums">
               {toPersianDigits(query.data.asOf)}
             </span>
           </>
@@ -179,9 +227,9 @@ export function DashboardPanel() {
       />
 
       {query.data?.populationDisclosureFa ? (
-        <p role="status" className="text-caption text-muted-foreground">
+        <FeedbackMessage kind="info" className="text-caption">
           {query.data.populationDisclosureFa}
-        </p>
+        </FeedbackMessage>
       ) : null}
 
       {!query.data && query.isLoading ? (
@@ -192,36 +240,29 @@ export function DashboardPanel() {
           data-slot="dashboard-skeleton"
         >
           {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="space-y-3 rounded-md border border-hairline p-4"
-            >
+            <Panel key={i} className="space-y-3 border-b border-hairline p-4">
               <Skeleton className="h-4 w-28" />
               <Skeleton className="h-8 w-20" />
               <Skeleton className="h-3 w-3/4" />
-            </div>
+            </Panel>
           ))}
         </div>
       ) : query.isError ? (
-        <p role="alert" className="text-body text-destructive">
+        <FeedbackMessage kind="error">
           {operationalCopy.dashboardLoadError}
-        </p>
+        </FeedbackMessage>
       ) : allSuppressed ? (
         <>
-          <p role="status" aria-live="polite" className="text-heading-sm">
+          <FeedbackMessage kind="info">
             {visibleCards[0]?.messageFa || operationalCopy.suppressedCohort}
-          </p>
+          </FeedbackMessage>
           {lastCalcFooter}
         </>
       ) : allEmpty ? (
         <>
-          <p
-            role="status"
-            aria-live="polite"
-            className="text-body text-muted-foreground"
-          >
+          <FeedbackMessage kind="empty">
             {operationalCopy.emptyDashboardScope}
-          </p>
+          </FeedbackMessage>
           {lastCalcFooter}
         </>
       ) : (
@@ -237,6 +278,8 @@ export function DashboardPanel() {
                 detailsLines={detailLinesForCard(card)}
                 reconcileHref={card.reconcileHref}
                 reconcileLabelFa={card.reconcileLabelFa}
+                lastCalculatedAt={lastCalcAt}
+                chart={chartForCard(card)}
               />
             ))}
           </div>
