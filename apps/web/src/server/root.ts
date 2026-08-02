@@ -37,6 +37,7 @@ import { exportArtifactRouter } from "./export-artifact";
 import { auditRouter } from "./audit";
 import { auditTrustRouter } from "./audit-trust";
 import { operationsRouter } from "./operations";
+import { settingsRouter } from "./settings";
 import { retentionRouter } from "./retention";
 import { correctionCaseRouter } from "./correction-case";
 import { decisionPublicationRouter } from "./decision-publication";
@@ -114,6 +115,8 @@ export const appRouter = createTRPCRouter({
   auditTrust: auditTrustRouter,
 
   operations: operationsRouter,
+
+  settings: settingsRouter,
 
   retention: retentionRouter,
 

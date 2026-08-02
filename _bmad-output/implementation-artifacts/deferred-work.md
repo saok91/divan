@@ -1,3 +1,8 @@
+## Deferred from: code review of 10-2-settings-surface-admin-access.md (2026-08-03)
+
+- `source: "environment"` UI label exists but resolver never emits `environment` — already deferred to Story 10.4 RO inventory honesty (same as 10.1 review).
+- `lastChangedBy` renders raw store `updatedBy` without batched identity DTO — Epic 9 carry-in preference; acceptable for 10.2 DTO minimum until identity display helper is standardized on settings-adjacent lists.
+
 ## Deferred from: code review of 10-1-governed-settings-registry-store.md (2026-08-03)
 
 - `source: "environment"` discrimination and RO session/identity cutover deferred to Story 10.4 inventory — 10.1 only registers shape/metadata; identity-access keeps reading env until 10.4.

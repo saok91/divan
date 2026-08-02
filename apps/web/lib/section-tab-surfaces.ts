@@ -153,6 +153,49 @@ export const SECTION_TAB_SURFACES: readonly SectionTabSurface[] = [
       },
     ],
   },
+  {
+    root: "/settings",
+    surfaceLabel: "تنظیمات",
+    ariaLabel: "بخش‌های تنظیمات",
+    defaultTabId: "general-display",
+    tabs: [
+      {
+        id: "general-display",
+        label: "عمومی و نمایش",
+        href: "/settings/general-display",
+      },
+      {
+        id: "data-retention",
+        label: "داده و نگه‌داشت",
+        href: "/settings/data-retention",
+      },
+      {
+        id: "import-export",
+        label: "ورود و خروجی",
+        href: "/settings/import-export",
+      },
+      {
+        id: "capacity-hiring",
+        label: "ظرفیت و جذب",
+        href: "/settings/capacity-hiring",
+      },
+      {
+        id: "access-session",
+        label: "دسترسی و نشست",
+        href: "/settings/access-session",
+      },
+      {
+        id: "audit-integrity",
+        label: "ممیزی و یکپارچگی",
+        href: "/settings/audit-integrity",
+      },
+      {
+        id: "infrastructure",
+        label: "زیرساخت",
+        href: "/settings/infrastructure",
+      },
+    ],
+  },
 ] as const;
 
 export function surfaceForPath(

@@ -17,6 +17,7 @@ import {
   ScrollText,
   Settings,
   Shield,
+  SlidersHorizontal,
   Upload,
   Users,
 } from "lucide-react";
@@ -60,6 +61,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/audit": ScrollText,
   "/operations": Settings,
   "/correction-cases": FolderOpen,
+  "/settings": SlidersHorizontal,
 };
 
 function isNavActive(pathname: string, href: string): boolean {

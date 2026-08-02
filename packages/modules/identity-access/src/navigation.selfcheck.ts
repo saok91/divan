@@ -39,6 +39,7 @@ const EXPECTED_NAV: Record<CoarseRole, string[]> = {
     "/import",
     "/access",
     "/correction-cases",
+    "/settings",
   ],
   manager: [
     "/dashboard",
@@ -48,7 +49,7 @@ const EXPECTED_NAV: Record<CoarseRole, string[]> = {
     "/reports",
   ],
   audit_reviewer: ["/audit"],
-  system_admin: ["/operations"],
+  system_admin: ["/operations", "/settings"],
 };
 
 const EXPECTED_CATALOG_ORDER = [
@@ -63,9 +64,10 @@ const EXPECTED_CATALOG_ORDER = [
   "/audit",
   "/operations",
   "/correction-cases",
+  "/settings",
 ] as const;
 
-assert.equal(NAV_CATALOG.length, 11);
+assert.equal(NAV_CATALOG.length, 12);
 assert.deepEqual(
   NAV_CATALOG.map((i) => i.href),
   [...EXPECTED_CATALOG_ORDER],
@@ -76,6 +78,11 @@ assert.equal(
   NAV_CATALOG.find((i) => i.href === "/correction-cases")?.label,
   "اصلاح اطلاعات",
 );
+assert.equal(
+  NAV_CATALOG.find((i) => i.href === "/settings")?.label,
+  "تنظیمات",
+);
+assert.equal(NAV_CATALOG[NAV_CATALOG.length - 1]?.href, "/settings");
 
 for (const role of Object.keys(EXPECTED_LANDINGS) as CoarseRole[]) {
   assert.equal(getRoleLandingPath(role), EXPECTED_LANDINGS[role], role);
@@ -95,8 +102,13 @@ assert.equal(canAccessPath("audit_reviewer", "/audit"), true);
 assert.equal(canAccessPath("audit_reviewer", "/dashboard"), false);
 assert.equal(canAccessPath("audit_reviewer", "/personnel-events"), false);
 assert.equal(canAccessPath("system_admin", "/operations"), true);
+assert.equal(canAccessPath("system_admin", "/settings"), true);
 assert.equal(canAccessPath("system_admin", "/personnel"), false);
 assert.equal(canAccessPath("system_admin", "/personnel-events"), false);
+assert.equal(canAccessPath("hr_admin", "/settings"), true);
+assert.equal(canAccessPath("hr_operator", "/settings"), false);
+assert.equal(canAccessPath("manager", "/settings"), false);
+assert.equal(canAccessPath("audit_reviewer", "/settings"), false);
 
 assert.equal(canAccessPath("hr_operator", "/personnel/../operations"), false);
 assert.equal(canAccessPath("hr_operator", "/personnel/%2e%2e/operations"), false);

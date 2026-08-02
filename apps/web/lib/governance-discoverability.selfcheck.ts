@@ -76,6 +76,7 @@ assert.doesNotMatch(
 assert.ok(operationalCopy.accessSurfacePurpose.length > 0);
 assert.ok(operationalCopy.auditSurfacePurpose.length > 0);
 assert.ok(operationalCopy.operationsSurfacePurpose.length > 0);
+assert.ok(operationalCopy.settingsSurfacePurpose.length > 0);
 assert.ok(operationalCopy.lifecycleHostPurpose.length > 0);
 
 const accessLayout = read("app/(app)/access/(tabs)/layout.tsx");
@@ -86,6 +87,10 @@ assert.match(auditPage, /auditSurfacePurpose/);
 
 const opsPage = read("app/(app)/operations/page.tsx");
 assert.match(opsPage, /operationsSurfacePurpose/);
+
+const settingsLayout = read("app/(app)/settings/(tabs)/layout.tsx");
+assert.match(settingsLayout, /settingsSurfacePurpose/);
+assert.match(settingsLayout, /visibleSettingsTabsForRole/);
 
 const dictPage = read("app/(app)/personnel/(tabs)/dictionary/page.tsx");
 assert.match(dictPage, /lifecycleHostPurpose/);
@@ -118,7 +123,8 @@ const panel = read("components/correction-cases/correction-cases-panel.tsx");
 assert.match(panel, /GlossaryTerm/);
 assert.match(panel, /correctionCase/);
 
-// No settings nav claimed
-assert.doesNotMatch(nav, /تنظیمات/);
+// Settings nav present for admin roles (Story 10.2)
+assert.match(nav, /href:\s*"\/settings"/);
+assert.match(nav, /label:\s*"تنظیمات"/);
 
 console.log("governance-discoverability.selfcheck: ok");

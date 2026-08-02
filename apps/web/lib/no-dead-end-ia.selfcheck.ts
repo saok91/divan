@@ -63,10 +63,10 @@ function isChromeComponent(mod: string): boolean {
   return CHROME_COMPONENT_PREFIXES.some((p) => mod.startsWith(p));
 }
 
-/** Redirect roots (defaultTabHref) or a non-chrome @/components host. */
+/** Redirect roots (defaultTabHref / defaultSettingsTabHref) or a non-chrome @/components host. */
 function hasHostSignal(source: string): boolean {
   const code = stripComments(source);
-  if (/defaultTabHref/.test(code)) return true;
+  if (/default(?:Settings)?TabHref/.test(code)) return true;
   const importRe = /from\s+["'](@\/components\/[^"']+)["']/g;
   let match: RegExpExecArray | null;
   while ((match = importRe.exec(code)) !== null) {
@@ -209,10 +209,15 @@ try {
   const hrefToPage = buildHrefToPageMap();
 
   // --- Catalog inventory + ≥1 role ---
-  assert.equal(NAV_CATALOG.length, 11, "NAV_CATALOG length must stay 11");
+  assert.equal(NAV_CATALOG.length, 12, "NAV_CATALOG length must stay 12");
   assert.ok(
-    !NAV_CATALOG.some((item) => item.href === "/settings" || item.label === "تنظیمات"),
-    "Settings («تنظیمات») must stay out of NAV_CATALOG (Epic 10)",
+    NAV_CATALOG.some((item) => item.href === "/settings" && item.label === "تنظیمات"),
+    "Settings («تنظیمات») must be in NAV_CATALOG (Story 10.2)",
+  );
+  assert.equal(
+    NAV_CATALOG[NAV_CATALOG.length - 1]?.href,
+    "/settings",
+    "Settings must be the last NAV_CATALOG item",
   );
 
   for (const item of NAV_CATALOG) {
@@ -243,6 +248,39 @@ try {
     }
   }
   assert.ok(tabHrefs.length > 0, "SECTION_TAB_SURFACES must expose tabs");
+
+  // --- Settings surface: functional hosts, no placeholders (Story 10.2) ---
+  const settingsTabs = SECTION_TAB_SURFACES.find((s) => s.root === "/settings");
+  assert.ok(settingsTabs, "SECTION_TAB_SURFACES must register /settings");
+  assert.equal(settingsTabs.tabs.length, 7, "settings must register all seven domains");
+  for (const tab of settingsTabs.tabs) {
+    const pageAbs = hrefToPage.get(tab.href);
+    assert.ok(pageAbs, `settings tab ${tab.href} has no page.tsx`);
+    const source = fs.readFileSync(pageAbs, "utf8");
+    assert.doesNotMatch(
+      stripComments(source),
+      PLACEHOLDER_BANNED,
+      `settings tab ${tab.href} must not use placeholder chrome`,
+    );
+    assert.ok(
+      hasHostSignal(source) ||
+        /renderSettingsDomainPage|SettingsDomainPanel/.test(
+          stripComments(source),
+        ),
+      `settings tab ${tab.href} must host real content`,
+    );
+  }
+  const sidebarIcons = readWeb("components/app-sidebar.tsx");
+  assert.match(
+    sidebarIcons,
+    /"\/settings":\s*SlidersHorizontal/,
+    "sidebar must use a distinct icon for /settings (not ops Settings)",
+  );
+  assert.match(
+    sidebarIcons,
+    /"\/operations":\s*Settings/,
+    "ops must keep Lucide Settings icon",
+  );
 
   // --- UX-DR3 wiring ---
   const layout = readWeb("app/(app)/layout.tsx");
@@ -301,6 +339,8 @@ try {
   runWebScript("selfcheck:headcount-ia");
   console.log("no-dead-end-ia: running selfcheck:reports-ia…");
   runWebScript("selfcheck:reports-ia");
+  console.log("no-dead-end-ia: running selfcheck:settings-ia…");
+  runWebScript("selfcheck:settings-ia");
 
   console.log(
     `no-dead-end-ia.selfcheck: ok (${NAV_CATALOG.length} catalog + ${tabHrefs.length} tabs)`,

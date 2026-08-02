@@ -110,6 +110,12 @@ export {
 } from "./ops-health";
 
 export {
+  MSG_SETTINGS_DENIED_FA,
+  SETTINGS_CONFIGURATION_DATA_CATEGORY,
+  SETTINGS_READ_PERMISSION,
+} from "./settings-access";
+
+export {
   DATA_LIFECYCLE_DATA_CATEGORY,
   DATA_LIFECYCLE_DISPOSE_PERMISSION,
   DATA_LIFECYCLE_HOLD_PERMISSION,
@@ -659,6 +665,13 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
     {
       permission: "ops.health.read",
       dataCategory: "ops.platform",
+      action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    // Story 10.2 — provisional settings surface (AR-ACCESS / AR-DATA pending freeze)
+    {
+      permission: "settings.read",
+      dataCategory: "settings.configuration",
       action: "read",
       organizationalScope: "org:selfcheck",
     },

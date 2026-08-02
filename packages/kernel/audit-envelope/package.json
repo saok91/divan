@@ -14,6 +14,7 @@
     "selfcheck:inference-bulk": "tsx src/inference-bulk.selfcheck.ts",
     "selfcheck:investigation": "tsx src/investigation.selfcheck.ts",
     "selfcheck:ops-health": "tsx src/ops-health.selfcheck.ts",
+    "selfcheck:settings-access": "tsx src/settings-access.selfcheck.ts",
     "selfcheck:data-lifecycle": "tsx src/data-lifecycle.selfcheck.ts",
     "selfcheck:audit-trust": "tsx src/audit-trust.selfcheck.ts",
     "selfcheck:audit-trust-baseline": "tsx src/audit-trust-baseline.selfcheck.ts",

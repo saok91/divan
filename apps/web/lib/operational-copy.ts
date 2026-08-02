@@ -691,6 +691,19 @@ export const operationalCopy = {
     "بازبین مستقل شواهد قابل‌انتساب را برای تحقیق فیلتر و جزئیات بررسی می‌کند.",
   operationsSurfacePurpose:
     "سلامت سرویس، صف بازمحاسبه و آرتیفکت‌های پرتاب برای SysAdmin — بدون مرور محتوای HR.",
+  settingsSurfacePurpose:
+    "پارامترهای حاکمیتی مجاز برای نقش شما — فقط مشاهده؛ تغییر در موج ویرایش بعدی.",
+  settingsLoading: "در حال بارگذاری تنظیمات…",
+  settingsLoadError: "بارگذاری تنظیمات ممکن نشد.",
+  settingsStoreUnavailable:
+    "مخزن تنظیمات در دسترس نبود؛ مقادیر پیش‌فرض کد نمایش داده می‌شوند.",
+  settingsEmpty: "برای این بخش پارامتری ثبت نشده است.",
+  settingsNeverChanged: "هنوز تغییری ثبت نشده",
+  settingsSourceCodeDefault: "پیش‌فرض کد",
+  settingsSourceStore: "ذخیرهٔ حاکمیتی",
+  settingsSourceEnvironment: "محیط استقرار",
+  settingsEditabilityAdmin: "قابل ویرایش توسط ادمین",
+  settingsEditabilityReadOnly: "فقط‌خواندنی با مسیر تغییر",
   lifecycleHostPurpose:
     "نگهداری قانونی حذف را مسدود می‌کند؛ حذف فقط عملیاتی/خروجی است — نه پاک‌کردن ردیف ممیزی.",
   auditTrustReviewRequiresAuditor:

@@ -16,6 +16,7 @@ import { getIdentityProvider } from "./config";
 import { seedExportPermissionFixtures } from "./seed-export";
 import { seedAuditPermissionFixtures } from "./seed-audit";
 import { seedOpsPermissionFixtures } from "./seed-ops";
+import { seedSettingsPermissionFixtures } from "./seed-settings";
 import { seedRetentionPermissionFixtures } from "./seed-retention";
 import { seedAuditTrustPermissionFixtures } from "./seed-audit-trust";
 import { seedCorrectionCasePermissionFixtures } from "./seed-correction-case";
@@ -166,6 +167,7 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
     await seedExportPermissionFixtures(tx as unknown as PrismaClient);
     await seedAuditPermissionFixtures(tx as unknown as PrismaClient);
     await seedOpsPermissionFixtures(tx as unknown as PrismaClient);
+    await seedSettingsPermissionFixtures(tx as unknown as PrismaClient);
     await seedRetentionPermissionFixtures(tx as unknown as PrismaClient);
     await seedAuditTrustPermissionFixtures(tx as unknown as PrismaClient);
     await seedCorrectionCasePermissionFixtures(tx as unknown as PrismaClient);

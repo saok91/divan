@@ -79,6 +79,11 @@ export {
 } from "./seed";
 
 export {
+  SEED_SETTINGS_PERMISSIONS,
+  seedSettingsPermissionFixtures,
+} from "./seed-settings";
+
+export {
   ACCESS_ADMINISTRATION_PERMISSION,
   ACCESS_ADMIN_DATA_CATEGORY,
   EMPTY_ENTITLEMENTS_COPY_FA,

@@ -218,6 +218,13 @@ export const DEV_DEMO_CATEGORIES: CategoryRegistry = freezeRegistry([
     sensitivity: "ordinary",
     requiresSeparateExport: false,
   },
+  // Story 10.2 — governed settings surface (ordinary; NOT person `health`)
+  {
+    id: "settings.configuration",
+    enabled: true,
+    sensitivity: "ordinary",
+    requiresSeparateExport: false,
+  },
 ]);
 
 /**

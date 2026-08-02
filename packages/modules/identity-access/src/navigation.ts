@@ -23,6 +23,7 @@ export const NAV_CATALOG: readonly NavItem[] = Object.freeze([
   { href: "/audit", label: "ممیزی" },
   { href: "/operations", label: "عملیات" },
   { href: "/correction-cases", label: "اصلاح اطلاعات" },
+  { href: "/settings", label: "تنظیمات" },
 ]);
 
 /** Role → permitted catalog hrefs (exact Epic-1 coarse matrix + events). */
@@ -45,6 +46,7 @@ const ROLE_NAV_HREFS: Readonly<Record<CoarseRole, readonly string[]>> =
       "/import",
       "/access",
       "/correction-cases",
+      "/settings",
     ]),
     manager: Object.freeze([
       "/dashboard",
@@ -54,7 +56,7 @@ const ROLE_NAV_HREFS: Readonly<Record<CoarseRole, readonly string[]>> =
       "/reports",
     ]),
     audit_reviewer: Object.freeze(["/audit"]),
-    system_admin: Object.freeze(["/operations"]),
+    system_admin: Object.freeze(["/operations", "/settings"]),
   });
 
 const ROLE_LANDING: Readonly<Record<CoarseRole, string>> = Object.freeze({
