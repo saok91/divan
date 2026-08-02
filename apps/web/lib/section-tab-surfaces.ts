@@ -155,10 +155,6 @@ export const SECTION_TAB_SURFACES: readonly SectionTabSurface[] = [
   },
 ] as const;
 
-/** Placeholder copy for tab shells until 4b.5–4b.7 fill content. */
-export const SECTION_TAB_PLACEHOLDER =
-  "محتوای این بخش در استوری بعدی تکمیل می‌شود.";
-
 export function surfaceForPath(
   pathname: string,
 ): SectionTabSurface | undefined {

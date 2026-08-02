@@ -39,6 +39,7 @@
     "selfcheck:personnel-events-list": "tsx lib/personnel-events-list.selfcheck.ts",
     "selfcheck:drill-through": "tsx lib/drill-through.selfcheck.ts",
     "selfcheck:governance-discoverability": "tsx lib/governance-discoverability.selfcheck.ts",
+    "selfcheck:no-dead-end-ia": "tsx lib/no-dead-end-ia.selfcheck.ts",
     "selfcheck:design-qa": "tsx lib/design-qa.selfcheck.ts"
   },
   "dependencies": {

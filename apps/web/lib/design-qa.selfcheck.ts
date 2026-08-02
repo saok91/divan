@@ -174,6 +174,7 @@ const REQUIRED_SCRIPTS = [
   "selfcheck:a11y-floor",
   "selfcheck:drill-through",
   "selfcheck:governance-discoverability",
+  "selfcheck:no-dead-end-ia",
 ] as const;
 
 function runWebScript(script: string): void {
