@@ -113,6 +113,7 @@ export {
   MSG_SETTINGS_DENIED_FA,
   SETTINGS_CONFIGURATION_DATA_CATEGORY,
   SETTINGS_READ_PERMISSION,
+  SETTINGS_WRITE_PERMISSION,
 } from "./settings-access";
 
 export {
@@ -673,6 +674,13 @@ export const DEV_DEMO_POLICY: PolicyRegistry = {
       permission: "settings.read",
       dataCategory: "settings.configuration",
       action: "read",
+      organizationalScope: "org:selfcheck",
+    },
+    // Story 10.3 — settings write (same category; soft PS gated separately)
+    {
+      permission: "settings.write",
+      dataCategory: "settings.configuration",
+      action: "write",
       organizationalScope: "org:selfcheck",
     },
     // Story 7.3 — provisional data lifecycle / legal hold (AR-ACCESS / AR-DATA pending freeze)

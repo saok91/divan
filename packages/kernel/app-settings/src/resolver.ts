@@ -21,6 +21,13 @@ import type {
   SettingsScalar,
   SettingsValueSource,
 } from "./types";
+import { validateSettingsValue } from "./validate";
+
+export {
+  assertValidSettingsValue,
+  invalidSettingsValueMessageFa,
+  validateSettingsValue,
+} from "./validate";
 
 type CacheEntry = {
   value: SettingsScalar;
@@ -55,69 +62,6 @@ export const MSG_SETTINGS_CONFIG_DEGRADED_FA =
 export const MSG_SETTINGS_STORE_UNAVAILABLE_FA =
   "مخزن تنظیمات در دسترس نبود؛ مقادیر پیش‌فرض کد اعمال شد.";
 
-function isNumberLike(def: SettingsParameterDefinition): boolean {
-  return def.valueType === "number" || def.valueType === "duration_ms";
-}
-
-function parseCandidate(
-  def: SettingsParameterDefinition,
-  raw: unknown,
-): SettingsScalar | null {
-  if (raw == null) return null;
-
-  if (isNumberLike(def)) {
-    const n =
-      typeof raw === "number"
-        ? raw
-        : typeof raw === "string"
-          ? Number(raw)
-          : NaN;
-    if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
-    if (def.range?.min != null && n < def.range.min) return null;
-    if (def.range?.max != null && n > def.range.max) return null;
-    return n;
-  }
-
-  if (def.valueType === "boolean") {
-    if (typeof raw === "boolean") return raw;
-    if (raw === "true" || raw === 1 || raw === "1") return true;
-    if (raw === "false" || raw === 0 || raw === "0") return false;
-    return null;
-  }
-
-  if (def.valueType === "string") {
-    if (typeof raw !== "string") return null;
-    if (def.allowlist && def.allowlist.length > 0) {
-      if (!def.allowlist.includes(raw)) return null;
-    }
-    return raw;
-  }
-
-  if (def.valueType === "string_list") {
-    let list: unknown[] | null = null;
-    if (Array.isArray(raw)) list = raw;
-    else if (typeof raw === "string") {
-      try {
-        const parsed = JSON.parse(raw) as unknown;
-        if (Array.isArray(parsed)) list = parsed;
-      } catch {
-        return null;
-      }
-    }
-    if (!list || !list.every((x) => typeof x === "string")) return null;
-    const strings = list as string[];
-    if (strings.length === 0) return null;
-    if (def.allowlist && def.allowlist.length > 0) {
-      for (const s of strings) {
-        if (!def.allowlist.includes(s)) return null;
-      }
-    }
-    return strings;
-  }
-
-  return null;
-}
-
 function seedCodeDefaults(degraded: boolean): Map<string, CacheEntry> {
   const entries = new Map<string, CacheEntry>();
   for (const key of listGovernedSettingsKeys()) {
@@ -150,7 +94,7 @@ function applyValidatedOverrides(
       degradedKeys.push(row.parameterKey);
       continue;
     }
-    const parsed = parseCandidate(def, row.valueJson);
+    const parsed = validateSettingsValue(def, row.valueJson);
     if (parsed == null) {
       degradedKeys.push(row.parameterKey);
       continue;

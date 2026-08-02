@@ -1,3 +1,7 @@
+## Deferred from: code review of 10-3-editable-parameter-wave-1.md (2026-08-03)
+
+- Reuse of `SETTINGS_INVALID_DEFINITION` for invalid user-supplied values (vs bad registry definitions) — pre-existing error-code enum shape in app-settings; split codes later if ops/monitoring needs distinct signals.
+
 ## Deferred from: code review of 10-2-settings-surface-admin-access.md (2026-08-03)
 
 - `source: "environment"` UI label exists but resolver never emits `environment` — already deferred to Story 10.4 RO inventory honesty (same as 10.1 review).

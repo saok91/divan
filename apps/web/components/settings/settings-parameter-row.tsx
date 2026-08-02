@@ -1,13 +1,17 @@
 /**
- * Registry-driven settings parameter row (Story 10.2 / DESIGN settings-row).
- * Read-only: plain text + lock + change path for RO — never a disabled fake input.
- * No apply / reset / blast-radius controls (those are Story 10.3).
+ * Registry-driven settings parameter row (Story 10.2–10.3 / DESIGN settings-row).
+ * RO: plain text + lock + change path — never a disabled fake input.
+ * Editable: composed SettingsParameterEditor (apply/reset/blast/reason).
  */
 
 "use client";
 
 import { Lock } from "lucide-react";
 
+import {
+  SettingsParameterEditor,
+  type SettingsMutationFeedback,
+} from "@/components/settings/settings-parameter-editor";
 import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
@@ -39,8 +43,6 @@ function formatScalar(
     text = value ? "بله" : "خیر";
   } else if (typeof value === "number") {
     text = toPersianDigits(String(value));
-  } else if (valueType === "duration_ms" && typeof value === "string") {
-    text = toPersianDigits(value);
   } else if (typeof value === "string" && /^\d+(\.\d+)?$/.test(value)) {
     text = toPersianDigits(value);
   } else {
@@ -59,8 +61,10 @@ function formatRange(
   }
   if (!range) return "—";
   const parts: string[] = [];
-  if (range.min != null) parts.push(`حداقل ${toPersianDigits(String(range.min))}`);
-  if (range.max != null) parts.push(`حداکثر ${toPersianDigits(String(range.max))}`);
+  if (range.min != null)
+    parts.push(`حداقل ${toPersianDigits(String(range.min))}`);
+  if (range.max != null)
+    parts.push(`حداکثر ${toPersianDigits(String(range.max))}`);
   return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
@@ -76,10 +80,30 @@ function formatLastChange(row: SettingsParameterRowDto): string {
 
 type SettingsParameterRowProps = {
   row: SettingsParameterRowDto;
+  storeUnavailable?: boolean;
+  onRowUpdated?: (row: SettingsParameterRowDto) => void;
+  onFeedback?: (feedback: SettingsMutationFeedback) => void;
 };
 
-export function SettingsParameterRow({ row }: SettingsParameterRowProps) {
+export function SettingsParameterRow({
+  row,
+  storeUnavailable = false,
+  onRowUpdated,
+  onFeedback,
+}: SettingsParameterRowProps) {
   const isReadOnly = row.editability === "read_only_with_evidence";
+
+  if (!isReadOnly && onRowUpdated && onFeedback) {
+    return (
+      <SettingsParameterEditor
+        row={row}
+        storeUnavailable={storeUnavailable}
+        onRowUpdated={onRowUpdated}
+        onFeedback={onFeedback}
+      />
+    );
+  }
+
   const editabilityLabel = isReadOnly
     ? operationalCopy.settingsEditabilityReadOnly
     : operationalCopy.settingsEditabilityAdmin;

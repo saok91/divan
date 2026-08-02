@@ -10,6 +10,7 @@ import {
   getSettingsParameter,
 } from "./registry";
 import type { SettingsOverrideRow, SettingsScalar } from "./types";
+import { assertValidSettingsValue } from "./validate";
 
 export type PgQueryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
@@ -50,15 +51,6 @@ async function refreshCacheAfterMutation(db: PgQueryable): Promise<void> {
   await invalidateSettingsCache(db);
 }
 
-function assertUpsertableValue(value: SettingsScalar): void {
-  if (typeof value === "number" && !Number.isFinite(value)) {
-    throw new GovernedSettingsError(
-      "SETTINGS_INVALID_DEFINITION",
-      "مقدار عددی تنظیمات باید finite باشد.",
-    );
-  }
-}
-
 export async function upsertOverride(
   db: PgQueryable,
   input: {
@@ -76,7 +68,8 @@ export async function upsertOverride(
       `پارامتر فقط‌خواندنی قابل ذخیره در مخزن نیست: ${input.parameterKey}`,
     );
   }
-  assertUpsertableValue(input.value);
+  // Shared parse — reject before write (do not rely on warm degrade).
+  const parsed = assertValidSettingsValue(def, input.value);
 
   const effectAt =
     input.effectAt == null || String(input.effectAt).trim() === ""
@@ -99,7 +92,7 @@ export async function upsertOverride(
                previous_value_json, effect_at`,
     [
       input.parameterKey,
-      JSON.stringify(input.value),
+      JSON.stringify(parsed),
       input.updatedBy ?? null,
       input.reason ?? null,
       effectAt,

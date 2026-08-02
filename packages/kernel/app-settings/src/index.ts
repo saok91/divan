@@ -54,6 +54,12 @@ export {
 } from "./resolver";
 
 export {
+  assertValidSettingsValue,
+  invalidSettingsValueMessageFa,
+  validateSettingsValue,
+} from "./validate";
+
+export {
   MSG_SETTINGS_CONFIG_NOT_WARMED_FA,
   MSG_SETTINGS_CONFIG_OK_FA,
   getConfigurationOpsHealthSection,

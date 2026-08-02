@@ -692,11 +692,13 @@ export const operationalCopy = {
   operationsSurfacePurpose:
     "سلامت سرویس، صف بازمحاسبه و آرتیفکت‌های پرتاب برای SysAdmin — بدون مرور محتوای HR.",
   settingsSurfacePurpose:
-    "پارامترهای حاکمیتی مجاز برای نقش شما — فقط مشاهده؛ تغییر در موج ویرایش بعدی.",
+    "پارامترهای حاکمیتی مجاز برای نقش شما — مشاهده و اعمال تغییر برای کلیدهای قابل‌ویرایش.",
   settingsLoading: "در حال بارگذاری تنظیمات…",
   settingsLoadError: "بارگذاری تنظیمات ممکن نشد.",
   settingsStoreUnavailable:
     "مخزن تنظیمات در دسترس نبود؛ مقادیر پیش‌فرض کد نمایش داده می‌شوند.",
+  settingsStoreUnavailableApply:
+    "مخزن تنظیمات در دسترس نیست؛ اعمال تغییر ممکن نیست.",
   settingsEmpty: "برای این بخش پارامتری ثبت نشده است.",
   settingsNeverChanged: "هنوز تغییری ثبت نشده",
   settingsSourceCodeDefault: "پیش‌فرض کد",
@@ -704,6 +706,30 @@ export const operationalCopy = {
   settingsSourceEnvironment: "محیط استقرار",
   settingsEditabilityAdmin: "قابل ویرایش توسط ادمین",
   settingsEditabilityReadOnly: "فقط‌خواندنی با مسیر تغییر",
+  settingsUnknownKey: "پارامتر تنظیمات ناشناخته است.",
+  settingsReadOnlyRefuse: "این پارامتر فقط‌خواندنی است و از این سطح قابل تغییر نیست.",
+  settingsApplyError: "اعمال تغییر تنظیمات ممکن نشد.",
+  settingsResetError: "بازگشت به پیش‌فرض ممکن نشد.",
+  settingsApplySuccess: "تغییر اعمال شد.",
+  settingsResetSuccess: "به پیش‌فرض کد بازگردانده شد.",
+  settingsApplyCta: "اعمال تغییر",
+  settingsApplyOpenConfirm: "تأیید و اعمال…",
+  settingsResetLabel: "بازگشت به پیش‌فرض",
+  settingsResetDisabledReason: "مقدار هم‌اکنون پیش‌فرض کد است.",
+  settingsResetConfirmTitle: "بازگشت به پیش‌فرض",
+  settingsApplyConfirmTitle: "تأیید اعمال تغییر",
+  settingsReasonLabel: "دلیل تغییر",
+  settingsReasonHelp: "حداقل ۱۰ نویسه — برای ردپای تغییر ثبت می‌شود.",
+  settingsReasonTooShort: "دلیل باید حداقل ۱۰ نویسه باشد.",
+  settingsValueInvalid: "مقدار خارج از بازه یا فهرست مجاز است.",
+  settingsPreviousValue: "مقدار فعلی",
+  settingsNewValue: "مقدار جدید",
+  settingsBlastRadiusLabel: "شعاع اثر",
+  settingsHighImpactConfirm:
+    "این پارامتر اثر بالا دارد؛ قبل از اعمال، شعاع اثر را بخوانید و تأیید کنید.",
+  settingsCancel: "انصراف",
+  settingsEditDisabledStore: "تا برقراری مخزن، ویرایش ممکن نیست.",
+  settingsConfirmUnderstood: "شعاع اثر را خواندم و تأیید می‌کنم",
   lifecycleHostPurpose:
     "نگهداری قانونی حذف را مسدود می‌کند؛ حذف فقط عملیاتی/خروجی است — نه پاک‌کردن ردیف ممیزی.",
   auditTrustReviewRequiresAuditor:

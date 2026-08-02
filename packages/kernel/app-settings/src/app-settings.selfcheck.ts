@@ -29,6 +29,7 @@ import {
   resolveSetting,
   resolveSettingNumber,
   upsertOverride,
+  validateSettingsValue,
   warmSettingsCache,
 } from "./index";
 
@@ -81,6 +82,24 @@ assert.throws(
   (err: unknown) =>
     err instanceof GovernedSettingsError && err.code === "SETTINGS_UNKNOWN_KEY",
 );
+
+// --- Pure: shared validate (Story 10.3) ---
+const maxFileDef = getSettingsParameter("import.max_file_bytes");
+assert.equal(validateSettingsValue(maxFileDef, 2 * 1024 * 1024), 2 * 1024 * 1024);
+assert.equal(validateSettingsValue(maxFileDef, -1), null);
+assert.equal(validateSettingsValue(maxFileDef, 1.5), null);
+const allowlistDefPure = getSettingsParameter("correction.attachment_allowlist");
+assert.deepEqual(validateSettingsValue(allowlistDefPure, ["pdf", "png"]), [
+  "pdf",
+  "png",
+]);
+assert.deepEqual(
+  validateSettingsValue(allowlistDefPure, ["pdf", "pdf", "png"]),
+  ["pdf", "png"],
+  "string_list duplicates are deduped",
+);
+assert.equal(validateSettingsValue(allowlistDefPure, []), null);
+assert.equal(validateSettingsValue(allowlistDefPure, ["exe"]), null);
 
 // --- Pure: resolve before warm → code default, no throw ---
 resetSettingsCacheForTests();
@@ -179,25 +198,37 @@ try {
   await invalidateSettingsCache(pool);
   assert.equal(resolveSettingNumber("import.max_file_bytes").value, 3 * 1024 * 1024);
 
-  // Invalid override → code default + degraded
-  await upsertOverride(pool, {
-    parameterKey: "import.max_file_bytes",
-    value: -1, // out of range
-  });
-  const invalid = resolveSettingNumber("import.max_file_bytes");
-  assert.equal(invalid.value, 5 * 1024 * 1024);
-  assert.equal(invalid.source, "code_default");
-  assert.equal(invalid.degraded, true);
-  assert.ok(isSettingsConfigurationDegraded());
-  assert.ok(getSettingsDegradedKeys().includes("import.max_file_bytes"));
-  const degradedHealth = getConfigurationOpsHealthSection();
-  assert.equal(degradedHealth.status, "degraded");
-  assert.ok(
-    (degradedHealth.detailFa ?? "").includes("پیش‌فرض") ||
-      degradedHealth.detailFa === MSG_SETTINGS_CONFIG_DEGRADED_FA,
+  // OOR / empty string_list / RO → reject before write (Story 10.3)
+  const beforeReject = resolveSettingNumber("import.max_file_bytes").value;
+  await assert.rejects(
+    () =>
+      upsertOverride(pool, {
+        parameterKey: "import.max_file_bytes",
+        value: -1,
+      }),
+    (err: unknown) =>
+      err instanceof GovernedSettingsError &&
+      err.code === "SETTINGS_INVALID_DEFINITION",
+  );
+  assert.equal(
+    resolveSettingNumber("import.max_file_bytes").value,
+    beforeReject,
+    "failed upsert must not change resolved value",
   );
 
-  // RO / security posture must not upsert
+  const allowlistDef = getSettingsParameter("correction.attachment_allowlist");
+  assert.equal(validateSettingsValue(allowlistDef, []), null);
+  await assert.rejects(
+    () =>
+      upsertOverride(pool, {
+        parameterKey: "correction.attachment_allowlist",
+        value: [],
+      }),
+    (err: unknown) =>
+      err instanceof GovernedSettingsError &&
+      err.code === "SETTINGS_INVALID_DEFINITION",
+  );
+
   await assert.rejects(
     () =>
       upsertOverride(pool, {
@@ -209,12 +240,34 @@ try {
       err.code === "SETTINGS_INVALID_DEFINITION",
   );
 
-  // Delete override → code default, clear that key from degraded on re-warm
+  // Delete override → code default restored without restart
   await deleteOverride(pool, "import.max_file_bytes");
   const afterDelete = resolveSettingNumber("import.max_file_bytes");
   assert.equal(afterDelete.value, 5 * 1024 * 1024);
   assert.equal(afterDelete.source, "code_default");
   assert.equal(afterDelete.degraded, false);
+
+  // Warm safety net: raw invalid store row still degrades (apply path rejects)
+  await pool.query(
+    `INSERT INTO app_settings.parameter_override
+       (parameter_key, value_json, updated_at, updated_by, reason)
+     VALUES ($1, $2::jsonb, CURRENT_TIMESTAMP, $3, $4)
+     ON CONFLICT (parameter_key) DO UPDATE SET
+       value_json = EXCLUDED.value_json`,
+    ["import.max_file_bytes", JSON.stringify(-1), "selfcheck", "raw-invalid"],
+  );
+  await invalidateSettingsCache(pool);
+  const degradedWarm = resolveSettingNumber("import.max_file_bytes");
+  assert.equal(degradedWarm.value, 5 * 1024 * 1024);
+  assert.equal(degradedWarm.source, "code_default");
+  assert.equal(degradedWarm.degraded, true);
+  assert.ok(isSettingsConfigurationDegraded());
+  assert.ok(getSettingsDegradedKeys().includes("import.max_file_bytes"));
+  assert.equal(
+    getConfigurationOpsHealthSection().detailFa,
+    MSG_SETTINGS_CONFIG_DEGRADED_FA,
+  );
+  await deleteOverride(pool, "import.max_file_bytes");
 
   // Simulated unavailable store: warm with broken queryable
   resetSettingsCacheForTests();

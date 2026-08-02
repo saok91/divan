@@ -1,5 +1,5 @@
 /**
- * Shared settings list DTO (Story 10.2) — server + client row contract.
+ * Shared settings list DTO (Story 10.2–10.3) — server + client row contract.
  */
 
 import type { SettingsValueSource } from "@divan/app-settings";
@@ -19,6 +19,8 @@ export type SettingsParameterRowDto = {
   lastChangedBy: string | null;
   lastChangedAtIso: string | null;
   valueType: string;
+  highImpact: boolean;
+  blastRadiusFa: string | null;
 };
 
 export type SettingsListByDomainResult = {
@@ -28,4 +30,8 @@ export type SettingsListByDomainResult = {
   storeUnavailable: boolean;
   /** Short Persian detail when storeUnavailable (or null). */
   detailFa: string | null;
+};
+
+export type SettingsMutationResult = {
+  row: SettingsParameterRowDto;
 };
