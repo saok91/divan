@@ -190,7 +190,7 @@ export function requiresCustodyAcknowledgement(input: {
 }): boolean {
   return (
     input.hasSensitiveFields ||
-    input.rowCount >= EXPORT_CUSTODY_BULK_ROW_THRESHOLD
+    input.rowCount >= EXPORT_CUSTODY_BULK_ROW_THRESHOLD()
   );
 }
 
@@ -301,7 +301,7 @@ export async function createExportArtifact(
     rowCount: projected.length,
   });
 
-  const ttl = input.ttlMs ?? EXPORT_ARTIFACT_TTL_MS;
+  const ttl = input.ttlMs ?? EXPORT_ARTIFACT_TTL_MS();
   const expiresAt = new Date(Date.now() + ttl);
   const safeName = `divan-export-${input.sourceSurface}-${Date.now()}.${input.format}`;
 

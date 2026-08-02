@@ -87,7 +87,7 @@ async function main(): Promise<void> {
       false,
       "already ending today is not soon-warn",
     );
-    assert.equal(HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS, 14);
+    assert.equal(HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS(), 14);
 
     // --- Approval near expiry warning ---
     const nearEnd = addDays(today, 10);

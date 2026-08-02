@@ -224,7 +224,13 @@ export const correctionCaseRouter = createTRPCRouter({
         } catch {
           /* soft-deny secondary */
         }
-        return { read, write, decide, close };
+        return {
+          read,
+          write,
+          decide,
+          close,
+          attachmentMaxBytes: loadCorrectionCaseAttachmentPolicy().maxBytes,
+        };
       } catch (err) {
         mapCorrectionCaseError(err);
       }

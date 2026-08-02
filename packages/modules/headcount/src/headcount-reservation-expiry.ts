@@ -3,6 +3,7 @@
  * AR-HEADCOUNT: N=14 day warning; do not invent escalation owners.
  */
 
+import { resolveSettingNumber } from "@divan/app-settings";
 import type { Pool, PoolClient } from "@divan/db";
 import { parseDateOnly, todayDateOnlyTehran } from "@divan/temporal-engine";
 
@@ -12,8 +13,10 @@ import {
   type HeadcountApprovalStatus,
 } from "./headcount-approval";
 
-/** AR-HEADCOUNT may retune N — keep as named constant. */
-export const HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS = 14;
+/** Warning window via AD-7 resolver (Story 10.1). */
+export function HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS(): number {
+  return resolveSettingNumber("headcount.reservation_expiry_warning_days").value;
+}
 
 export const MSG_HEADCOUNT_APPROVAL_EXPIRY_SOON_FA =
   "اعتبار مجوز ظرفیت متصل به رزرو تا ۱۴ روز دیگر به پایان می‌رسد؛ پیش از اعمال اثر رسیدگی کنید.";
@@ -72,7 +75,7 @@ export function isApprovalExpiryWithinWarningHorizon(
   } = {},
 ): boolean {
   const today = opts.today ?? todayDateOnlyTehran();
-  const n = opts.warningDays ?? HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS;
+  const n = opts.warningDays ?? HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS();
   const endParsed = parseDateOnly(validityEndExclusive);
   if (!endParsed.ok) return false;
   // Already ended or ending today → not "soon" warning (exception path elsewhere)

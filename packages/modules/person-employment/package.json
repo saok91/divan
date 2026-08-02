@@ -38,6 +38,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@divan/app-settings": "workspace:*",
     "@divan/audit-envelope": "workspace:*",
     "@divan/compensation-facts": "workspace:*",
     "@divan/db": "workspace:*",

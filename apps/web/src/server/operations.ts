@@ -22,6 +22,10 @@ import {
   type OpsHealthSection,
   type OpsHealthSnapshot,
 } from "@divan/audit-envelope";
+import {
+  getConfigurationOpsHealthSection,
+  warmSettingsCache,
+} from "@divan/app-settings";
 import { getSharedPgPool, type Pool } from "@divan/db";
 import { appendAccessEvent } from "@divan/event-store";
 import {
@@ -322,6 +326,23 @@ async function buildOpsHealthSnapshot(
     };
   }
 
+  // Story 10.1 — configuration degraded (FR45); warm cache if needed, never throw.
+  let configuration: OpsHealthSection = {
+    status: "ok",
+    detailFa: "پیکربندی تنظیمات بررسی نشد.",
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    await warmSettingsCache(pool);
+    configuration = getConfigurationOpsHealthSection() as OpsHealthSection;
+  } catch {
+    configuration = {
+      status: "degraded",
+      detailFa: "بررسی پیکربندی تنظیمات ممکن نشد؛ پیش‌فرض کد اعمال می‌شود.",
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   return {
     identity,
     service,
@@ -330,6 +351,7 @@ async function buildOpsHealthSnapshot(
     backup: backupSection,
     dependencies,
     auditTrust,
+    configuration,
     honestyFa,
     correlationId,
   };

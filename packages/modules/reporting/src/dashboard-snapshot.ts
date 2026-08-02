@@ -236,7 +236,7 @@ function summarizeOpenHeadcount(
       if (
         isApprovalExpiryWithinWarningHorizon(a.validityEndExclusive, {
           today: asOf,
-          warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
+          warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS(),
         })
       ) {
         nearExpiryCount += 1;
@@ -290,7 +290,7 @@ export async function assembleDashboardSnapshot(
       lastCalculatedAt,
       asOf: filter.asOf,
       populationVolume: null,
-      warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
+      warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS(),
     };
   }
 
@@ -300,7 +300,7 @@ export async function assembleDashboardSnapshot(
       lastCalculatedAt,
       asOf: filter.asOf,
       populationVolume: 0,
-      warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
+      warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS(),
     };
   }
 
@@ -520,7 +520,7 @@ export async function assembleDashboardSnapshot(
           openFree: openFreeValue,
           nearExpiryCount: open.nearExpiryCount,
           expiredNonConsumableCount: open.expiredNonConsumableCount,
-          warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
+          warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS(),
           freeSource: historical?.ok === true ? "historical" : "approval_slots",
         },
         reconcileHref: capacityReconcileHref({ teamId: filter.teamId }),
@@ -536,7 +536,7 @@ export async function assembleDashboardSnapshot(
     lastCalculatedAt,
     asOf: filter.asOf,
     populationVolume: input.subjectIds.length,
-    warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
+    warningDays: HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS(),
   };
 }
 

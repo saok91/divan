@@ -4,9 +4,13 @@
  * No parallel SoT — consumers must pass authorized Person ids only.
  */
 
+/** Soft list cap via AD-7 resolver (Story 10.1). */
+import { resolveSettingNumber } from "@divan/app-settings";
 import type { CurrentPersonState } from "./current-person-state";
 
-export const PERSONNEL_LIST_MAX_ROWS = 500;
+export function PERSONNEL_LIST_MAX_ROWS(): number {
+  return resolveSettingNumber("list.personnel_max_rows").value;
+}
 
 /** UUID v4-ish Person.id shape (not fixture `person:a1`). */
 export function isPersonUuid(id: string): boolean {

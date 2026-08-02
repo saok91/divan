@@ -30,6 +30,7 @@ import type {
   PrismaClient,
 } from "@divan/db";
 import { getSharedPgPool } from "@divan/db";
+import { resolveSettingNumber } from "@divan/app-settings";
 
 import { randomUUID } from "node:crypto";
 
@@ -212,7 +213,8 @@ export type GrantView = {
   updatedAt: string;
 };
 
-const DEFAULT_RECERT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const DEFAULT_RECERT_WINDOW_MS = (): number =>
+  resolveSettingNumber("entitlement.recert_window_ms").value;
 
 function toIso(d: Date | null | undefined): string | null {
   return d ? d.toISOString() : null;
@@ -1001,7 +1003,7 @@ export async function activateGrant(
       }
     }
 
-    const windowMs = input.recertWindowMs ?? DEFAULT_RECERT_WINDOW_MS;
+    const windowMs = input.recertWindowMs ?? DEFAULT_RECERT_WINDOW_MS();
     const recertifyBy =
       input.recertifyBy !== undefined
         ? input.recertifyBy
@@ -1229,7 +1231,7 @@ export async function recertifyGrant(
       "این دسترسی منقضی شده و قابل بازتأیید نیست.",
     );
   }
-  const windowMs = input.recertWindowMs ?? DEFAULT_RECERT_WINDOW_MS;
+  const windowMs = input.recertWindowMs ?? DEFAULT_RECERT_WINDOW_MS();
   const recertifyBy =
     input.recertifyBy ?? new Date(now.getTime() + windowMs);
 

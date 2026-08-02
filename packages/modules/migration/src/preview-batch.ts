@@ -9,6 +9,8 @@
 
 import { randomUUID } from "node:crypto";
 
+import { resolveSettingNumber } from "@divan/app-settings";
+
 import type { ParsedImportMatrix } from "./parse-workbook";
 import { MigrationError } from "./errors";
 import {
@@ -89,10 +91,16 @@ type StoredDraft = {
 
 const draftStore = new Map<string, StoredDraft>();
 
-/** Bound in-process memory (single-process ops assumption). */
-export const IMPORT_MAX_DRAFTS_GLOBAL = 50;
-export const IMPORT_MAX_DRAFTS_PER_ACTOR = 5;
-export const IMPORT_DRAFT_TTL_MS = 60 * 60 * 1000;
+/** Bound in-process memory via AD-7 resolver (Story 10.1). */
+export function IMPORT_MAX_DRAFTS_GLOBAL(): number {
+  return resolveSettingNumber("import.max_drafts_global").value;
+}
+export function IMPORT_MAX_DRAFTS_PER_ACTOR(): number {
+  return resolveSettingNumber("import.max_drafts_per_actor").value;
+}
+export function IMPORT_DRAFT_TTL_MS(): number {
+  return resolveSettingNumber("import.draft_ttl_ms").value;
+}
 
 function severityForRow(
   sourceRow: number,
@@ -148,8 +156,9 @@ function projectRowValues(
 }
 
 function purgeExpiredDrafts(now = Date.now()): void {
+  const ttl = IMPORT_DRAFT_TTL_MS();
   for (const [id, stored] of draftStore) {
-    if (now - stored.createdAtMs > IMPORT_DRAFT_TTL_MS) {
+    if (now - stored.createdAtMs > ttl) {
       draftStore.delete(id);
     }
   }
@@ -157,7 +166,7 @@ function purgeExpiredDrafts(now = Date.now()): void {
 
 function assertDraftCapacity(actorAccountId: string): void {
   purgeExpiredDrafts();
-  if (draftStore.size >= IMPORT_MAX_DRAFTS_GLOBAL) {
+  if (draftStore.size >= IMPORT_MAX_DRAFTS_GLOBAL()) {
     throw new MigrationError(
       "VALIDATION_FAILED",
       "ظرفیت پیش‌نویس‌های موقت پر است. پیش‌نمایش‌های قبلی را لغو کنید یا بعداً دوباره تلاش کنید.",
@@ -167,7 +176,7 @@ function assertDraftCapacity(actorAccountId: string): void {
   for (const stored of draftStore.values()) {
     if (stored.createdByAccountId === actorAccountId) actorCount++;
   }
-  if (actorCount >= IMPORT_MAX_DRAFTS_PER_ACTOR) {
+  if (actorCount >= IMPORT_MAX_DRAFTS_PER_ACTOR()) {
     throw new MigrationError(
       "VALIDATION_FAILED",
       "تعداد پیش‌نویس‌های باز شما به حد مجاز رسیده است. یکی را لغو کنید و دوباره بارگذاری کنید.",

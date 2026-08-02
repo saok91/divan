@@ -10,6 +10,11 @@
  * MVP seeds both on hr.admin — do not auto-grant audit/ops/trust.
  */
 
+import {
+  resolveSettingNumber,
+  resolveSettingStringList,
+} from "@divan/app-settings";
+
 /** @provisional-pending-AR-ACCESS-freeze — list/get cases + evidence meta */
 export const CORRECTION_CASE_READ_PERMISSION = "correction.case.read";
 
@@ -295,8 +300,8 @@ export type CorrectionCaseAttachmentPolicy = {
   enforceConfigured: boolean;
 };
 
-/** @provisional-pending-AR-DATA-freeze */
-const PROVISIONAL_DEFAULT_ALLOWLIST: Readonly<
+/** @provisional-pending-AR-DATA-freeze — MIME map is structural; extensions come from registry. */
+const PROVISIONAL_MIME_BY_EXT: Readonly<
   Record<string, readonly string[]>
 > = {
   pdf: ["application/pdf"],
@@ -307,9 +312,27 @@ const PROVISIONAL_DEFAULT_ALLOWLIST: Readonly<
   csv: ["text/csv", "text/plain", "application/csv"],
 };
 
-const PROVISIONAL_DEFAULT_MAX_BYTES = 1_048_576; // 1 MiB
-const PROVISIONAL_DEFAULT_MAX_PER_CASE = 10;
 const PROVISIONAL_PREVIEW_EXTENSIONS = ["pdf", "png", "jpg", "jpeg"] as const;
+
+function defaultAllowlistFromRegistry(): Readonly<
+  Record<string, readonly string[]>
+> {
+  const exts = resolveSettingStringList("correction.attachment_allowlist").value;
+  const out: Record<string, readonly string[]> = {};
+  for (const ext of exts) {
+    const mimes = PROVISIONAL_MIME_BY_EXT[ext];
+    if (mimes) out[ext] = mimes;
+  }
+  return Object.keys(out).length > 0 ? out : {};
+}
+
+function defaultMaxBytesFromRegistry(): number {
+  return resolveSettingNumber("correction.attachment_max_bytes").value;
+}
+
+function defaultMaxPerCaseFromRegistry(): number {
+  return resolveSettingNumber("correction.attachment_max_per_case").value;
+}
 
 /** Extensions always rejected (active/executable/script/unauthorized archive). */
 const REJECT_EXTENSIONS = new Set([
@@ -378,7 +401,7 @@ function parseAllowlistEnv(
   for (const part of raw.split(",")) {
     const ext = part.trim().toLowerCase().replace(/^\./, "");
     if (!ext) continue;
-    const defaults = PROVISIONAL_DEFAULT_ALLOWLIST[ext];
+    const defaults = PROVISIONAL_MIME_BY_EXT[ext];
     if (defaults) {
       out[ext] = [...defaults];
     } else {
@@ -394,7 +417,7 @@ function parseAllowlistEnv(
  * @provisional-pending-AR-DATA-freeze
  *
  * DIVAN_CORRECTION_CASE_ENFORCE=1 → require explicit knobs (fail-closed if missing).
- * Otherwise use documented provisional defaults.
+ * Otherwise use governed registry defaults via resolver (no parallel env SoT).
  */
 export function loadCorrectionCaseAttachmentPolicy(
   env: NodeJS.ProcessEnv = process.env,
@@ -403,11 +426,10 @@ export function loadCorrectionCaseAttachmentPolicy(
     env.DIVAN_CORRECTION_CASE_ENFORCE === "1" ||
     env.DIVAN_CORRECTION_CASE_ENFORCE === "true";
 
-  const allowlist = parseAllowlistEnv(env.DIVAN_CORRECTION_CASE_ALLOWLIST);
-  const maxBytes = parsePositiveInt(env.DIVAN_CORRECTION_CASE_MAX_BYTES);
-  const maxPerCase = parsePositiveInt(env.DIVAN_CORRECTION_CASE_MAX_PER_CASE);
-
   if (enforceConfigured) {
+    const allowlist = parseAllowlistEnv(env.DIVAN_CORRECTION_CASE_ALLOWLIST);
+    const maxBytes = parsePositiveInt(env.DIVAN_CORRECTION_CASE_MAX_BYTES);
+    const maxPerCase = parsePositiveInt(env.DIVAN_CORRECTION_CASE_MAX_PER_CASE);
     if (allowlist == null || maxBytes == null || maxPerCase == null) {
       throw new CorrectionCaseError(
         "CORRECTION_CASE_ALLOWLIST_UNSET",
@@ -425,9 +447,9 @@ export function loadCorrectionCaseAttachmentPolicy(
   }
 
   return {
-    allowlist: allowlist ?? PROVISIONAL_DEFAULT_ALLOWLIST,
-    maxBytes: maxBytes ?? PROVISIONAL_DEFAULT_MAX_BYTES,
-    maxPerCase: maxPerCase ?? PROVISIONAL_DEFAULT_MAX_PER_CASE,
+    allowlist: defaultAllowlistFromRegistry(),
+    maxBytes: defaultMaxBytesFromRegistry(),
+    maxPerCase: defaultMaxPerCaseFromRegistry(),
     previewExtensions: PROVISIONAL_PREVIEW_EXTENSIONS,
     enforceConfigured: false,
   };

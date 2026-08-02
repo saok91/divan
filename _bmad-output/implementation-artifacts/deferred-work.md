@@ -1,3 +1,10 @@
+## Deferred from: code review of 10-1-governed-settings-registry-store.md (2026-08-03)
+
+- `source: "environment"` discrimination and RO session/identity cutover deferred to Story 10.4 inventory — 10.1 only registers shape/metadata; identity-access keeps reading env until 10.4.
+- `effect_at` is stored but ignored by warm/resolve — AC#7 foreshadow for 10.5 change-control; do not invent effect-time scheduling in 10.1.
+- Zod import base64 ceiling is fixed at registry max (50 MiB), not the effective `import.max_file_bytes` — documented tradeoff; runtime still enforces the resolver value.
+- `app-settings.selfcheck` exits 0 when `DATABASE_URL` or schema `022` is missing — same kernel selfcheck pattern without local DB; store round-trip gates only run when DB is present.
+
 ## Deferred from: code review of 9-10-dashboard-report-visual-quality.md (2026-08-03)
 
 - Sequential palette has no dark-theme override in `globals.css` — AC #1 does not require dark sequential; revisit if dark heatmaps ship.

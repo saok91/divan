@@ -45,6 +45,8 @@ export type OpsHealthSnapshot = {
   dependencies: OpsHealthSection;
   /** Story 7.4 — audit trust summary (no HR rows) */
   auditTrust?: OpsHealthSection;
+  /** Story 10.1 — governed settings / configuration degraded (FR45; HR-free) */
+  configuration?: OpsHealthSection;
   /** Optional honesty banners (Epic 6 retro) */
   honestyFa?: string[];
   correlationId: string;

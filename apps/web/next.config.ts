@@ -17,11 +17,13 @@ const nextConfig: NextConfig = {
     "@divan/db",
     "@divan/event-store",
     "@divan/temporal-engine",
+    "@divan/app-settings",
     "@divan/audit-envelope",
     "@divan/identity-access",
     "@divan/person-employment",
     "@divan/compensation-facts",
     "@divan/headcount",
+    "@divan/migration",
     "@divan/reporting",
   ],
 };

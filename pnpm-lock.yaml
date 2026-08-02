@@ -23,6 +23,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@divan/app-settings':
+        specifier: workspace:*
+        version: link:../../packages/kernel/app-settings
       '@divan/audit-envelope':
         specifier: workspace:*
         version: link:../../packages/kernel/audit-envelope
@@ -173,8 +176,33 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
+  packages/kernel/app-settings:
+    dependencies:
+      pg:
+        specifier: ^8.16.3
+        version: 8.22.0
+    devDependencies:
+      '@divan/db':
+        specifier: workspace:*
+        version: link:../../db
+      '@types/pg':
+        specifier: ^8.15.4
+        version: 8.20.0
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      tsx:
+        specifier: ^4.20.3
+        version: 4.23.1
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
   packages/kernel/audit-envelope:
     dependencies:
+      '@divan/app-settings':
+        specifier: workspace:*
+        version: link:../app-settings
       '@divan/event-store':
         specifier: workspace:*
         version: link:../event-store
@@ -262,6 +290,9 @@ importers:
 
   packages/modules/headcount:
     dependencies:
+      '@divan/app-settings':
+        specifier: workspace:*
+        version: link:../../kernel/app-settings
       '@divan/audit-envelope':
         specifier: workspace:*
         version: link:../../kernel/audit-envelope
@@ -287,6 +318,9 @@ importers:
 
   packages/modules/identity-access:
     dependencies:
+      '@divan/app-settings':
+        specifier: workspace:*
+        version: link:../../kernel/app-settings
       '@divan/audit-envelope':
         specifier: workspace:*
         version: link:../../kernel/audit-envelope
@@ -327,6 +361,9 @@ importers:
 
   packages/modules/migration:
     dependencies:
+      '@divan/app-settings':
+        specifier: workspace:*
+        version: link:../../kernel/app-settings
       '@divan/audit-envelope':
         specifier: workspace:*
         version: link:../../kernel/audit-envelope
@@ -364,6 +401,9 @@ importers:
 
   packages/modules/person-employment:
     dependencies:
+      '@divan/app-settings':
+        specifier: workspace:*
+        version: link:../../kernel/app-settings
       '@divan/audit-envelope':
         specifier: workspace:*
         version: link:../../kernel/audit-envelope
@@ -395,6 +435,9 @@ importers:
 
   packages/modules/reporting:
     dependencies:
+      '@divan/app-settings':
+        specifier: workspace:*
+        version: link:../../kernel/app-settings
       '@divan/audit-envelope':
         specifier: workspace:*
         version: link:../../kernel/audit-envelope
@@ -6445,7 +6488,7 @@ snapshots:
       '@next/eslint-plugin-next': 16.2.10
       eslint: 9.39.5(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@2.7.0))
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@2.7.0))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.5(jiti@2.7.0))
       eslint-plugin-react: 7.37.5(eslint@9.39.5(jiti@2.7.0))
@@ -6468,7 +6511,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0)):
+  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@2.7.0)):
     dependencies:
       '@nolyfill/is-core-module': 1.0.39
       debug: 4.4.3
@@ -6483,14 +6526,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.14.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0)):
+  eslint-module-utils@2.14.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@2.7.0)):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
       '@typescript-eslint/parser': 8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
       eslint: 9.39.5(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@2.7.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -6505,7 +6548,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 9.39.5(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
-      eslint-module-utils: 2.14.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0))
+      eslint-module-utils: 2.14.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@2.7.0))
       hasown: 2.0.4
       is-core-module: 2.16.2
       is-glob: 4.0.3

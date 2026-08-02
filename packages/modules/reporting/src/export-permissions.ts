@@ -5,6 +5,8 @@
  * Envelope policy must use action: "export" (not read) — 6.4 lesson.
  */
 
+import { resolveSettingNumber } from "@divan/app-settings";
+
 /** @provisional-pending-AR-ACCESS-freeze */
 export const REPORT_EXPORT_PERMISSION = "report.export";
 
@@ -19,16 +21,20 @@ export const PERSON_EXPORT_PERMISSION = "person.export";
 export const EXPORT_RETRIEVE_PERMISSION = "export.retrieve";
 
 /**
- * @provisional — default managed-artifact TTL when AR-DATA silent.
+ * @provisional — default managed-artifact TTL via AD-7 resolver (Story 10.1).
  * Short fail-closed window (hours), not a signed retention policy.
  */
-export const EXPORT_ARTIFACT_TTL_MS = 4 * 60 * 60 * 1000;
+export function EXPORT_ARTIFACT_TTL_MS(): number {
+  return resolveSettingNumber("export.artifact_ttl_ms").value;
+}
 
 /**
- * @provisional — custody acknowledgement required at or above this row count
- * (bulk retrieval) even without sensitive columns. Not an AR volume threshold.
+ * @provisional — custody acknowledgement threshold via AD-7 resolver (Story 10.1).
+ * Bulk retrieval even without sensitive columns. Not an AR volume threshold.
  */
-export const EXPORT_CUSTODY_BULK_ROW_THRESHOLD = 25;
+export function EXPORT_CUSTODY_BULK_ROW_THRESHOLD(): number {
+  return resolveSettingNumber("export.custody_bulk_row_threshold").value;
+}
 
 export const CLASSIFICATION_INTERNAL_FA = "داخلی — محدود";
 export const CLASSIFICATION_SENSITIVE_FA = "حساس — محدود";

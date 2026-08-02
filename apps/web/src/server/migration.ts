@@ -76,9 +76,12 @@ import { createTRPCRouter, governedProcedure } from "./trpc";
 const MSG_TEMPLATE_INVALID_FA = "کلید قالب واردسازی نامعتبر است.";
 const MSG_UPLOAD_INVALID_FA = "فایل واردسازی نامعتبر است.";
 
-/** Base64 length ceiling ≈ decoded IMPORT_MAX_FILE_BYTES (+ padding slack). */
+/**
+ * Zod transport ceiling for base64 body — upper bound of registry range
+ * (50 MiB), not the effective AD-7 setting. Runtime still enforces IMPORT_MAX_FILE_BYTES().
+ */
 const CONTENT_BASE64_MAX_CHARS =
-  Math.ceil((IMPORT_MAX_FILE_BYTES * 4) / 3) + 8;
+  Math.ceil((50 * 1024 * 1024 * 4) / 3) + 8;
 
 const BASE64_BODY_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 
@@ -598,10 +601,17 @@ export const migrationRouter = createTRPCRouter({
             message: MSG_UPLOAD_INVALID_FA,
           });
         }
-        if (buffer.byteLength > IMPORT_MAX_FILE_BYTES) {
+        if (buffer.byteLength > IMPORT_MAX_FILE_BYTES()) {
+          const maxBytes = IMPORT_MAX_FILE_BYTES();
+          const limitFa =
+            maxBytes >= 1024 * 1024
+              ? `${Math.floor(maxBytes / (1024 * 1024))} مگابایت`
+              : maxBytes >= 1024
+                ? `${Math.floor(maxBytes / 1024)} کیلوبایت`
+                : `${maxBytes} بایت`;
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: `حجم فایل از حد مجاز (${Math.floor(IMPORT_MAX_FILE_BYTES / (1024 * 1024))} مگابایت) بیشتر است.`,
+            message: `حجم فایل از حد مجاز (${limitFa}) بیشتر است.`,
           });
         }
 

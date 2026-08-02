@@ -6,6 +6,7 @@
  * Leading formula-control characters are stored/displayed as literal text.
  */
 
+import { resolveSettingNumber } from "@divan/app-settings";
 import ExcelJS from "exceljs";
 
 import { MigrationError } from "./errors";
@@ -15,10 +16,14 @@ import {
   type LaunchImportTemplate,
 } from "./templates";
 
-/** Hard limits — NFR-13 envelope; not invented AR-NFR percentiles. */
-export const IMPORT_MAX_FILE_BYTES = 5 * 1024 * 1024;
+/** Hard limits — NFR-13 envelope via AD-7 resolver (Story 10.1). */
+export function IMPORT_MAX_FILE_BYTES(): number {
+  return resolveSettingNumber("import.max_file_bytes").value;
+}
 export const IMPORT_MAX_SHEETS = 1;
-export const IMPORT_MAX_DATA_ROWS = 5_000;
+export function IMPORT_MAX_DATA_ROWS(): number {
+  return resolveSettingNumber("import.max_data_rows").value;
+}
 
 const FORMULA_CONTROL_PREFIX = /^[=+\-@\t\r]/;
 
@@ -131,11 +136,22 @@ export function hasFormulaControlPrefix(value: string): boolean {
   return FORMULA_CONTROL_PREFIX.test(value);
 }
 
+function formatImportByteLimitFa(maxBytes: number): string {
+  if (maxBytes >= 1024 * 1024) {
+    return `${Math.floor(maxBytes / (1024 * 1024))} مگابایت`;
+  }
+  if (maxBytes >= 1024) {
+    return `${Math.floor(maxBytes / 1024)} کیلوبایت`;
+  }
+  return `${maxBytes} بایت`;
+}
+
 function assertFileSize(byteLength: number): void {
-  if (byteLength > IMPORT_MAX_FILE_BYTES) {
+  const maxBytes = IMPORT_MAX_FILE_BYTES();
+  if (byteLength > maxBytes) {
     throw new MigrationError(
       "FILE_TOO_LARGE",
-      `حجم فایل از حد مجاز (${Math.floor(IMPORT_MAX_FILE_BYTES / (1024 * 1024))} مگابایت) بیشتر است.`,
+      `حجم فایل از حد مجاز (${formatImportByteLimitFa(maxBytes)}) بیشتر است.`,
     );
   }
 }
@@ -199,10 +215,11 @@ function matrixToRecords(
     );
   }
 
-  if (matrix.length > IMPORT_MAX_DATA_ROWS) {
+  const maxRows = IMPORT_MAX_DATA_ROWS();
+  if (matrix.length > maxRows) {
     throw new MigrationError(
       "ROW_LIMIT",
-      `تعداد ردیف‌ها از حد مجاز (${IMPORT_MAX_DATA_ROWS}) بیشتر است.`,
+      `تعداد ردیف‌ها از حد مجاز (${maxRows}) بیشتر است.`,
     );
   }
 
@@ -250,7 +267,7 @@ export function parseCsvText(
     if (maxTotalRows != null && rows.length > maxTotalRows) {
       throw new MigrationError(
         "ROW_LIMIT",
-        `تعداد ردیف‌ها از حد مجاز (${IMPORT_MAX_DATA_ROWS}) بیشتر است.`,
+        `تعداد ردیف‌ها از حد مجاز (${IMPORT_MAX_DATA_ROWS()}) بیشتر است.`,
       );
     }
   };
@@ -318,19 +335,20 @@ export async function parseCsvBuffer(
   }
   const template = assertTemplateKey(templateKey);
   const text = buffer.toString("utf8");
+  const maxRows = IMPORT_MAX_DATA_ROWS();
   // header + max data rows — reject while parsing, not after full materialize
   const allRows = parseCsvText(text, {
-    maxTotalRows: IMPORT_MAX_DATA_ROWS + 1,
+    maxTotalRows: maxRows + 1,
   });
   if (allRows.length === 0) {
     throw new MigrationError("PARSE_FAILED", "فایل CSV خالی است.");
   }
   const headers = (allRows[0] ?? []).map((h) => h.trim());
   const data = allRows.slice(1);
-  if (data.length > IMPORT_MAX_DATA_ROWS) {
+  if (data.length > maxRows) {
     throw new MigrationError(
       "ROW_LIMIT",
-      `تعداد ردیف‌ها از حد مجاز (${IMPORT_MAX_DATA_ROWS}) بیشتر است.`,
+      `تعداد ردیف‌ها از حد مجاز (${maxRows}) بیشتر است.`,
     );
   }
   const sourceRowNumbers = data.map((_, i) => i + 2);

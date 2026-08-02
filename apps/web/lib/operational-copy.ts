@@ -494,6 +494,7 @@ export const operationalCopy = {
   opsSectionImport: "ورود / مهاجرت",
   opsSectionBackup: "پشتیبان / بازیابی",
   opsSectionDependencies: "وابستگی‌ها",
+  opsSectionConfiguration: "پیکربندی تنظیمات",
   opsSectionAuditTrust: "اعتماد ممیزی",
   opsHonestyTitle: "صداقت عملیاتی",
   opsStatusOk: "سالم",

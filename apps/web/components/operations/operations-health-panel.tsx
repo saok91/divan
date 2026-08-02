@@ -292,6 +292,13 @@ export function OperationsHealthPanel() {
           title={operationalCopy.opsSectionDependencies}
           section={snapshot.dependencies}
         />
+        {snapshot.configuration ? (
+          <HealthSection
+            id="ops-configuration"
+            title={operationalCopy.opsSectionConfiguration}
+            section={snapshot.configuration}
+          />
+        ) : null}
         {snapshot.auditTrust ? (
           <HealthSection
             id="ops-audit-trust"

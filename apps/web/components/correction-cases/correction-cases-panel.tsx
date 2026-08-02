@@ -103,8 +103,6 @@ type CaseRow = {
 
 type DialogKind = "open" | "decide" | "close" | "link" | "evidence" | null;
 
-const ATTACHMENT_MAX_BYTES_CLIENT = 1_048_576;
-
 function statusLabel(status: string): string {
   switch (status) {
     case "open":
@@ -497,7 +495,8 @@ export function CorrectionCasesPanel() {
 
   async function onFileChosen(file: File | null) {
     if (!file || !selectedId) return;
-    if (file.size > ATTACHMENT_MAX_BYTES_CLIENT) {
+    const maxBytes = caps?.attachmentMaxBytes;
+    if (typeof maxBytes === "number" && file.size > maxBytes) {
       setActionError(operationalCopy.correctionCaseAttachmentTooLarge);
       setUploadName("");
       setUploadB64("");

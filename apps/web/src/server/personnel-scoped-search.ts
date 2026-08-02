@@ -29,6 +29,7 @@ import {
   throwEvaluationSnapshotConflict,
   type AuthoritativeEvaluationSnapshot,
 } from "@divan/audit-envelope";
+import { resolveSettingNumber } from "@divan/app-settings";
 import { COMPENSATION_DATA_CATEGORY } from "@divan/compensation-facts";
 import { getSharedPgPool, type Pool } from "@divan/db";
 import {
@@ -115,9 +116,13 @@ export type PersonnelScopedSearchResult = {
   totalInSnapshot: number | null;
 };
 
-/** Story 7.8 — FR-33 authoritative pagination defaults. */
-export const PERSONNEL_SEARCH_PAGE_SIZE_DEFAULT = 50;
-export const PERSONNEL_SEARCH_PAGE_SIZE_MAX = 100;
+/** Story 7.8 — FR-33 authoritative pagination defaults via AD-7 (Story 10.1). */
+export function PERSONNEL_SEARCH_PAGE_SIZE_DEFAULT(): number {
+  return resolveSettingNumber("list.search_page_size_default").value;
+}
+export function PERSONNEL_SEARCH_PAGE_SIZE_MAX(): number {
+  return resolveSettingNumber("list.search_page_size_max").value;
+}
 const PERSONNEL_SEARCH_PAGINATION_TTL_MS = 60 * 60 * 1000;
 const EVAL_SNAPSHOT_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -132,10 +137,10 @@ function resolvePageParams(input: {
       : 1;
   const rawSize = Number.isInteger(input.pageSize)
     ? (input.pageSize as number)
-    : PERSONNEL_SEARCH_PAGE_SIZE_DEFAULT;
+    : PERSONNEL_SEARCH_PAGE_SIZE_DEFAULT();
   const pageSize = Math.min(
     Math.max(rawSize, 1),
-    PERSONNEL_SEARCH_PAGE_SIZE_MAX,
+    PERSONNEL_SEARCH_PAGE_SIZE_MAX(),
   );
   return { page, pageSize };
 }
@@ -436,9 +441,10 @@ export async function projectAuthorizedPersonnelRows(input: {
   const uuidIds = [...new Set(input.subjectIds.filter(isPersonUuid))];
   if (uuidIds.length === 0) return { rows: [], truncated: false };
 
-  const truncated = uuidIds.length > PERSONNEL_LIST_MAX_ROWS;
+  const maxRows = PERSONNEL_LIST_MAX_ROWS();
+  const truncated = uuidIds.length > maxRows;
   const cappedIds = truncated
-    ? uuidIds.slice(0, PERSONNEL_LIST_MAX_ROWS)
+    ? uuidIds.slice(0, maxRows)
     : uuidIds;
 
   const allowedCategories = new Set<string>([PERSON_DATA_CATEGORY]);
