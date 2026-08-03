@@ -44,6 +44,7 @@ export const operationalCopy = {
   auditOpenReview: "باز کردن بازبینی مستقل",
   auditFilterActor: "بازیگر",
   auditFilterOperation: "عملیات",
+  auditFilterOperationPrefix: "پیشوند عملیات",
   auditFilterEntityType: "نوع موجودیت",
   auditFilterEntityId: "موجودیت",
   auditFilterResult: "نتیجه",
@@ -710,8 +711,9 @@ export const operationalCopy = {
   settingsReadOnlyRefuse: "این پارامتر فقط‌خواندنی است و از این سطح قابل تغییر نیست.",
   settingsApplyError: "اعمال تغییر تنظیمات ممکن نشد.",
   settingsResetError: "بازگشت به پیش‌فرض ممکن نشد.",
-  settingsApplySuccess: "تغییر اعمال شد.",
-  settingsResetSuccess: "به پیش‌فرض کد بازگردانده شد.",
+  settingsApplySuccess: "تغییر اعمال شد. این تغییر در ممیزی ثبت می‌شود.",
+  settingsResetSuccess:
+    "به پیش‌فرض کد بازگردانده شد. این تغییر در ممیزی ثبت می‌شود.",
   settingsApplyCta: "اعمال تغییر",
   settingsApplyOpenConfirm: "تأیید و اعمال…",
   settingsResetLabel: "بازگشت به پیش‌فرض",
@@ -730,6 +732,13 @@ export const operationalCopy = {
   settingsCancel: "انصراف",
   settingsEditDisabledStore: "تا برقراری مخزن، ویرایش ممکن نیست.",
   settingsConfirmUnderstood: "شعاع اثر را خواندم و تأیید می‌کنم",
+  /** Story 10.5 — FR51 trust/append failure (ops copy; never «دسترسی ندارید.»). */
+  settingsEvidenceRequiredFail:
+    "ثبت شواهد ممیزی برای این تغییر ممکن نشد؛ تغییر اعمال نشد. وضعیت اعتماد ممیزی را در عملیات بررسی کنید.",
+  settingsViewInAuditCta: "مشاهده در ممیزی",
+  settingsParameterHistoryCta: "تاریخچهٔ این پارامتر",
+  settingsAuditLinkHint:
+    "برای دیدن ردپای این تغییر، سطح تحقیق ممیزی را با فیلتر عملیات تنظیمات باز کنید.",
   settingsInventorySectionHint:
     "کنترل‌شده در زیرساخت — خروجی شامل کل موجودی فقط‌خواندنی قابل‌دید نقش است (نه فقط این تب).",
   settingsInventoryExportCta: "خروجی موجودی تنظیمات",

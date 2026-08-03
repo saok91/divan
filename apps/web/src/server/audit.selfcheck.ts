@@ -53,6 +53,9 @@ function main() {
   );
   assert.ok(panelSrc.includes("canOpenExportArtifact"));
   assert.ok(panelSrc.includes("gregorianDateTimePartsToIso"));
+  assert.ok(panelSrc.includes("operationPrefix"));
+  assert.ok(panelSrc.includes("hydrateDraftFromSearchParams") || panelSrc.includes("useSearchParams"));
+  assert.ok(pageSrc.includes("Suspense"));
 
   const rootSrc = readFileSync(rootPath, "utf8");
   assert.ok(rootSrc.includes("audit: auditRouter"));

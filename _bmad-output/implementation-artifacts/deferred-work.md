@@ -1,3 +1,8 @@
+## Deferred from: code review of 10-5-configuration-change-control-evidence.md (2026-08-04)
+
+- Empty-filter `audit.search` fires before URL hydrate applies filters — cosmetic flash of unfiltered results; same one-shot hydrate pattern.
+- Brief resolver cache staleness between TX commit and post-commit `invalidateSettingsCache` — inherent to `skipCacheRefresh` + after-commit warm.
+
 ## Deferred from: code review of 10-4-readonly-infrastructure-security-inventory.md (2026-08-03)
 
 - Inventory/export selfchecks are mostly source-regex + warm — no real create/download/reauth/secret-byte exercise; deepen when export E2E harness exists.

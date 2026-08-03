@@ -40,6 +40,7 @@
     "selfcheck:settings-ia": "tsx components/settings/settings-ia.selfcheck.ts",
     "selfcheck:settings-mutation": "tsx src/server/settings-mutation.selfcheck.ts",
     "selfcheck:settings-inventory": "tsx src/server/settings-inventory.selfcheck.ts",
+    "selfcheck:settings-evidence": "tsx src/server/settings-evidence.selfcheck.ts",
     "selfcheck:personnel-events-list": "tsx lib/personnel-events-list.selfcheck.ts",
     "selfcheck:drill-through": "tsx lib/drill-through.selfcheck.ts",
     "selfcheck:governance-discoverability": "tsx lib/governance-discoverability.selfcheck.ts",

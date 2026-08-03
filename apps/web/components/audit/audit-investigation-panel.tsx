@@ -7,6 +7,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 
 import {
   EntityPicker,
@@ -61,6 +62,7 @@ type DraftFilters = {
   actor: EntityPickerValue;
   actorTechnicalId: string;
   operation: string;
+  operationPrefix: string;
   entityType: string;
   entity: EntityPickerValue;
   entityTechnicalId: string;
@@ -75,6 +77,7 @@ const EMPTY_DRAFT: DraftFilters = {
   actor: null,
   actorTechnicalId: "",
   operation: "",
+  operationPrefix: "",
   entityType: "",
   entity: null,
   entityTechnicalId: "",
@@ -84,6 +87,9 @@ const EMPTY_DRAFT: DraftFilters = {
   fromGregorian: undefined,
   toGregorian: undefined,
 };
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function resolveActorId(draft: DraftFilters): string {
   return draft.actor?.id?.trim() || draft.actorTechnicalId.trim() || "";
@@ -103,6 +109,7 @@ function draftToInput(draft: DraftFilters) {
   return {
     actorAccountId: resolveActorId(draft) || undefined,
     operation: draft.operation.trim() || undefined,
+    operationPrefix: draft.operationPrefix.trim() || undefined,
     entityType: draft.entityType.trim() || undefined,
     entityId: resolveEntityId(draft) || undefined,
     result: draft.result || undefined,
@@ -114,6 +121,54 @@ function draftToInput(draft: DraftFilters) {
       ? new Date(new Date(toIso).getTime() + 59_000 + 999)
       : undefined,
   };
+}
+
+/**
+ * Hydrate investigation filters from URL (Story 10.5).
+ * Bad / unknown values → ignored (empty), never silently coerced to unrelated filters.
+ */
+function hydrateDraftFromSearchParams(
+  searchParams: URLSearchParams,
+): { draft: DraftFilters; hasFilter: boolean } {
+  const draft: DraftFilters = { ...EMPTY_DRAFT };
+  let hasFilter = false;
+
+  const operation = searchParams.get("operation")?.trim() ?? "";
+  if (operation && operation.length <= 200) {
+    draft.operation = operation;
+    hasFilter = true;
+  }
+
+  // Prefer exact operation when both are present (avoid AND → empty results).
+  const operationPrefix = searchParams.get("operationPrefix")?.trim() ?? "";
+  if (
+    !draft.operation &&
+    operationPrefix &&
+    operationPrefix.length <= 200
+  ) {
+    draft.operationPrefix = operationPrefix;
+    hasFilter = true;
+  }
+
+  const correlationId = searchParams.get("correlationId")?.trim() ?? "";
+  if (correlationId && UUID_RE.test(correlationId)) {
+    draft.correlationId = correlationId;
+    hasFilter = true;
+  }
+
+  const entityType = searchParams.get("entityType")?.trim() ?? "";
+  if (entityType && entityType.length <= 120) {
+    draft.entityType = entityType;
+    hasFilter = true;
+  }
+
+  const entityId = searchParams.get("entityId")?.trim() ?? "";
+  if (entityId && entityId.length <= 120) {
+    draft.entityTechnicalId = entityId;
+    hasFilter = true;
+  }
+
+  return { draft, hasFilter };
 }
 
 function entityTypeImpliesPicker(entityType: string): "person" | "account" | "org" | null {
@@ -367,6 +422,8 @@ const COLUMNS: GovernedColumn<AuditRow>[] = [
  */
 export function AuditInvestigationPanel() {
   const leaveGuard = useLeaveGuardOptional();
+  const urlSearchParams = useSearchParams();
+  const hydrateKey = urlSearchParams.toString();
   const [draft, setDraft] = React.useState<DraftFilters>(EMPTY_DRAFT);
   const [applied, setApplied] = React.useState<DraftFilters>(EMPTY_DRAFT);
   const [detail, setDetail] = React.useState<AuditRow | null>(null);
@@ -374,6 +431,16 @@ export function AuditInvestigationPanel() {
   const [artifactError, setArtifactError] = React.useState<string | null>(null);
   const [custodyAck, setCustodyAck] = React.useState(false);
   const [recipient, setRecipient] = React.useState("");
+
+  // Story 10.5 — URL → filter draft when hydrateKey changes; bad values ignored.
+  React.useEffect(() => {
+    const { draft: next, hasFilter } = hydrateDraftFromSearchParams(
+      new URLSearchParams(hydrateKey),
+    );
+    if (!hasFilter) return;
+    setDraft(next);
+    setApplied(next);
+  }, [hydrateKey]);
 
   const accountSearch = React.useMemo(() => createAccountSearch(), []);
   const personSearch = React.useMemo(() => createPersonSearch(), []);
@@ -649,6 +716,20 @@ export function AuditInvestigationPanel() {
             onChange={(e) => updateDraft("operation", e.target.value)}
             dir="ltr"
             autoComplete="off"
+          />
+        </label>
+        <label
+          className="block space-y-1.5 text-caption"
+          htmlFor="audit-filter-operation-prefix"
+        >
+          {operationalCopy.auditFilterOperationPrefix}
+          <Input
+            id="audit-filter-operation-prefix"
+            value={draft.operationPrefix}
+            onChange={(e) => updateDraft("operationPrefix", e.target.value)}
+            dir="ltr"
+            autoComplete="off"
+            placeholder="settings."
           />
         </label>
         <label

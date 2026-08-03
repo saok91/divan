@@ -217,7 +217,27 @@ export function SettingsDomainPanel({ domain }: SettingsDomainPanelProps) {
         <FeedbackMessage kind="info">{storeDetail}</FeedbackMessage>
       ) : null}
       {feedback ? (
-        <FeedbackMessage kind={feedback.kind}>{feedback.message}</FeedbackMessage>
+        <FeedbackMessage kind={feedback.kind}>
+          <span className="block">{feedback.message}</span>
+          {feedback.kind === "success" && feedback.auditHref ? (
+            <span className="mt-2 flex flex-wrap items-center gap-3">
+              <a
+                href={feedback.auditHref}
+                className="text-caption font-medium underline-offset-2 hover:underline"
+              >
+                {operationalCopy.settingsViewInAuditCta}
+              </a>
+              {feedback.historyHref ? (
+                <a
+                  href={feedback.historyHref}
+                  className="text-caption underline-offset-2 hover:underline"
+                >
+                  {operationalCopy.settingsParameterHistoryCta}
+                </a>
+              ) : null}
+            </span>
+          ) : null}
+        </FeedbackMessage>
       ) : null}
       <div className="divide-y-0" role="list" aria-label="پارامترهای تنظیمات">
         {rows.map((row) => (

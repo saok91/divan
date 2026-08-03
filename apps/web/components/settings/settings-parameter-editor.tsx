@@ -35,6 +35,11 @@ import { RowActionButton } from "@/components/ui/row-action-button";
 import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
+import {
+  settingsApplyAuditHref,
+  settingsHistoryAuditHref,
+  settingsResetAuditHref,
+} from "@/lib/settings-audit-href";
 import type { SettingsParameterRowDto } from "@/lib/settings-types";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -42,6 +47,10 @@ import { cn } from "@/lib/utils";
 export type SettingsMutationFeedback = {
   kind: "success" | "error";
   message: string;
+  /** Live deep-link to investigation (Story 10.5). */
+  auditHref?: string;
+  /** Optional history prefix search. */
+  historyHref?: string;
 };
 
 type SettingsParameterEditorProps = {
@@ -223,6 +232,8 @@ export function SettingsParameterEditor({
       onFeedback({
         kind: "success",
         message: operationalCopy.settingsApplySuccess,
+        auditHref: settingsApplyAuditHref(data.correlationId),
+        historyHref: settingsHistoryAuditHref(row.key),
       });
       setConfirmMode(null);
       setReason("");
@@ -243,6 +254,8 @@ export function SettingsParameterEditor({
       onFeedback({
         kind: "success",
         message: operationalCopy.settingsResetSuccess,
+        auditHref: settingsResetAuditHref(data.correlationId),
+        historyHref: settingsHistoryAuditHref(row.key),
       });
       setConfirmMode(null);
       setReason("");
@@ -461,6 +474,13 @@ export function SettingsParameterEditor({
                 }
                 onClick={openResetConfirm}
               />
+              <a
+                href={settingsHistoryAuditHref(row.key)}
+                className="text-caption text-primary underline-offset-2 hover:underline"
+                title={operationalCopy.settingsAuditLinkHint}
+              >
+                {operationalCopy.settingsParameterHistoryCta}
+              </a>
             </div>
           </FormSection>
         </FormLayout>

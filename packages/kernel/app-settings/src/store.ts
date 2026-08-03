@@ -59,6 +59,11 @@ export async function upsertOverride(
     updatedBy?: string | null;
     reason?: string | null;
     effectAt?: string | null;
+    /**
+     * When true, skip in-process cache warm (use inside a larger TX so a
+     * rolled-back write cannot poison the resolver cache — Story 10.5).
+     */
+    skipCacheRefresh?: boolean;
   },
 ): Promise<SettingsOverrideRow> {
   const def = getSettingsParameter(input.parameterKey);
@@ -99,16 +104,19 @@ export async function upsertOverride(
     ],
   );
   const row = mapOverrideRow(res.rows[0] as Record<string, unknown>);
-  await refreshCacheAfterMutation(db);
+  if (!input.skipCacheRefresh) {
+    await refreshCacheAfterMutation(db);
+  }
   return row;
 }
 
 /**
- * Reset to code default = delete store row (full audited reset product = 10.5).
+ * Reset to code default = delete store row (audited reset product = Story 10.5).
  */
 export async function deleteOverride(
   db: PgQueryable,
   parameterKey: string,
+  options?: { skipCacheRefresh?: boolean },
 ): Promise<boolean> {
   getSettingsParameter(parameterKey);
   const res = await db.query(
@@ -118,6 +126,8 @@ export async function deleteOverride(
     [parameterKey],
   );
   const deleted = (res.rowCount ?? 0) > 0;
-  await refreshCacheAfterMutation(db);
+  if (deleted && !options?.skipCacheRefresh) {
+    await refreshCacheAfterMutation(db);
+  }
   return deleted;
 }

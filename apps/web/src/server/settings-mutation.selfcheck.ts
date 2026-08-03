@@ -109,7 +109,9 @@ assert.match(routerSrc, /settingsStoreUnavailableApply/);
 assert.match(routerSrc, /highImpact/);
 assert.match(routerSrc, /blastRadiusFa/);
 assert.doesNotMatch(routerSrc, /effectAt.*scheduling/);
-assert.match(routerSrc, /effectAt:\s*null/);
+assert.match(routerSrc, /assertAuditTrustWriterAllowed/);
+assert.match(routerSrc, /withTransaction/);
+assert.doesNotMatch(routerSrc, /effectAt:\s*null/);
 
 // --- UI: FormLayout + RowActionButton + leave-guard + FeedbackMessage ---
 assert.match(editorSrc, /data-slot="form-layout"|FormLayout/);
@@ -121,20 +123,20 @@ assert.match(editorSrc, /busyRef/);
 assert.match(editorSrc, /type=\{row\.valueType === "duration_ms" \? "text" : "number"\}/);
 assert.match(editorSrc, /blastRadiusFa|data-settings-blast-radius/);
 assert.match(editorSrc, /settingsApplyCta|settingsApplyOpenConfirm/);
+assert.match(editorSrc, /settingsHistoryAuditHref|settingsParameterHistoryCta/);
 assert.match(rowSrc, /SettingsParameterEditor/);
 assert.match(rowSrc, /read_only_with_evidence/);
 assert.match(panelSrc, /FeedbackMessage/);
 assert.match(panelSrc, /onRowUpdated/);
 assert.match(panelSrc, /exportInventory/);
 assert.match(panelSrc, /settingsInventoryExportCta/);
+assert.match(panelSrc, /settingsViewInAuditCta|مشاهده در ممیزی/);
 assert.match(routerSrc, /exportInventory:\s*governedProcedure/);
 assert.match(routerSrc, /settings\.inventory\.view/);
 assert.match(routerSrc, /settings\.inventory\.export/);
 assert.match(routerSrc, /createExportArtifact/);
 assert.match(routerSrc, /settings_inventory/);
 assert.match(routerSrc, /serializeSettingsInventoryValue/);
-assert.doesNotMatch(editorSrc, /مشاهده در ممیزی/);
-assert.doesNotMatch(panelSrc, /مشاهده در ممیزی/);
 assert.ok(
   !listAdminEditableKeys().some((k) =>
     /password|secret|database_url|bind_dn|tls_ca/i.test(k),

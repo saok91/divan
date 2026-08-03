@@ -12,8 +12,9 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "selfcheck": "tsx src/app-settings.selfcheck.ts",
-    "selfcheck:guard": "tsx src/governed-settings-guard.selfcheck.ts"
+    "selfcheck": "tsx src/app-settings.selfcheck.ts && tsx src/boundary-guard.selfcheck.ts",
+    "selfcheck:guard": "tsx src/governed-settings-guard.selfcheck.ts",
+    "selfcheck:boundary": "tsx src/boundary-guard.selfcheck.ts"
   },
   "dependencies": {
     "pg": "^8.16.3"

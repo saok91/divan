@@ -5,11 +5,14 @@
  */
 
 import {
+  AuditTrustError,
   DEV_DEMO_CATEGORIES,
   MSG_SETTINGS_DENIED_FA,
   SETTINGS_CONFIGURATION_DATA_CATEGORY,
   SETTINGS_READ_PERMISSION,
   SETTINGS_WRITE_PERMISSION,
+  assertAuditTrustWriterAllowed,
+  enforceClockAnomalyOrThrow,
   loadCategoryRegistry,
 } from "@divan/audit-envelope";
 import {
@@ -17,8 +20,10 @@ import {
   GovernedSettingsError,
   assertValidSettingsValue,
   deleteOverride,
+  getCodeDefault,
   getSettingsConfigurationDetailFa,
   getSettingsParameter,
+  invalidateSettingsCache,
   invalidSettingsValueMessageFa,
   isSettingsStoreUnavailable,
   loadAllOverrides,
@@ -33,7 +38,7 @@ import {
   type SettingsScalar,
 } from "@divan/app-settings";
 import { getSharedPgPool, type Pool } from "@divan/db";
-import { appendAccessEvent } from "@divan/event-store";
+import { appendAccessEvent, withTransaction } from "@divan/event-store";
 import {
   currentAsOfDate,
   reauthorizeForQueuedOrArtifactWork,
@@ -248,6 +253,70 @@ async function denySettings(input: {
     code: "FORBIDDEN",
     message: MSG_SETTINGS_DENIED_FA,
   });
+}
+
+/** Marks required access-event append failure inside the FR51 transaction. */
+class SettingsEvidenceAppendError extends Error {
+  override readonly cause: unknown;
+  constructor(cause: unknown) {
+    super("settings_evidence_append_failed");
+    this.name = "SettingsEvidenceAppendError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * FR51 allow-path: trust/append failure must not leave unaudited overrides.
+ * Non-evidence failures keep generic apply/reset ops copy (TX already rolled back).
+ */
+function throwSettingsEvidenceRequired(
+  err: unknown,
+  kind: "apply" | "reset",
+): never {
+  if (err instanceof TRPCError) throw err;
+  if (err instanceof GovernedSettingsError) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: err.messageFa,
+    });
+  }
+  if (
+    err instanceof AuditTrustError ||
+    err instanceof SettingsEvidenceAppendError
+  ) {
+    // Trust suspend / append failure → INTERNAL ops copy (never «دسترسی ندارید.»).
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: operationalCopy.settingsEvidenceRequiredFail,
+      cause: err instanceof AuditTrustError ? err : err.cause,
+    });
+  }
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message:
+      kind === "reset"
+        ? operationalCopy.settingsResetError
+        : operationalCopy.settingsApplyError,
+    cause: err,
+  });
+}
+
+/** After a committed FR51 TX, never surface cache/projection noise as mutation failure. */
+async function projectRowAfterEvidenceCommit(
+  pool: Pool,
+  key: string,
+): Promise<SettingsParameterRowDto> {
+  try {
+    await invalidateSettingsCache(pool);
+  } catch {
+    // Override + access event already committed — prefer mutation success.
+  }
+  try {
+    return await projectFreshRow(pool, key);
+  } catch {
+    const def = getSettingsParameter(key);
+    return toRowDto(def, null);
+  }
 }
 
 function serializeValue(
@@ -833,50 +902,62 @@ export const settingsRouter = createTRPCRouter({
       }
 
       const previous = resolveSetting(def.key).value;
+      const effectAt = new Date().toISOString();
+      const previousValue = serializeValue(def, previous);
+      const newValue = serializeValue(def, parsed);
 
       try {
-        await upsertOverride(pool, {
-          parameterKey: def.key,
-          value: parsed,
-          updatedBy: ctx.session.accountId,
-          reason: input.reason,
-          effectAt: null,
+        await withTransaction(pool, async (client) => {
+          await assertAuditTrustWriterAllowed(client, {
+            correlationId: ctx.correlationId,
+            permission: SETTINGS_WRITE_PERMISSION,
+          });
+          await enforceClockAnomalyOrThrow(client, {
+            correlationId: ctx.correlationId,
+            actorAccountId: ctx.session.accountId,
+            permission: SETTINGS_WRITE_PERMISSION,
+          });
+          await upsertOverride(client, {
+            parameterKey: def.key,
+            value: parsed,
+            updatedBy: ctx.session.accountId,
+            reason: input.reason,
+            effectAt,
+            skipCacheRefresh: true,
+          });
+          try {
+            await appendAccessEvent(client, {
+              correlationId: ctx.correlationId,
+              actorAccountId: ctx.session.accountId,
+              operation,
+              scope: {
+                channel: "settings",
+                purpose: "settings_configuration",
+                volume: 1,
+              },
+              result: "allow",
+              reason: "configuration_change",
+              entityType: "settings_configuration",
+              entityId: def.key,
+              payload: {
+                parameterKey: def.key,
+                action: "apply",
+                reason: input.reason,
+                previousValue,
+                newValue,
+                effectAt,
+              },
+            });
+          } catch (appendErr) {
+            throw new SettingsEvidenceAppendError(appendErr);
+          }
         });
       } catch (err) {
-        if (err instanceof GovernedSettingsError) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: err.messageFa,
-          });
-        }
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: operationalCopy.settingsApplyError,
-          cause: err,
-        });
+        throwSettingsEvidenceRequired(err, "apply");
       }
 
-      try {
-        await appendSettingsAccessEvent({
-          correlationId: ctx.correlationId,
-          actorAccountId: ctx.session.accountId,
-          outcome: "allow",
-          reason: "configuration_change",
-          operation,
-          payload: {
-            parameterKey: def.key,
-            action: "apply",
-            reason: input.reason,
-            previousValue: serializeValue(def, previous),
-            newValue: serializeValue(def, parsed),
-          },
-        });
-      } catch {
-        // Prefer successful mutation visibility; full FR51 = 10.5.
-      }
-
-      const row = await projectFreshRow(pool, def.key);
-      return { row };
+      const row = await projectRowAfterEvidenceCommit(pool, def.key);
+      return { row, correlationId: ctx.correlationId };
     }),
 
   reset: governedProcedure
@@ -906,50 +987,62 @@ export const settingsRouter = createTRPCRouter({
       });
 
       const previous = resolveSetting(def.key).value;
+      const effectAt = new Date().toISOString();
+      const previousValue = serializeValue(def, previous);
+      const newValue = serializeValue(def, getCodeDefault(def.key));
 
-      let deleted = false;
       try {
-        deleted = await deleteOverride(pool, def.key);
-      } catch (err) {
-        if (err instanceof GovernedSettingsError) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: err.messageFa,
+        await withTransaction(pool, async (client) => {
+          await assertAuditTrustWriterAllowed(client, {
+            correlationId: ctx.correlationId,
+            permission: SETTINGS_WRITE_PERMISSION,
           });
-        }
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: operationalCopy.settingsResetError,
-          cause: err,
+          await enforceClockAnomalyOrThrow(client, {
+            correlationId: ctx.correlationId,
+            actorAccountId: ctx.session.accountId,
+            permission: SETTINGS_WRITE_PERMISSION,
+          });
+          const deleted = await deleteOverride(client, def.key, {
+            skipCacheRefresh: true,
+          });
+          if (!deleted) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: operationalCopy.settingsResetDisabledReason,
+            });
+          }
+          try {
+            await appendAccessEvent(client, {
+              correlationId: ctx.correlationId,
+              actorAccountId: ctx.session.accountId,
+              operation,
+              scope: {
+                channel: "settings",
+                purpose: "settings_configuration",
+                volume: 1,
+              },
+              result: "allow",
+              reason: "configuration_reset",
+              entityType: "settings_configuration",
+              entityId: def.key,
+              payload: {
+                parameterKey: def.key,
+                action: "reset",
+                reason: input.reason,
+                previousValue,
+                newValue,
+                effectAt,
+              },
+            });
+          } catch (appendErr) {
+            throw new SettingsEvidenceAppendError(appendErr);
+          }
         });
+      } catch (err) {
+        throwSettingsEvidenceRequired(err, "reset");
       }
 
-      if (!deleted) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: operationalCopy.settingsResetDisabledReason,
-        });
-      }
-
-      try {
-        await appendSettingsAccessEvent({
-          correlationId: ctx.correlationId,
-          actorAccountId: ctx.session.accountId,
-          outcome: "allow",
-          reason: "configuration_reset",
-          operation,
-          payload: {
-            parameterKey: def.key,
-            action: "reset",
-            reason: input.reason,
-            previousValue: serializeValue(def, previous),
-          },
-        });
-      } catch {
-        // Prefer successful mutation visibility; full FR51 = 10.5.
-      }
-
-      const row = await projectFreshRow(pool, def.key);
-      return { row };
+      const row = await projectRowAfterEvidenceCommit(pool, def.key);
+      return { row, correlationId: ctx.correlationId };
     }),
 });

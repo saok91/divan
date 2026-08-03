@@ -34,4 +34,6 @@ export type SettingsListByDomainResult = {
 
 export type SettingsMutationResult = {
   row: SettingsParameterRowDto;
+  /** Correlation for live «مشاهده در ممیزی» deep-link (Story 10.5). */
+  correlationId: string;
 };
