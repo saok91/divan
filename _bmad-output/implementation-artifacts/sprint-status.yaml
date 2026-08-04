@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-08-04T00:45:00+03:30
+# last_updated: 2026-08-04T00:55:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,12 +41,13 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-08-04T00:45:00+03:30
+last_updated: 2026-08-04T00:55:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
+# Epic 10 retrospective → done 2026-08-04 (AD-7 settings closed; no Epic 11 in backlog — roadmap decision next)
 # Epic 9 retrospective → done 2026-08-03 (operational surfaces + IA closed; Epic 10 prep encodes)
 # Epic 10 → in-progress 2026-08-03 (Story 10.1 create-story)
 # Story 10.2 → done 2026-08-03 (Settings surface & admin-only access)
@@ -168,13 +169,13 @@ development_status:
   9-10-dashboard-report-visual-quality: done
   epic-9-retrospective: done
 
-  epic-10: in-progress
+  epic-10: done
   10-1-governed-settings-registry-store: done
   10-2-settings-surface-admin-access: done
   10-3-editable-parameter-wave-1: done
   10-4-readonly-infrastructure-security-inventory: done
   10-5-configuration-change-control-evidence: done
-  epic-10-retrospective: optional
+  epic-10-retrospective: done
 
 action_items:
   - epic: 1
@@ -582,7 +583,8 @@ action_items:
   - epic: 9
     action: "Close FeedbackMessage / PendingSurface adoption on settings and any ops/audit panels touched in Epic 10"
     owner: "Amelia + Sally"
-    status: open
+    status: in-progress
+    resolved_in: "Settings panels FeedbackMessage in 10.2–10.5; untouched ops/audit long-tail remains — continued as Epic 10 action #3"
   - epic: 9
     action: "Migrate residual typography hotspots when next touching those panels"
     owner: "Amelia + Sally"
@@ -603,8 +605,50 @@ action_items:
   - epic: 9
     action: "Keep AR-* fail-closed; do not invent freeze numbers; Epic 10 must not claim LG-complete while Epic 7 carry-ins remain open"
     owner: "Mary + John"
-    status: open
+    status: done
+    resolved_in: "Epic 10 Gates 10.1–10.5 held fail-closed + no LG-complete claim; succeeded by Epic 10 AR fail-closed for next work"
   - epic: 9
     action: "Carry forward still-open Epic 7/8 production-honesty and security items (SoD, list IDOR, AD-6, Baseline projector, PopulationPort, mutation IDOR, Vitest, leave-guard logout, person-create dedupe, enforcement-matrix DoD, honesty boundary doc, Button forwardRef, composed tRPC authorize selfchecks)"
+    owner: "Winston / Amelia+Sally / Paige+Winston / Mary"
+    status: open
+  - epic: 10
+    action: "Mark epic-10 and epic-10-retrospective done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-10-retro-2026-08-04.md + sprint-status epic-10/epic-10-retrospective"
+  - epic: 10
+    action: "Decide next roadmap slice (production-honesty / LG carry-ins vs new product epic) and record it in planning artifacts"
+    owner: "John + Mary + AtA"
+    status: open
+  - epic: 10
+    action: "Close FeedbackMessage / PendingSurface on remaining ops/audit/list panels when next touched (Epic 9 #4 continuation)"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 10
+    action: "Migrate residual typography hotspots on touch (Epic 9 #5 continuation)"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 10
+    action: "Prefer batched identity DTOs for lastChangedBy / settings-adjacent actor display"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 10
+    action: "Document PE/HC bulk multi-row atomicity honesty boundary (or named architecture follow-up)"
+    owner: "Winston + Amelia + Mary"
+    status: open
+  - epic: 10
+    action: "Document process-local settings cache ceiling and criteria for multi-instance invalidate follow-up"
+    owner: "Winston + Amelia"
+    status: open
+  - epic: 10
+    action: "Add binder-runtime parity checks for RO inventory posture (Infinity/0, trust enforce fail-closed, pool default alignment)"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 10
+    action: "Keep AR-* fail-closed; do not invent freeze numbers; do not claim LG-complete while Epic 7-9 carry-ins remain open"
+    owner: "Mary + John"
+    status: open
+  - epic: 10
+    action: "Carry forward still-open Epic 7/8/9 production-honesty and security items (SoD, list IDOR, AD-6, Baseline projector, PopulationPort, mutation IDOR, Vitest, leave-guard logout, person-create dedupe, enforcement-matrix DoD, honesty boundary doc, Button forwardRef, composed tRPC authorize selfchecks, dual redaction consolidate, export selfcheck depth)"
     owner: "Winston / Amelia+Sally / Paige+Winston / Mary"
     status: open
