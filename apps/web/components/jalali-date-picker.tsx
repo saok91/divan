@@ -18,12 +18,15 @@ import {
   gregorianToJalali,
   jalaliMonthLength,
   jalaliMonthName,
+  jalaliMonthNames,
   jalaliMonthStartWeekday,
   jalaliToGregorian,
   jalaliWeekdayLabels,
+  jalaliYearsAround,
   parseGregorianDateOnly,
   parseJalaliInput,
   parseTimeInput,
+  setJalaliMonthYear,
   todayJalaliInTehran,
   type JalaliDateOnly,
 } from "@/lib/jalali";
@@ -57,6 +60,8 @@ export type JalaliDateTimePickerProps = BasePickerProps & {
   helperText?: string;
 };
 
+type DayGridPanel = "days" | "months" | "years";
+
 function displayFromValue(value: string | undefined): string {
   const g = parseGregorianDateOnly(value);
   return g ? formatJalaliDisplay(gregorianToJalali(g)) : "";
@@ -81,6 +86,10 @@ function DayGrid({
   onSelectDay: (day: JalaliDateOnly) => void;
   onViewChange: (next: JalaliDateOnly) => void;
 }) {
+  const listboxId = React.useId();
+  const monthsListId = `${listboxId}-months`;
+  const yearsListId = `${listboxId}-years`;
+  const [panel, setPanel] = React.useState<DayGridPanel>("days");
   const length = jalaliMonthLength(view.jy, view.jm);
   const startPad = jalaliMonthStartWeekday(view.jy, view.jm);
   const cells: Array<number | null> = [
@@ -89,19 +98,40 @@ function DayGrid({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
   const rows = chunkRows(cells, 7);
+  const monthNames = jalaliMonthNames();
+  const yearOptions = jalaliYearsAround(view.jy);
 
   const initialFocus =
     selected?.jy === view.jy && selected?.jm === view.jm ? selected.jd : 1;
   const [focusDay, setFocusDay] = React.useState(initialFocus);
   const safeFocusDay = Math.min(Math.max(1, focusDay), length);
   const focusRef = React.useRef<HTMLButtonElement | null>(null);
+  const optionFocusRef = React.useRef<HTMLButtonElement | null>(null);
   const restoreFocusRef = React.useRef(false);
+  const [optionFocus, setOptionFocus] = React.useState(0);
 
   React.useLayoutEffect(() => {
-    if (!restoreFocusRef.current) return;
+    if (!restoreFocusRef.current || panel !== "days") return;
     focusRef.current?.focus();
     restoreFocusRef.current = false;
-  }, [view.jy, view.jm, safeFocusDay]);
+  }, [view.jy, view.jm, safeFocusDay, panel]);
+
+  React.useLayoutEffect(() => {
+    if (panel === "days") return;
+    optionFocusRef.current?.focus();
+    optionFocusRef.current?.scrollIntoView({ block: "nearest" });
+  }, [panel, optionFocus]);
+
+  const openMonths = () => {
+    setOptionFocus(view.jm - 1);
+    setPanel("months");
+  };
+
+  const openYears = () => {
+    const idx = yearOptions.indexOf(view.jy);
+    setOptionFocus(idx >= 0 ? idx : 0);
+    setPanel("years");
+  };
 
   const moveFocus = (delta: number) => {
     const next = addJalaliDays(
@@ -143,22 +173,81 @@ function DayGrid({
     }
   };
 
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="ماه بعد"
-          onClick={() => onViewChange(addJalaliMonths(view, 1))}
-        >
-          <ChevronRightIcon className="size-4" />
-        </Button>
-        <p className="text-body-medium text-foreground">
-          {jalaliMonthName(view.jm)}{" "}
-          <span className="text-tabular">{toPersianDigits(view.jy)}</span>
-        </p>
+  const moveOptionFocus = (delta: number, count: number) => {
+    setOptionFocus((current) => {
+      const next = current + delta;
+      if (next < 0) return 0;
+      if (next >= count) return count - 1;
+      return next;
+    });
+  };
+
+  const onOptionListKeyDown = (
+    event: React.KeyboardEvent,
+    count: number,
+    columns: number,
+    onCommit: (index: number) => void,
+  ) => {
+    switch (event.key) {
+      case "ArrowLeft":
+        event.preventDefault();
+        moveOptionFocus(1, count);
+        break;
+      case "ArrowRight":
+        event.preventDefault();
+        moveOptionFocus(-1, count);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        moveOptionFocus(-columns, count);
+        break;
+      case "ArrowDown":
+        event.preventDefault();
+        moveOptionFocus(columns, count);
+        break;
+      case "Home":
+        event.preventDefault();
+        setOptionFocus(0);
+        break;
+      case "End":
+        event.preventDefault();
+        setOptionFocus(count - 1);
+        break;
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        onCommit(optionFocus);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const applyMonthYear = (jm: number, jy: number, nextPanel: DayGridPanel) => {
+    const next = setJalaliMonthYear(view, jm, jy);
+    onViewChange(next);
+    setFocusDay(next.jd);
+    if (nextPanel === "days") {
+      restoreFocusRef.current = true;
+      setPanel("days");
+      return;
+    }
+    if (nextPanel === "months") {
+      setOptionFocus(jm - 1);
+      setPanel("months");
+      return;
+    }
+    setPanel(nextPanel);
+  };
+
+  // Logical order: prev → title → next. Under dir=rtl, prev sits at
+  // inline-start (right) and next at inline-end (left). ChevronRight on
+  // prev / ChevronLeft on next mirrors LTR chrome so icons agree with action.
+  // Prev/next only on days panel — hide while browsing month/year lists.
+  const showMonthStep = panel === "days";
+  const monthChrome = (
+    <div className="flex items-center justify-between gap-2">
+      {showMonthStep ? (
         <Button
           type="button"
           variant="ghost"
@@ -166,9 +255,147 @@ function DayGrid({
           aria-label="ماه قبل"
           onClick={() => onViewChange(addJalaliMonths(view, -1))}
         >
-          <ChevronLeftIcon className="size-4" />
+          <ChevronRightIcon className="size-4" />
+        </Button>
+      ) : (
+        <span className="size-8 shrink-0" aria-hidden="true" />
+      )}
+      <div className="flex min-w-0 items-center justify-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-8 px-2 text-body-medium"
+          aria-label="انتخاب ماه"
+          aria-expanded={panel === "months"}
+          aria-controls={panel === "months" ? monthsListId : undefined}
+          onClick={() =>
+            panel === "months" ? setPanel("days") : openMonths()
+          }
+        >
+          {jalaliMonthName(view.jm)}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-8 px-2 text-body-medium text-tabular"
+          aria-label="انتخاب سال"
+          aria-expanded={panel === "years"}
+          aria-controls={panel === "years" ? yearsListId : undefined}
+          onClick={() => (panel === "years" ? setPanel("days") : openYears())}
+        >
+          {toPersianDigits(view.jy)}
         </Button>
       </div>
+      {showMonthStep ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="ماه بعد"
+          onClick={() => onViewChange(addJalaliMonths(view, 1))}
+        >
+          <ChevronLeftIcon className="size-4" />
+        </Button>
+      ) : (
+        <span className="size-8 shrink-0" aria-hidden="true" />
+      )}
+    </div>
+  );
+
+  if (panel === "months") {
+    return (
+      <div className="space-y-3">
+        {monthChrome}
+        <div
+          id={monthsListId}
+          role="listbox"
+          aria-label="فهرست ماه‌ها"
+          className="grid grid-cols-3 gap-1"
+          onKeyDown={(event) =>
+            onOptionListKeyDown(event, 12, 3, (index) =>
+              applyMonthYear(index + 1, view.jy, "days"),
+            )
+          }
+        >
+          {monthNames.map((name, index) => {
+            const jm = index + 1;
+            const isSelected = view.jm === jm;
+            const isFocused = optionFocus === index;
+            return (
+              <button
+                key={name}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                tabIndex={isFocused ? 0 : -1}
+                ref={isFocused ? optionFocusRef : undefined}
+                className={cn(
+                  "rounded-sm px-2 py-2 text-body outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isSelected
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted",
+                )}
+                onClick={() => applyMonthYear(jm, view.jy, "days")}
+                onFocus={() => setOptionFocus(index)}
+              >
+                {name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (panel === "years") {
+    return (
+      <div className="space-y-3">
+        {monthChrome}
+        <div
+          id={yearsListId}
+          role="listbox"
+          aria-label="فهرست سال‌ها"
+          className="grid max-h-56 grid-cols-3 gap-1 overflow-y-auto"
+          onKeyDown={(event) =>
+            onOptionListKeyDown(event, yearOptions.length, 3, (index) => {
+              const jy = yearOptions[index];
+              if (jy == null) return;
+              applyMonthYear(view.jm, jy, "months");
+            })
+          }
+        >
+          {yearOptions.map((jy, index) => {
+            const isSelected = view.jy === jy;
+            const isFocused = optionFocus === index;
+            return (
+              <button
+                key={jy}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                tabIndex={isFocused ? 0 : -1}
+                ref={isFocused ? optionFocusRef : undefined}
+                className={cn(
+                  "rounded-sm px-2 py-2 text-body text-tabular outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isSelected
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted",
+                )}
+                onClick={() => applyMonthYear(view.jm, jy, "months")}
+                onFocus={() => setOptionFocus(index)}
+              >
+                {toPersianDigits(jy)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {monthChrome}
 
       <div
         role="grid"

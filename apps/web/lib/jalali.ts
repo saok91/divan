@@ -35,8 +35,48 @@ const JALALI_MONTH_NAMES = [
 
 const WEEKDAY_LABELS = ["ش", "ی", "د", "س", "چ", "پ", "ج"] as const;
 
+/** Default half-window for year jump UI (today±50 → ~101 years). */
+export const JALALI_YEAR_RANGE_RADIUS = 50;
+
 export function jalaliMonthName(jm: number): string {
   return JALALI_MONTH_NAMES[jm - 1] ?? "";
+}
+
+/** All 12 Jalali month names (index 0 = Farvardin). */
+export function jalaliMonthNames(): readonly string[] {
+  return JALALI_MONTH_NAMES;
+}
+
+/**
+ * Inclusive Jalali year window centered on `centerJy`.
+ * Picker year list uses this (e.g. view year ±50).
+ */
+export function jalaliYearRange(
+  centerJy: number,
+  radius: number = JALALI_YEAR_RANGE_RADIUS,
+): { min: number; max: number } {
+  return { min: centerJy - radius, max: centerJy + radius };
+}
+
+/** Descending years in `jalaliYearRange` for year-list UI. */
+export function jalaliYearsAround(
+  centerJy: number,
+  radius: number = JALALI_YEAR_RANGE_RADIUS,
+): number[] {
+  const { min, max } = jalaliYearRange(centerJy, radius);
+  const years: number[] = [];
+  for (let y = max; y >= min; y -= 1) years.push(y);
+  return years;
+}
+
+/** Set month/year on a Jalali date, clamping `jd` to the target month length. */
+export function setJalaliMonthYear(
+  j: JalaliDateOnly,
+  jm: number,
+  jy: number,
+): JalaliDateOnly {
+  const maxDay = jalaliMonthLength(jy, jm);
+  return { jy, jm, jd: Math.min(j.jd, maxDay) };
 }
 
 export function jalaliWeekdayLabels(): readonly string[] {
