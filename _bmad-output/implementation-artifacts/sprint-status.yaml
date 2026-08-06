@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-08-04T00:55:00+03:30
+# last_updated: 2026-08-07T01:00:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,18 +41,14 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-08-04T00:55:00+03:30
+last_updated: 2026-08-07T01:00:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
-# Epic 10 retrospective → done 2026-08-04 (AD-7 settings closed; no Epic 11 in backlog — roadmap decision next)
-# Epic 9 retrospective → done 2026-08-03 (operational surfaces + IA closed; Epic 10 prep encodes)
-# Epic 10 → in-progress 2026-08-03 (Story 10.1 create-story)
-# Story 10.2 → done 2026-08-03 (Settings surface & admin-only access)
-# Story 10.3 → done 2026-08-03 (Editable parameter wave 1)
-# Story 10.4 → review 2026-08-03 (RO infra/security inventory)
+# Epic 10 retrospective → done 2026-08-04 (AD-7 settings closed)
+# Epic 11 authorized 2026-08-07 via sprint-change-proposal-2026-08-07 (UAT unblock)
 # Story 10.5 → done 2026-08-04 (Configuration change control & evidence)
 
 development_status:
@@ -176,6 +172,16 @@ development_status:
   10-4-readonly-infrastructure-security-inventory: done
   10-5-configuration-change-control-evidence: done
   epic-10-retrospective: done
+
+  # Epic 11 authorized by sprint-change-proposal-2026-08-07 (UAT unblock after Epic 10)
+  epic-11: backlog
+  11-1-stale-recalc-unblock-role-honest-next-steps: backlog
+  11-2-personnel-event-finalize-capacity-override-honesty: backlog
+  11-3-jalali-datepicker-month-year-rtl-chrome: backlog
+  11-4-compact-field-help-label-info-icon: backlog
+  11-5-form-surface-alignment-ux-2026-07-31: backlog
+  11-6-capacity-drawer-intelligibility-create-activate: backlog
+  11-7-employment-primary-assignment-empty-state-honesty: backlog
 
 action_items:
   - epic: 1
@@ -619,7 +625,8 @@ action_items:
   - epic: 10
     action: "Decide next roadmap slice (production-honesty / LG carry-ins vs new product epic) and record it in planning artifacts"
     owner: "John + Mary + AtA"
-    status: open
+    status: done
+    resolved_in: "sprint-change-proposal-2026-08-07.md → Epic 11 UAT Unblock & Operational UX Hardening"
   - epic: 10
     action: "Close FeedbackMessage / PendingSurface on remaining ops/audit/list panels when next touched (Epic 9 #4 continuation)"
     owner: "Amelia + Sally"

@@ -107,7 +107,8 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
 
   const passwordHash = await bcrypt.hash(DEV_SEED_PASSWORD, 10);
 
-  return db.$transaction(async (tx) => {
+  return db.$transaction(
+    async (tx) => {
     let createdOrUpdated = 0;
 
     for (const spec of SEED_ACCOUNTS) {
@@ -176,5 +177,7 @@ export async function seedDevAccounts(db: PrismaClient): Promise<{
     await seedEvaluationSnapshotPermissionFixtures(tx as unknown as PrismaClient);
 
     return { createdOrUpdated };
-  });
+    },
+    { maxWait: 20_000, timeout: 120_000 },
+  );
 }

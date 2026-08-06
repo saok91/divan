@@ -101,13 +101,6 @@ CREATE TRIGGER reporting_decision_publication_no_delete
   FOR EACH ROW
   EXECUTE PROCEDURE reporting.forbid_publication_delete();
 
-DROP TRIGGER IF EXISTS reporting_reproducibility_package_no_delete
-  ON reporting.reproducibility_package;
-CREATE TRIGGER reporting_reproducibility_package_no_delete
-  BEFORE DELETE ON reporting.reproducibility_package
-  FOR EACH ROW
-  EXECUTE PROCEDURE reporting.forbid_publication_delete();
-
 -- Decision-defining columns are immutable after insert.
 CREATE OR REPLACE FUNCTION reporting.forbid_decision_publication_rewrite()
 RETURNS trigger
@@ -160,6 +153,13 @@ CREATE TABLE IF NOT EXISTS reporting.reproducibility_package (
 
 CREATE INDEX IF NOT EXISTS reporting_reproducibility_package_publication_idx
   ON reporting.reproducibility_package (publication_id);
+
+DROP TRIGGER IF EXISTS reporting_reproducibility_package_no_delete
+  ON reporting.reproducibility_package;
+CREATE TRIGGER reporting_reproducibility_package_no_delete
+  BEFORE DELETE ON reporting.reproducibility_package
+  FOR EACH ROW
+  EXECUTE PROCEDURE reporting.forbid_publication_delete();
 
 -- Lifecycle events for allowed status/reproducibility updates (attributable).
 CREATE TABLE IF NOT EXISTS reporting.decision_publication_lifecycle_event (

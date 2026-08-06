@@ -26,6 +26,7 @@ import {
   getEvaluationSnapshot,
   getInferenceBulkHooks,
   revalidateEvaluationSnapshot,
+  setInferenceBulkHooksForTests,
   throwEvaluationSnapshotConflict,
   type AuthoritativeEvaluationSnapshot,
 } from "@divan/audit-envelope";
@@ -334,6 +335,12 @@ export function applyDevUuidInferenceBulkGuard(
   // Prior oversized denies charge DEMO windows and brick the actor for 60s —
   // clear for provisional local retrieval surfaces only.
   clearInferenceBulkWindowsForTests();
+  // DEMO minimumCohortSize=3 otherwise suppresses list/search until ≥3 people
+  // exist («داده قابل نمایش نیست») — unusable for empty-DB UAT with 1–2 persons.
+  setInferenceBulkHooksForTests({
+    ...hooks,
+    minimumCohortSize: 1,
+  });
   const cap = hooks.maxVolumePerRequest > 0 ? hooks.maxVolumePerRequest : 10;
   if (registry.subjects.length > cap) {
     return {

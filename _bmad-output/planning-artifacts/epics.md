@@ -280,6 +280,10 @@ Every navigable surface does real work: per-section bulk entry with downloadable
 An authorized administrator sees every governed application parameter in one place and changes the explicitly permitted ones with validation, reason, audit evidence, and reset-to-default, while security-critical parameters stay read-only with their change path stated.
 **FRs covered:** FR60; FR42, FR45, FR55 (evidence and change control). **UX contract:** ux-divan-2026-07-31. **Sequencing:** after Epic 9.
 
+### Epic 11: UAT Unblock & Operational UX Hardening
+Stakeholders can complete core HR flows after Epics 1–10: personnel-event finalization works end-to-end, stale/recalc guidance is role-honest and matches real ops UI (no invented «صف محاسبه»), Jalali date entry supports month/year jump with RTL-correct chrome, and high-friction UAT gaps (filter help, form chrome, capacity drawer, draft→activate, Employment/Primary empty states) are closed against UX 2026-07-31 — without reopening closed epics.
+**FRs covered:** FR15, FR19, FR20, FR28, FR32, FR44, FR45, FR57, FR58, FR59 (delivery/hardening — no new FR numbers). **UX contract:** ux-divan-2026-07-31. **Sequencing:** after Epic 10. Authorized by sprint-change-proposal-2026-08-07.
+
 ## Epic 1: Secure Access & Persian Desktop Shell
 
 Users authenticate (seeded accounts for early development; LDAP after Infrastructure approval), land on a role-appropriate Persian RTL desktop shell with brand tokens, light/dark theme, and keyboard command palette — establishing the modular-monolith substrate for all later work.
@@ -1793,3 +1797,112 @@ So that configuration is governed like any other privileged act (FR60, FR42, FR5
 **Then** the system fails closed to defaults and shows the FR45 degraded state rather than operating on an unknown configuration
 **And** a selfcheck proves that no registered parameter can widen a permission, retention, export, or audit boundary
 **And** audit-required failure prevents or safely suspends the configuration change, consistent with FR51
+
+## Epic 11: UAT Unblock & Operational UX Hardening
+
+Stakeholders cannot complete core HR flows after Epics 1–10. This epic restores end-to-end personnel-event finalization, role-honest stale/recalc guidance aligned to real ops UI, Jalali date usability, and high-friction UX gaps against UX 2026-07-31 — without reopening closed epics.
+
+**UX contract:** `ux-divan-2026-07-31`. **Depends on:** Epics 1–10 done. **Architecture:** AD-6 recalc worker + fail-closed finalize gates remain; no invented HR person rows on ops; FR-28 Draft not consumable. Authorized by `sprint-change-proposal-2026-08-07`.
+
+### Story 11.1: Stale/Recalc Unblock & Role-Honest Next Steps
+
+As an operator blocked by the stale/recalc banner,
+I want the pending recalculation to complete (or a reachable next step for my role),
+So that finalize and export are not stuck behind a dead-end message (FR45, NFR-3, UX-DR5).
+
+**Acceptance Criteria:**
+
+**Given** persons in `recalculation_status` with pending/failed/stale
+**When** the `@divan/workers` process is running against the same database
+**Then** jobs on `temporal.recalculate` are processed and the platform banner clears when no blocking rows remain
+**And** stale disclosure copy never invents a destination named «صف محاسبه»
+**And** for `system_admin`, next step points at the real ops health section «بازمحاسبه» (`/operations#ops-recalc`) or an explicitly shipped queue UI
+**And** for HR coarse roles, next step is reachable without `/operations` nav (wait/retry and/or contact SysAdmin / in-product status that exposes no HR person rows)
+**And** worker startup reclaim of orphan pending/failed rows remains documented for local UAT (`pnpm --filter @divan/workers start`)
+
+### Story 11.2: Personnel-Event Finalize Path (Capacity + Override Honesty)
+
+As an HR operator,
+I want Start Collaboration (and related events) to finalize when business preconditions and Override/exemption are correctly supplied,
+So that UAT can record real personnel events (FR15, FR19, FR20, FR32).
+
+**Acceptance Criteria:**
+
+**Given** a Draft Start (or peer) event with required facts
+**When** a compatible Active headcount approval exists, or a permitted Override/exemption is recorded
+**And** recalc is not blocking the subject
+**Then** Finalize succeeds and conflicts surface in Persian naming the failing gate (capacity vs override vs stale)
+**And** choosing capacity on the form is sufficient when the approval actually matches the assignment facts
+**And** no silent false conflict when Override reason was accepted but another gate still blocks
+
+### Story 11.3: Jalali Date Picker Month/Year & RTL Chrome
+
+As any user entering historical dates,
+I want to jump by month and year without paging one month at a time, with prev/next matching RTL,
+So that Effective Date entry is practical (FR44, UX-DR12).
+
+**Acceptance Criteria:**
+
+**Given** the shared Jalali date picker
+**When** I open it
+**Then** I can select month and year directly (patterns may follow majidh1/jalaliDatePicker after license review)
+**And** previous/next month controls are correctly oriented for RTL
+**And** typed Jalali entry and day-grid selection remain available
+**And** existing a11y floor for the picker stays green
+
+### Story 11.4: Compact Field Help (Label + Info Icon)
+
+As a user of dashboard filters and dense forms,
+I want helper text on an info icon beside the label, not under the control,
+So that filter/control rows stay vertically aligned (FR58, UX-DR7, UX-DR38).
+
+**Acceptance Criteria:**
+
+**Given** DashboardFilters and other compact filter/form rows that currently render help under the field
+**When** help is present
+**Then** it appears as a label-adjacent info control with hover and keyboard focus tooltip/disclosure
+**And** control baselines align across the row
+**And** the pattern is reusable (shared form-field help), not one-off CSS
+
+### Story 11.5: Form Surface Alignment to UX 2026-07-31
+
+As an operator on create/edit panels (e.g. personnel events),
+I want form chrome to match the latest mockup surface treatment,
+So that the panel does not appear as an abrupt different background band (FR58, UX-DR38).
+
+**Acceptance Criteria:**
+
+**Given** the personnel-event (and peer) form panels called out in UAT
+**When** rendered on the page shell
+**Then** background/spacing/hairline treatment matches UX 2026-07-31 intent for those surfaces
+**And** no unexplained color break glued to field labels
+
+### Story 11.6: Capacity Drawer Intelligibility & Create Activate CTA
+
+As an operator working headcount/capacity,
+I want drawer fields explained in plain Persian and the option to activate on create,
+So that I am not forced to decode opaque detail or hunt the table to activate a draft (FR28, FR59, UX-DR13, UX-DR34).
+
+**Acceptance Criteria:**
+
+**Given** the capacity/headcount record drawer
+**When** I open a row
+**Then** lifecycle and quantity fields (used/reserved/free/exempt/override as applicable) have plain-language labels or glossary tips
+**Given** create permission includes activate
+**When** I submit a new approval
+**Then** I can «ثبت پیش‌نویس» or «ثبت و فعال‌سازی» without leaving the create flow
+**And** Draft remains non-consumable until Active (FR28)
+
+### Story 11.7: Employment / Primary Assignment Empty-State Honesty
+
+As an operator creating a Start Collaboration event,
+I want «همکاری» and «انتصاب اولیه» empty states to read as expected for a new start, not as a broken search,
+So that I understand what to fill (FR11, FR20, FR57, UX-DR29, UX-DR32).
+
+**Acceptance Criteria:**
+
+**Given** a person with no prior Employment/Primary for a Start-type event
+**When** those pickers are shown
+**Then** copy distinguishes optional prior Employment vs required «نوع همکاری» and explains Primary Assignment
+**And** empty results use an expected-empty message for Start, not a generic failure tone
+**And** glossary/help does not require reading architecture docs
