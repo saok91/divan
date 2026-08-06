@@ -98,6 +98,15 @@ const t = initTRPC
         typeof (cause as { code: unknown }).code === "string"
           ? (cause as { code: string }).code
           : undefined;
+      const conflicts =
+        typeof cause === "object" &&
+        cause !== null &&
+        "name" in cause &&
+        (cause as { name: unknown }).name === "PersonnelEventError" &&
+        "conflicts" in cause &&
+        Array.isArray((cause as { conflicts: unknown }).conflicts)
+          ? (cause as { conflicts: unknown[] }).conflicts
+          : undefined;
       return {
         ...shape,
         data: {
@@ -105,6 +114,7 @@ const t = initTRPC
           divanCode: authzChanged
             ? ("AUTHZ_CHANGED" as const)
             : personCode,
+          ...(conflicts !== undefined ? { conflicts } : {}),
         },
       };
     },

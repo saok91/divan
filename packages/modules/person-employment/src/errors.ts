@@ -474,19 +474,32 @@ export type PersonnelEventErrorCode =
   | "CORRECTION_CYCLE"
   | "BROKEN_CORRECTION_REF";
 
+/** Serializable conflict row carried on reject throws (Story 11.2). */
+export type PersonnelEventConflictPayload = {
+  code: string;
+  severity: "blocking" | "warning";
+  messageFa: string;
+  requiresAck?: boolean;
+  requiresOverride?: boolean;
+};
+
 export class PersonnelEventError extends Error {
   readonly code: PersonnelEventErrorCode;
   readonly messageFa: string;
+  /** Present when finalize/evaluate reject should surface ConflictList rows. */
+  readonly conflicts?: readonly PersonnelEventConflictPayload[];
 
   constructor(
     code: PersonnelEventErrorCode,
     messageFa: string,
     message?: string,
+    conflicts?: readonly PersonnelEventConflictPayload[],
   ) {
     super(message ?? messageFa);
     this.name = "PersonnelEventError";
     this.code = code;
     this.messageFa = messageFa;
+    this.conflicts = conflicts;
   }
 }
 
@@ -550,6 +563,60 @@ export const MSG_HEADCOUNT_NO_CAPACITY_FA =
 
 export const MSG_HEADCOUNT_PORT_UNAVAILABLE_FA =
   "سامانه ظرفیت نیروی انسانی در دسترس نیست؛ نهایی‌سازی مسدود است.";
+
+const CAPACITY_CONFLICT_CODES = new Set([
+  "HEADCOUNT_UNAPPROVED",
+  "HEADCOUNT_CHECK_BLOCKED",
+  "HEADCOUNT_CAPACITY_MISSING",
+  "HEADCOUNT_PORT_UNAVAILABLE",
+]);
+
+/**
+ * Gate-honest Persian envelope for finalize reject (Story 11.2).
+ * Conflict row `messageFa` remains SoT for detail; this summarizes the gate family.
+ */
+export function finalizeRejectEnvelopeMessageFa(input: {
+  code: string;
+  messageFa: string;
+  conflicts?: readonly PersonnelEventConflictPayload[];
+}): string {
+  const conflicts = input.conflicts ?? [];
+  const conflictCodes = new Set(conflicts.map((c) => c.code));
+
+  if (
+    input.code === "FINALIZE_STALE_SNAPSHOT" ||
+    conflictCodes.has("FINALIZE_STALE_SNAPSHOT")
+  ) {
+    return MSG_FINALIZE_STALE_SNAPSHOT_FA;
+  }
+
+  if (input.code === "FINALIZE_OVERRIDE_REQUIRED") {
+    return input.messageFa?.trim() || MSG_FINALIZE_OVERRIDE_REQUIRED_FA;
+  }
+
+  const capacityConflict = conflicts.find((c) =>
+    CAPACITY_CONFLICT_CODES.has(c.code),
+  );
+  if (capacityConflict) {
+    // Prefer capacity detail over generic FINALIZE_BLOCKED — but never
+    // mis-label when a non-capacity blocking row is the real gate.
+    if (
+      input.code === "FINALIZE_BLOCKED" ||
+      input.messageFa === MSG_FINALIZE_BLOCKED_FA
+    ) {
+      const hasNonCapacityBlocking = conflicts.some(
+        (c) =>
+          c.severity === "blocking" &&
+          !CAPACITY_CONFLICT_CODES.has(c.code),
+      );
+      if (!hasNonCapacityBlocking) {
+        return capacityConflict.messageFa || MSG_HEADCOUNT_NO_CAPACITY_FA;
+      }
+    }
+  }
+
+  return input.messageFa;
+}
 
 export const MSG_MISSING_PERSONNEL_CODE_FA =
   "فرد باید کد پرسنلی پایدار داشته باشد.";

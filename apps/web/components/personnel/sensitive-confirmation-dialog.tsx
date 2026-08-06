@@ -168,9 +168,9 @@ export function ConflictList({
       role="list"
       aria-label="فهرست تعارض‌ها"
     >
-      {conflicts.map((c) => (
+      {conflicts.map((c, index) => (
         <li
-          key={c.code}
+          key={`${c.code}:${index}`}
           className={cn(
             "rounded-md border px-3 py-2 text-sm",
             c.severity === "blocking"

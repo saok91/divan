@@ -4,6 +4,7 @@ import { operationalCopy } from "@/lib/operational-copy";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 import {
   EntityPicker,
@@ -54,6 +55,7 @@ import {
   type StatusBadgeKind,
 } from "@/components/personnel/status-badge";
 import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
 import { RowActionCluster } from "@/components/ui/row-action-overflow";
 import { usePlatformStatus } from "@/components/platform-status-provider";
@@ -71,6 +73,67 @@ type Conflict = {
   requiresAck?: boolean;
   requiresOverride?: boolean;
 };
+
+function readFinalizeRejectPayload(err: unknown): {
+  message: string;
+  conflicts: Conflict[] | null;
+  divanCode?: string;
+} {
+  const message =
+    err && typeof err === "object" && "message" in err
+      ? String((err as { message: unknown }).message)
+      : "نهایی‌سازی ناموفق بود.";
+  if (!err || typeof err !== "object" || !("data" in err)) {
+    return { message, conflicts: null };
+  }
+  const data = (err as { data?: unknown }).data;
+  if (!data || typeof data !== "object") {
+    return { message, conflicts: null };
+  }
+  const divanCode =
+    "divanCode" in data && typeof data.divanCode === "string"
+      ? data.divanCode
+      : undefined;
+  const rawConflicts =
+    "conflicts" in data && Array.isArray(data.conflicts)
+      ? data.conflicts
+      : null;
+  if (!rawConflicts) {
+    return { message, conflicts: null, divanCode };
+  }
+  const conflicts: Conflict[] = [];
+  for (const row of rawConflicts) {
+    if (!row || typeof row !== "object") continue;
+    const code =
+      "code" in row && typeof row.code === "string" ? row.code : "";
+    const messageFa =
+      "messageFa" in row && typeof row.messageFa === "string"
+        ? row.messageFa
+        : "";
+    const severity =
+      "severity" in row &&
+      (row.severity === "blocking" || row.severity === "warning")
+        ? row.severity
+        : "blocking";
+    if (!code || !messageFa) continue;
+    conflicts.push({
+      code,
+      severity,
+      messageFa,
+      requiresAck:
+        "requiresAck" in row && row.requiresAck === true ? true : undefined,
+      requiresOverride:
+        "requiresOverride" in row && row.requiresOverride === true
+          ? true
+          : undefined,
+    });
+  }
+  return {
+    message,
+    conflicts: conflicts.length > 0 ? conflicts : null,
+    divanCode,
+  };
+}
 
 function isStartReturnType(eventType: string): boolean {
   return (
@@ -180,9 +243,19 @@ export function PersonnelEventForm({
   const [statusMsg, setStatusMsg] = React.useState<string | null>(null);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [conflicts, setConflicts] = React.useState<Conflict[]>([]);
+  /** Server reject conflicts while confirm stays open — prefer over evaluate cache. */
+  const [rejectConflicts, setRejectConflicts] = React.useState<
+    Conflict[] | null
+  >(null);
   const [ackCodes, setAckCodes] = React.useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
+  const [preferredPersistPending, setPreferredPersistPending] =
+    React.useState(false);
+  const { data: session, status: sessionStatus } = useSession();
+  const sessionReady = sessionStatus !== "loading";
+  const canActorOverride =
+    sessionReady && session?.user?.coarseRole === "hr_admin";
 
   const personId = entityId(person);
   const employmentId = entityId(employment);
@@ -910,6 +983,7 @@ export function PersonnelEventForm({
     applySnapshot(lastSavedRef.current);
     setDirty(false);
     setConflicts([]);
+    setRejectConflicts(null);
     setErrorMsg(null);
     setStatusMsg(null);
     setDemoDraftOpen(Boolean(lastSavedRef.current.draftId));
@@ -990,18 +1064,22 @@ export function PersonnelEventForm({
   }, [initialPersonId, leaveGuard, router]);
 
   // Sync evaluate → local conflicts for form-level ack UI (same as pre-4b.7).
+  // Skip while showing a finalize reject payload (Story 11.2 — no stale evaluate list).
   /* eslint-disable react-hooks/set-state-in-effect -- intentional evaluate→conflicts bridge */
   React.useEffect(() => {
+    if (rejectConflicts !== null) return;
     if (evaluateQuery.data?.conflicts) {
       setConflicts(evaluateQuery.data.conflicts as Conflict[]);
     }
-  }, [evaluateQuery.data]);
+  }, [evaluateQuery.data, rejectConflicts]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const evaluatedConflicts = (evaluateQuery.data?.conflicts ??
     []) as Conflict[];
-  /** While confirm is open, always trust evaluate payload (including empty). */
-  const activeConflicts = confirmOpen ? evaluatedConflicts : conflicts;
+  /** Prefer server reject rows; while confirm open trust evaluate unless reject active. */
+  const activeConflicts =
+    rejectConflicts ??
+    (confirmOpen ? evaluatedConflicts : conflicts);
 
   const blocking = activeConflicts.some((c) => c.severity === "blocking");
   const warningsNeedingAck = activeConflicts.filter(
@@ -1016,27 +1094,48 @@ export function PersonnelEventForm({
   );
   const ackComplete = warningsNeedingAck.every((w) => ackCodes.has(w.code));
   const overrideComplete =
-    !needsOverride || overrideReason.trim().length >= 3;
+    !needsOverride ||
+    (canActorOverride && overrideReason.trim().length >= 3);
   const finalizeBlocked =
+    !sessionReady ||
     isGoldCtaBlocked ||
     isFinalizeBlockedByAuthzChange ||
     blocking ||
     !ackComplete ||
-    !overrideComplete;
+    !overrideComplete ||
+    (needsOverride && !canActorOverride);
+
+  const ensurePreferredPersisted = React.useCallback(async (): Promise<boolean> => {
+    const savedPreferred = (
+      lastSavedRef.current.preferredApprovalId ?? ""
+    ).trim();
+    const currentPreferred = preferredApprovalId.trim();
+    if (currentPreferred === savedPreferred) return true;
+    const ok = await saveDraft();
+    if (!ok) {
+      setErrorMsg(operationalCopy.finalizePreferredPersistFailed);
+    }
+    return ok;
+  }, [preferredApprovalId, saveDraft]);
 
   async function onFinalizeConfirm() {
-    if (!draftId || finalizeBlocked) return;
+    if (!draftId || finalizeBlocked || preferredPersistPending) return;
     setErrorMsg(null);
+    setPreferredPersistPending(true);
     try {
+      const preferredOk = await ensurePreferredPersisted();
+      if (!preferredOk) return;
+      const expectedVersion = lastSavedRef.current.version;
+      const persistedDraftId = lastSavedRef.current.draftId ?? draftId;
       const result = await finalizeMut.mutateAsync({
-        draftId,
-        expectedVersion: version,
-        idempotencyKey: `ui-${draftId}`,
+        draftId: persistedDraftId,
+        expectedVersion,
+        idempotencyKey: `ui-${persistedDraftId}`,
         acknowledgement:
           warningsNeedingAck.length > 0
             ? { warningCodes: [...ackCodes] }
             : undefined,
-        override: needsOverride
+        override: needsOverride && canActorOverride
           ? {
               reason: overrideReason.trim(),
               approvedByAccountId: "server-bound",
@@ -1053,18 +1152,33 @@ export function PersonnelEventForm({
         setDemoDraftOpen(false);
         setConfirmOpen(false);
         setConflicts([]);
+        setRejectConflicts(null);
         void eventsQuery.refetch();
       } else if (result.outcome === "pending_review") {
         setStatusMsg(result.messageFa);
         setVersion(result.draft.version);
         setConfirmOpen(false);
+        setRejectConflicts(null);
       }
     } catch (err) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: unknown }).message)
-          : "نهایی‌سازی ناموفق بود.";
+      const rejected = readFinalizeRejectPayload(err);
+      let msg = rejected.message;
+      if (rejected.divanCode === "FINALIZE_STALE_SNAPSHOT") {
+        msg = operationalCopy.finalizeGateStaleSnapshot;
+      }
       setErrorMsg(msg);
+      setAckCodes(new Set());
+      if (rejected.conflicts) {
+        setRejectConflicts(rejected.conflicts);
+        setConflicts(rejected.conflicts);
+      } else {
+        // Empty reject rows — do not keep prior evaluate/reject ConflictList (AC4).
+        setRejectConflicts([]);
+        setConflicts([]);
+      }
+      // Keep confirm open so ConflictList shows current server rows.
+    } finally {
+      setPreferredPersistPending(false);
     }
   }
 
@@ -2025,28 +2139,32 @@ export function PersonnelEventForm({
                     <StatusBadge status="Exception" />
                   </div>
                 ) : null}
-                <FormField
-                  label="دلیل Override (فقط HR Admin)"
-                  htmlFor={`${formId}-override`}
-                  required
-                  help="ظرفیت یا محدودیت دیگر نیازمند تأیید صریح و ثبت ممیزی است."
-                >
-                  <Input
-                    value={overrideReason}
-                    onChange={(e) => setOverrideReason(e.target.value)}
-                    aria-required
-                    autoComplete="off"
-                  />
-                </FormField>
+                {canActorOverride ? (
+                  <FormField
+                    label="دلیل Override (فقط HR Admin)"
+                    htmlFor={`${formId}-override`}
+                    required
+                    help="ظرفیت یا محدودیت دیگر نیازمند تأیید صریح و ثبت ممیزی است."
+                  >
+                    <Input
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      aria-required
+                      autoComplete="off"
+                    />
+                  </FormField>
+                ) : (
+                  <FeedbackMessage kind="info">
+                    {operationalCopy.finalizeOverrideRequiresHrAdmin}
+                  </FeedbackMessage>
+                )}
               </>
             ) : null}
           </div>
         ) : null}
 
-        {errorMsg ? (
-          <p role="alert" className="text-body text-destructive">
-            {errorMsg}
-          </p>
+        {errorMsg && !confirmOpen ? (
+          <FeedbackMessage kind="error">{errorMsg}</FeedbackMessage>
         ) : null}
         {statusMsg ? (
           <p role="status" className="text-body text-text-secondary">
@@ -2064,6 +2182,7 @@ export function PersonnelEventForm({
               lastSavedRef.current = cleared;
               setDirty(false);
               setConflicts([]);
+              setRejectConflicts(null);
               setErrorMsg(null);
               setStatusMsg(null);
               setDemoDraftOpen(false);
@@ -2095,16 +2214,34 @@ export function PersonnelEventForm({
           <Button
             type="button"
             variant="primary"
-            disabled={!draftId || isFinalizeBlockedByAuthzChange}
+            disabled={
+              !draftId ||
+              isFinalizeBlockedByAuthzChange ||
+              preferredPersistPending ||
+              !sessionReady
+            }
             onClick={() => {
-              setConfirmOpen(true);
+              void (async () => {
+                if (preferredPersistPending) return;
+                setPreferredPersistPending(true);
+                try {
+                  const ok = await ensurePreferredPersisted();
+                  if (!ok) return;
+                  setRejectConflicts(null);
+                  setConfirmOpen(true);
+                } finally {
+                  setPreferredPersistPending(false);
+                }
+              })();
             }}
             disabledReason={
               !draftId
                 ? operationalCopy.noDraftToFinalize
                 : isFinalizeBlockedByAuthzChange
                   ? operationalCopy.authzChangedFinalizeBlocked
-                  : undefined
+                  : preferredPersistPending || !sessionReady
+                    ? operationalCopy.actionPending
+                    : undefined
             }
           >
             نهایی‌سازی
@@ -2228,7 +2365,10 @@ export function PersonnelEventForm({
 
       <SensitiveConfirmationDialog
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) setRejectConflicts(null);
+        }}
         title={
           isTerminationType(eventType)
             ? "تأیید خاتمه همکاری"
@@ -2261,6 +2401,9 @@ export function PersonnelEventForm({
                 ? ` · دلیل: ${terminationReason || "—"}`
                 : ""}
             </p>
+            {errorMsg ? (
+              <FeedbackMessage kind="error">{errorMsg}</FeedbackMessage>
+            ) : null}
             {evaluateQuery.isLoading ? (
               <p role="status">در حال بررسی تعارض‌ها…</p>
             ) : (
@@ -2271,21 +2414,28 @@ export function PersonnelEventForm({
         confirmDisabled={
           finalizeBlocked ||
           finalizeMut.isPending ||
+          preferredPersistPending ||
           evaluateQuery.isLoading ||
           evaluateQuery.isError
         }
         blockedReason={
           isFinalizeBlockedByAuthzChange
             ? "نهایی‌سازی تا تأیید تغییر دسترسی ممکن نیست."
-            : blocking
+            : !sessionReady
+              ? operationalCopy.actionPending
+              : blocking
               ? "تعارض مسدودکننده وجود دارد."
               : !ackComplete
                 ? "تأیید هشدارها الزامی است."
-                : isGoldCtaBlocked
-                  ? "وضعیت کهنه یا بازمحاسبه مانع نهایی‌سازی است."
-                  : undefined
+                : needsOverride && !canActorOverride
+                  ? operationalCopy.finalizeOverrideRequiresHrAdmin
+                  : needsOverride && !overrideComplete
+                    ? operationalCopy.finalizeOverrideReasonRequired
+                    : isGoldCtaBlocked
+                      ? "وضعیت کهنه یا بازمحاسبه مانع نهایی‌سازی است."
+                      : undefined
         }
-        busy={finalizeMut.isPending}
+        busy={finalizeMut.isPending || preferredPersistPending}
         onConfirm={onFinalizeConfirm}
       />
 

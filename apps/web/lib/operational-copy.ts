@@ -443,6 +443,15 @@ export const operationalCopy = {
   disposeNotReady: "شرایط خاتمه هنوز برقرار نیست.",
   selectReconRun: "یک اجرای تطبیق را انتخاب کنید.",
   noDraftToFinalize: "پیش‌نویسی برای نهایی‌سازی نیست.",
+  /** Story 11.2 — Operator cannot Override; do not imply reason alone works. */
+  finalizeOverrideRequiresHrAdmin:
+    "نهایی‌سازی نیازمند Override توسط HR Admin با مجوز headcount.override.write است؛ ورود دلیل توسط اپراتور کافی نیست.",
+  finalizeOverrideReasonRequired:
+    "دلیل Override (حداقل ۳ نویسه) الزامی است.",
+  finalizeGateStaleSnapshot:
+    "مرجع ارزیابی کهنه است؛ دوباره بررسی کنید (متفاوت از بازمحاسبهٔ سکو).",
+  finalizePreferredPersistFailed:
+    "ذخیرهٔ انتخاب ظرفیت روی پیش‌نویس ممکن نشد؛ قبل از نهایی‌سازی دوباره ذخیره کنید.",
   artifactLoadFailed: "بارگذاری سند ممکن نشد.",
   publicationSnapshotRequired: "اسنپ‌شات بازبینی‌شده لازم است.",
   importUploadPrerequisites: "قالب و پرونده را انتخاب کنید.",

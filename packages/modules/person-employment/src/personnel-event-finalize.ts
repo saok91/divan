@@ -622,21 +622,36 @@ export async function finalizeDraft(
     }
 
     // Story 4.13 — manual Approval reselection requires permission + audit
+    // Story 11.2 — choosing the default free match (preferred === automatic) is not a reselection.
     if (draft.payload.headcountMatchedBy === "manual") {
-      try {
-        await assertActorHasHeadcountMatchReselect(
-          input.actorId,
-          getPersonDb(),
-        );
-      } catch (err) {
-        if (err instanceof HeadcountExemptionError) {
-          throw new PersonnelEventError(
-            "PERMISSION_DENIED",
-            err.messageFa,
-            err.message,
+      const selectedApprovalId =
+        typeof draft.payload.headcountApprovalId === "string"
+          ? draft.payload.headcountApprovalId
+          : null;
+      const defaultApprovalId =
+        typeof draft.payload.headcountDefaultApprovalId === "string"
+          ? draft.payload.headcountDefaultApprovalId
+          : null;
+      // Null/empty selected with matchedBy=manual is not "on default" — fail-closed.
+      const isAwayFromDefault =
+        defaultApprovalId == null ||
+        selectedApprovalId !== defaultApprovalId;
+      if (isAwayFromDefault) {
+        try {
+          await assertActorHasHeadcountMatchReselect(
+            input.actorId,
+            getPersonDb(),
           );
+        } catch (err) {
+          if (err instanceof HeadcountExemptionError) {
+            throw new PersonnelEventError(
+              "PERMISSION_DENIED",
+              err.messageFa,
+              err.message,
+            );
+          }
+          throw err;
         }
-        throw err;
       }
     }
 
@@ -882,31 +897,35 @@ export async function finalizeDraft(
           typeof draft.payload.headcountDefaultApprovalId === "string"
             ? draft.payload.headcountDefaultApprovalId
             : null;
-        await appendAccessEvent(client, {
-          correlationId,
-          actorAccountId: input.actorId,
-          operation: "personnel_event.headcount_match_reselect",
-          scope: {
-            draftId: draft.id,
-            personId: draft.personId,
-            eventId: eventId!,
-            effectiveDate: draft.effectiveDate,
-            previousDefaultApprovalId: previousDefault,
-            selectedApprovalId: selected,
-          },
-          result: "allow",
-          reason:
-            typeof draft.payload.headcountReselectReason === "string"
-              ? draft.payload.headcountReselectReason
-              : "manual_approval_reselect",
-          entityType: "PersonnelEventDraft",
-          entityId: draft.id,
-          payload: {
-            matchedBy: "manual",
-            previousDefaultApprovalId: previousDefault,
-            selectedApprovalId: selected,
-          },
-        });
+        const isAwayFromDefault =
+          previousDefault == null || selected !== previousDefault;
+        if (isAwayFromDefault) {
+          await appendAccessEvent(client, {
+            correlationId,
+            actorAccountId: input.actorId,
+            operation: "personnel_event.headcount_match_reselect",
+            scope: {
+              draftId: draft.id,
+              personId: draft.personId,
+              eventId: eventId!,
+              effectiveDate: draft.effectiveDate,
+              previousDefaultApprovalId: previousDefault,
+              selectedApprovalId: selected,
+            },
+            result: "allow",
+            reason:
+              typeof draft.payload.headcountReselectReason === "string"
+                ? draft.payload.headcountReselectReason
+                : "manual_approval_reselect",
+            entityType: "PersonnelEventDraft",
+            entityId: draft.id,
+            payload: {
+              matchedBy: "manual",
+              previousDefaultApprovalId: previousDefault,
+              selectedApprovalId: selected,
+            },
+          });
+        }
       }
 
       // Manual rematch for anonymized Return — independent access-event evidence

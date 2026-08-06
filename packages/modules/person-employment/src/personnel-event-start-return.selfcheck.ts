@@ -5,6 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,11 +20,17 @@ import {
   createDraft,
   createPerson,
   finalizeDraft,
+  finalizeRejectEnvelopeMessageFa,
   getPersonDb,
   getRecalculationStatus,
   listEmploymentsForPerson,
   listPrimaryAssignmentsForEmployment,
   matchReturn,
+  MSG_FINALIZE_BLOCKED_FA,
+  MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
+  MSG_FINALIZE_STALE_SNAPSHOT_FA,
+  MSG_HEADCOUNT_NO_CAPACITY_FA,
+  PersonnelEventError,
   resetProjectionRefreshHook,
   seedPrimaryAssignmentFixtures,
   SEED_EMPLOYMENT_LIFECYCLE,
@@ -37,6 +44,122 @@ const rootEnv = resolve(
   "../../../../.env",
 );
 loadEnv({ path: rootEnv });
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+
+function assertSourceRejectTransportGates(): void {
+  const peErrors = readFileSync(resolve(__dirname, "./errors.ts"), "utf8");
+  assert.match(
+    peErrors,
+    /finalizeRejectEnvelopeMessageFa/,
+    "errors.ts must export finalizeRejectEnvelopeMessageFa",
+  );
+  assert.match(
+    peErrors,
+    /readonly conflicts\?/,
+    "PersonnelEventError must carry optional conflicts",
+  );
+
+  const webPe = readFileSync(
+    resolve(__dirname, "../../../../apps/web/src/server/personnel-event.ts"),
+    "utf8",
+  );
+  assert.match(
+    webPe,
+    /finalizeRejectEnvelopeMessageFa/,
+    "tRPC finalize reject must build gate-honest envelope",
+  );
+  assert.match(
+    webPe,
+    /new PersonnelEventError\([\s\S]*?conflicts/,
+    "tRPC finalize reject must pass conflicts into PersonnelEventError",
+  );
+
+  const trpc = readFileSync(
+    resolve(__dirname, "../../../../apps/web/src/server/trpc.ts"),
+    "utf8",
+  );
+  assert.match(
+    trpc,
+    /conflicts !== undefined \? \{ conflicts \}/,
+    "errorFormatter must expose conflicts on data",
+  );
+
+  // Envelope unit gates (no DB)
+  assert.equal(
+    finalizeRejectEnvelopeMessageFa({
+      code: "FINALIZE_STALE_SNAPSHOT",
+      messageFa: "ignored",
+      conflicts: [],
+    }),
+    MSG_FINALIZE_STALE_SNAPSHOT_FA,
+  );
+  assert.equal(
+    finalizeRejectEnvelopeMessageFa({
+      code: "FINALIZE_OVERRIDE_REQUIRED",
+      messageFa: MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
+      conflicts: [
+        {
+          code: "HEADCOUNT_UNAPPROVED",
+          severity: "warning",
+          messageFa: "جزئیات ظرفیت",
+          requiresOverride: true,
+        },
+      ],
+    }),
+    MSG_FINALIZE_OVERRIDE_REQUIRED_FA,
+  );
+  assert.equal(
+    finalizeRejectEnvelopeMessageFa({
+      code: "FINALIZE_BLOCKED",
+      messageFa: MSG_FINALIZE_BLOCKED_FA,
+      conflicts: [
+        {
+          code: "HEADCOUNT_UNAPPROVED",
+          severity: "blocking",
+          messageFa: MSG_HEADCOUNT_NO_CAPACITY_FA,
+        },
+      ],
+    }),
+    MSG_HEADCOUNT_NO_CAPACITY_FA,
+  );
+  // Capacity warning must not steal the envelope when another gate blocks.
+  assert.equal(
+    finalizeRejectEnvelopeMessageFa({
+      code: "FINALIZE_BLOCKED",
+      messageFa: MSG_FINALIZE_BLOCKED_FA,
+      conflicts: [
+        {
+          code: "IRRECONCILABLE_ORDERING",
+          severity: "blocking",
+          messageFa: "ترتیب هم‌روز ناسازگار است.",
+        },
+        {
+          code: "HEADCOUNT_UNAPPROVED",
+          severity: "warning",
+          messageFa: MSG_HEADCOUNT_NO_CAPACITY_FA,
+          requiresOverride: true,
+        },
+      ],
+    }),
+    MSG_FINALIZE_BLOCKED_FA,
+  );
+  const carried = new PersonnelEventError(
+    "FINALIZE_BLOCKED",
+    MSG_FINALIZE_BLOCKED_FA,
+    undefined,
+    [
+      {
+        code: "HEADCOUNT_UNAPPROVED",
+        severity: "warning",
+        messageFa: "کمبود",
+        requiresOverride: true,
+      },
+    ],
+  );
+  assert.equal(carried.conflicts?.length, 1);
+  assert.equal(carried.conflicts?.[0]?.code, "HEADCOUNT_UNAPPROVED");
+}
 
 async function resolveStartPayload(db: ReturnType<typeof getPersonDb>) {
   const team = await db.organizationalUnit.findUniqueOrThrow({
@@ -93,6 +216,8 @@ async function countPrimariesForPerson(
 }
 
 async function main() {
+  assertSourceRejectTransportGates();
+
   const url = process.env.DATABASE_URL?.trim();
   assert.ok(url, "DATABASE_URL required");
 
@@ -214,6 +339,77 @@ async function main() {
     }
     assert.equal(await countEmployments(db, startPerson.id), 1);
     assert.equal(await countPrimariesForPerson(db, startPerson.id), 1);
+
+    // --- Story 11.2: preferred free Active Approval → finalize without Override ---
+    const { activateApproval, createApproval } = await import("@divan/headcount");
+    const prefPerson = await createPerson(
+      {
+        personnelCode: `18${suffix.slice(0, 4)}`,
+        givenName: "ترجیح",
+        familyName: "ظرفیت",
+        mobilePhone: "09120000011",
+      },
+      { accountId: operator, correlationId: `sc-pref-${suffix}` },
+      db,
+    );
+    const prefDept = await db.organizationalUnit.findFirstOrThrow({
+      where: { unitType: "DEPARTMENT", active: true },
+    });
+    const prefTeam = await db.organizationalUnit.create({
+      data: {
+        code: `TEAM-PREF-11-2-${suffix}`,
+        nameFa: "تیم ترجیح ظرفیت ۱۱٫۲",
+        unitType: "TEAM",
+        parentId: prefDept.id,
+        startDate: new Date("2020-01-01"),
+        active: true,
+      },
+    });
+    const preferredApproval = await createApproval(pool, {
+      requirementCode: `REQ-PREF-11-2-${suffix}`,
+      teamId: prefTeam.id,
+      jobTitleId: basePayload.jobTitleId,
+      allowedCount: 5,
+      validityStart: "2020-01-01",
+      validityEndExclusive: "2099-12-31",
+      actorId: admin,
+    });
+    await activateApproval(pool, {
+      id: preferredApproval.id,
+      actorId: admin,
+    });
+    const draftPreferred = await createDraft(
+      {
+        personId: prefPerson.id,
+        eventType: "EmploymentStarted",
+        effectiveDate: today,
+        payload: {
+          ...basePayload,
+          teamId: prefTeam.id,
+          preferredApprovalId: preferredApproval.id,
+        },
+      },
+      { accountId: operator },
+      db,
+    );
+    const preferredFin = await finalizeDraft(
+      {
+        draftId: draftPreferred.id,
+        actorId: operator,
+        expectedVersion: draftPreferred.version,
+        idempotencyKey: `pref-${suffix}`,
+      },
+      pool,
+      db,
+    );
+    assert.equal(
+      preferredFin.outcome,
+      "finalized",
+      preferredFin.outcome === "rejected"
+        ? `preferred free compatible Approval must finalize without Override (got ${preferredFin.code}: ${preferredFin.messageFa})`
+        : "preferred free compatible Approval must finalize without Override",
+    );
+    assert.equal(await countEmployments(db, prefPerson.id), 1);
 
     // --- Scheduled Start — no Employment/Primary mutation ---
     const schedPerson = await createPerson(
@@ -427,6 +623,21 @@ async function main() {
           opBlocked.code === "FINALIZE_OVERRIDE_REQUIRED" ||
             opBlocked.conflicts.some((c) => c.code === "HEADCOUNT_UNAPPROVED"),
           "Operator blocked without Override permission",
+        );
+        assert.ok(
+          opBlocked.conflicts.length > 0,
+          "Story 11.2: domain reject must retain conflicts[] for transport",
+        );
+        const envelope = finalizeRejectEnvelopeMessageFa({
+          code: opBlocked.code,
+          messageFa: opBlocked.messageFa,
+          conflicts: opBlocked.conflicts,
+        });
+        assert.ok(
+          envelope.includes("Override") ||
+            envelope.includes("ظرفیت") ||
+            opBlocked.conflicts.some((c) => c.messageFa.length > 0),
+          "reject envelope must name capacity/override gate family",
         );
       }
 

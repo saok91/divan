@@ -1,3 +1,8 @@
+## Deferred from: code review of 11-2-personnel-event-finalize-capacity-override-honesty.md (2026-08-07)
+
+- Preferred-only auto-persist before finalize: when other draft fields are dirty but preferred is unchanged, finalize still uses last saved version — pre-existing dirty/save contract; story only required preferred persistence.
+- `PersonnelEventError` optional 4th positional `conflicts` arg is easy to mis-order with `message` — workable for current call sites; consider options bag in a later hygiene pass.
+
 ## Deferred from: code review of 10-5-configuration-change-control-evidence.md (2026-08-04)
 
 - Empty-filter `audit.search` fires before URL hydrate applies filters — cosmetic flash of unfiltered results; same one-shot hydrate pattern.

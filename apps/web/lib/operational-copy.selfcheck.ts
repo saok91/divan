@@ -253,6 +253,55 @@ for (const file of walkTsx(path.join(webRoot, "components"))) {
 }
 
 assert.equal(
+  operationalCopy.finalizeOverrideRequiresHrAdmin.includes("headcount.override.write"),
+  true,
+  "override honesty must name headcount.override.write",
+);
+assert.ok(operationalCopy.finalizeOverrideReasonRequired.length > 0);
+assert.ok(
+  operationalCopy.finalizeGateStaleSnapshot.includes("مرجع ارزیابی"),
+);
+assert.doesNotMatch(
+  operationalCopy.finalizeGateStaleSnapshot,
+  /صف محاسبه/,
+  "stale snapshot gate must not invent «صف محاسبه»",
+);
+assert.ok(operationalCopy.finalizePreferredPersistFailed.length > 0);
+
+// Story 11.2 — form must persist preferred and surface reject conflicts
+const peForm = read("components/personnel/personnel-event-form.tsx");
+assert.match(
+  peForm,
+  /ensurePreferredPersisted/,
+  "form must auto-persist preferredApprovalId before evaluate/finalize",
+);
+assert.match(
+  peForm,
+  /readFinalizeRejectPayload|setRejectConflicts/,
+  "form must refresh ConflictList from finalize reject payload",
+);
+assert.match(
+  peForm,
+  /setRejectConflicts\(\[\]\)/,
+  "reject without conflicts must clear ConflictList (no stale evaluate rows)",
+);
+assert.match(
+  peForm,
+  /preferredPersistPending/,
+  "finalize CTA must gate concurrent preferred persist",
+);
+assert.match(
+  peForm,
+  /sessionStatus/,
+  "session loading must not flash Override-unavailable for Admin",
+);
+assert.match(
+  peForm,
+  /finalizeOverrideRequiresHrAdmin/,
+  "form must not imply Operator reason alone unlocks Override",
+);
+
+assert.equal(
   missing.length,
   0,
   `Button disabled without disabledReason:\n${missing.slice(0, 40).join("\n")}`,

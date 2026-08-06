@@ -12,6 +12,7 @@ import {
   PERSONNEL_EVENT_FINALIZE_PERMISSION,
   PERSONNEL_EVENT_REVERSE_PERMISSION,
   PersonnelEventError,
+  finalizeRejectEnvelopeMessageFa,
   PersonIdentityError,
   assertActorHasPersonnelEventCancel,
   assertActorHasPersonnelEventCorrect,
@@ -396,7 +397,18 @@ export const personnelEventRouter = createTRPCRouter({
           await readyFinalizePool(),
         );
         if (result.outcome === "rejected") {
-          throw new PersonnelEventError(result.code, result.messageFa);
+          const conflicts = result.conflicts ?? [];
+          const messageFa = finalizeRejectEnvelopeMessageFa({
+            code: result.code,
+            messageFa: result.messageFa,
+            conflicts,
+          });
+          throw new PersonnelEventError(
+            result.code,
+            messageFa,
+            undefined,
+            conflicts,
+          );
         }
         return result;
       } catch (err) {

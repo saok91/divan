@@ -115,6 +115,7 @@ export {
   COMPENSATION_WRITE_PERMISSION,
   PERSONNEL_EVENT_DATA_CATEGORY,
   PersonnelEventError,
+  finalizeRejectEnvelopeMessageFa,
   MSG_DRAFT_NOT_FOUND_FA,
   MSG_DRAFT_NOT_EDITABLE_FA,
   MSG_DRAFT_ALREADY_FINALIZED_FA,
@@ -166,6 +167,7 @@ export type {
   SecondaryAssignmentErrorCode,
   ManagementRelationshipErrorCode,
   PersonnelEventErrorCode,
+  PersonnelEventConflictPayload,
 } from "./errors";
 
 export {
