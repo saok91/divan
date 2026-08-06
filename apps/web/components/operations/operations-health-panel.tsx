@@ -82,6 +82,7 @@ function HealthSection(props: {
   section: SectionView;
 }) {
   const { id, title, section } = props;
+  const headingId = `${id}-heading`;
   const isAlert = section.status === "red";
   const pending = formatCount(section.pendingCount);
   const failed = formatCount(section.failedCount);
@@ -89,11 +90,13 @@ function HealthSection(props: {
 
   return (
     <section
-      aria-labelledby={id}
-      className="border-b border-border py-4 last:border-b-0"
+      id={id}
+      aria-labelledby={headingId}
+      tabIndex={-1}
+      className="scroll-mt-4 border-b border-border py-4 last:border-b-0 outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id={id} className="text-title-sm font-medium text-foreground">
+        <h2 id={headingId} className="text-title-sm font-medium text-foreground">
           {title}
         </h2>
         <p
@@ -158,6 +161,28 @@ function trpcErrorMessage(_err: unknown, fallback: string): string {
   return fallback;
 }
 
+/** App Router may not scroll to hash on client navigate — focus real section. */
+function useOpsHashScroll(ready: boolean) {
+  React.useEffect(() => {
+    if (!ready || typeof window === "undefined") return;
+
+    function scrollToHash() {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (!hash) return;
+      const el = document.getElementById(hash);
+      if (!el) return;
+      el.scrollIntoView({ block: "start" });
+      if (typeof el.focus === "function") {
+        el.focus({ preventScroll: true });
+      }
+    }
+
+    scrollToHash();
+    window.addEventListener("hashchange", scrollToHash);
+    return () => window.removeEventListener("hashchange", scrollToHash);
+  }, [ready]);
+}
+
 export function OperationsHealthPanel() {
   const leaveGuard = useLeaveGuardOptional();
   const { data: session } = useSession();
@@ -167,6 +192,7 @@ export function OperationsHealthPanel() {
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   });
+  useOpsHashScroll(Boolean(healthQuery.data) && !healthQuery.isLoading);
 
   function navigateAuditTrustReview() {
     const href = "/audit?trust=review";

@@ -8,7 +8,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  isStaleRecalcOpsRole,
   operationalCopy,
+  staleRecalcDisclosureBody,
   staleRecalcMessage,
 } from "./operational-copy";
 import { emptyStateCopy } from "./empty-state";
@@ -45,12 +47,76 @@ assert.equal(
 );
 assert.equal(operationalCopy.staleRecalcDisclosureSummary, "توضیح بیشتر");
 assert.ok(
-  operationalCopy.staleRecalcDisclosureBody.includes("۱۵ دقیقه"),
-  "disclosure must mention 15-minute ops check without clock deadline",
+  operationalCopy.staleRecalcDisclosureBodySysAdmin.includes("۱۵ دقیقه"),
+  "SysAdmin disclosure must mention 15-minute ops check without clock deadline",
+);
+assert.ok(
+  operationalCopy.staleRecalcDisclosureBodyNonOps.includes("۱۵ دقیقه"),
+  "non-ops disclosure must mention 15-minute wait without clock deadline",
 );
 assert.doesNotMatch(
-  operationalCopy.staleRecalcDisclosureBody,
+  operationalCopy.staleRecalcDisclosureBodySysAdmin,
   /تا\s*[۰-۹0-9]{1,2}:[۰-۹0-9]{2}/,
+);
+assert.doesNotMatch(
+  operationalCopy.staleRecalcDisclosureBodyNonOps,
+  /تا\s*[۰-۹0-9]{1,2}:[۰-۹0-9]{2}/,
+);
+
+// Story 11.1 — ban invented «صف محاسبه»; role-honest next steps
+for (const body of [
+  operationalCopy.staleRecalcDisclosureBodySysAdmin,
+  operationalCopy.staleRecalcDisclosureBodyNonOps,
+  operationalCopy.staleRecalcDisclosureBodySessionLoading,
+  staleRecalcDisclosureBody("system_admin"),
+  staleRecalcDisclosureBody("hr_operator"),
+  staleRecalcDisclosureBody("hr_admin"),
+  staleRecalcDisclosureBody("manager"),
+  staleRecalcDisclosureBody(undefined),
+]) {
+  assert.doesNotMatch(
+    body,
+    /صف محاسبه/,
+    "stale disclosure must never invent «صف محاسبه»",
+  );
+  assert.doesNotMatch(body, /عملیات\s*←\s*صف محاسبه/);
+}
+assert.doesNotMatch(
+  operationalCopy.staleRecalcDisclosureBodySessionLoading,
+  /\/operations|SysAdmin|مدیر سامانه/,
+  "session-loading disclosure must not assume role next step",
+);
+assert.ok(isStaleRecalcOpsRole("system_admin"));
+assert.equal(isStaleRecalcOpsRole("hr_operator"), false);
+assert.ok(
+  operationalCopy.staleRecalcDisclosureBodySysAdmin.includes("بازمحاسبه"),
+  "SysAdmin disclosure must name real section «بازمحاسبه»",
+);
+assert.equal(
+  operationalCopy.staleRecalcOpsDeepLinkHref,
+  "/operations#ops-recalc",
+);
+assert.match(
+  operationalCopy.staleRecalcOpsDeepLinkLabel,
+  /بازمحاسبه/,
+);
+assert.doesNotMatch(
+  operationalCopy.staleRecalcDisclosureBodyNonOps,
+  /\/operations/,
+  "non-ops disclosure must not require /operations as next step",
+);
+assert.doesNotMatch(
+  operationalCopy.staleRecalcDisclosureBodyNonOps,
+  /عملیات/,
+  "non-ops disclosure must not point at «عملیات» nav",
+);
+assert.equal(
+  staleRecalcDisclosureBody("system_admin"),
+  operationalCopy.staleRecalcDisclosureBodySysAdmin,
+);
+assert.equal(
+  staleRecalcDisclosureBody("hr_operator"),
+  operationalCopy.staleRecalcDisclosureBodyNonOps,
 );
 
 const banner = read("components/stale-recalc-banner.tsx");
@@ -62,6 +128,19 @@ assert.doesNotMatch(
   "banner must not render stalePendingUntil",
 );
 assert.match(banner, /affectedPersonCount/);
+assert.match(banner, /useSession/);
+assert.match(banner, /staleRecalcDisclosureBody/);
+assert.match(banner, /staleRecalcOpsDeepLinkHref|\/operations#ops-recalc/);
+assert.match(banner, /isStaleRecalcOpsRole|system_admin/);
+assert.match(banner, /requestNavigation/);
+assert.match(banner, /sessionStatus|status !== ["']loading["']|!== "loading"/);
+assert.doesNotMatch(banner, /صف محاسبه/);
+
+const opsPanel = read("components/operations/operations-health-panel.tsx");
+assert.match(opsPanel, /id=["']ops-recalc["']/);
+assert.match(opsPanel, /scrollIntoView|useOpsHashScroll/);
+assert.match(opsPanel, /hashchange/);
+assert.match(opsPanel, /focus(?:-visible)?:ring/);
 
 const provider = read("components/platform-status-provider.tsx");
 assert.match(provider, /affectedPersonCount/);

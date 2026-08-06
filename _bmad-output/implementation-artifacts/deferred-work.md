@@ -780,3 +780,9 @@
 - Audit-trust deep link only shown when status is red/degraded (operations-health-panel.tsx) — pre-existing visibility gate; 9.8 only swapped Link for leave-guard Button.
 - Governance discoverability selfcheck asserts purpose keys only via `length > 0` — structural presence only; content contract not encoded.
 - Touched ops/audit/lifecycle panels still use raw `<p role="alert">` in places — pre-existing FeedbackMessage inconsistency outside the new leave-guard deep-link change.
+
+## Deferred from: code review of 11-1-stale-recalc-unblock-role-honest-next-steps.md (2026-08-07)
+
+- Reclaim success log only when `reclaimed > 0` — pre-existing; README documents the positive reclaim case; zero-reclaim boot still silent
+- No behavioral selfcheck for `stale` → reclaim → clear path — Story 11.1 used source gate + manual DoD; expand worker/integration coverage later
+- `reenqueuePendingRecalculationIfNeeded` stale branch not separately source-locked — list SQL gate covers reclaim list only; tighten if reverse/correct replay regresses

@@ -97,6 +97,17 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) — unauthenticated visitors redirect to `/login`. After login, each coarse role lands on its first surface (`/personnel`, `/dashboard`, `/audit`, or `/operations`); see Story 1.5 nav matrix. Command palette: `Ctrl+K` / `Cmd+K`, or `/` when focus is not in a text field. Jalali date-picker + platform banner smoke toggles (stale / break-glass / gold CTA): `/personnel`. At 200% zoom on a ≥1280×720 display the shell stays usable; resize the window below that floor to see the viewport gate.
 
+### Recalc worker (local UAT)
+
+Personnel-event mutations mark `recalculation_status` pending in the web process; the platform stale banner stays up until `@divan/workers` **successfully runs** `temporal.recalculate` against the **same** `DATABASE_URL` as the web app. If only `pnpm dev` is running, pending/failed/stale rows remain and gold CTAs stay blocked (expected fail-closed).
+
+```bash
+# same DATABASE_URL as apps/web (root .env)
+pnpm --filter @divan/workers start
+```
+
+On boot the worker **re-enqueues** orphan pending/failed/stale rows (reclaim does not clear status by itself) and logs `[workers] reclaimed N pending/failed/stale recalc job(s)` when `N > 0`. The banner clears only after those jobs finish successfully. Do not SQL-clear status rows as a product happy path.
+
 Required env (see `.env.example`): `AUTH_SECRET`, `IDENTITY_PROVIDER` (`seeded` for local), session timeout hooks.
 For LDAP mode (Infra-gated): `LDAP_URL`, `LDAP_BIND_DN`, `LDAP_BIND_PASSWORD`, `LDAP_BASE_DN`, `LDAP_USER_FILTER`, `LDAP_ID_ATTRIBUTE`, plus optional TLS / create-mapping keys.
 Copy auth-related vars into `apps/web/.env` as well (Next.js loads env from the app package directory).

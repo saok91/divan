@@ -1,8 +1,13 @@
 /**
- * pg-boss worker bootstrap — temporal.recalculate (Story 4.4 / AD-6).
+ * pg-boss worker bootstrap — temporal.recalculate (Story 4.4 / AD-6 / 11.1).
  *
  * Start: DATABASE_URL=... pnpm --filter @divan/workers start
  * Or import `startWorkers()` from app bootstrap.
+ *
+ * Local UAT: same DATABASE_URL as web. On boot, reclaimPendingRecalculations
+ * re-enqueues pending|failed|stale rows (does not clear status). Banner clears
+ * only after runHistoricalRecalculation succeeds. Log when N > 0:
+ * `[workers] reclaimed N pending/failed/stale recalc job(s)`
  */
 
 import { createPgPool, type Pool } from "@divan/db";
@@ -35,7 +40,9 @@ async function sendRecalcJob(
 }
 
 /**
- * Re-send durable pending/failed rows (orphan after API crash or missing send).
+ * Re-send durable pending/failed/stale rows (orphan after API crash or missing send).
+ * Blocking set matches getPlatformRecalcSignal. Reclaim only enqueues; status
+ * clears when the worker handler finishes runHistoricalRecalculation.
  */
 export async function reclaimPendingRecalculations(
   boss: PgBoss,
@@ -76,7 +83,9 @@ export async function startWorkers(
 
   const reclaimed = await reclaimPendingRecalculations(boss, pool);
   if (reclaimed > 0) {
-    console.log(`[workers] reclaimed ${reclaimed} pending/failed recalc job(s)`);
+    console.log(
+      `[workers] reclaimed ${reclaimed} pending/failed/stale recalc job(s)`,
+    );
   }
 
   await boss.work<RecalcJobPayload>(

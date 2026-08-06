@@ -67,6 +67,23 @@ function main() {
   assert.ok(panelSrc.includes("opsSectionImport"));
   assert.ok(panelSrc.includes("opsSectionBackup"));
   assert.ok(panelSrc.includes("opsSectionDependencies"));
+  assert.ok(
+    panelSrc.includes('id="ops-recalc"'),
+    "ops recalc section must keep deep-link id ops-recalc",
+  );
+  assert.ok(
+    /scrollIntoView|useOpsHashScroll/.test(panelSrc),
+    "ops panel must honor #ops-recalc hash scroll (Story 11.1)",
+  );
+  assert.ok(
+    panelSrc.includes("hashchange"),
+    "ops hash scroll must listen for hashchange (same-page deep-link)",
+  );
+  assert.ok(
+    /focus(?:-visible)?:ring/.test(panelSrc),
+    "ops section focus after hash scroll must keep a visible focus ring",
+  );
+  assert.equal(operationalCopy.opsSectionRecalc, "بازمحاسبه");
 
   const rootSrc = readFileSync(rootPath, "utf8");
   assert.ok(rootSrc.includes("operations: operationsRouter"));

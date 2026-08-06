@@ -3,6 +3,8 @@
  * Fact + next step; no emoji; no ceremonial success. Persian-only UI.
  */
 
+import type { CoarseRole } from "@divan/identity-access";
+
 import { toPersianDigits } from "./persian-digits";
 
 export const operationalCopy = {
@@ -395,11 +397,25 @@ export const operationalCopy = {
     "تا به‌روز شدن داده، نهایی‌سازی و خروجی غیرفعال است.",
 
   /**
-   * Recalc banner disclosure (Story 8.9 / Direction A) — no clock deadline.
+   * Recalc banner disclosure (Story 8.9 / 11.1) — no clock deadline.
+   * Role-split bodies; never invent «صف محاسبه» destination.
    */
   staleRecalcDisclosureSummary: "توضیح بیشتر",
-  staleRecalcDisclosureBody:
-    "پس از هر رویداد پرسنلی، وضعیت جاری فرد دوباره محاسبه می‌شود. تا پایان محاسبه، ردیف‌های علامت‌خورده فقط خواندنی هستند و در خروجی اکسل نمی‌آیند. اگر بیش از ۱۵ دقیقه طول کشید، از «عملیات ← صف محاسبه» وضعیت را ببینید.",
+  /** SysAdmin: real ops section «بازمحاسبه» (counts only). */
+  staleRecalcDisclosureBodySysAdmin:
+    "پس از هر رویداد پرسنلی، وضعیت جاری فرد دوباره محاسبه می‌شود. تا پایان محاسبه، ردیف‌های علامت‌خورده فقط خواندنی هستند و در خروجی اکسل نمی‌آیند. اگر بیش از ۱۵ دقیقه طول کشید، بخش «بازمحاسبه» در سلامت عملیات عمق صف (تعداد در انتظار، ناموفق و کهنه) را نشان می‌دهد.",
+  /** Non-ops roles: wait/retry + contact SysAdmin — never require /operations. */
+  staleRecalcDisclosureBodyNonOps:
+    "پس از هر رویداد پرسنلی، وضعیت جاری فرد دوباره محاسبه می‌شود. تا پایان محاسبه، ردیف‌های علامت‌خورده فقط خواندنی هستند و در خروجی اکسل نمی‌آیند. معمولاً چند دقیقه طول می‌کشد؛ صفحه را تازه کنید یا کمی صبر کنید. اگر بیش از ۱۵ دقیقه طول کشید، با مدیر سامانه (SysAdmin) تماس بگیرید تا وضعیت بازمحاسبه را بررسی کند.",
+  /**
+   * While session role is still loading — shared facts + wait only.
+   * No SysAdmin deep-link and no “contact SysAdmin” (role not known yet).
+   */
+  staleRecalcDisclosureBodySessionLoading:
+    "پس از هر رویداد پرسنلی، وضعیت جاری فرد دوباره محاسبه می‌شود. تا پایان محاسبه، ردیف‌های علامت‌خورده فقط خواندنی هستند و در خروجی اکسل نمی‌آیند. معمولاً چند دقیقه طول می‌کشد؛ صفحه را تازه کنید یا کمی صبر کنید.",
+  /** Live deep-link for system_admin only — matches ops HealthSection id. */
+  staleRecalcOpsDeepLinkHref: "/operations#ops-recalc",
+  staleRecalcOpsDeepLinkLabel: "مشاهدهٔ بخش بازمحاسبه",
 
   /**
    * Banner when N is unknown (fail-closed / signal error) — no invented count.
@@ -691,7 +707,7 @@ export const operationalCopy = {
   auditSurfacePurpose:
     "بازبین مستقل شواهد قابل‌انتساب را برای تحقیق فیلتر و جزئیات بررسی می‌کند.",
   operationsSurfacePurpose:
-    "سلامت سرویس، صف بازمحاسبه و آرتیفکت‌های پرتاب برای SysAdmin — بدون مرور محتوای HR.",
+    "سلامت سرویس، بخش بازمحاسبه و آرتیفکت‌های پرتاب برای SysAdmin — بدون مرور محتوای HR.",
   settingsSurfacePurpose:
     "پارامترهای حاکمیتی مجاز برای نقش شما — مشاهده و اعمال تغییر برای کلیدهای قابل‌ویرایش.",
   settingsLoading: "در حال بارگذاری تنظیمات…",
@@ -871,6 +887,26 @@ export function staleRecalcMessage(
   const n = Math.max(0, Math.trunc(affectedPersonCount));
   const nFa = toPersianDigits(String(n));
   return `محاسبهٔ وضعیت جاری برای ${nFa} فرد هنوز کامل نشده — نهایی‌سازی رویداد و خروجی گرفتن برای این افراد موقتاً غیرفعال است. معمولاً چند دقیقه طول می‌کشد.`;
+}
+
+/** SysAdmin is the only role with a live ops «بازمحاسبه» next step (Story 11.1). */
+export function isStaleRecalcOpsRole(
+  coarseRole: CoarseRole | string | null | undefined,
+): boolean {
+  return coarseRole === "system_admin";
+}
+
+/**
+ * Role-honest disclosure body (Story 11.1).
+ * SysAdmin → ops «بازمحاسبه»; everyone else → wait/contact (no /operations).
+ */
+export function staleRecalcDisclosureBody(
+  coarseRole: CoarseRole | string | null | undefined,
+): string {
+  if (isStaleRecalcOpsRole(coarseRole)) {
+    return operationalCopy.staleRecalcDisclosureBodySysAdmin;
+  }
+  return operationalCopy.staleRecalcDisclosureBodyNonOps;
 }
 
 /**

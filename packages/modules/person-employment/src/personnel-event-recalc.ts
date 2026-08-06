@@ -387,7 +387,10 @@ export async function getOpsRecalcAggregate(
   };
 }
 
-/** All non-clear rows that still need a job (worker reclaim / idempotent replay). */
+/**
+ * All blocking rows that still need a job (worker reclaim / idempotent replay).
+ * Matches getPlatformRecalcSignal blocking set: pending | failed | stale.
+ */
 export async function listPendingRecalculationJobs(
   db: RecalcQueryable,
 ): Promise<RecalcJobPayload[]> {
@@ -403,7 +406,7 @@ export async function listPendingRecalculationJobs(
        generation,
        job_key
      FROM recalculation_status
-     WHERE status IN ('pending', 'failed')
+     WHERE status IN ('pending', 'failed', 'stale')
      ORDER BY from_effective_date ASC, person_id ASC`,
   );
   return result.rows.map((row) => ({
@@ -415,7 +418,7 @@ export async function listPendingRecalculationJobs(
 }
 
 /**
- * If person still has pending/failed status, re-enqueue current generation.
+ * If person still has pending/failed/stale status, re-enqueue current generation.
  * Used after idempotent Reverse/Correct replay and by worker reclaim.
  */
 export async function reenqueuePendingRecalculationIfNeeded(
@@ -423,7 +426,12 @@ export async function reenqueuePendingRecalculationIfNeeded(
   personId: string,
 ): Promise<RecalcJobPayload | null> {
   const current = await getRecalculationStatus(db, personId);
-  if (!current || (current.status !== "pending" && current.status !== "failed")) {
+  if (
+    !current ||
+    (current.status !== "pending" &&
+      current.status !== "failed" &&
+      current.status !== "stale")
+  ) {
     return null;
   }
   const payload: RecalcJobPayload = {

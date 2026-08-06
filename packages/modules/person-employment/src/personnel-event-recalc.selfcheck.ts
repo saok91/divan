@@ -41,6 +41,18 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 config({ path: resolve(__dirname, "../../../../.env") });
 
 async function main() {
+  // Source gate (Story 11.1): reclaim list must match platform blocking set.
+  const { readFileSync } = await import("node:fs");
+  const recalcSrc = readFileSync(
+    resolve(__dirname, "./personnel-event-recalc.ts"),
+    "utf8",
+  );
+  assert.match(
+    recalcSrc,
+    /listPendingRecalculationJobs[\s\S]*?status IN \('pending', 'failed', 'stale'\)/,
+    "listPendingRecalculationJobs must reclaim stale as well as pending/failed",
+  );
+
   const url = process.env.DATABASE_URL?.trim();
   assert.ok(url, "DATABASE_URL required");
   const db = getPersonDb();

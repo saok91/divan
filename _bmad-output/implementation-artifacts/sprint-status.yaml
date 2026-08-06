@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-08-07T01:00:00+03:30
+# last_updated: 2026-08-07T02:45:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-08-07T01:00:00+03:30
+last_updated: 2026-08-07T02:45:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -174,8 +174,8 @@ development_status:
   epic-10-retrospective: done
 
   # Epic 11 authorized by sprint-change-proposal-2026-08-07 (UAT unblock after Epic 10)
-  epic-11: backlog
-  11-1-stale-recalc-unblock-role-honest-next-steps: backlog
+  epic-11: in-progress
+  11-1-stale-recalc-unblock-role-honest-next-steps: done
   11-2-personnel-event-finalize-capacity-override-honesty: backlog
   11-3-jalali-datepicker-month-year-rtl-chrome: backlog
   11-4-compact-field-help-label-info-icon: backlog
