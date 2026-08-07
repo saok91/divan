@@ -105,6 +105,16 @@ assert.match(
   /PageHeader/,
   "SurfaceSectionTabsLayout must compose PageHeader",
 );
+assert.match(
+  surfaceLayout,
+  /flex min-h-0 flex-1 flex-col bg-surface-page/,
+  "SurfaceSectionTabsLayout root must flex-fill main so form hosts can fill remaining height",
+);
+assert.match(
+  surfaceLayout,
+  /flex min-h-0 min-w-0 flex-1 flex-col/,
+  "tabpanel must be a flex column that grows so FormSurfaceHost can flex-1",
+);
 
 const button = read("components/ui/button.tsx");
 assert.match(
@@ -132,6 +142,16 @@ assert.doesNotMatch(
   /help \? \(\s*<p id=\{helpId\} className="text-caption text-text-tertiary">/,
   "FormField must not render always-visible under-control help paragraph",
 );
+assert.match(
+  formLayout,
+  /border-t border-hairline-strong bg-surface/,
+  "FormFooter must use content surface + strong hairline (mockup .fbar), not surface-subtle band",
+);
+assert.doesNotMatch(
+  formLayout,
+  /FormFooter[\s\S]*?bg-surface-subtle/,
+  "FormFooter default chrome must not use bg-surface-subtle",
+);
 
 const fieldHelp = read("components/form-layout/field-help.tsx");
 assert.match(fieldHelp, /export function FieldHelpIcon/);
@@ -157,6 +177,61 @@ assert.match(
 const panel = read("components/layout/panel-section.tsx");
 assert.match(panel, /Full-bleed table/);
 assert.match(panel, /max-w-4xl/);
+assert.match(
+  panel,
+  /export function FormSurfaceHost/,
+  "panel-section must export FormSurfaceHost for form tab content plane",
+);
+assert.match(
+  panel,
+  /data-slot="form-surface-host"/,
+  "FormSurfaceHost must expose data-slot for contract asserts",
+);
+assert.match(
+  panel,
+  /min-h-0 min-w-0 flex-1 bg-surface/,
+  "FormSurfaceHost must fill remaining tab height with content surface (mockup .main)",
+);
+assert.match(
+  panel,
+  /FormSurfaceHost/,
+  "panel docs must document FormSurfaceHost for form tabs",
+);
+assert.match(
+  panel,
+  /do \*\*not\*\* nest Panel fill|do not nest Panel fill/i,
+  "panel docs must forbid nested Panel fill around form body",
+);
+
+const peForm = read("components/personnel/personnel-event-form.tsx");
+assert.match(peForm, /FormLayout/);
+assert.match(peForm, /FormFooter/);
+assert.doesNotMatch(
+  peForm,
+  /import \{ Panel \} from ["']@\/components\/layout\/panel-section["']/,
+  "PE form must not import Panel — form sits on FormSurfaceHost, not nested Panel fill",
+);
+assert.doesNotMatch(
+  peForm,
+  /<Panel[\s>]/,
+  "PE form must not nest <Panel> around the form body",
+);
+
+const peRegister = read(
+  "app/(app)/personnel-events/(tabs)/register/page.tsx",
+);
+assert.match(
+  peRegister,
+  /FormSurfaceHost/,
+  "PE register tab must host form on FormSurfaceHost content plane",
+);
+
+const hcCreate = read("app/(app)/headcount/(tabs)/create/page.tsx");
+assert.match(
+  hcCreate,
+  /FormSurfaceHost/,
+  "headcount create tab must host form on FormSurfaceHost content plane",
+);
 
 const iconContract = read("components/icons/icon-contract.md");
 assert.match(iconContract, /lucide-react/);
@@ -172,6 +247,11 @@ assert.match(
   gallery,
   /NODE_ENV === ["']production["']/,
   "gallery must gate production with notFound/redirect",
+);
+assert.match(
+  gallery,
+  /FormSurfaceHost/,
+  "gallery Form layout demo must show FormSurfaceHost aligned surface",
 );
 
 const dashboardFilters = read("components/dashboard/dashboard-filters.tsx");

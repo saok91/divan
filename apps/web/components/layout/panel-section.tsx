@@ -3,14 +3,15 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Panel / section hairline system (Story 8.2).
+ * Panel / section hairline system (Story 8.2 / UX-DR38 / Story 11.5).
  *
  * ## When to use what
  *
  * | Surface | Pattern | Notes |
  * | --- | --- | --- |
  * | List / index with GovernedDataTable | **Full-bleed table** | No card wrapper; hairline row rules only; gutter via `px-content-padding-inline` |
- * | Forms, settings rows, side detail, grouped non-table | **Panel** | Hairline section edges; default is NOT a bordered card |
+ * | Form tabs (PE register, headcount create, …) | **FormSurfaceHost** + FormLayout | Full-bleed content `surface` plane (mockup `.main`); do **not** nest Panel fill around the form |
+ * | Settings rows, side detail, grouped non-table (non-form) | **Panel** | Hairline section edges; default is NOT a bordered card |
  * | Record drawer | width `--drawer-width` (480px) | |
  *
  * ## Content max-widths (locked in 8.2)
@@ -40,6 +41,32 @@ export function Panel({ children, className, ...props }: PanelProps) {
     >
       {children}
     </section>
+  );
+}
+
+/**
+ * Full-bleed form content plane for tabs sitting on `surface-page` shell
+ * (Story 11.5 / UX mockup `.main`). Hosts FormLayout without nested Panel fill.
+ * Fills remaining tabpanel height via flex (`flex-1`) so short forms still sit
+ * on a continuous content plane — not a content-height island over page gray.
+ */
+export function FormSurfaceHost({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      data-slot="form-surface-host"
+      className={cn(
+        "min-h-0 min-w-0 flex-1 bg-surface text-text-primary",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 

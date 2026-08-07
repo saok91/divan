@@ -40,6 +40,11 @@ assert.doesNotMatch(
 );
 assert.match(
   createPage,
+  /FormSurfaceHost/,
+  "create tab must wrap form in FormSurfaceHost (Story 11.5 content plane)",
+);
+assert.match(
+  createPage,
   /HeadcountApprovalCreateForm|headcount-approval-create-form/,
   "create tab must host approval create form",
 );

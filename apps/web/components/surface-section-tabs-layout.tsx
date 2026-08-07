@@ -47,7 +47,7 @@ export function SurfaceSectionTabsLayout({
   const labelledBy = active ? `section-tab-${active.id}` : undefined;
 
   return (
-    <div className="flex min-h-0 flex-col bg-surface-page">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-page">
       <PageHeader
         breadcrumb={
           breadcrumb ?? (
@@ -74,7 +74,7 @@ export function SurfaceSectionTabsLayout({
         role="tabpanel"
         id={PANEL_ID}
         aria-labelledby={labelledBy}
-        className="min-w-0"
+        className="flex min-h-0 min-w-0 flex-1 flex-col"
       >
         {children}
       </div>

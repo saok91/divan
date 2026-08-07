@@ -196,7 +196,8 @@ export function FormFooter({ children, className }: FormFooterProps) {
     <footer
       data-slot="form-footer"
       className={cn(
-        "sticky bottom-0 z-10 -mx-content-padding-inline mt-form-section-gap flex flex-wrap items-center gap-2 border-t border-hairline-strong bg-surface-subtle px-content-padding-inline py-3",
+        // Same content plane as form body (mockup .fbar) — not surface-subtle tint band
+        "sticky bottom-0 z-10 -mx-content-padding-inline mt-form-section-gap flex flex-wrap items-center gap-2 border-t border-hairline-strong bg-surface px-content-padding-inline py-3",
         className,
       )}
     >

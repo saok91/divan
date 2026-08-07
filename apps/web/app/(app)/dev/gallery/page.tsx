@@ -27,6 +27,7 @@ import {
   FormSection,
 } from "@/components/form-layout";
 import {
+  FormSurfaceHost,
   FullBleedTableHost,
   Panel,
   PanelSection,
@@ -302,10 +303,15 @@ export default function DevGalleryPage() {
         <h2 id="gallery-panel" className="text-heading-sm">
           Panel / section
         </h2>
+        <p className="text-caption text-text-secondary">
+          Panel برای گروه‌بندی غیرجدولی (تنظیمات، جزئیات کناری) — نه برای بدنهٔ فرم
+          روی تب‌های form. فرم‌ها از FormSurfaceHost استفاده می‌کنند.
+        </p>
         <Panel>
           <PanelSection title="بخش اول">
             <p className="text-body text-text-secondary px-content-padding-inline">
-              پنل برای فرم و محتوای گروه‌بندی‌شده — نه برای جدول فهرست.
+              پنل برای محتوای گروه‌بندی‌شده — نه برای جدول فهرست و نه برای باند
+              سفید تو‌در‌تو دور فرم.
             </p>
           </PanelSection>
           <PanelSection title="بخش دوم">
@@ -328,27 +334,34 @@ export default function DevGalleryPage() {
         >
           Form layout
         </h2>
-        <FormLayout>
-          <FormSection title="نمونه فیلدها">
-            <FormField label="نام" htmlFor="gallery-name" required help="متن راهنما — روی آیکون اطلاعات کنار برچسب">
-              <Input id="gallery-name" />
-            </FormField>
-            <FormField label="کد" htmlFor="gallery-code" error="خطای نمونه">
-              <Input id="gallery-code" dir="ltr" aria-invalid />
-            </FormField>
-          </FormSection>
-          <FormFooter>
-            <Button type="button" variant="ghost">
-              انصراف
-            </Button>
-            <Button type="button" variant="secondary">
-              ذخیره پیش‌نویس
-            </Button>
-            <Button type="button" variant="primary">
-              نهایی‌سازی
-            </Button>
-          </FormFooter>
-        </FormLayout>
+        <p className="text-caption text-text-secondary px-content-padding-inline mb-2">
+          FormSurfaceHost صفحهٔ محتوا (`bg-surface` + `flex-1`) را روی پوستهٔ
+          `surface-page` می‌گذارد؛ FormFooter همان صفحه + `border-hairline-strong`
+          (بدون باند `surface-subtle`).
+        </p>
+        <FormSurfaceHost>
+          <FormLayout>
+            <FormSection title="نمونه فیلدها">
+              <FormField label="نام" htmlFor="gallery-name" required help="متن راهنما — روی آیکون اطلاعات کنار برچسب">
+                <Input id="gallery-name" />
+              </FormField>
+              <FormField label="کد" htmlFor="gallery-code" error="خطای نمونه">
+                <Input id="gallery-code" dir="ltr" aria-invalid />
+              </FormField>
+            </FormSection>
+            <FormFooter>
+              <Button type="button" variant="ghost">
+                انصراف
+              </Button>
+              <Button type="button" variant="secondary">
+                ذخیره پیش‌نویس
+              </Button>
+              <Button type="button" variant="primary">
+                نهایی‌سازی
+              </Button>
+            </FormFooter>
+          </FormLayout>
+        </FormSurfaceHost>
       </section>
 
       <EntityPickerGalleryDemos />

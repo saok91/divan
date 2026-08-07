@@ -93,7 +93,7 @@ export function AppShell({
             <main
               id="main-content"
               tabIndex={-1}
-              className="min-h-[calc(100vh-var(--chrome-height)-var(--banner-stack-height,0px))] outline-none"
+              className="flex min-h-[calc(100vh-var(--chrome-height)-var(--banner-stack-height,0px))] flex-col outline-none"
             >
               {children}
             </main>

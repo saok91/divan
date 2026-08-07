@@ -27,7 +27,6 @@ import {
   FormLayout,
   FormSection,
 } from "@/components/form-layout";
-import { Panel } from "@/components/layout/panel-section";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import {
   useLeaveGuardOptional,
@@ -1271,7 +1270,6 @@ export function PersonnelEventForm({
         </p>
       </header>
 
-      <Panel>
       <form
         className="space-y-form-section-gap"
         onSubmit={(e) => {
@@ -2249,7 +2247,6 @@ export function PersonnelEventForm({
           </Button>
         </FormFooter>
       </form>
-      </Panel>
 
       {personId.trim() ? (
         <section
