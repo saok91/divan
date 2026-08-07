@@ -7,6 +7,7 @@ import {
   createOrgUnitSearch,
   type EntityPickerValue,
 } from "@/components/entity-picker";
+import { LabelWithHelp, FILTER_FIELD_LABEL_CLASS } from "@/components/form-layout";
 import {
   JalaliDatePicker,
   type JalaliDatePickerHandle,
@@ -14,6 +15,17 @@ import {
 import { operationalCopy } from "@/lib/operational-copy";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+
+const filterSelectClass = cn(
+  "flex h-control-height w-full rounded-md border border-input bg-background px-3",
+  "text-body text-foreground",
+);
+
+const filterSubmitClass = cn(
+  "inline-flex h-control-height items-center justify-center rounded-md px-4",
+  "bg-primary text-primary-foreground text-field-label",
+  "disabled:opacity-50",
+);
 
 export type DashboardFilterState = {
   teamId: string;
@@ -99,6 +111,9 @@ export function DashboardFilters({
     });
   }, [parentTeamId, teamHydrate.data]);
 
+  const asOfHelpId = `${formId}-asof-help`;
+  const teamHelpId = `${formId}-team-help`;
+
   return (
     <form
       className="flex flex-wrap items-end gap-3"
@@ -151,7 +166,7 @@ export function DashboardFilters({
       }}
     >
       <div className="min-w-[10rem] space-y-1.5">
-        <label htmlFor={`${formId}-mode`} className="text-label">
+        <label htmlFor={`${formId}-mode`} className={FILTER_FIELD_LABEL_CLASS}>
           حالت زمانی
         </label>
         <select
@@ -161,10 +176,7 @@ export function DashboardFilters({
           onChange={(e) =>
             setEvaluationMode(e.target.value as "current" | "as_of")
           }
-          className={cn(
-            "flex h-10 w-full rounded-md border border-input bg-background px-3",
-            "text-body text-foreground",
-          )}
+          className={filterSelectClass}
         >
           <option value="current">جاری</option>
           <option value="as_of">مبنا (as-of)</option>
@@ -173,23 +185,32 @@ export function DashboardFilters({
 
       {evaluationMode === "as_of" ? (
         <div className="min-w-[14rem] space-y-1.5">
-          <label htmlFor={`${formId}-asof`} className="text-label">
+          <LabelWithHelp
+            htmlFor={`${formId}-asof`}
+            help="الزامی در حالت مبنا"
+            helpLabel="راهنمای تاریخ مبنا"
+            helpId={asOfHelpId}
+          >
             تاریخ مبنا
-          </label>
+          </LabelWithHelp>
           <JalaliDatePicker
             ref={asOfRef}
             id={`${formId}-asof`}
             aria-label="تاریخ مبنا برای داشبورد"
+            aria-describedby={asOfHelpId}
             value={asOfDate}
             onChange={setAsOfDate}
             disabled={disabled}
-            helperText="الزامی در حالت مبنا"
+            helperText=""
           />
         </div>
       ) : null}
 
       <div className="min-w-[14rem] space-y-1.5">
-        <label htmlFor={`${formId}-range-start`} className="text-label">
+        <label
+          htmlFor={`${formId}-range-start`}
+          className={FILTER_FIELD_LABEL_CLASS}
+        >
           شروع بازه روند
         </label>
         <JalaliDatePicker
@@ -199,11 +220,15 @@ export function DashboardFilters({
           value={trendRangeStart}
           onChange={setTrendRangeStart}
           disabled={disabled}
+          helperText=""
         />
       </div>
 
       <div className="min-w-[14rem] space-y-1.5">
-        <label htmlFor={`${formId}-range-end`} className="text-label">
+        <label
+          htmlFor={`${formId}-range-end`}
+          className={FILTER_FIELD_LABEL_CLASS}
+        >
           پایان بازه روند
         </label>
         <JalaliDatePicker
@@ -213,11 +238,15 @@ export function DashboardFilters({
           value={trendRangeEnd}
           onChange={setTrendRangeEnd}
           disabled={disabled}
+          helperText=""
         />
       </div>
 
       <div className="min-w-[10rem] space-y-1.5">
-        <label htmlFor={`${formId}-granularity`} className="text-label">
+        <label
+          htmlFor={`${formId}-granularity`}
+          className={FILTER_FIELD_LABEL_CLASS}
+        >
           دانه‌بندی روند
         </label>
         <select
@@ -227,10 +256,7 @@ export function DashboardFilters({
           onChange={(e) =>
             setTrendGranularity(e.target.value as "daily" | "monthly")
           }
-          className={cn(
-            "flex h-10 w-full rounded-md border border-input bg-background px-3",
-            "text-body text-foreground",
-          )}
+          className={filterSelectClass}
         >
           <option value="monthly">ماهانه</option>
           <option value="daily">روزانه</option>
@@ -238,9 +264,14 @@ export function DashboardFilters({
       </div>
 
       <div className="min-w-[16rem] flex-1 space-y-1.5">
-        <label htmlFor={`${formId}-team`} className="text-label">
+        <LabelWithHelp
+          htmlFor={`${formId}-team`}
+          help={operationalCopy.dashboardTeamFilterHint}
+          helpLabel="راهنمای تیم (اختیاری)"
+          helpId={teamHelpId}
+        >
           تیم (اختیاری)
-        </label>
+        </LabelWithHelp>
         <EntityPicker
           id={`${formId}-team`}
           search={orgUnitSearch}
@@ -249,21 +280,11 @@ export function DashboardFilters({
           disabled={disabled}
           scopeNoteFa="واحدهای سازمانی قابل‌مشاهده — خالی = همه تیم‌ها"
           placeholder="کد یا نام تیم…"
+          aria-describedby={teamHelpId}
         />
-        <p className="text-caption text-muted-foreground">
-          {operationalCopy.dashboardTeamFilterHint}
-        </p>
       </div>
 
-      <button
-        type="submit"
-        disabled={disabled}
-        className={cn(
-          "inline-flex h-10 items-center justify-center rounded-md px-4",
-          "bg-primary text-primary-foreground text-label",
-          "disabled:opacity-50",
-        )}
-      >
+      <button type="submit" disabled={disabled} className={filterSubmitClass}>
         اعمال فیلتر
       </button>
 

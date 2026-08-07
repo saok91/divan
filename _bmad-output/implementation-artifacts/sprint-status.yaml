@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-08-07T03:25:00+03:30
+# last_updated: 2026-08-07
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-08-07T03:25:00+03:30
+last_updated: 2026-08-07T03:53:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -178,7 +178,7 @@ development_status:
   11-1-stale-recalc-unblock-role-honest-next-steps: done
   11-2-personnel-event-finalize-capacity-override-honesty: done
   11-3-jalali-datepicker-month-year-rtl-chrome: done
-  11-4-compact-field-help-label-info-icon: backlog
+  11-4-compact-field-help-label-info-icon: done
   11-5-form-surface-alignment-ux-2026-07-31: backlog
   11-6-capacity-drawer-intelligibility-create-activate: backlog
   11-7-employment-primary-assignment-empty-state-honesty: backlog

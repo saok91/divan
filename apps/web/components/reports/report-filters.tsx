@@ -7,6 +7,7 @@ import {
   createOrgUnitSearch,
   type EntityPickerValue,
 } from "@/components/entity-picker";
+import { LabelWithHelp, FILTER_FIELD_LABEL_CLASS } from "@/components/form-layout";
 import {
   JalaliDatePicker,
   type JalaliDatePickerHandle,
@@ -15,6 +16,17 @@ import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { operationalCopy } from "@/lib/operational-copy";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+
+const filterSelectClass = cn(
+  "flex h-control-height w-full rounded-md border border-input bg-background px-3",
+  "text-body text-foreground",
+);
+
+const filterSubmitClass = cn(
+  "inline-flex h-control-height items-center justify-center rounded-md px-4",
+  "bg-primary text-primary-foreground text-field-label",
+  "disabled:opacity-50",
+);
 
 export type ReportFilterState = {
   teamId: string;
@@ -110,6 +122,10 @@ export function ReportFilters({
     value.rangeEnd,
   ]);
 
+  const asOfHelpId = `${formId}-asof-help`;
+  const rangeStartHelpId = `${formId}-range-start-help`;
+  const teamHelpId = `${formId}-team-help`;
+
   return (
     <form
       className="flex flex-wrap items-end gap-3"
@@ -167,7 +183,7 @@ export function ReportFilters({
       }}
     >
       <div className="min-w-[10rem] space-y-1.5">
-        <label htmlFor={`${formId}-mode`} className="text-label">
+        <label htmlFor={`${formId}-mode`} className={FILTER_FIELD_LABEL_CLASS}>
           حالت زمانی
         </label>
         <select
@@ -177,10 +193,7 @@ export function ReportFilters({
           onChange={(e) =>
             setEvaluationMode(e.target.value as "current" | "as_of")
           }
-          className={cn(
-            "flex h-10 w-full rounded-md border border-input bg-background px-3",
-            "text-body text-foreground",
-          )}
+          className={filterSelectClass}
         >
           <option value="current">جاری</option>
           <option value="as_of">مبنا (as-of)</option>
@@ -189,38 +202,53 @@ export function ReportFilters({
 
       {evaluationMode === "as_of" ? (
         <div className="min-w-[14rem] space-y-1.5">
-          <label htmlFor={`${formId}-asof`} className="text-label">
+          <LabelWithHelp
+            htmlFor={`${formId}-asof`}
+            help="الزامی در حالت مبنا"
+            helpLabel="راهنمای تاریخ مبنا"
+            helpId={asOfHelpId}
+          >
             تاریخ مبنا
-          </label>
+          </LabelWithHelp>
           <JalaliDatePicker
             ref={asOfRef}
             id={`${formId}-asof`}
             aria-label="تاریخ مبنا برای گزارش"
+            aria-describedby={asOfHelpId}
             value={asOfDate}
             onChange={setAsOfDate}
             disabled={disabled}
-            helperText="الزامی در حالت مبنا"
+            helperText=""
           />
         </div>
       ) : null}
 
       <div className="min-w-[14rem] space-y-1.5">
-        <label htmlFor={`${formId}-range-start`} className="text-label">
+        <LabelWithHelp
+          htmlFor={`${formId}-range-start`}
+          help="برای گزارش‌های رویدادی الزامی"
+          helpLabel="راهنمای شروع بازه"
+          helpId={rangeStartHelpId}
+        >
           شروع بازه
-        </label>
+        </LabelWithHelp>
         <JalaliDatePicker
           ref={rangeStartRef}
           id={`${formId}-range-start`}
           aria-label="شروع بازه گزارش"
+          aria-describedby={rangeStartHelpId}
           value={rangeStart}
           onChange={setRangeStart}
           disabled={disabled}
-          helperText="برای گزارش‌های رویدادی الزامی"
+          helperText=""
         />
       </div>
 
       <div className="min-w-[14rem] space-y-1.5">
-        <label htmlFor={`${formId}-range-end`} className="text-label">
+        <label
+          htmlFor={`${formId}-range-end`}
+          className={FILTER_FIELD_LABEL_CLASS}
+        >
           پایان بازه
         </label>
         <JalaliDatePicker
@@ -230,13 +258,19 @@ export function ReportFilters({
           value={rangeEnd}
           onChange={setRangeEnd}
           disabled={disabled}
+          helperText=""
         />
       </div>
 
       <div className="min-w-[16rem] flex-1 space-y-1.5">
-        <label htmlFor={`${formId}-team`} className="text-label">
+        <LabelWithHelp
+          htmlFor={`${formId}-team`}
+          help={operationalCopy.reportTeamFilterHint}
+          helpLabel="راهنمای تیم (اختیاری)"
+          helpId={teamHelpId}
+        >
           تیم (اختیاری)
-        </label>
+        </LabelWithHelp>
         <EntityPicker
           id={`${formId}-team`}
           search={orgUnitSearch}
@@ -245,10 +279,8 @@ export function ReportFilters({
           disabled={disabled}
           scopeNoteFa="واحدهای سازمانی قابل‌مشاهده — برای اعضای تیم الزامی"
           placeholder="کد یا نام تیم…"
+          aria-describedby={teamHelpId}
         />
-        <p className="text-caption text-muted-foreground">
-          {operationalCopy.reportTeamFilterHint}
-        </p>
       </div>
 
       <button
@@ -258,11 +290,7 @@ export function ReportFilters({
         aria-description={
           disabled ? operationalCopy.reportCatalogueBusy : undefined
         }
-        className={cn(
-          "inline-flex h-10 items-center justify-center rounded-md px-4",
-          "bg-primary text-primary-foreground text-label",
-          "disabled:opacity-50",
-        )}
+        className={filterSubmitClass}
       >
         {submitLabel}
       </button>

@@ -330,7 +330,7 @@ export default function DevGalleryPage() {
         </h2>
         <FormLayout>
           <FormSection title="نمونه فیلدها">
-            <FormField label="نام" htmlFor="gallery-name" required help="متن راهنما">
+            <FormField label="نام" htmlFor="gallery-name" required help="متن راهنما — روی آیکون اطلاعات کنار برچسب">
               <Input id="gallery-name" />
             </FormField>
             <FormField label="کد" htmlFor="gallery-code" error="خطای نمونه">

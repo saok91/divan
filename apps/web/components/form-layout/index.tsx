@@ -5,7 +5,18 @@ import {
   type ReactNode,
 } from "react";
 
+import { FieldHelpIcon } from "@/components/form-layout/field-help";
 import { cn } from "@/lib/utils";
+
+export { FieldHelpIcon, LabelWithHelp, FILTER_FIELD_LABEL_CLASS } from "@/components/form-layout/field-help";
+export type { FieldHelpIconProps } from "@/components/form-layout/field-help";
+
+function fieldHelpAriaLabel(label: ReactNode): string {
+  if (typeof label === "string" && label.trim()) {
+    return `راهنمای ${label.trim()}`;
+  }
+  return "راهنمای فیلد";
+}
 
 /**
  * Shared form layout chrome (Story 8.2 / UX-DR38).
@@ -93,6 +104,7 @@ export type FormFieldProps = {
  * Two-column field: label column (`--form-label-column` 168px) + control.
  * When `htmlFor` is set and `children` is a single element, wires id /
  * aria-required / aria-invalid / aria-describedby onto that control.
+ * Help chrome is label-adjacent (`FieldHelpIcon`); errors stay under the control.
  */
 export function FormField({
   label,
@@ -136,26 +148,30 @@ export function FormField({
         className,
       )}
     >
-      <label
-        htmlFor={htmlFor}
-        className="text-field-label pt-1.5 text-text-primary"
-      >
-        {label}
-        {required ? (
-          <span className="text-destructive" aria-hidden>
-            {" "}
-            *
-          </span>
+      <div className="inline-flex items-center gap-1 pt-1.5">
+        <label
+          htmlFor={htmlFor}
+          className="text-field-label text-text-primary"
+        >
+          {label}
+          {required ? (
+            <span className="text-destructive" aria-hidden>
+              {" "}
+              *
+            </span>
+          ) : null}
+          {required ? <span className="sr-only"> (الزامی)</span> : null}
+        </label>
+        {help ? (
+          <FieldHelpIcon
+            label={fieldHelpAriaLabel(label)}
+            content={help}
+            contentId={helpId}
+          />
         ) : null}
-        {required ? <span className="sr-only"> (الزامی)</span> : null}
-      </label>
+      </div>
       <div className="min-w-0 space-y-1">
         {control}
-        {help ? (
-          <p id={helpId} className="text-caption text-text-tertiary">
-            {help}
-          </p>
-        ) : null}
         {error ? (
           <p id={errorId} role="alert" className="text-caption text-destructive">
             {error}

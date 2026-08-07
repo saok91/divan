@@ -1,3 +1,8 @@
+## Deferred from: code review of 11-4-compact-field-help-label-info-icon.md (2026-08-07)
+
+- JalaliDatePicker default `helperText` is not auto-suppressed when an external `aria-describedby` is set — migrated 11.4 call sites pass `helperText=""`; harden API later if double-help regressions appear.
+- Duplicated `filterSelectClass` / `filterSubmitClass` between `dashboard-filters.tsx` and `report-filters.tsx` — pre-existing copy; extract shared filter chrome on a later hygiene pass.
+
 ## Deferred from: code review of 11-2-personnel-event-finalize-capacity-override-honesty.md (2026-08-07)
 
 - Preferred-only auto-persist before finalize: when other draft fields are dirty but preferred is unchanged, finalize still uses last saved version — pre-existing dirty/save contract; story only required preferred persistence.

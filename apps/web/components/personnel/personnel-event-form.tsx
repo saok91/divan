@@ -1390,6 +1390,7 @@ export function PersonnelEventForm({
                 setEffectiveDate(v ?? "");
                 setDirty(true);
               }}
+              helperText=""
             />
           </FormField>
         </FormSection>

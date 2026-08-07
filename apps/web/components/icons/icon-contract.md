@@ -13,6 +13,7 @@ Living reference for chrome, gallery, and **canonical row-action** icons.
 | --- | --- | --- |
 | Row action | **12px** | `size-3` / `h-3 w-3` inside `RowActionButton` (`--control-height-xs`) |
 | Toolbar / filter chrome | **16px** | `size-4` (existing default on Button `[&_svg]:size-4`) |
+| Field help / label info | **14–16px** | `size-3.5`–`size-4` inside `FieldHelpIcon` (Story 11.4) |
 | Nav / sidebar | **16–20px** | Keep existing call-site sizes |
 
 ## Stroke
@@ -48,11 +49,13 @@ Same Persian action ⇒ same Lucide export on every surface.
 | کپی | `Copy` | Identifier disclosure |
 | پیوند خارجی | `ExternalLink` | External open |
 | جستجو | `Search` | Picker / command |
+| راهنمای فیلد (label info) | `Info` | Compact field help beside labels (`FieldHelpIcon`) — toolbar/filter size |
 
 ## Primitives
 
 - `RowActionButton` — icon-only `rowAction` + required `aria-label` + tooltip (hover **and** focus)
 - `RowActionCluster` / `RowActionOverflow` — at most **two** visible icons; #3+ in labelled overflow
+- `FieldHelpIcon` — quiet ghost `Info` at ~14–16px beside field labels; tooltip = help body; distinct from GlossaryTerm
 
 ## Non-goals (other stories)
 

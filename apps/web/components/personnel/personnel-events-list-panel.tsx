@@ -16,6 +16,7 @@ import {
   createPersonSearch,
   type EntityPickerValue,
 } from "@/components/entity-picker";
+import { FieldHelpIcon, FILTER_FIELD_LABEL_CLASS } from "@/components/form-layout";
 import { GovernedDataTable } from "@/components/governed-data-table";
 import type { GovernedColumn } from "@/components/governed-data-table";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
@@ -445,7 +446,7 @@ export function PersonnelEventsListPanel() {
     !suppressed;
 
   const selectClass = cn(
-    "flex h-10 w-full rounded-md border border-input bg-background px-3",
+    "flex h-control-height w-full rounded-md border border-input bg-background px-3",
     "text-body text-foreground",
   );
 
@@ -469,7 +470,7 @@ export function PersonnelEventsListPanel() {
         aria-label="فیلتر فهرست رویدادها"
       >
         <div className="min-w-[12rem] flex-1 space-y-1.5">
-          <label htmlFor={`${formId}-type`} className="text-label">
+          <label htmlFor={`${formId}-type`} className={FILTER_FIELD_LABEL_CLASS}>
             نوع رویداد
           </label>
           <select
@@ -488,7 +489,10 @@ export function PersonnelEventsListPanel() {
         </div>
 
         <div className="min-w-[10rem] space-y-1.5">
-          <label htmlFor={`${formId}-status`} className="text-label">
+          <label
+            htmlFor={`${formId}-status`}
+            className={FILTER_FIELD_LABEL_CLASS}
+          >
             وضعیت
           </label>
           <select
@@ -506,7 +510,7 @@ export function PersonnelEventsListPanel() {
         </div>
 
         <div className="min-w-[12rem] space-y-1.5">
-          <label htmlFor={`${formId}-from`} className="text-label">
+          <label htmlFor={`${formId}-from`} className={FILTER_FIELD_LABEL_CLASS}>
             از تاریخ مؤثر
           </label>
           <JalaliDatePicker
@@ -514,11 +518,12 @@ export function PersonnelEventsListPanel() {
             aria-label="از تاریخ مؤثر"
             value={draftFrom}
             onChange={setDraftFrom}
+            helperText=""
           />
         </div>
 
         <div className="min-w-[12rem] space-y-1.5">
-          <label htmlFor={`${formId}-to`} className="text-label">
+          <label htmlFor={`${formId}-to`} className={FILTER_FIELD_LABEL_CLASS}>
             تا تاریخ مؤثر
           </label>
           <JalaliDatePicker
@@ -526,11 +531,15 @@ export function PersonnelEventsListPanel() {
             aria-label="تا تاریخ مؤثر"
             value={draftTo}
             onChange={setDraftTo}
+            helperText=""
           />
         </div>
 
         <div className="min-w-[14rem] flex-1 space-y-1.5">
-          <span className="text-label" id={`${formId}-person-label`}>
+          <span
+            className={FILTER_FIELD_LABEL_CLASS}
+            id={`${formId}-person-label`}
+          >
             فرد
           </span>
           <EntityPicker
@@ -543,11 +552,17 @@ export function PersonnelEventsListPanel() {
         </div>
 
         <div className="min-w-[14rem] flex-1 space-y-1.5">
-          <span className="text-label" id={`${formId}-team-label`}>
-            تیم
-          </span>
+          <div className={FILTER_FIELD_LABEL_CLASS}>
+            <span id={`${formId}-team-label`}>تیم</span>
+            <FieldHelpIcon
+              label="راهنمای تیم"
+              content="فیلتر تیم بر اساس عضویت اصلی فرد در تاریخ امروز است، نه فقط فیلد تیم داخل محتوای رویداد."
+              contentId={`${formId}-team-help`}
+            />
+          </div>
           <EntityPicker
             aria-labelledby={`${formId}-team-label`}
+            aria-describedby={`${formId}-team-help`}
             value={draftTeam}
             onValueChange={setDraftTeam}
             search={teamSearch}
@@ -568,13 +583,9 @@ export function PersonnelEventsListPanel() {
                   : undefined
             }
           />
-          <p className="text-caption text-muted-foreground">
-            فیلتر تیم بر اساس عضویت اصلی فرد در تاریخ امروز است، نه فقط
-            فیلد تیم داخل محتوای رویداد.
-          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-h-control-height flex-wrap items-center gap-2 self-end">
           <Button type="button" variant="secondary" onClick={applyFilters}>
             اعمال فیلتر
           </Button>

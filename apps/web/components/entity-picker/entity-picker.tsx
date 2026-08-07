@@ -245,7 +245,7 @@ export function EntityPicker({
           aria-disabled={disabled || undefined}
           title={disabled ? disabledReasonFa : undefined}
           className={cn(
-            "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+            "flex h-control-height w-full items-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             disabled && "cursor-not-allowed",
           )}
           onKeyDown={(e) => {

@@ -7,6 +7,7 @@ import {
   createOrgUnitSearch,
   type EntityPickerValue,
 } from "@/components/entity-picker";
+import { LabelWithHelp, FILTER_FIELD_LABEL_CLASS } from "@/components/form-layout";
 import { JalaliDatePicker, type JalaliDatePickerHandle } from "@/components/jalali-date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toPersianDigits } from "@/lib/persian-digits";
@@ -95,20 +96,26 @@ export function HistoricalOrgHeadcountForeshadow({
         }}
       >
         <div className="min-w-[14rem] space-y-1.5">
-          <label htmlFor={`${formId}-asof`} className="text-label">
+          <LabelWithHelp
+            htmlFor={`${formId}-asof`}
+            help="الزامی — تاریخ فقط (تهران)"
+            helpLabel="راهنمای تاریخ مبنا"
+            helpId={`${formId}-asof-help`}
+          >
             تاریخ مبنا
-          </label>
+          </LabelWithHelp>
           <JalaliDatePicker
             ref={asOfPickerRef}
             id={`${formId}-asof`}
             aria-label="تاریخ مبنا برای بازسازی شمارش سازمان و ظرفیت"
+            aria-describedby={`${formId}-asof-help`}
             value={asOf}
             onChange={setAsOf}
-            helperText="الزامی — تاریخ فقط (تهران)"
+            helperText=""
           />
         </div>
         <div className="min-w-[16rem] flex-1 space-y-1.5">
-          <label htmlFor={`${formId}-team`} className="text-label">
+          <label htmlFor={`${formId}-team`} className={FILTER_FIELD_LABEL_CLASS}>
             تیم (اختیاری)
           </label>
           <EntityPicker
@@ -123,8 +130,8 @@ export function HistoricalOrgHeadcountForeshadow({
         <button
           type="submit"
           className={cn(
-            "inline-flex h-10 items-center justify-center rounded-md px-4",
-            "bg-primary text-primary-foreground text-label",
+            "inline-flex h-control-height items-center justify-center rounded-md px-4",
+            "bg-primary text-primary-foreground text-field-label",
           )}
         >
           نمایش

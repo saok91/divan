@@ -76,6 +76,7 @@ const ALLOWED_FILE_HINTS = [
   "personnel-quick-create-dialog.tsx",
   "personnel-quick-edit-modal.tsx",
   "jalali-date-picker.tsx",
+  "form-layout/field-help.tsx",
   "dev/gallery/page.tsx",
 ];
 

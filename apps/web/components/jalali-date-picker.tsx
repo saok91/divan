@@ -37,6 +37,8 @@ type BasePickerProps = {
   id?: string;
   /** Accessible purpose label, e.g. «تاریخ مؤثر». */
   "aria-label": string;
+  /** Merged onto the date input with helper/error ids (FormField / label help). */
+  "aria-describedby"?: string;
   disabled?: boolean;
   className?: string;
   error?: string;
@@ -483,6 +485,7 @@ export const JalaliDatePicker = React.forwardRef<
   {
     id,
     "aria-label": ariaLabel,
+    "aria-describedby": ariaDescribedBy,
     value,
     onChange,
     disabled,
@@ -518,6 +521,7 @@ export const JalaliDatePicker = React.forwardRef<
     [
       showError ? errorId : null,
       helperText ? helperId : null,
+      ariaDescribedBy,
     ]
       .filter(Boolean)
       .join(" ") || undefined;
@@ -572,11 +576,11 @@ export const JalaliDatePicker = React.forwardRef<
   };
 
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <div className="flex gap-2">
+    <div className={cn((helperText || showError) && "space-y-1.5", className)}>
+      <div className="flex items-center gap-2">
         <Input
           id={fieldId}
-          className="rounded-sm text-tabular"
+          className="h-control-height rounded-sm text-tabular"
           value={display}
           disabled={disabled}
           aria-label={ariaLabel}
@@ -609,7 +613,7 @@ export const JalaliDatePicker = React.forwardRef<
               size="icon"
               disabled={disabled}
               aria-label={`${ariaLabel} — باز کردن تقویم`}
-              className="shrink-0 rounded-sm"
+              className="size-control-height shrink-0 rounded-sm"
             >
               <CalendarIcon className="size-4" />
             </Button>
