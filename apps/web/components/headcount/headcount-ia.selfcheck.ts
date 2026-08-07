@@ -55,6 +55,31 @@ assert.match(createForm, /FormField/, "create form must use FormField");
 assert.match(createForm, /FormFooter/, "create form must use FormFooter");
 assert.match(createForm, /EntityPicker/, "create form must use EntityPicker");
 assert.match(createForm, /FeedbackMessage/, "create form must use FeedbackMessage");
+assert.match(
+  createForm,
+  /activateApproval/,
+  "create form must wire activateApproval after create (Story 11.6)",
+);
+assert.match(
+  createForm,
+  /ثبت و فعال‌سازی/,
+  "create form must expose ثبت و فعال‌سازی CTA",
+);
+assert.match(
+  createForm,
+  /ثبت پیش‌نویس/,
+  "create form must expose ثبت پیش‌نویس CTA",
+);
+assert.doesNotMatch(
+  createForm,
+  /فعال‌سازی از فهرست هدکانت انجام می‌شود/,
+  "create form must not mandate activation-only-from-list (Story 11.6)",
+);
+assert.match(
+  createForm,
+  /تلاش مجدد فعال‌سازی/,
+  "create form must offer activate retry after partial failure (Story 11.6)",
+);
 assert.doesNotMatch(
   createForm,
   /function StatusMessage/,
@@ -99,6 +124,21 @@ assert.match(
   drawer,
   /تاریخی|HistoricalOrgHeadcountForeshadow/,
   "drawer must include historical reconstruction",
+);
+assert.match(
+  drawer,
+  /مصرف‌شده/,
+  "drawer chrome must surface مصرف‌شده (Story 11.6)",
+);
+assert.match(
+  drawer,
+  /رزرو/,
+  "drawer chrome must surface رزرو (Story 11.6)",
+);
+assert.match(
+  drawer,
+  /GlossaryTerm/,
+  "drawer must use GlossaryTerm for quantity/lifecycle tips (Story 11.6)",
 );
 assert.match(drawer, /FeedbackMessage/, "drawer must use FeedbackMessage");
 assert.doesNotMatch(

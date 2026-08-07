@@ -27,6 +27,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import type { HeadcountApprovalRow } from "@/components/headcount/headcount-approval-types";
 import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
@@ -312,14 +313,48 @@ export function HeadcountApprovalRecordDrawer({
               : "جزئیات مجوز"}
           </SheetTitle>
           <SheetDescription>
-            {approval ? (
-              <>
-                {statusLabel} · مصوب{" "}
-                {toPersianDigits(String(approval.allowedCount))} · آزاد{" "}
-                {toPersianDigits(String(approval.free))}
-              </>
-            ) : null}
+            {approval ? statusLabel : null}
           </SheetDescription>
+          {approval ? (
+            <div className="space-y-2 pt-1">
+              <dl
+                className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+                aria-label="خلاصهٔ ظرفیت مجوز"
+              >
+                <div>
+                  <dt className="text-muted-foreground text-xs">مصوب</dt>
+                  <dd className="text-tabular font-medium">
+                    {toPersianDigits(String(approval.allowedCount))}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">مصرف‌شده</dt>
+                  <dd className="text-tabular font-medium">
+                    {toPersianDigits(String(approval.used))}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">رزرو</dt>
+                  <dd className="text-tabular font-medium">
+                    {toPersianDigits(String(approval.reserved))}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">آزاد</dt>
+                  <dd className="text-tabular font-medium">
+                    {toPersianDigits(String(approval.free))}
+                  </dd>
+                </div>
+              </dl>
+              <div className="flex flex-wrap gap-2">
+                <GlossaryTerm termKey="headcountApprovalLifecycle" />
+                <GlossaryTerm termKey="headcountApproved" />
+                <GlossaryTerm termKey="headcountUsed" />
+                <GlossaryTerm termKey="reservation" />
+                <GlossaryTerm termKey="headcountFree" />
+              </div>
+            </div>
+          ) : null}
         </SheetHeader>
 
         <Panel className="flex-1 px-4">
@@ -330,10 +365,13 @@ export function HeadcountApprovalRecordDrawer({
           ) : null}
 
           <PanelSection title="معافیت‌ها" titleId={`${formId}-exemptions`}>
-            <p className="text-caption text-muted-foreground mb-3">
+            <p className="text-caption text-muted-foreground mb-2">
               معافیت‌ها به انتصاب اصلی وابسته‌اند (نه به شناسهٔ مجوز). فهرست
               سراسری معافیت‌هاست؛ هویت این مجوز فقط در هدر drawer است.
             </p>
+            <div className="mb-3">
+              <GlossaryTerm termKey="headcountExemption" />
+            </div>
             {exemptionsQuery.isLoading ? (
               <Skeleton className="h-20 w-full" />
             ) : exemptionsQuery.isError ? (
@@ -513,10 +551,14 @@ export function HeadcountApprovalRecordDrawer({
           </PanelSection>
 
           <PanelSection title="بازنویسی‌ها" titleId={`${formId}-overrides`}>
-            <p className="text-caption text-muted-foreground mb-3">
+            <p className="text-caption text-muted-foreground mb-2">
               فهرست ممیزی‌شدهٔ لغو محدودیت برای تیم این مجوز؛ صدور بازنویسی از
-              مسیر رویداد است.
+              مسیر رویداد است. «بازنویسی» همان مفهوم «لغو محدودیت» در پنل ظرفیت
+              است.
             </p>
+            <div className="mb-3">
+              <GlossaryTerm termKey="headcountOverride" />
+            </div>
             {overridesQuery.isLoading ? (
               <Skeleton className="h-20 w-full" />
             ) : overridesQuery.isError ? (

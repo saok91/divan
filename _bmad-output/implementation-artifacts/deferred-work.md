@@ -1,3 +1,8 @@
+## Deferred from: code review of 11-6-capacity-drawer-intelligibility-create-activate.md (2026-08-07)
+
+- Table column still «مصرف» while drawer uses «مصرف‌شده» — pre-existing table header; story scoped drawer to UX-DR13 panel wording.
+- Create form label «سقف مجاز» vs glossary «مصوب» — pre-existing create-field vocabulary from 9.4.
+
 ## Deferred from: code review of 11-4-compact-field-help-label-info-icon.md (2026-08-07)
 
 - JalaliDatePicker default `helperText` is not auto-suppressed when an external `aria-describedby` is set — migrated 11.4 call sites pass `helperText=""`; harden API later if double-help regressions appear.

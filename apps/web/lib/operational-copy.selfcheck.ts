@@ -172,7 +172,26 @@ assert.doesNotMatch(
   /data-slot="technical-detail-disclosure"/,
 );
 assert.ok(Object.keys(uiGlossary).length >= 8);
-assert.ok(Object.keys(uiGlossary).length <= 15);
+// Story 11.6 adds capacity quantity / lifecycle / exemption / override terms
+assert.ok(Object.keys(uiGlossary).length <= 22);
+for (const key of [
+  "headcountApproved",
+  "headcountUsed",
+  "headcountFree",
+  "headcountExemption",
+  "headcountOverride",
+  "headcountApprovalLifecycle",
+] as const) {
+  assert.ok(
+    key in uiGlossary,
+    `uiGlossary must include ${key} (Story 11.6)`,
+  );
+  assert.ok(uiGlossary[key].termFa.trim().length > 0, `${key}.termFa`);
+  assert.ok(
+    uiGlossary[key].definitionFa.trim().length > 0,
+    `${key}.definitionFa`,
+  );
+}
 
 // Story 9.2 — day-to-day bulk five-step labels + dual-entry distinction
 assert.equal(operationalCopy.bulkStepTemplate, "قالب");
