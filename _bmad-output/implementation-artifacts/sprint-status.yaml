@@ -1,5 +1,5 @@
 # generated: 2026-07-16
-# last_updated: 2026-08-07T17:50:00+03:30
+# last_updated: 2026-08-07T18:00:00+03:30
 # project: divan
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-16
-last_updated: 2026-08-07T17:50:00+03:30
+last_updated: 2026-08-07T18:00:00+03:30
 project: divan
 project_key: NOKEY
 tracking_system: file-system
@@ -49,6 +49,7 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
 # Epic 10 retrospective → done 2026-08-04 (AD-7 settings closed)
 # Epic 11 authorized 2026-08-07 via sprint-change-proposal-2026-08-07 (UAT unblock)
+# Epic 11 retrospective → done 2026-08-07 (UAT unblock & operational UX hardening closed)
 # Story 10.5 → done 2026-08-04 (Configuration change control & evidence)
 
 development_status:
@@ -174,7 +175,7 @@ development_status:
   epic-10-retrospective: done
 
   # Epic 11 authorized by sprint-change-proposal-2026-08-07 (UAT unblock after Epic 10)
-  epic-11: in-progress
+  epic-11: done
   11-1-stale-recalc-unblock-role-honest-next-steps: done
   11-2-personnel-event-finalize-capacity-override-honesty: done
   11-3-jalali-datepicker-month-year-rtl-chrome: done
@@ -182,6 +183,7 @@ development_status:
   11-5-form-surface-alignment-ux-2026-07-31: done
   11-6-capacity-drawer-intelligibility-create-activate: done
   11-7-employment-primary-assignment-empty-state-honesty: done
+  epic-11-retrospective: done
 
 action_items:
   - epic: 1
@@ -654,8 +656,54 @@ action_items:
   - epic: 10
     action: "Keep AR-* fail-closed; do not invent freeze numbers; do not claim LG-complete while Epic 7-9 carry-ins remain open"
     owner: "Mary + John"
-    status: open
+    status: done
+    resolved_in: "Epic 11 Gates 11.1–11.7 held fail-closed + no LG-complete claim; succeeded by Epic 11 AR fail-closed for next work"
   - epic: 10
     action: "Carry forward still-open Epic 7/8/9 production-honesty and security items (SoD, list IDOR, AD-6, Baseline projector, PopulationPort, mutation IDOR, Vitest, leave-guard logout, person-create dedupe, enforcement-matrix DoD, honesty boundary doc, Button forwardRef, composed tRPC authorize selfchecks, dual redaction consolidate, export selfcheck depth)"
+    owner: "Winston / Amelia+Sally / Paige+Winston / Mary"
+    status: open
+  - epic: 11
+    action: "Mark epic-11 and epic-11-retrospective done in sprint-status (stories + retro complete)"
+    owner: "Amelia"
+    status: done
+    resolved_in: "epic-11-retro-2026-08-07.md + sprint-status epic-11/epic-11-retrospective"
+  - epic: 11
+    action: "Decide next roadmap slice (production-honesty / LG carry-ins vs residual UX vocab/selfcheck debt vs new product epic) and record it in planning artifacts"
+    owner: "John + Mary + AtA"
+    status: open
+  - epic: 11
+    action: "Assert concrete glossary / operational-copy keys in selfchecks whenever new keys are added (encode 11.6 to 11.7 lesson)"
+    owner: "Amelia + Paige"
+    status: open
+  - epic: 11
+    action: "Close capacity/create vocabulary drift (مصرف vs مصرف‌شده; سقف مجاز vs مصوب) on next headcount touch"
+    owner: "Amelia + Sally"
+    status: open
+  - epic: 11
+    action: "Align person-profile vocabulary (اشتغال / انتصاب اصلی) with Employment/PA glossary on next person-surface touch"
+    owner: "Amelia + Sally + Paige"
+    status: open
+  - epic: 11
+    action: "Surface EntityPicker resolver failures distinctly from empty domain (stop catch-to-empty looking like expected-empty)"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 11
+    action: "Wire jalali.selfcheck into package script / design-qa composition (close 1.6/11.3 defer)"
+    owner: "Amelia"
+    status: open
+  - epic: 11
+    action: "Add behavioral or source-locked stale-reclaim-clear coverage (and lock reenqueuePending stale branch)"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 11
+    action: "Harden PersonnelEventError transport API (named options over positional 4th arg) when next PE error work lands"
+    owner: "Amelia + Winston"
+    status: open
+  - epic: 11
+    action: "Keep AR-* fail-closed; do not invent freeze numbers; do not claim LG-complete while Epic 7-10 carry-ins remain open"
+    owner: "Mary + John"
+    status: open
+  - epic: 11
+    action: "Carry forward still-open Epic 7/8/9/10 production-honesty and security items (FeedbackMessage long-tail, typography, identity DTOs, PE/HC atomicity doc, settings cache ceiling, binder parity, SoD, list/mutation IDOR, AD-6, Baseline projector, PopulationPort, Vitest, leave-guard logout, person-create dedupe, enforcement-matrix DoD, honesty boundary doc, Button forwardRef, composed tRPC authorize selfchecks, dual redaction, export selfcheck depth)"
     owner: "Winston / Amelia+Sally / Paige+Winston / Mary"
     status: open

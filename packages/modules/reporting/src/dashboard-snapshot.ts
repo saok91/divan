@@ -7,6 +7,7 @@
 import type { Pool, PoolClient } from "@divan/db";
 import {
   HEADCOUNT_RESERVATION_EXPIRY_WARNING_DAYS,
+  HeadcountLedgerError,
   effectiveApprovalStatus,
   isApprovalConsumableAt,
   isApprovalExpiryWithinWarningHorizon,
@@ -271,6 +272,10 @@ function isInactiveTeamError(err: unknown): boolean {
   );
 }
 
+function isHeadcountLedgerError(err: unknown): err is HeadcountLedgerError {
+  return err instanceof HeadcountLedgerError;
+}
+
 /**
  * Assemble permission-safe dashboard cards from authorized subjects + published APIs.
  */
@@ -337,6 +342,16 @@ export async function assembleDashboardSnapshot(
           cards.push(
             cardBase(key, "empty", { messageFa: input.emptyMessageFa }),
           );
+        }
+        historical = null;
+      } else if (isHeadcountLedgerError(err)) {
+        // Fail-closed on ledger ambiguity for HC/org cards only — do not blank the whole dashboard.
+        for (const key of [
+          "org_unit_counts",
+          "headcount_conservation",
+          "team_capacity",
+        ] as const) {
+          cards.push(cardBase(key, "error", { messageFa: err.messageFa }));
         }
         historical = null;
       } else {

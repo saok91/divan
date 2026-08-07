@@ -8,6 +8,7 @@
 import { getSharedPgPool, type Pool } from "@divan/db";
 import {
   HeadcountApprovalError,
+  HeadcountLedgerError,
   assertActorHasHeadcountApprovalRead,
 } from "@divan/headcount";
 import { currentAsOfDate } from "@divan/identity-access";
@@ -183,6 +184,13 @@ function mapDashboardError(err: unknown): never {
   if (err instanceof HeadcountApprovalError) {
     throw new TRPCError({
       code: err.code === "PERMISSION_DENIED" ? "FORBIDDEN" : "BAD_REQUEST",
+      message: err.messageFa,
+      cause: err,
+    });
+  }
+  if (err instanceof HeadcountLedgerError) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
       message: err.messageFa,
       cause: err,
     });
