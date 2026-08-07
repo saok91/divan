@@ -59,7 +59,7 @@ export async function hydrateEmploymentValue(
     if (!row) return null;
     const range = formatDateRange(row.startDate, row.endDateExclusive);
     const collab = row.collaborationType?.trim();
-    const labelFa = collab ? `اشتغال · ${collab}` : "اشتغال";
+    const labelFa = collab ? `همکاری · ${collab}` : "همکاری";
     return {
       id: row.id,
       code: "",

@@ -58,7 +58,7 @@ export function EntityPickerGalleryDemos() {
       </p>
 
       <FormLayout>
-        <FormSection title="پرسنل + اشتغال وابسته">
+        <FormSection title="پرسنل + همکاری وابسته">
           <FormField label="پرسنل" htmlFor="gallery-ep-person" required>
             <EntityPicker
               id="gallery-ep-person"
@@ -69,7 +69,7 @@ export function EntityPickerGalleryDemos() {
               placeholder="کد یا نام پرسنل…"
             />
           </FormField>
-          <FormField label="اشتغال" htmlFor="gallery-ep-employment">
+          <FormField label="همکاری" htmlFor="gallery-ep-employment">
             <EntityPicker
               id="gallery-ep-employment"
               search={employmentSearch}
@@ -77,7 +77,7 @@ export function EntityPickerGalleryDemos() {
               onValueChange={employmentCascade.onValueChange}
               disabled={employmentCascade.disabled}
               disabledReasonFa={employmentCascade.disabledReasonFa}
-              scopeNoteFa="سوابق اشتغال پس از انتخاب پرسنل"
+              scopeNoteFa="سوابق همکاری پس از انتخاب پرسنل"
               placeholder="تاریخ یا نوع همکاری…"
             />
           </FormField>

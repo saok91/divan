@@ -302,7 +302,7 @@ export function createEmploymentSearch(
         .map((r) => {
           const range = formatDateRange(r.startDate, r.endDateExclusive);
           const collab = r.collaborationType?.trim();
-          const labelFa = collab ? `اشتغال · ${collab}` : "اشتغال";
+          const labelFa = collab ? `همکاری · ${collab}` : "همکاری";
           return {
             id: r.id,
             code: "",

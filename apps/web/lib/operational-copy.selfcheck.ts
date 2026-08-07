@@ -172,8 +172,8 @@ assert.doesNotMatch(
   /data-slot="technical-detail-disclosure"/,
 );
 assert.ok(Object.keys(uiGlossary).length >= 8);
-// Story 11.6 adds capacity quantity / lifecycle / exemption / override terms
-assert.ok(Object.keys(uiGlossary).length <= 22);
+// Story 11.6 capacity terms + Story 11.7 employment/PA/collaborationType (+3)
+assert.ok(Object.keys(uiGlossary).length <= 25);
 for (const key of [
   "headcountApproved",
   "headcountUsed",
@@ -192,6 +192,24 @@ for (const key of [
     `${key}.definitionFa`,
   );
 }
+for (const key of [
+  "employment",
+  "collaborationType",
+  "primaryAssignment",
+] as const) {
+  assert.ok(
+    key in uiGlossary,
+    `uiGlossary must include ${key} (Story 11.7)`,
+  );
+  assert.ok(uiGlossary[key].termFa.trim().length > 0, `${key}.termFa`);
+  assert.ok(
+    uiGlossary[key].definitionFa.trim().length > 0,
+    `${key}.definitionFa`,
+  );
+}
+assert.equal(uiGlossary.employment.termFa, "همکاری");
+assert.equal(uiGlossary.collaborationType.termFa, "نوع همکاری");
+assert.equal(uiGlossary.primaryAssignment.termFa, "انتصاب اولیه");
 
 // Story 9.2 — day-to-day bulk five-step labels + dual-entry distinction
 assert.equal(operationalCopy.bulkStepTemplate, "قالب");

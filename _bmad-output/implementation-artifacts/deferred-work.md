@@ -1,3 +1,9 @@
+## Deferred from: code review of 11-7-employment-primary-assignment-empty-state-honesty.md (2026-08-07)
+
+- Resolver catch returns `[]` for Employment/PA search so API failure looks like empty domain — pre-existing enumeration-safe pattern; story said do not invent error surfacing unless cheap.
+- Person profile still uses «اشتغال» / «انتصاب اصلی» vocabulary — explicitly out of AC for 11.7 (Start pickers are the UAT surface).
+- Gallery EntityPicker demos rename labels to «همکاری» but do not exercise `emptyCopyFa` Start expected-empty — optional proof surface; PE form is the AC surface.
+
 ## Deferred from: code review of 11-6-capacity-drawer-intelligibility-create-activate.md (2026-08-07)
 
 - Table column still «مصرف» while drawer uses «مصرف‌شده» — pre-existing table header; story scoped drawer to UX-DR13 panel wording.

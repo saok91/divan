@@ -76,6 +76,36 @@ assert.doesNotMatch(
   /CommandDialog/,
   "EntityPicker must not use CommandDialog",
 );
+assert.match(
+  pickerSrc,
+  /emptyCopyFa\??:/,
+  "EntityPicker must accept emptyCopyFa override (Story 11.7)",
+);
+assert.match(
+  pickerSrc,
+  /EMPTY_COPY_FA/,
+  "EntityPicker must keep default EMPTY_COPY_FA for unrelated surfaces",
+);
+assert.match(
+  pickerSrc,
+  /resolvedEmptyCopy|emptyCopyFa \?\? EMPTY_COPY_FA/,
+  "EntityPicker empty list/live region must use override with default fallback",
+);
+assert.match(
+  pickerSrc,
+  /normalized\.length > 0 \? EMPTY_COPY_FA/,
+  "EntityPicker must keep search-miss tone for filtered-empty (not expected-empty override)",
+);
+assert.match(
+  pickerSrc,
+  /catch \{[\s\S]*?setLiveMessage\(EMPTY_COPY_FA\)/,
+  "EntityPicker catch path must not reuse expected-empty override",
+);
+assert.match(
+  pickerSrc,
+  /\{liveMessage\}/,
+  "EntityPicker empty list row must show liveMessage (stay in sync with live region)",
+);
 
 const tokenSrc = read("components/entity-picker/entity-token.tsx");
 assert.match(
@@ -216,6 +246,68 @@ assert.doesNotMatch(
   "approval options must not use truncated UUID as primary identity",
 );
 
+// Story 11.7: Start/Return expected-empty honesty + glossary for employment/PA/collab
+assert.match(
+  eventForm,
+  /START_EMPLOYMENT_EMPTY_COPY_FA|emptyCopyFa=\{/,
+  "personnel-event-form must pass emptyCopyFa override for Employment/PA",
+);
+assert.match(
+  eventForm,
+  /START_EMPLOYMENT_EMPTY_COPY_FA/,
+  "personnel-event-form must define Start employment expected-empty copy",
+);
+assert.match(
+  eventForm,
+  /START_PRIMARY_ASSIGNMENT_EMPTY_COPY_FA/,
+  "personnel-event-form must define Start primary-assignment expected-empty copy",
+);
+assert.match(
+  eventForm,
+  /سابقه‌ای برای انتخاب نیست/,
+  "Start employment empty must use expected-empty tone (not bare search-miss)",
+);
+assert.match(
+  eventForm,
+  /انتصاب اولیه‌ای برای انتخاب نیست/,
+  "Start PA empty must use expected-empty tone",
+);
+assert.doesNotMatch(
+  eventForm,
+  /emptyCopyFa=\{[\s\S]{0,80}نتیجه‌ای یافت نشد/,
+  "Start/Return Employment/PA path must not hard-wire search-miss empty copy",
+);
+assert.match(
+  eventForm,
+  /GlossaryTerm/,
+  "personnel-event-form must wire GlossaryTerm (Story 11.7)",
+);
+assert.match(
+  eventForm,
+  /termKey=["']employment["']/,
+  "personnel-event-form must glossary-key employment",
+);
+assert.match(
+  eventForm,
+  /termKey=["']collaborationType["']/,
+  "personnel-event-form must glossary-key collaborationType",
+);
+assert.match(
+  eventForm,
+  /termKey=["']primaryAssignment["']/,
+  "personnel-event-form must glossary-key primaryAssignment",
+);
+assert.match(
+  eventForm,
+  /isStartReturnType\(eventType\) && person/,
+  "expected-empty override must gate on Start/Return + person",
+);
+assert.match(
+  eventForm,
+  /help=\{\s*isStartReturnType\(eventType\)/,
+  "PA FieldHelp must gate Start/Return creation tip by event type",
+);
+
 const resolvers = read("components/entity-picker/resolvers.ts");
 assert.match(resolvers, /createPersonSearch/, "person resolver");
 assert.match(resolvers, /createOrgUnitSearch/, "org resolver");
@@ -224,6 +316,16 @@ assert.match(resolvers, /createEmploymentSearch/, "employment dependent resolver
 assert.match(resolvers, /createPrimaryAssignmentSearch/, "PA dependent resolver");
 assert.match(resolvers, /createHeadcountApprovalSearch/, "approval resolver");
 assert.match(resolvers, /createAccountSearch/, "account resolver");
+assert.match(
+  resolvers,
+  /همکاری ·|labelFa = collab \? `همکاری/,
+  "employment resolver option prefix must use همکاری (Story 11.7)",
+);
+assert.doesNotMatch(
+  resolvers,
+  /`اشتغال ·|labelFa = collab \? `اشتغال/,
+  "employment resolver must not keep اشتغال option prefix after 11.7 align",
+);
 
 // 8.5: remaining admin/analysis surfaces wire EntityPicker; no free-text UUID entry
 const surfaceInventory: { rel: string; label: string; allowTechnicalInput?: boolean }[] = [

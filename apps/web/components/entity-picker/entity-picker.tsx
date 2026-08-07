@@ -37,6 +37,11 @@ export type EntityPickerProps = {
   debounceMs?: number;
   /** Optional create-on-empty slot — wire only; no create UI in 8.3. */
   emptyCreateAction?: () => void;
+  /**
+   * Override empty list + live-region copy (Story 11.7).
+   * Default keeps search-miss tone for unrelated surfaces.
+   */
+  emptyCopyFa?: string;
   className?: string;
   "aria-labelledby"?: string;
   "aria-describedby"?: string;
@@ -73,6 +78,7 @@ export function EntityPicker({
   placeholder = "جستجو با کد یا نام…",
   debounceMs = DEFAULT_DEBOUNCE_MS,
   emptyCreateAction,
+  emptyCopyFa,
   className,
   "aria-labelledby": ariaLabelledBy,
   "aria-describedby": ariaDescribedBy,
@@ -94,6 +100,7 @@ export function EntityPicker({
   const [liveMessage, setLiveMessage] = React.useState("");
   const [focusInputAfterClear, setFocusInputAfterClear] = React.useState(false);
   const searchGen = React.useRef(0);
+  const resolvedEmptyCopy = emptyCopyFa ?? EMPTY_COPY_FA;
 
   const describedBy =
     [ariaDescribedBy, disabledReasonFa ? reasonId : null]
@@ -110,8 +117,11 @@ export function EntityPicker({
         if (gen !== searchGen.current) return;
         setOptions(rows);
         setActiveIndex(rows.length > 0 ? 0 : -1);
+        // Override is for expected empty (no query). Filtered miss + errors keep search-miss tone.
+        const emptyCopy =
+          normalized.length > 0 ? EMPTY_COPY_FA : resolvedEmptyCopy;
         setLiveMessage(
-          rows.length === 0 ? EMPTY_COPY_FA : `${rows.length} نتیجه`,
+          rows.length === 0 ? emptyCopy : `${rows.length} نتیجه`,
         );
       } catch {
         if (gen !== searchGen.current) return;
@@ -122,7 +132,7 @@ export function EntityPicker({
         if (gen === searchGen.current) setLoading(false);
       }
     },
-    [search],
+    [search, resolvedEmptyCopy],
   );
 
   React.useEffect(() => {
@@ -357,7 +367,7 @@ export function EntityPicker({
             ) : null}
             {!loading && options.length === 0 && liveMessage ? (
               <li className="px-3 py-2 text-caption text-text-secondary" role="presentation">
-                {EMPTY_COPY_FA}
+                {liveMessage}
                 {emptyCreateAction ? (
                   <button
                     type="button"

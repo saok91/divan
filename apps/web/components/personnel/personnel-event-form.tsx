@@ -27,6 +27,7 @@ import {
   FormLayout,
   FormSection,
 } from "@/components/form-layout";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { JalaliDatePicker } from "@/components/jalali-date-picker";
 import {
   useLeaveGuardOptional,
@@ -139,6 +140,12 @@ function isStartReturnType(eventType: string): boolean {
     eventType === "EmploymentStarted" || eventType === "EmploymentReturned"
   );
 }
+
+/** Start/Return expected-empty — fact + cause + next step (Story 11.7). */
+const START_EMPLOYMENT_EMPTY_COPY_FA =
+  "سابقه‌ای برای انتخاب نیست. برای شروع/بازگشت جدید لازم نیست همکاری قبلی انتخاب شود؛ «نوع همکاری» و واقعیت‌های حداقل را پایین پر کنید.";
+const START_PRIMARY_ASSIGNMENT_EMPTY_COPY_FA =
+  "انتصاب اولیه‌ای برای انتخاب نیست. با نهایی‌سازی شروع/بازگشت، انتصاب اولیه همراه همکاری جدید ثبت می‌شود.";
 
 function isTerminationType(eventType: string): boolean {
   return eventType === "EmploymentTerminated";
@@ -1330,6 +1337,11 @@ export function PersonnelEventForm({
               disabledReasonFa={employmentCascade.disabledReasonFa}
               scopeNoteFa="سوابق همکاری فرد انتخاب‌شده"
               placeholder="تاریخ یا نوع همکاری…"
+              emptyCopyFa={
+                isStartReturnType(eventType) && person
+                  ? START_EMPLOYMENT_EMPTY_COPY_FA
+                  : undefined
+              }
               aria-required={
                 isTerminationType(eventType) ||
                 isTransferType(eventType) ||
@@ -1338,10 +1350,17 @@ export function PersonnelEventForm({
               }
             />
           </FormField>
+          <div className="flex flex-wrap gap-2">
+            <GlossaryTerm termKey="employment" />
+          </div>
           <FormField
             label="انتصاب اولیه"
             htmlFor={`${formId}-primary-assignment`}
-            help="انتخاب انتصاب، همکاری متناظر را هماهنگ می‌کند."
+            help={
+              isStartReturnType(eventType)
+                ? "اگر انتصاب قبلی باشد، همکاری متناظر را هماهنگ می‌کند؛ در شروع/بازگشت جدید، انتصاب اولیه با خود رویداد ثبت می‌شود."
+                : "انتخاب انتصاب، همکاری متناظر را هماهنگ می‌کند."
+            }
           >
             <EntityPicker
               id={`${formId}-primary-assignment`}
@@ -1352,8 +1371,16 @@ export function PersonnelEventForm({
               disabledReasonFa={primaryAssignmentCascade.disabledReasonFa}
               scopeNoteFa="انتصاب‌های اولیه فرد انتخاب‌شده"
               placeholder="تیم، عنوان یا تاریخ…"
+              emptyCopyFa={
+                isStartReturnType(eventType) && person
+                  ? START_PRIMARY_ASSIGNMENT_EMPTY_COPY_FA
+                  : undefined
+              }
             />
           </FormField>
+          <div className="flex flex-wrap gap-2">
+            <GlossaryTerm termKey="primaryAssignment" />
+          </div>
         </FormSection>
 
         <FormSection title="رویداد">
@@ -1407,6 +1434,9 @@ export function PersonnelEventForm({
                 autoComplete="off"
               />
             </FormField>
+            <div className="flex flex-wrap gap-2">
+              <GlossaryTerm termKey="collaborationType" />
+            </div>
             <FormField label="تیم" htmlFor={`${formId}-team`} required>
               <EntityPicker
                 id={`${formId}-team`}
