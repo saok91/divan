@@ -106,10 +106,43 @@ Personnel-event mutations mark `recalculation_status` pending in the web process
 pnpm --filter @divan/workers start
 ```
 
-On boot the worker **re-enqueues** orphan pending/failed/stale rows (reclaim does not clear status by itself) and logs `[workers] reclaimed N pending/failed/stale recalc job(s)` when `N > 0`. The banner clears only after those jobs finish successfully. Do not SQL-clear status rows as a product happy path.
+The worker loads the root `.env` when launched through its CLI (explicit environment values take precedence). On boot and every 30 seconds after the previous recovery pass completes, it **re-enqueues** orphan pending/failed/stale rows in batches of at most 100. A cursor prevents permanently failing early rows from starving later rows. Reclaim does not clear status; the banner clears only after processing succeeds. Positive recovery logs use `[workers] reclaimed N pending/failed/stale recalc job(s)`. Shutdown stops future recovery and waits for the current pass. Do not SQL-clear status rows as a product happy path.
 
 Required env (see `.env.example`): `AUTH_SECRET`, `IDENTITY_PROVIDER` (`seeded` for local), session timeout hooks.
 For LDAP mode (Infra-gated): `LDAP_URL`, `LDAP_BIND_DN`, `LDAP_BIND_PASSWORD`, `LDAP_BASE_DN`, `LDAP_USER_FILTER`, `LDAP_ID_ATTRIBUTE`, plus optional TLS / create-mapping keys.
 Copy auth-related vars into `apps/web/.env` as well (Next.js loads env from the app package directory).
 
 See `packages/db/README.md` for database details.
+
+### Verification
+
+Use Node 22.x and the installed pnpm version. The web typecheck regenerates Next route types before checking source, so a stale development cache does not invalidate the check.
+
+```bash
+pnpm -r --if-present typecheck
+pnpm lint
+pnpm --filter @divan/web selfcheck:design-qa
+pnpm --filter @divan/web selfcheck:session-token
+pnpm --filter @divan/web selfcheck:product-ui
+pnpm --filter @divan/web selfcheck:database-health
+pnpm --filter @divan/workers selfcheck:recovery-loop
+pnpm build
+```
+
+Database integration checks **create test people and artifacts** and temporarily test account deactivation. Run them only against a separate, migrated and seeded database, with its exact database name confirmed in `DIVAN_TEST_DATABASE_CONFIRM`. Explicit `DATABASE_URL` takes precedence over `.env`. Start the worker against that same database before the durable-recovery check.
+
+```powershell
+$env:DATABASE_URL = '<isolated test PostgreSQL URL>'
+$env:DIVAN_TEST_DATABASE_CONFIRM = '<test database name>'
+$env:ALLOW_DEV_POPULATION_UUID_REGISTRY = 'true'
+pnpm --filter @divan/web selfcheck:product-hardening
+pnpm --filter @divan/workers selfcheck:durable-recovery
+```
+
+Browser verification covers role login, global search, create/profile navigation, team-filter history, Jalali entry, unsaved-change confirmation, report execution, settings validation, light/dark themes, and scrollable dialogs at a constrained 640×360 CSS viewport. This viewport reproduces the content space of 200% zoom on the minimum desktop display; it is not a claim of testing the browser's own zoom setting. Evidence images are in `docs/qa/2026-10-18/`.
+
+Production cutover still requires the real population adapter and approved scope/bulk policy, identity-provider configuration, and the migration baseline boundary. Fixture registries and the development UUID flag do not establish production workforce authorization. Run web and worker against the same database and keep development accounts out of production.
+
+The provisional development population and bulk ceiling apply before text matching; an exact match outside that capped set cannot be found. The interface discloses truncation and disables incomplete exports. The 61-person integration scenario uses explicit test-only bulk hooks; it does not widen the default application policy.
+
+For a loopback-only production-build preview, set `AUTH_URL=http://127.0.0.1:3000` and `AUTH_TRUST_HOST=true`, and bind Next to `127.0.0.1`. The application explicitly requires this trusted-host flag in production mode. In deployment, configure the canonical origin and trusted reverse proxy before enabling it.

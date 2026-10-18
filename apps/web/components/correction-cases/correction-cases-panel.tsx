@@ -232,7 +232,7 @@ export function CorrectionCasesPanel() {
   const formId = React.useId();
   const searchParams = useSearchParams();
   const utils = api.useUtils();
-  const urlHydratedKeyRef = React.useRef<string | null>(null);
+  const [urlHydratedKey, setUrlHydratedKey] = React.useState<string | null>(null);
   const [breachedOnly, setBreachedOnly] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [dialog, setDialog] = React.useState<DialogKind>(null);
@@ -293,37 +293,19 @@ export function CorrectionCasesPanel() {
 
   // Story 9.7 — hydrate ?person= (+ optional open=1) from profile CTA.
   const searchKey = searchParams.toString();
-  React.useEffect(() => {
-    if (urlHydratedKeyRef.current === searchKey) return;
-    if (capsQuery.isLoading) return;
-
+  const hydrationKey = searchKey;
+  if (urlHydratedKey !== hydrationKey && !capsQuery.isLoading && !capsQuery.isError) {
+    setUrlHydratedKey(hydrationKey);
     const personId = searchParams.get("person")?.trim();
     const wantOpen = searchParams.get("open") === "1";
-
-    if (wantOpen && capsQuery.isError) {
-      setUrlAccessHintFa(operationalCopy.correctionCaseCapabilitiesError);
-      return;
+    setUrlAccessHintFa(null);
+    if (personId && isUuid(personId)) setPerson({ id: personId, code: "", labelFa: "فرد از پیوند پروفایل" });
+    if (wantOpen) {
+      if (capsQuery.isError) setUrlAccessHintFa(operationalCopy.correctionCaseCapabilitiesError);
+      else if (capsQuery.data?.write === true) setDialog("open");
+      else setUrlAccessHintFa(operationalCopy.profileCorrectionRequestDenied);
     }
-
-    urlHydratedKeyRef.current = searchKey;
-
-    if (personId && isUuid(personId)) {
-      setPerson({ id: personId, code: "", labelFa: "فرد از پیوند پروفایل" });
-    }
-
-    if (!wantOpen) return;
-    if (capsQuery.data?.write === true) {
-      setDialog("open");
-      return;
-    }
-    setUrlAccessHintFa(operationalCopy.profileCorrectionRequestDenied);
-  }, [
-    searchKey,
-    searchParams,
-    capsQuery.data,
-    capsQuery.isError,
-    capsQuery.isLoading,
-  ]);
+  }
 
   const openMutation = api.correctionCase.open.useMutation({
     onSuccess: async (res) => {

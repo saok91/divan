@@ -432,15 +432,12 @@ export function AuditInvestigationPanel() {
   const [custodyAck, setCustodyAck] = React.useState(false);
   const [recipient, setRecipient] = React.useState("");
 
-  // Story 10.5 — URL → filter draft when hydrateKey changes; bad values ignored.
-  React.useEffect(() => {
-    const { draft: next, hasFilter } = hydrateDraftFromSearchParams(
-      new URLSearchParams(hydrateKey),
-    );
-    if (!hasFilter) return;
-    setDraft(next);
-    setApplied(next);
-  }, [hydrateKey]);
+  const [previousHydrateKey, setPreviousHydrateKey] = React.useState<string | null>(null);
+  if (previousHydrateKey !== hydrateKey) {
+    setPreviousHydrateKey(hydrateKey);
+    const { draft: next } = hydrateDraftFromSearchParams(new URLSearchParams(hydrateKey));
+    setDraft(next); setApplied(next);
+  }
 
   const accountSearch = React.useMemo(() => createAccountSearch(), []);
   const personSearch = React.useMemo(() => createPersonSearch(), []);

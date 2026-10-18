@@ -9,6 +9,7 @@ import { BASELINE_RECORDED_EVENT_TYPE } from "@divan/migration/event-origin";
 import { operationalCopy } from "./operational-copy";
 import {
   EVENT_TYPE_OPTIONS,
+  EVENT_SEARCH_TYPE_OPTIONS,
   TIMELINE_EMPTY_COPY_FA,
   TIMELINE_MAX_LIMIT,
   TIMELINE_PAGE_SIZE,
@@ -23,12 +24,14 @@ import {
 
 function run() {
   assert.equal(TIMELINE_EMPTY_COPY_FA, "رویداد پرسنلی ثبت نشده.");
+  assert.ok(EVENT_SEARCH_TYPE_OPTIONS.some((option) => option.value === "ScaffoldChangeRecorded"));
+  assert.ok(!EVENT_TYPE_OPTIONS.some((option) => String(option.value) === "ScaffoldChangeRecorded"));
   assert.equal(TIMELINE_PAGE_SIZE, 50);
   assert.equal(TIMELINE_MAX_LIMIT, 200);
   assert.equal(eventTypeLabelFa("EventCancelled"), "لغو رویداد");
   assert.equal(eventTypeLabelFa("EventReversed"), "بازگشت رویداد");
   assert.equal(eventTypeLabelFa("EventCorrected"), "اصلاح رویداد");
-  assert.equal(eventTypeLabelFa("EmploymentStarted"), "شروع همکاری (EmploymentStarted)");
+  assert.equal(eventTypeLabelFa("EmploymentStarted"), "شروع همکاری");
   assert.equal(
     eventTypeLabelFa(BASELINE_RECORDED_EVENT_TYPE),
     operationalCopy.eventTypeBaselineRecordedFa,

@@ -112,18 +112,21 @@ export async function checkDatabaseConnectivity(
     return false;
   }
 
-  const pool = createPgPool(trimmed, { max: 1 });
-  const adapter = new PrismaPg(pool);
-  const client = new PrismaClient({ adapter });
-
+  // Separate readiness budget; domain transactions retain their normal limits.
+  const client = new pg.Client({
+    connectionString: trimmed,
+    connectionTimeoutMillis: 2_000,
+    query_timeout: 2_000,
+    statement_timeout: 2_000,
+  });
   try {
-    await client.$queryRaw`SELECT 1`;
+    await client.connect();
+    await client.query("SELECT 1");
     return true;
   } catch {
     return false;
   } finally {
-    await client.$disconnect().catch(() => undefined);
-    await pool.end().catch(() => undefined);
+    await client.end().catch(() => undefined);
   }
 }
 

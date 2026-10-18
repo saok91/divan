@@ -167,59 +167,19 @@ export function HeadcountApprovalsTable({
   const utils = api.useUtils();
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
-  const [drawerRow, setDrawerRow] = React.useState<HeadcountApprovalRow | null>(
+  const [selectedDrawerRow, setDrawerRow] = React.useState<HeadcountApprovalRow | null>(
     null,
   );
   const [drawerTrigger, setDrawerTrigger] =
     React.useState<HTMLElement | null>(null);
-  const [teamIdFilter, setTeamIdFilter] = React.useState<string | undefined>(
-    undefined,
-  );
-  const [teamFilterHintFa, setTeamFilterHintFa] = React.useState<string | null>(
-    null,
-  );
-
+  const teamsQuery = api.organization.list.useQuery({ includeInactive: false });
+  const teamIdFilter = !teamIdMalformed ? initialTeamId : undefined;
+  const teamFilterHintFa = teamIdMalformed ? "شناسه تیم در فیلتر URL معتبر نیست."
+    : teamsQuery.isError ? operationalCopy.orgListError : null;
   const listQuery = api.headcount.listApprovals.useQuery(
     teamIdFilter ? { teamId: teamIdFilter } : undefined,
+    { enabled: !teamIdMalformed },
   );
-  const teamsQuery = api.organization.list.useQuery({ includeInactive: false });
-
-  React.useEffect(() => {
-    if (teamIdMalformed) {
-      setTeamIdFilter(undefined);
-      setTeamFilterHintFa("شناسه تیم در فیلتر URL معتبر نیست.");
-      return;
-    }
-    if (!initialTeamId) {
-      setTeamIdFilter(undefined);
-      setTeamFilterHintFa(null);
-      return;
-    }
-    if (teamsQuery.isLoading) return;
-    if (teamsQuery.isError) {
-      setTeamIdFilter(undefined);
-      setTeamFilterHintFa(operationalCopy.orgListError);
-      return;
-    }
-    const unit = (teamsQuery.data ?? []).find(
-      (u) => u.id === initialTeamId && u.unitType === "TEAM",
-    );
-    if (!unit) {
-      setTeamIdFilter(undefined);
-      setTeamFilterHintFa(
-        "شناسه تیم در فیلتر URL معتبر نیست یا در محدوده نیست.",
-      );
-      return;
-    }
-    setTeamIdFilter(initialTeamId);
-    setTeamFilterHintFa(null);
-  }, [
-    initialTeamId,
-    teamIdMalformed,
-    teamsQuery.data,
-    teamsQuery.isLoading,
-    teamsQuery.isError,
-  ]);
 
   const teamById = React.useMemo(() => {
     const map = new Map<
@@ -259,13 +219,7 @@ export function HeadcountApprovalsTable({
     });
   }, [listQuery.data, teamById, teamsQuery.isLoading]);
 
-  React.useEffect(() => {
-    setDrawerRow((prev) => {
-      if (!prev) return prev;
-      const fresh = rows.find((r) => r.id === prev.id);
-      return fresh ?? prev;
-    });
-  }, [rows]);
+  const drawerRow = rows.find((row) => row.id === selectedDrawerRow?.id) ?? selectedDrawerRow;
 
   const activateMutation = api.headcount.activateApproval.useMutation({
     onSuccess: async () => {

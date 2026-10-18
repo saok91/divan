@@ -158,5 +158,9 @@ assert.ok(comparePersonnelListRows(b, a) < 0);
 assert.equal(rowMatchesPersonnelQuery(withoutComp, "محمد"), true);
 assert.equal(rowMatchesPersonnelQuery(withoutComp, "99999"), false);
 assert.equal(rowMatchesPersonnelQuery(withoutComp, "0912"), true);
+assert.equal(rowMatchesPersonnelQuery(withoutComp, "۰۹۱۲"), true);
+assert.equal(rowMatchesPersonnelQuery(withoutComp, "٠٩١٢"), true);
+assert.equal(rowMatchesPersonnelQuery({ ...withoutComp, givenName: "علی", familyName: "کمالی" }, "علي كمالي"), true);
+assert.equal(rowMatchesPersonnelQuery({ ...withoutComp, givenName: "علی", familyName: "کمالی" }, "علی ناموجود"), false);
 
 console.log("personnel-list-projector selfcheck: ok");

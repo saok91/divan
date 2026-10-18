@@ -393,6 +393,7 @@ export async function getOpsRecalcAggregate(
  */
 export async function listPendingRecalculationJobs(
   db: RecalcQueryable,
+  afterPersonId?: string,
 ): Promise<RecalcJobPayload[]> {
   const result = await db.query<{
     person_id: string;
@@ -407,7 +408,10 @@ export async function listPendingRecalculationJobs(
        job_key
      FROM recalculation_status
      WHERE status IN ('pending', 'failed', 'stale')
-     ORDER BY from_effective_date ASC, person_id ASC`,
+       AND ($1::uuid IS NULL OR person_id > $1::uuid)
+     ORDER BY person_id ASC
+     LIMIT 100`,
+    [afterPersonId ?? null],
   );
   return result.rows.map((row) => ({
     personId: row.person_id,

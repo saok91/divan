@@ -538,13 +538,8 @@ export async function getCurrentPersonState(
 export function currentPersonStateFactsForCompare(
   state: CurrentPersonState,
 ): unknown {
-  const {
-    ok: _ok,
-    viewSemantics: _viewSemantics,
-    baselineDisclosure: _baselineDisclosure,
-    disposalDisclosure: _disposalDisclosure,
-    ...rest
-  } = state;
+  const metadataKeys = new Set(["ok", "viewSemantics", "baselineDisclosure", "disposalDisclosure"]);
+  const rest = Object.fromEntries(Object.entries(state).filter(([key]) => !metadataKeys.has(key)));
   return JSON.parse(
     JSON.stringify(rest, (_key, value) => {
       if (value instanceof Date) return value.toISOString();

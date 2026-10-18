@@ -11,7 +11,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "tsx src/index.ts",
-    "selfcheck:recalc": "tsx src/recalc.selfcheck.ts"
+    "selfcheck:recalc": "tsx src/recalc.selfcheck.ts",
+    "selfcheck:recovery-loop": "tsx src/recovery-loop.selfcheck.ts",
+    "selfcheck:durable-recovery": "tsx src/durable-recovery.selfcheck.ts"
   },
   "dependencies": {
     "@divan/db": "workspace:*",

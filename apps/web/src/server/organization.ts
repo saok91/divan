@@ -149,8 +149,8 @@ export const organizationRouter = createTRPCRouter({
         .optional(),
     )
     .query(async ({ ctx, input }) => {
-      await assertActorHasOrganizationRead(ctx.session.accountId);
       try {
+        await assertActorHasOrganizationRead(ctx.session.accountId);
         return await listOrgUnits({
           includeInactive: input?.includeInactive === true,
         });

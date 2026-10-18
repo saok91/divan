@@ -240,7 +240,7 @@ function getEventPool(): Pool | null {
   return eventPool;
 }
 
-async function actorPermissionFingerprint(accountId: string): Promise<string> {
+async function actorPermissionFingerprint(accountId: string, scopeCodes: readonly string[]): Promise<string> {
   const db = getPersonDb();
   const rows = await db.accountAccessRole.findMany({
     where: { accountId },
@@ -254,7 +254,7 @@ async function actorPermissionFingerprint(accountId: string): Promise<string> {
       if (typeof p === "string" && p.trim()) perms.add(p.trim());
     }
   }
-  return computeContentFingerprint([...perms].sort());
+  return computeContentFingerprint({ permissions: [...perms].sort(), scopeCodes: [...new Set(scopeCodes)].sort() });
 }
 
 function emptyResult(
@@ -306,7 +306,6 @@ function compareCatalogueMembers(a: CatalogueMember, b: CatalogueMember): number
 
 function personLabelFrom(
   person: { givenName: string; familyName: string; personnelCode: string } | undefined,
-  _personId: string,
 ): { personLabel: string; personnelCode: string | null } {
   if (!person) {
     return { personLabel: "فرد نامشخص", personnelCode: null };
@@ -327,7 +326,6 @@ async function hydrateRows(
   return members.map((m) => {
     const { personLabel, personnelCode } = personLabelFrom(
       byId.get(m.personId),
-      m.personId,
     );
     return {
       id: m.rawId,
@@ -591,7 +589,7 @@ export async function runPersonnelEventSearch(
       }
       assertPaginationTokenMatches(snapshot, filterFingerprintInput);
 
-      const livePermFp = await actorPermissionFingerprint(input.actorAccountId);
+      const livePermFp = await actorPermissionFingerprint(input.actorAccountId, input.actorScopeCodes);
       const permCheck = await revalidateEvaluationSnapshot(eventDb, snapshot, {
         permissionFingerprint: livePermFp,
       });
@@ -742,9 +740,7 @@ export async function runPersonnelEventSearch(
   if (personIds.length === 0) {
     // Mint empty snapshot so page controls stay consistent when filters yield empty.
     try {
-      const permissionFingerprint = await actorPermissionFingerprint(
-        input.actorAccountId,
-      );
+      const permissionFingerprint = await actorPermissionFingerprint(input.actorAccountId, input.actorScopeCodes);
       const snap = await beginEvaluationSnapshot(eventDb, {
         kind: "pagination",
         payload: paginationPayload(filterFingerprintInput),
@@ -816,9 +812,7 @@ export async function runPersonnelEventSearch(
 
   let evaluationSnapshotId: string;
   try {
-    const permissionFingerprint = await actorPermissionFingerprint(
-      input.actorAccountId,
-    );
+    const permissionFingerprint = await actorPermissionFingerprint(input.actorAccountId, input.actorScopeCodes);
     const snap = await beginEvaluationSnapshot(eventDb, {
       kind: "pagination",
       payload: paginationPayload(filterFingerprintInput),

@@ -4,8 +4,8 @@
 
 "use client";
 
+import { collaborationTypeLabel } from "@/lib/collaboration-type";
 import * as React from "react";
-import { keepPreviousData } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import {
@@ -20,6 +20,7 @@ import { useLeaveGuardOptional } from "@/components/leave-guard";
 import type { PersonnelListRow } from "@/components/personnel/personnel-list-types";
 import { PersonnelQuickCreateDialog } from "@/components/personnel/personnel-quick-create-dialog";
 import { PersonnelQuickEditModal } from "@/components/personnel/personnel-quick-edit-modal";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { RowActionCluster } from "@/components/ui/row-action-overflow";
@@ -49,8 +50,6 @@ function buildColumns(
       header: "کد پرسنلی",
       accessor: (r) => r.personnelCode,
       sticky: "identifier",
-      sortable: true,
-      filter: "text",
       cell: (r) => (
         <span className="text-tabular" dir="ltr">
           {toPersianDigits(r.personnelCode)}
@@ -61,22 +60,16 @@ function buildColumns(
       id: "givenName",
       header: "نام",
       accessor: (r) => r.givenName,
-      filter: "text",
-      sortable: true,
     },
     {
       id: "familyName",
       header: "نام خانوادگی",
       accessor: (r) => r.familyName,
-      filter: "text",
-      sortable: true,
     },
     {
       id: "team",
       header: "تیم",
       accessor: (r) => r.team,
-      filter: "text",
-      sortable: true,
       cellOverflow: "wrap",
       maxWidthClass: "max-w-[14rem]",
     },
@@ -84,14 +77,11 @@ function buildColumns(
       id: "role",
       header: "نقش",
       accessor: (r) => r.role,
-      filter: "text",
     },
     {
       id: "jobTitle",
       header: "عنوان شغلی",
       accessor: (r) => r.jobTitle,
-      filter: "text",
-      sortable: true,
       cellOverflow: "wrap",
       maxWidthClass: "max-w-[14rem]",
     },
@@ -99,29 +89,22 @@ function buildColumns(
       id: "ladder",
       header: "نردبان",
       accessor: (r) => r.ladder,
-      filter: "text",
     },
     {
       id: "grade",
       header: "گرید",
       accessor: (r) => r.grade,
-      filter: "text",
     },
     {
       id: "collaborationType",
       header: "نوع همکاری",
       accessor: (r) => r.collaborationType,
-      filter: "enum",
-      enumOptions: [
-        { value: "کارمند", label: "کارمند" },
-        { value: "پیمانکار", label: "پیمانکار" },
-      ],
+      cell: (r) => collaborationTypeLabel(r.collaborationType),
     },
     {
       id: "mobilePhone",
       header: "تلفن همراه",
       accessor: (r) => r.mobilePhone ?? "",
-      filter: "text",
       cell: (r) =>
         r.mobilePhone ? (
           <span className="text-tabular" dir="ltr">
@@ -141,26 +124,18 @@ function buildColumns(
       id: "contractEndDate",
       header: "تاریخ پایان قرارداد",
       accessor: (r) => r.contractEndDate,
-      filter: "text",
       permitted: hasCompensationRead,
     },
     {
       id: "contractParty",
       header: "طرف قرارداد",
       accessor: (r) => r.contractParty,
-      filter: "text",
       permitted: hasCompensationRead,
     },
     {
       id: "currentColleague",
       header: "همکار فعلی",
       accessor: (r) => r.currentColleague,
-      filter: "enum",
-      enumOptions: [
-        { value: "yes", label: "بله" },
-        { value: "no", label: "خیر" },
-      ],
-      sortable: true,
       cell: (r) => (r.currentColleague === "yes" ? "بله" : "خیر"),
     },
   ];
@@ -171,24 +146,29 @@ function buildColumns(
  * Server snapshot token + page drive membership; client table shows one server page.
  */
 export function PersonnelListPanel() {
+  const params = useSearchParams();
+  return <PersonnelListContent key={params.toString()} />;
+}
+
+function PersonnelListContent() {
   const leaveGuard = useLeaveGuardOptional();
   const searchParams = useSearchParams();
   const utils = api.useUtils();
   const formId = React.useId();
-  const urlHydratedKeyRef = React.useRef<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editRow, setEditRow] = React.useState<PersonnelListRow | null>(null);
   const [page, setPage] = React.useState(1);
   const [evaluationSnapshotId, setEvaluationSnapshotId] = React.useState<
     string | undefined
   >(undefined);
-  const snapshotTokenRef = React.useRef<string | undefined>(undefined);
-  const [teamFilter, setTeamFilter] =
-    React.useState<EntityPickerValue | null>(null);
-  const [filterHintFa, setFilterHintFa] = React.useState<string | null>(null);
+  const rawTeamId = searchParams.get("teamId")?.trim() || undefined;
+  const appliedTeamId = rawTeamId && isUuid(rawTeamId) ? rawTeamId : undefined;
+  const normalizedQuery = searchParams.get("q")?.trim() || undefined;
+  const [queryDraft, setQueryDraft] = React.useState(normalizedQuery ?? "");
   const pageSize = 25;
 
-  const teamsQuery = api.organization.list.useQuery({ includeInactive: false });
+  const teamsQuery = api.organization.list.useQuery({ includeInactive: false }, { retry: false });
+  const teamReadDenied = teamsQuery.error?.data?.code === "FORBIDDEN";
   const teamIds = React.useMemo(() => {
     const set = new Set<string>();
     for (const u of teamsQuery.data ?? []) {
@@ -206,47 +186,20 @@ export function PersonnelListPanel() {
     [baseOrgSearch, teamIds],
   );
 
-  const searchKey = searchParams.toString();
-  React.useEffect(() => {
-    if (urlHydratedKeyRef.current === searchKey) return;
-    if (teamsQuery.isLoading) return;
-    const teamId = searchParams.get("teamId")?.trim();
-    if (!teamId) {
-      urlHydratedKeyRef.current = searchKey;
-      return;
-    }
-    if (teamsQuery.isError) {
-      setFilterHintFa(operationalCopy.orgListError);
-      return;
-    }
-    urlHydratedKeyRef.current = searchKey;
-    if (!isUuid(teamId)) {
-      setFilterHintFa("شناسه تیم در فیلتر URL معتبر نیست.");
-      return;
-    }
-    const unit = (teamsQuery.data ?? []).find((u) => u.id === teamId);
-    if (!unit || unit.unitType !== "TEAM") {
-      setFilterHintFa("شناسه تیم در فیلتر URL معتبر نیست یا در محدوده نیست.");
-      return;
-    }
-    setFilterHintFa(null);
-    setTeamFilter({
-      id: unit.id,
-      code: unit.code,
-      labelFa: unit.nameFa,
-    });
-    setPage(1);
-    snapshotTokenRef.current = undefined;
-    setEvaluationSnapshotId(undefined);
-  }, [
-    searchKey,
-    searchParams,
-    teamsQuery.data,
-    teamsQuery.isLoading,
-    teamsQuery.isError,
-  ]);
-
-  const appliedTeamId = teamFilter?.id;
+  const unit = teamsQuery.data?.find((u) => u.id === appliedTeamId && u.unitType === "TEAM");
+  const teamFilter: EntityPickerValue | null = unit
+    ? { id: unit.id, code: unit.code, labelFa: unit.nameFa }
+    : appliedTeamId ? { id: appliedTeamId, code: "", labelFa: "تیم انتخاب‌شده" } : null;
+  const filterHintFa = rawTeamId && !appliedTeamId
+    ? "شناسه تیم در نشانی معتبر نیست؛ فیلتر را پاک کنید."
+    : teamsQuery.isError && !teamReadDenied ? operationalCopy.orgListError : null;
+  function updateFilters(query: string, teamId?: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (query.trim()) params.set("q", query.trim()); else params.delete("q");
+    if (teamId) params.set("teamId", teamId); else params.delete("teamId");
+    const queryString = params.toString();
+    navigate(`/personnel/list${queryString ? `?${queryString}` : ""}`);
+  }
 
   const searchQuery = api.person.search.useQuery(
     {
@@ -255,17 +208,10 @@ export function PersonnelListPanel() {
       pageSize,
       evaluationSnapshotId,
       teamId: appliedTeamId,
+      normalizedQuery,
     },
-    { placeholderData: keepPreviousData },
+    { enabled: !rawTeamId || Boolean(appliedTeamId) },
   );
-
-  React.useEffect(() => {
-    const token = searchQuery.data?.evaluationSnapshotId;
-    if (typeof token === "string" && token.length > 0) {
-      snapshotTokenRef.current = token;
-      setEvaluationSnapshotId(token);
-    }
-  }, [searchQuery.data?.evaluationSnapshotId]);
 
   const rows = React.useMemo((): PersonnelListRow[] => {
     return (searchQuery.data?.rows ?? []).map((r) => ({
@@ -346,29 +292,22 @@ export function PersonnelListPanel() {
 
   async function invalidateList() {
     setPage(1);
-    snapshotTokenRef.current = undefined;
     setEvaluationSnapshotId(undefined);
     await utils.person.search.invalidate();
   }
 
   function applyTeamFilter(next: EntityPickerValue | null) {
-    setTeamFilter(next);
-    setFilterHintFa(null);
-    setPage(1);
-    snapshotTokenRef.current = undefined;
-    setEvaluationSnapshotId(undefined);
+    updateFilters(normalizedQuery ?? "", next?.id);
   }
 
   function goToServerPage(next: number) {
     const token =
       evaluationSnapshotId ??
-      snapshotTokenRef.current ??
       searchQuery.data?.evaluationSnapshotId ??
       undefined;
     const clamped = Math.min(Math.max(1, next), totalPages);
     if (clamped > 1 && !token) return;
     if (token) {
-      snapshotTokenRef.current = token;
       setEvaluationSnapshotId(token);
     }
     setPage(clamped);
@@ -391,9 +330,10 @@ export function PersonnelListPanel() {
       </header>
 
       {searchQuery.isError ? (
-        <FeedbackMessage kind="error">
-          {searchQuery.error.message || operationalCopy.accessDeniedTitle}
-        </FeedbackMessage>
+        <div className="flex flex-wrap items-center gap-3">
+          <FeedbackMessage kind="error">{searchQuery.error.message || "بارگذاری فهرست ممکن نشد."}</FeedbackMessage>
+          <Button variant="tertiary" size="sm" onClick={() => { void invalidateList(); }}>تلاش دوباره</Button>
+        </div>
       ) : null}
 
       {statusMessage ? (
@@ -417,7 +357,18 @@ export function PersonnelListPanel() {
         role="search"
         aria-label="فیلتر فهرست پرسنل"
       >
-        <div className="min-w-[14rem] flex-1 space-y-1.5">
+        <form className="flex flex-1 items-end gap-2" onSubmit={(event) => {
+          event.preventDefault(); updateFilters(queryDraft, appliedTeamId);
+        }}>
+          <div className="flex-1 space-y-1.5">
+            <label className="text-label" htmlFor={`${formId}-query`}>جست‌وجوی پرسنل</label>
+            <Input id={`${formId}-query`} value={queryDraft} maxLength={200}
+              placeholder="نام، نام خانوادگی یا کد پرسنلی" onChange={(event) => setQueryDraft(event.target.value)} />
+          </div>
+          <Button type="submit" variant="tertiary">جست‌وجو</Button>
+          {normalizedQuery ? <Button type="button" variant="tertiary" onClick={() => updateFilters("", appliedTeamId)}>پاک کردن جست‌وجو</Button> : null}
+        </form>
+        {!teamReadDenied ? <div className="min-w-[14rem] flex-1 space-y-1.5">
           <span className="text-label" id={`${formId}-team-label`}>
             تیم
           </span>
@@ -432,8 +383,8 @@ export function PersonnelListPanel() {
               teamsQuery.isLoading ? operationalCopy.actionPending : undefined
             }
           />
-        </div>
-        {teamFilter ? (
+        </div> : null}
+        {rawTeamId ? (
           <Button
             type="button"
             variant="tertiary"
@@ -460,12 +411,15 @@ export function PersonnelListPanel() {
                 افزودن سریع
               </Button>
               <p className="text-caption text-muted-foreground">
-                می‌توانید با فیلتر «همکار فعلی» فقط شاغلان جاری را ببینید.
-                {disclosure ? ` — ${disclosure}` : null}
+                {teamReadDenied ? "جست‌وجو پیش از صفحه‌بندی اعمال می‌شود. ترتیب: کد پرسنلی." : "جست‌وجو و فیلتر تیم پیش از صفحه‌بندی اعمال می‌شوند. ترتیب: کد پرسنلی."}
                 {truncated
-                  ? " — فهرست به سقف حجم بازیابی محدود شده است."
+                  ? " — دامنهٔ جست‌وجو به سقف بازیابی محدود است و ممکن است فرد موردنظر در آن نباشد. خروجی کامل تا بررسی سقف بازیابی و تنظیم محدوده توسط مدیر سامانه در دسترس نیست."
                   : null}
               </p>
+              {disclosure ? <details className="max-w-full text-caption text-muted-foreground">
+                <summary className="cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-ring">محیط آزمایشی — اطلاعات محدودهٔ داده‌ها</summary>
+                <p className="mt-2 max-w-prose break-words">{disclosure}</p>
+              </details> : null}
             </div>
           }
           exportSlot={
@@ -477,7 +431,8 @@ export function PersonnelListPanel() {
                   kind: "personnel_list",
                   reviewedSnapshotHash: searchQuery.data.exportSnapshotHash,
                   // Server-side search query when wired; client table filters are not SoT.
-                  normalizedQuery: undefined,
+                  normalizedQuery,
+                  teamId: appliedTeamId,
                 }}
               />
             ) : undefined

@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     assert.equal(draft.status, "draft");
     assert.equal(draft.slotId, null);
 
-    const evalDraft = await evaluateHeadcountCapacity(pool, {
+    await evaluateHeadcountCapacity(pool, {
       teamId: team.id,
       jobTitleId: title.id,
       effectiveDate: today,

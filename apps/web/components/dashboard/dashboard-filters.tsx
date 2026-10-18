@@ -56,7 +56,7 @@ export function DashboardFilters({
   const rangeStartRef = React.useRef<JalaliDatePickerHandle>(null);
   const rangeEndRef = React.useRef<JalaliDatePickerHandle>(null);
 
-  const [team, setTeam] = React.useState<EntityPickerValue>(
+  const [draftTeam, setTeam] = React.useState<EntityPickerValue>(
     value.teamId
       ? { id: value.teamId, code: "", labelFa: "تیم فیلتر" }
       : null,
@@ -81,35 +81,20 @@ export function DashboardFilters({
     { enabled: Boolean(parentTeamId), retry: false },
   );
 
-  React.useEffect(() => {
-    if (!parentTeamId) {
-      setTeam(null);
-      return;
-    }
-    setTeam((prev) =>
-      prev?.id === parentTeamId
-        ? prev
-        : { id: parentTeamId, code: "", labelFa: "تیم فیلتر" },
-    );
-  }, [parentTeamId]);
-
-  React.useEffect(() => {
-    if (
-      !parentTeamId ||
-      !teamHydrate.data ||
-      teamHydrate.data.id !== parentTeamId
-    ) {
-      return;
-    }
-    setTeam((prev) => {
-      if (prev?.id !== parentTeamId) return prev;
-      return {
-        id: teamHydrate.data.id,
-        code: teamHydrate.data.code,
-        labelFa: teamHydrate.data.nameFa,
-      };
-    });
-  }, [parentTeamId, teamHydrate.data]);
+  const incomingKey = JSON.stringify(value);
+  const [previousIncomingKey, setPreviousIncomingKey] = React.useState(incomingKey);
+  if (incomingKey !== previousIncomingKey) {
+    setPreviousIncomingKey(incomingKey);
+    setTeam(parentTeamId ? { id: parentTeamId, code: "", labelFa: "تیم فیلتر" } : null);
+    setEvaluationMode(value.evaluationMode);
+    setAsOfDate(value.asOfDate);
+    setTrendRangeStart(value.trendRangeStart);
+    setTrendRangeEnd(value.trendRangeEnd);
+    setTrendGranularity(value.trendGranularity);
+  }
+  const team = draftTeam?.id === teamHydrate.data?.id && teamHydrate.data
+    ? { id: teamHydrate.data.id, code: teamHydrate.data.code, labelFa: teamHydrate.data.nameFa }
+    : draftTeam;
 
   const asOfHelpId = `${formId}-asof-help`;
   const teamHelpId = `${formId}-team-help`;

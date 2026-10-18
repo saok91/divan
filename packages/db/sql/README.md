@@ -18,6 +18,8 @@ psql "$DATABASE_URL" -f packages/db/sql/003_business_event_attributable_fields.s
 
 `apply.mjs` runs every `NNN_*.sql` file in lexical order inside a transaction per file (includes `003_business_event_attributable_fields.sql`).
 
+For fresh installations, Prisma migration `20260716210000_kernel_events_bootstrap` first creates the base event table if absent, before the access-administration migration alters its actor column. This compatibility bridge avoids a circular bootstrap dependency. Continue to run all kernel SQL after `pnpm db:migrate`; kernel schema evolution and append-only behavior remain owned by these raw SQL files. The bridge is idempotent for databases that already have the event store.
+
 ## Conventions
 
 - Filename: `NNN_description.sql` (zero-padded sequence)

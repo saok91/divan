@@ -6,7 +6,7 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import type { SettingsOwningDomain } from "@divan/app-settings";
 
 import type { SettingsMutationFeedback } from "@/components/settings/settings-parameter-editor";
@@ -124,16 +124,19 @@ export function SettingsDomainPanel({ domain }: SettingsDomainPanelProps) {
     },
   });
 
-  useEffect(() => {
+  const [previousDomain, setPreviousDomain] = useState(domain);
+  const [previousDataUpdatedAt, setPreviousDataUpdatedAt] = useState(query.dataUpdatedAt);
+  if (previousDataUpdatedAt !== query.dataUpdatedAt || previousDomain !== domain) {
+    setPreviousDataUpdatedAt(query.dataUpdatedAt);
     setRowPatches({});
-  }, [domain, query.dataUpdatedAt]);
-
-  useEffect(() => {
+  }
+  if (previousDomain !== domain) {
+    setPreviousDomain(domain);
     setFeedback(null);
     setExportOpen(false);
     setExportPanel(null);
     setExportErrorFa(null);
-  }, [domain]);
+  }
 
   if (query.isLoading || (query.isFetching && !query.data)) {
     return (

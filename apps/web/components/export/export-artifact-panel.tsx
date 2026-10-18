@@ -37,6 +37,7 @@ type ExportSource =
       kind: "personnel_list";
       reviewedSnapshotHash: string;
       normalizedQuery?: string;
+      teamId?: string;
     };
 
 type PanelState = {
@@ -126,6 +127,7 @@ export function ExportArtifactPanel({
           reviewedSnapshotHash: source.reviewedSnapshotHash,
           format,
           normalizedQuery: source.normalizedQuery,
+          teamId: source.teamId,
         });
         setPanel(result);
       }

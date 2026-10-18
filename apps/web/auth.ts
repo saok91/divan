@@ -1,5 +1,6 @@
 import NextAuth, { type NextAuthResult } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { refreshSessionToken } from "@/lib/session-token";
 import { CredentialsSignin } from "next-auth";
 import { z } from "zod";
 
@@ -95,57 +96,7 @@ const nextAuth = NextAuth({
         return token;
       }
 
-      // Explicit session.update() after mid-session authz ack — refresh fingerprint.
-      if (trigger === "update" && typeof token.accountId === "string") {
-        const ctx = await getSessionContext(token.accountId);
-        if (!ctx) return null;
-        token.username = ctx.username;
-        token.coarseRole = ctx.coarseRole;
-        token.humanIdentityId = ctx.humanIdentityId;
-        token.displayName = ctx.displayName;
-        token.organizationalScopeIds = ctx.organizationalScopeIds;
-        token.authzBindingFingerprint = ctx.authzBindingFingerprint;
-        token.lastActivityAt = now;
-        return token;
-      }
-
-      // Malformed/legacy tokens without timeout hooks → fail closed.
-      if (
-        typeof token.absoluteExp !== "number" ||
-        typeof token.lastActivityAt !== "number" ||
-        typeof token.accountId !== "string"
-      ) {
-        return null;
-      }
-
-      if (now > token.absoluteExp) {
-        return null;
-      }
-
-      if (now - token.lastActivityAt > timeouts.idleTimeoutSeconds) {
-        return null;
-      }
-
-      const ctx = await getSessionContext(token.accountId);
-      if (!ctx) {
-        return null;
-      }
-
-      token.username = ctx.username;
-      token.coarseRole = ctx.coarseRole;
-      token.humanIdentityId = ctx.humanIdentityId;
-      token.displayName = ctx.displayName;
-      token.organizationalScopeIds = ctx.organizationalScopeIds;
-      // Login-time snapshot for mid-session detect. Empty/legacy → hydrate once
-      // (do not leave blank — blank was treated as perpetual AUTHZ_CHANGED).
-      if (
-        typeof token.authzBindingFingerprint !== "string" ||
-        !token.authzBindingFingerprint.trim()
-      ) {
-        token.authzBindingFingerprint = ctx.authzBindingFingerprint;
-      }
-      token.lastActivityAt = now;
-      return token;
+      return refreshSessionToken(token, trigger, now, timeouts, getSessionContext);
     },
     async session({ session, token }) {
       if (!token?.accountId || !token.coarseRole) {

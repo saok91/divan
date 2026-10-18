@@ -35,6 +35,13 @@ type HistoricalOrgHeadcountForeshadowProps = {
  * Not Approval admin UI (→ 4.12) or dashboard (→ 5.4).
  */
 export function HistoricalOrgHeadcountForeshadow({
+  initialTeam,
+  embedded,
+}: HistoricalOrgHeadcountForeshadowProps) {
+  return <HistoricalCountsForm key={initialTeam?.id ?? "all"} initialTeam={initialTeam} embedded={embedded} />;
+}
+
+function HistoricalCountsForm({
   initialTeam = null,
   embedded = false,
 }: HistoricalOrgHeadcountForeshadowProps) {
@@ -47,10 +54,6 @@ export function HistoricalOrgHeadcountForeshadow({
     asOf: string;
     teamId?: string;
   } | null>(null);
-
-  React.useEffect(() => {
-    setTeam(initialTeam ?? null);
-  }, [initialTeam]);
 
   const query = api.organization.getHistoricalCounts.useQuery(
     {

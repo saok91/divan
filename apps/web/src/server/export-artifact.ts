@@ -167,14 +167,16 @@ function makeReauth(accountId: string, actorScopeCodes: string[]) {
     objectIds?: string[];
     actorScopeCodes?: string[];
     asOfDate?: string;
-  }) =>
-    reauthorizeForQueuedOrArtifactWork({
+  }) => {
+    return resolvePersonnelPopulationRegistry().then(({registry}) => reauthorizeForQueuedOrArtifactWork({
       accountId: input.accountId || accountId,
       populationChannel: "export",
       objectIds: input.objectIds,
       actorScopeCodes: input.actorScopeCodes ?? actorScopeCodes,
       asOfDate: input.asOfDate,
-    });
+      populationRegistry: registry,
+    }));
+  };
 }
 
 async function softHasOrganizationRead(accountId: string): Promise<boolean> {
@@ -407,6 +409,7 @@ export const exportArtifactRouter = createTRPCRouter({
         format: z.enum(["csv", "xlsx"]),
         purpose: z.string().min(1).max(200).optional(),
         normalizedQuery: z.string().max(200).optional(),
+        teamId: z.string().uuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -428,6 +431,7 @@ export const exportArtifactRouter = createTRPCRouter({
           correlationId: ctx.correlationId,
           channel: "list",
           normalizedQuery: input.normalizedQuery,
+          teamId: input.teamId,
         });
 
         if (search.outcome !== "allowed") {
@@ -435,6 +439,19 @@ export const exportArtifactRouter = createTRPCRouter({
             code: "FORBIDDEN",
             message: search.messageFa || operationalCopy.accessDeniedTitle,
           });
+        }
+
+        const allRows = [...search.rows];
+        if (search.truncated) throw new ExportError("EXPORT_DENIED", "خروجی کامل به علت سقف بازیابی در دسترس نیست. مدیر سامانه باید سقف بازیابی و تنظیم محدودهٔ داده‌ها را بررسی کند؛ تغییر عبارت جست‌وجو این محدودیت را رفع نمی‌کند.");
+        for (let page = 2; (page - 1) * search.pageSize < (search.totalInSnapshot ?? 0); page++) {
+          const continuation = await runPersonnelScopedSearch({
+            actorAccountId: ctx.session.accountId, actorScopeCodes: ctx.session.organizationalScopeCodes,
+            correlationId: ctx.correlationId, channel: "list",
+            normalizedQuery: input.normalizedQuery, teamId: input.teamId,
+            page, pageSize: search.pageSize, evaluationSnapshotId: search.evaluationSnapshotId ?? undefined,
+          });
+          if (continuation.outcome !== "allowed") throw new ExportError("EXPORT_DENIED", continuation.messageFa || operationalCopy.exportDenied);
+          allRows.push(...continuation.rows);
         }
 
         // Export channel InferenceBulk — separate from list channel evidence.
@@ -465,7 +482,7 @@ export const exportArtifactRouter = createTRPCRouter({
         }
 
         const allowed = new Set(retrieval.subjectIds);
-        const scopedRows = search.rows.filter((r) => allowed.has(r.id));
+        const scopedRows = allRows.filter((r) => allowed.has(r.id));
         const { fields, exportRows } = personnelRowsToExport(
           scopedRows,
           search.hasCompensationRead,
@@ -473,6 +490,7 @@ export const exportArtifactRouter = createTRPCRouter({
 
         const filtersSnapshot = {
           normalizedQuery: input.normalizedQuery ?? null,
+          teamId: input.teamId ?? null,
           asOf,
           fieldIds: fields.map((f) => f.id),
         };

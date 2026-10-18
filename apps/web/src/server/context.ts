@@ -1,5 +1,3 @@
-import { getSessionContext } from "@divan/identity-access";
-
 import { auth } from "@/auth";
 
 import type { TrpcContext } from "./trpc";
@@ -15,13 +13,11 @@ export async function createContext(): Promise<TrpcContext> {
     return { session: null, priorAuthzBindingFingerprint: null };
   }
 
-  const fresh = await getSessionContext(session.user.accountId);
-  if (!fresh) {
-    return { session: null, priorAuthzBindingFingerprint: null };
-  }
-
   return {
-    session: fresh,
+    // Authentication only here. Each protected operation loads current DB access
+    // at its boundary, avoiding a redundant hydration for the entire batch.
+    session: null,
+    authenticatedAccountId: session.user.accountId,
     priorAuthzBindingFingerprint:
       session.user.authzBindingFingerprint?.trim() || null,
   };

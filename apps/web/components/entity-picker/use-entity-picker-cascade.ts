@@ -36,7 +36,7 @@ export function useEntityPickerCascade(
   const value = controlled ? (options.value ?? null) : internal;
   const onValueChangeProp = options?.onValueChange;
   const onValueChangeRef = useRef(onValueChangeProp);
-  onValueChangeRef.current = onValueChangeProp;
+  useEffect(() => { onValueChangeRef.current = onValueChangeProp; }, [onValueChangeProp]);
 
   const setValue = useCallback(
     (next: EntityPickerValue) => {

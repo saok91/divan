@@ -33,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { RowActionButton } from "@/components/ui/row-action-button";
 import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
+import { initialDraft, shouldRefreshSettingsDraft, isDraftDirty } from "@/lib/settings-draft";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
 import {
@@ -102,19 +103,6 @@ function formatLastChange(row: SettingsParameterRowDto): string {
   return `${actor} · ${when}`;
 }
 
-function valuesEqual(
-  a: string | number | boolean | string[],
-  b: string | number | boolean | string[],
-): boolean {
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    const sa = [...a].sort();
-    const sb = [...b].sort();
-    return sa.every((v, i) => v === sb[i]);
-  }
-  return a === b;
-}
-
 function draftToCandidate(
   row: SettingsParameterRowDto,
   draft: string | string[],
@@ -132,34 +120,6 @@ function draftToCandidate(
     return draft === "true";
   }
   return typeof draft === "string" ? draft : String(draft);
-}
-
-function initialDraft(row: SettingsParameterRowDto): string | string[] {
-  if (row.valueType === "string_list") {
-    return Array.isArray(row.value) ? [...row.value] : [];
-  }
-  if (typeof row.value === "boolean") {
-    return row.value ? "true" : "false";
-  }
-  return String(row.value);
-}
-
-function isDraftDirty(
-  row: SettingsParameterRowDto,
-  draft: string | string[],
-): boolean {
-  if (row.valueType === "string_list") {
-    const current = Array.isArray(row.value) ? row.value : [];
-    const next = Array.isArray(draft) ? draft : [];
-    return !valuesEqual(current, next);
-  }
-  if (row.valueType === "number" || row.valueType === "duration_ms") {
-    return String(row.value) !== String(draft).trim();
-  }
-  if (row.valueType === "boolean") {
-    return (row.value === true ? "true" : "false") !== draft;
-  }
-  return String(row.value) !== String(draft);
 }
 
 type ConfirmMode = "apply" | "reset" | null;
@@ -197,21 +157,16 @@ export function SettingsParameterEditor({
 
   const dirtySimple = isDraftDirty(row, draft);
   const isDirty = dirtySimple || confirmMode != null;
-  const isDirtyRef = useRef(isDirty);
-  isDirtyRef.current = isDirty;
-  const rowKeyRef = useRef(row.key);
   const busyRef = useRef(false);
-
-  useEffect(() => {
-    const keyChanged = rowKeyRef.current !== row.key;
-    rowKeyRef.current = row.key;
-    // Preserve in-progress edits when sibling invalidate refreshes row props.
-    if (!keyChanged && isDirtyRef.current) return;
-    setDraft(initialDraft(row));
-    setConfirmMode(null);
-    setReason("");
-    setBlastAck(false);
-  }, [row.key, row.value, row.source, row.lastChangedAtIso]);
+  const rowVersion = JSON.stringify([row.key, row.value, row.source, row.lastChangedAtIso]);
+  const [previousRow, setPreviousRow] = useState({ row, version: rowVersion });
+  if (previousRow.version !== rowVersion) {
+    setPreviousRow({ row, version: rowVersion });
+    // Refresh clean forms, but never erase edits due to another row's refetch.
+    if (shouldRefreshSettingsDraft(previousRow.row, row, draft, confirmMode != null)) {
+      setDraft(initialDraft(row)); setConfirmMode(null); setReason(""); setBlastAck(false);
+    }
+  }
 
   useLeaveGuardRegistration({
     id: `settings-row-${row.key}`,
@@ -228,6 +183,7 @@ export function SettingsParameterEditor({
 
   const applyMutation = api.settings.applyParameter.useMutation({
     onSuccess: async (data) => {
+      setDraft(initialDraft(data.row));
       onRowUpdated(data.row);
       onFeedback({
         kind: "success",
@@ -250,6 +206,7 @@ export function SettingsParameterEditor({
 
   const resetMutation = api.settings.reset.useMutation({
     onSuccess: async (data) => {
+      setDraft(initialDraft(data.row));
       onRowUpdated(data.row);
       onFeedback({
         kind: "success",
@@ -271,7 +228,7 @@ export function SettingsParameterEditor({
   });
 
   const busy = applyMutation.isPending || resetMutation.isPending;
-  busyRef.current = busy;
+  useEffect(() => { busyRef.current = busy; }, [busy]);
   // Override metadata may exist even when warm degraded to code_default.
   const atDefault =
     row.source === "code_default" && row.lastChangedAtIso == null;

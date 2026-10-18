@@ -9,7 +9,9 @@ const SURFACE = SECTION_TAB_SURFACES.find((s) => s.root === "/personnel");
 /**
  * Personnel root → default section tab (Story 4b.2 nested URL strategy).
  */
-export default async function PersonnelIndexPage() {
+export default async function PersonnelIndexPage({ searchParams }: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (!SURFACE) {
     redirect("/dashboard");
   }
@@ -18,5 +20,10 @@ export default async function PersonnelIndexPage() {
     redirect("/login");
   }
   assertPageAccess(session.user.coarseRole, "/personnel");
-  redirect(defaultTabHref(SURFACE));
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (Array.isArray(value)) value.forEach((item) => params.append(key, item));
+    else if (value !== undefined) params.set(key, value);
+  }
+  redirect(defaultTabHref(SURFACE, params));
 }

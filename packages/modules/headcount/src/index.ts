@@ -188,7 +188,6 @@ import { todayDateOnlyTehran } from "@divan/temporal-engine";
 
 import {
   assertSlotApprovalConsumable,
-  HeadcountApprovalError,
   slotApprovalAllowsConsume,
 } from "./headcount-approval";
 import {

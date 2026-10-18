@@ -22,8 +22,6 @@ import type { EntitlementGrant, PrismaClient } from "@divan/db";
 import {
   ACCESS_ADMINISTRATION_PERMISSION,
   AccessAdminError,
-  MSG_ACCESS_ADMIN_REQUIRED_FA,
-  MSG_TOXIC_COMBINATION_FA,
   assertToxicCombinationAllowed,
   type AccessAdminActor,
   type MutateResult,

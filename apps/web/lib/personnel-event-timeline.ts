@@ -24,14 +24,13 @@ export const TIMELINE_LOAD_MORE_LABEL_FA = "بارگذاری بیشتر";
 
 /** Form draft/create options only — do not add lifecycle system types here. */
 export const EVENT_TYPE_OPTIONS = [
-  { value: "ScaffoldChangeRecorded", labelFa: "اسکفولد (آزمایش بستر)" },
-  { value: "EmploymentStarted", labelFa: "شروع همکاری (EmploymentStarted)" },
-  { value: "EmploymentReturned", labelFa: "بازگشت همکاری (EmploymentReturned)" },
+  { value: "EmploymentStarted", labelFa: "شروع همکاری" },
+  { value: "EmploymentReturned", labelFa: "بازگشت همکاری" },
   {
     value: "EmploymentTerminated",
-    labelFa: "خاتمه همکاری (EmploymentTerminated)",
+    labelFa: "خاتمه همکاری",
   },
-  { value: "TransferRecorded", labelFa: "انتقال (TransferRecorded)" },
+  { value: "TransferRecorded", labelFa: "انتقال" },
   {
     value: "OrganizationalRoleChanged",
     labelFa: "تغییر نقش سازمانی",
@@ -43,6 +42,11 @@ export const EVENT_TYPE_OPTIONS = [
   { value: "PromotionRecorded", labelFa: "ثبت ارتقا (نتیجه نهایی)" },
   { value: "CompensationChanged", labelFa: "تغییر جبران‌خدمت" },
   { value: "ContractChanged", labelFa: "تغییر قرارداد" },
+] as const;
+
+export const EVENT_SEARCH_TYPE_OPTIONS = [
+  ...EVENT_TYPE_OPTIONS,
+  { value: "ScaffoldChangeRecorded", labelFa: "رویداد آزمایشی" },
 ] as const;
 
 /** Display-only labels for append-only lifecycle / migration events (not form create). */
@@ -57,6 +61,7 @@ const LIFECYCLE_EVENT_TYPE_LABELS = [
 ] as const;
 
 const EVENT_TYPE_LABEL_BY_VALUE = new Map<string, string>([
+  ["ScaffoldChangeRecorded", "رویداد آزمایشی"],
   ...EVENT_TYPE_OPTIONS.map((o) => [o.value, o.labelFa] as const),
   ...LIFECYCLE_EVENT_TYPE_LABELS.map((o) => [o.value, o.labelFa] as const),
 ]);

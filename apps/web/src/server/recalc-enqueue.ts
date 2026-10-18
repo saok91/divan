@@ -32,18 +32,23 @@ export async function ensureRecalcEnqueueRegistered(
     instance.on("error", (err) => {
       console.error("[web] pg-boss enqueue error", err);
     });
-    await instance.start();
-    await instance.createQueue(TEMPORAL_RECALCULATE_QUEUE, {
-      policy: "singleton",
-    });
-    setRecalcEnqueue(async (payload: RecalcJobPayload) => {
-      await instance.send(TEMPORAL_RECALCULATE_QUEUE, payload, {
-        // Per-generation key so bumps are not coalesced away from an older job.
-        singletonKey: `person:${payload.personId}:g${payload.generation}`,
-        singletonSeconds: 60,
+    try {
+      await instance.start();
+      await instance.createQueue(TEMPORAL_RECALCULATE_QUEUE, {
+        policy: "singleton",
       });
-    });
-    boss = instance;
+      setRecalcEnqueue(async (payload: RecalcJobPayload) => {
+        await instance.send(TEMPORAL_RECALCULATE_QUEUE, payload, {
+          // Per-generation key so bumps are not coalesced away from an older job.
+          singletonKey: `person:${payload.personId}:g${payload.generation}`,
+          singletonSeconds: 60,
+        });
+      });
+      boss = instance;
+    } catch (error) {
+      await instance.stop({ graceful: false }).catch(() => undefined);
+      throw error;
+    }
   })();
   try {
     await ready;
@@ -57,6 +62,7 @@ export async function ensureRecalcEnqueueRegistered(
 
 /** Test / shutdown hook. */
 export async function stopRecalcEnqueue(): Promise<void> {
+  await ready?.catch(() => undefined);
   setRecalcEnqueue(null);
   if (boss) {
     await boss.stop({ graceful: true, timeout: 5_000 });

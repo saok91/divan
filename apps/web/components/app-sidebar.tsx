@@ -142,8 +142,8 @@ export function AppSidebar({ navItems, accountId }: AppSidebarProps) {
                 aria-label={item.label}
                 aria-current={isActive ? "page" : undefined}
                 onNavigate={(event) => {
-                  // Same surface (e.g. /personnel vs /personnel/list): no remount, no leave dialog.
-                  if (isNavActive(pathname, item.href)) {
+                  // Active section styling does not imply the same destination.
+                  if (pathname === item.href) {
                     event.preventDefault();
                     return;
                   }

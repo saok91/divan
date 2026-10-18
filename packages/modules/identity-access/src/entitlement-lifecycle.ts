@@ -1480,6 +1480,8 @@ export async function reauthorizeForQueuedOrArtifactWork(
     objectIds?: string[];
     /** Actor scope codes for population port (required when objectIds set). */
     actorScopeCodes?: string[];
+    /** Trusted server registry; must match the source retrieval's population adapter. */
+    populationRegistry?: import("./population-authz").PopulationFixtureRegistry;
   },
   db: PrismaClient = getIdentityDb(),
 ): Promise<{ allowed: boolean; reason: string }> {
@@ -1536,13 +1538,13 @@ export async function reauthorizeForQueuedOrArtifactWork(
       return { allowed: false, reason: asOf.reason };
     }
 
-    const codes =
-      input.actorScopeCodes ??
-      (
-        await import("./access-admin").then((m) =>
-          m.loadOrganizationalScopesForAccount(input.accountId, db),
-        )
-      ).codes;
+    const liveCodes = (await import("./access-admin").then((m) =>
+      m.loadOrganizationalScopesForAccount(input.accountId, db),
+    )).codes;
+    // A stored artifact/snapshot can only narrow the actor's current scopes.
+    const codes = input.actorScopeCodes
+      ? liveCodes.filter((code) => input.actorScopeCodes!.includes(code))
+      : liveCodes;
 
     const pop = intersectPopulation({
       actorAccountId: input.accountId,
@@ -1550,7 +1552,7 @@ export async function reauthorizeForQueuedOrArtifactWork(
       asOfDate: asOf.value,
       channel: input.populationChannel ?? "audit",
       objectIds: input.objectIds,
-    });
+    }, input.populationRegistry);
     if (!pop.ok) {
       return { allowed: false, reason: pop.reason };
     }

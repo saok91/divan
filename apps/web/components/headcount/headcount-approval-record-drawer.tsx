@@ -177,7 +177,9 @@ export function HeadcountApprovalRecordDrawer({
     }
   }, [open, triggerEl]);
 
-  React.useEffect(() => {
+  const [previousOpen, setPreviousOpen] = React.useState(open);
+  if (open !== previousOpen) {
+    setPreviousOpen(open);
     if (!open) {
       setShowExemptionForm(false);
       setSectionError(null);
@@ -190,7 +192,7 @@ export function HeadcountApprovalRecordDrawer({
       setValidityEnd(undefined);
       setBusyId(null);
     }
-  }, [open, approvalId]);
+  }
 
   React.useEffect(() => {
     if (!showExemptionForm) return;

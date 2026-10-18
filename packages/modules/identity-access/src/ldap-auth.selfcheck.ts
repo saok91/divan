@@ -103,6 +103,8 @@ assert.equal(
 
 // Filter escaping — no injection via special chars
 assert.equal(escapeLdapFilterValue("a*b(c)"), "a\\2ab\\28c\\29");
+assert.equal(escapeLdapFilterValue("\0\\"), "\\00\\5c");
+assert.equal(escapeLdapFilterValue("کاربر"), "کاربر");
 assert.equal(
   buildUserFilter("(uid={{username}})", "a*b"),
   "(uid=a\\2ab)",

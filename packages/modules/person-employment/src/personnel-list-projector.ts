@@ -7,6 +7,7 @@
 /** Soft list cap via AD-7 resolver (Story 10.1). */
 import { resolveSettingNumber } from "@divan/app-settings";
 import type { CurrentPersonState } from "./current-person-state";
+import { normalizeDigitsForMatch } from "./digits";
 
 export function PERSONNEL_LIST_MAX_ROWS(): number {
   return resolveSettingNumber("list.personnel_max_rows").value;
@@ -171,8 +172,10 @@ export function rowMatchesPersonnelQuery(
   row: PersonnelListRowDto,
   normalizedQuery: string,
 ): boolean {
-  const q = normalizedQuery.trim().toLowerCase();
-  if (!q) return true;
+  const normalizeText = (text: string) => normalizeDigitsForMatch(text)
+    .toLowerCase().replace(/ي/g, "ی").replace(/ك/g, "ک").replace(/[\u064B-\u065F\u0670]/g, "");
+  const terms = normalizedQuery.replace(/\u200c/g, " ").trim().split(/\s+/).map(normalizeText).filter(Boolean);
+  if (terms.length === 0) return true;
   const haystacks = [
     row.personnelCode,
     row.givenName,
@@ -185,5 +188,6 @@ export function rowMatchesPersonnelQuery(
     row.collaborationType,
     row.mobilePhone ?? "",
   ];
-  return haystacks.some((h) => h.toLowerCase().includes(q));
+  const normalizedFields = haystacks.map(normalizeText);
+  return terms.every((term) => normalizedFields.some((field) => field.includes(term)));
 }

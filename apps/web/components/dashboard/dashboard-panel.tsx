@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Panel } from "@/components/layout/panel-section";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
+import { formatJalaliDisplayFromGregorian, formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
@@ -201,14 +202,14 @@ export function DashboardPanel() {
       <p className="text-caption text-muted-foreground">
         آخرین محاسبه:{" "}
         <span className="text-tabular tabular-nums" dir="ltr">
-          {toPersianDigits(lastCalcAt)}
+          {formatJalaliDateTimeFromIso(lastCalcAt)}
         </span>
         {query.data?.asOf ? (
           <>
             {" "}
             · مبنا:{" "}
             <span className="text-tabular tabular-nums">
-              {toPersianDigits(query.data.asOf)}
+              {formatJalaliDisplayFromGregorian(query.data.asOf)}
             </span>
           </>
         ) : null}

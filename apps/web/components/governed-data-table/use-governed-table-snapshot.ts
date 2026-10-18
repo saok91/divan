@@ -122,7 +122,7 @@ export function useGovernedTableSnapshot<T>({
         getRowId,
         hiddenColumnIds,
       }),
-    [rows, columns, filters, sort, pageIndex, pageSize, getRowId, operatorHideKey],
+    [rows, columns, filters, sort, pageIndex, pageSize, getRowId, hiddenColumnIds],
   );
 
   // Filter/sort identity change (including omit scrub) → page 1.

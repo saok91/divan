@@ -33,7 +33,7 @@ import { RowActionCluster } from "@/components/ui/row-action-overflow";
 import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
-import { EVENT_TYPE_OPTIONS } from "@/lib/personnel-event-timeline";
+import { EVENT_SEARCH_TYPE_OPTIONS } from "@/lib/personnel-event-timeline";
 import { profileHref } from "@/lib/personnel-profile-href";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -98,7 +98,6 @@ const COLUMNS: GovernedColumn<EventListRow>[] = [
         ? `${r.personnelCode} ${r.personLabel}`
         : r.personLabel,
     sticky: "identifier",
-    sortable: true,
     cell: (r) => (
       <span className="inline-flex flex-col gap-0.5">
         <span>{r.personLabel}</span>
@@ -114,13 +113,11 @@ const COLUMNS: GovernedColumn<EventListRow>[] = [
     id: "eventType",
     header: "نوع رویداد",
     accessor: (r) => r.eventTypeLabelFa,
-    sortable: true,
   },
   {
     id: "effectiveDate",
     header: "تاریخ مؤثر",
     accessor: (r) => r.effectiveDate,
-    sortable: true,
     cell: (r) => (
       <span className="text-tabular">
         {toPersianDigits(formatJalaliDisplayFromGregorian(r.effectiveDate))}
@@ -154,9 +151,10 @@ export function PersonnelEventsListPanel() {
   const leaveGuard = useLeaveGuardOptional();
   const searchParams = useSearchParams();
   const formId = React.useId();
-  const urlHydratedKeyRef = React.useRef<string | null>(null);
+  const [urlHydratedKey, setUrlHydratedKey] = React.useState<string | null>(null);
 
-  const teamsQuery = api.organization.list.useQuery({ includeInactive: false });
+  const teamsQuery = api.organization.list.useQuery({ includeInactive: false }, { retry: false });
+  const teamReadDenied = teamsQuery.error?.data?.code === "FORBIDDEN";
   const teamIds = React.useMemo(() => {
     const set = new Set<string>();
     for (const u of teamsQuery.data ?? []) {
@@ -190,7 +188,6 @@ export function PersonnelEventsListPanel() {
   const [evaluationSnapshotId, setEvaluationSnapshotId] = React.useState<
     string | undefined
   >(undefined);
-  const snapshotTokenRef = React.useRef<string | undefined>(undefined);
   const [filterHintFa, setFilterHintFa] = React.useState<string | null>(null);
   const pageSize = 25;
 
@@ -198,9 +195,10 @@ export function PersonnelEventsListPanel() {
 
   // Story 9.7 — hydrate reconcile query presets; re-run when searchParams change.
   const searchKey = searchParams.toString();
-  React.useEffect(() => {
-    if (urlHydratedKeyRef.current === searchKey) return;
-    if (teamsQuery.isLoading) return;
+  const hydrationKey = searchKey;
+  if (urlHydratedKey !== hydrationKey && !teamsQuery.isLoading && (!firstParam(searchParams, "teamId") || !teamsQuery.isError)) {
+    setUrlHydratedKey(hydrationKey);
+    (() => {
 
     const teamId = firstParam(searchParams, "teamId");
     const eventTypeRaw = firstParam(searchParams, "eventType") ?? "";
@@ -214,13 +212,13 @@ export function PersonnelEventsListPanel() {
       return;
     }
 
-    urlHydratedKeyRef.current = searchKey;
+
 
     const hints: string[] = [];
 
     let knownEventType = "";
     if (eventTypeRaw) {
-      if (EVENT_TYPE_OPTIONS.some((o) => o.value === eventTypeRaw)) {
+      if (EVENT_SEARCH_TYPE_OPTIONS.some((o) => o.value === eventTypeRaw)) {
         knownEventType = eventTypeRaw;
       } else {
         hints.push("نوع رویداد در فیلتر URL ناشناخته نادیده گرفته شد.");
@@ -283,15 +281,9 @@ export function PersonnelEventsListPanel() {
       personId: personValue?.id,
     });
     setPage(1);
-    snapshotTokenRef.current = undefined;
     setEvaluationSnapshotId(undefined);
-  }, [
-    searchKey,
-    searchParams,
-    teamsQuery.data,
-    teamsQuery.isLoading,
-    teamsQuery.isError,
-  ]);
+    })();
+  }
 
   const searchQuery = api.personnelEvent.search.useQuery(
     {
@@ -307,15 +299,6 @@ export function PersonnelEventsListPanel() {
     },
     { placeholderData: keepPreviousData },
   );
-
-  React.useEffect(() => {
-    if (searchQuery.isPlaceholderData) return;
-    const token = searchQuery.data?.evaluationSnapshotId;
-    if (typeof token === "string" && token.length > 0) {
-      snapshotTokenRef.current = token;
-      setEvaluationSnapshotId(token);
-    }
-  }, [searchQuery.data?.evaluationSnapshotId, searchQuery.isPlaceholderData]);
 
   const rows = React.useMemo((): EventListRow[] => {
     return (searchQuery.data?.rows ?? []).map((r) => ({
@@ -374,7 +357,6 @@ export function PersonnelEventsListPanel() {
 
   function resetSnapshotAndPage() {
     setPage(1);
-    snapshotTokenRef.current = undefined;
     setEvaluationSnapshotId(undefined);
   }
 
@@ -410,7 +392,6 @@ export function PersonnelEventsListPanel() {
   function goToServerPage(next: number) {
     const token =
       evaluationSnapshotId ??
-      snapshotTokenRef.current ??
       (!searchQuery.isPlaceholderData
         ? searchQuery.data?.evaluationSnapshotId
         : undefined) ??
@@ -422,7 +403,6 @@ export function PersonnelEventsListPanel() {
     }
     setFilterHintFa(null);
     if (token) {
-      snapshotTokenRef.current = token;
       setEvaluationSnapshotId(token);
     }
     setPage(clamped);
@@ -430,7 +410,6 @@ export function PersonnelEventsListPanel() {
 
   const snapshotReady = Boolean(
     evaluationSnapshotId ??
-      snapshotTokenRef.current ??
       (!searchQuery.isPlaceholderData &&
         searchQuery.data?.evaluationSnapshotId),
   );
@@ -480,7 +459,7 @@ export function PersonnelEventsListPanel() {
             className={selectClass}
           >
             <option value="">همه انواع</option>
-            {EVENT_TYPE_OPTIONS.map((o) => (
+            {EVENT_SEARCH_TYPE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.labelFa}
               </option>
@@ -569,6 +548,7 @@ export function PersonnelEventsListPanel() {
             placeholder={
               teamsLoading
                 ? "در حال بارگذاری تیم‌ها…"
+                : teamReadDenied ? "مجوز خواندن ساختار سازمان لازم است"
                 : teamsErrored
                   ? "بارگذاری تیم‌ها ناموفق"
                   : "جستجوی تیم…"
@@ -578,6 +558,7 @@ export function PersonnelEventsListPanel() {
             disabledReasonFa={
               teamsLoading
                 ? "فهرست تیم‌ها در حال بارگذاری است."
+                : teamReadDenied ? "این حساب مجوز خواندن ساختار سازمان را ندارد."
                 : teamsErrored
                   ? "فهرست تیم‌ها بارگذاری نشد؛ فیلتر تیم موقتاً غیرفعال است."
                   : undefined

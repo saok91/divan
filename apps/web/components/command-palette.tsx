@@ -129,7 +129,7 @@ export function CommandPalette({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="overflow-hidden rounded-lg p-0 sm:max-w-lg"
+        className="overflow-y-auto rounded-lg p-0 sm:max-w-lg"
       >
         <DialogHeader className="sr-only">
           <DialogTitle>پالت فرمان</DialogTitle>

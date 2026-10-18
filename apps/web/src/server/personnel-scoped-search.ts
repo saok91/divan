@@ -191,7 +191,7 @@ function assertPaginationTokenMatches(
   }
 }
 
-async function actorPermissionFingerprint(accountId: string): Promise<string> {
+async function actorPermissionFingerprint(accountId: string, scopeCodes: readonly string[]): Promise<string> {
   const db = getPersonDb();
   const rows = await db.accountAccessRole.findMany({
     where: { accountId },
@@ -205,7 +205,7 @@ async function actorPermissionFingerprint(accountId: string): Promise<string> {
       if (typeof p === "string" && p.trim()) perms.add(p.trim());
     }
   }
-  return computeContentFingerprint([...perms].sort());
+  return computeContentFingerprint({ permissions: [...perms].sort(), scopeCodes: [...new Set(scopeCodes)].sort() });
 }
 
 function paginationMemberIds(
@@ -675,7 +675,7 @@ export async function runPersonnelScopedSearch(
         teamId: input.teamId,
       });
 
-      const livePermFp = await actorPermissionFingerprint(input.actorAccountId);
+      const livePermFp = await actorPermissionFingerprint(input.actorAccountId, input.actorScopeCodes);
       const permCheck = await revalidateEvaluationSnapshot(eventDb, snapshot, {
         permissionFingerprint: livePermFp,
       });
@@ -879,9 +879,7 @@ export async function runPersonnelScopedSearch(
 
   // Story 7.8 — mint the pagination snapshot over the full (pre-slice) membership.
   // Fail-closed (AC1/AC6): no allowed page-1 without an attributable snapshot token.
-  const permissionFingerprint = await actorPermissionFingerprint(
-    input.actorAccountId,
-  );
+  const permissionFingerprint = await actorPermissionFingerprint(input.actorAccountId, input.actorScopeCodes);
   let evaluationSnapshotId: string;
   try {
     const snap = await beginEvaluationSnapshot(eventDb, {

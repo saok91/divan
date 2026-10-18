@@ -24,6 +24,7 @@ import { RowActionButton } from "@/components/ui/row-action-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
+import { formatJalaliDisplayFromGregorian, formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import {
   buildReportPath,
   buildReportSearchParams,
@@ -75,7 +76,10 @@ function formatCell(value: string | number | null | undefined): React.ReactNode 
       </span>
     );
   }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value) || /^\d+$/.test(value)) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return <span className="text-tabular" dir="ltr">{formatJalaliDisplayFromGregorian(value)}</span>;
+  }
+  if (/^\d+$/.test(value)) {
     return (
       <span className="text-tabular" dir="ltr">
         {toPersianDigits(value)}
@@ -94,6 +98,7 @@ function buildColumns(
     permitted: c.permitted,
     accessor: (r) => {
       const v = r.cells[c.id];
+      if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return formatJalaliDisplayFromGregorian(v);
       return v == null ? "" : String(v);
     },
     sticky: index === 0 ? ("identifier" as const) : undefined,
@@ -108,10 +113,10 @@ function formatAsOfLabel(
   asOf: string | undefined,
 ): string {
   if (evaluationMode === "as_of" && asOf) {
-    return toPersianDigits(asOf);
+    return formatJalaliDisplayFromGregorian(asOf);
   }
   if (asOf) {
-    return toPersianDigits(asOf);
+    return formatJalaliDisplayFromGregorian(asOf);
   }
   return "جاری";
 }
@@ -155,20 +160,9 @@ function ReportWorkspaceInner({ subject }: ReportWorkspaceProps) {
   );
 
   const pathKey = reportKeyFromPathname(pathname, subject);
-  const [invalidPathKey, setInvalidPathKey] = React.useState(false);
-
-  React.useEffect(() => {
-    const prefix = `/reports/${subject}`;
-    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
-      const rest = pathname.slice(prefix.length + 1);
-      const segment = rest.split("/")[0]?.trim() ?? "";
-      if (segment && !pathKey) {
-        setInvalidPathKey(true);
-      } else {
-        setInvalidPathKey(false);
-      }
-    }
-  }, [pathname, subject, pathKey]);
+  const prefix = `/reports/${subject}`;
+  const pathSegment = pathname.startsWith(`${prefix}/`) ? pathname.slice(prefix.length + 1).split("/")[0]?.trim() : "";
+  const invalidPathKey = Boolean(pathSegment && !pathKey);
 
   const [draftFilters, setDraftFilters] = React.useState<ReportFilterState>({
     teamId: urlFilters.teamId,
@@ -178,7 +172,9 @@ function ReportWorkspaceInner({ subject }: ReportWorkspaceProps) {
     rangeEnd: urlFilters.rangeEnd,
   });
 
-  React.useEffect(() => {
+  const [previousUrlFilters, setPreviousUrlFilters] = React.useState(urlFilters);
+  if (previousUrlFilters !== urlFilters) {
+    setPreviousUrlFilters(urlFilters);
     setDraftFilters({
       teamId: urlFilters.teamId,
       evaluationMode: urlFilters.evaluationMode,
@@ -186,7 +182,7 @@ function ReportWorkspaceInner({ subject }: ReportWorkspaceProps) {
       rangeStart: urlFilters.rangeStart,
       rangeEnd: urlFilters.rangeEnd,
     });
-  }, [urlFilters]);
+  }
 
   const catalogueQuery = api.report.catalogue.useQuery(undefined, {
     staleTime: 60_000,
@@ -366,7 +362,7 @@ function ReportWorkspaceInner({ subject }: ReportWorkspaceProps) {
           <span>
             آخرین محاسبه:{" "}
             <span className="text-tabular" dir="ltr">
-              {toPersianDigits(runQuery.data.lastCalculatedAt)}
+              {formatJalaliDateTimeFromIso(runQuery.data.lastCalculatedAt)}
             </span>
           </span>
         ) : null}
@@ -418,13 +414,6 @@ function ReportWorkspaceInner({ subject }: ReportWorkspaceProps) {
                       : fetching
                         ? operationalCopy.reportCatalogueBusy
                         : undefined
-                  }
-                  aria-description={
-                    locked
-                      ? r.accessRequirementFa
-                      : fetching
-                        ? operationalCopy.reportCatalogueBusy
-                        : r.purposeFa
                   }
                   onClick={() => {
                     if (locked) return;

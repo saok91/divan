@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "next typegen && tsc --noEmit -p tsconfig.json",
     "selfcheck:governed": "tsx src/server/governed.selfcheck.ts",
     "selfcheck:governed-table": "tsx components/governed-data-table/governed-data-table.selfcheck.ts",
     "selfcheck:tree-navigator": "tsx components/tree-navigator/tree-navigator.selfcheck.ts",
@@ -45,7 +45,11 @@
     "selfcheck:drill-through": "tsx lib/drill-through.selfcheck.ts",
     "selfcheck:governance-discoverability": "tsx lib/governance-discoverability.selfcheck.ts",
     "selfcheck:no-dead-end-ia": "tsx lib/no-dead-end-ia.selfcheck.ts",
-    "selfcheck:design-qa": "tsx lib/design-qa.selfcheck.ts"
+    "selfcheck:design-qa": "tsx lib/design-qa.selfcheck.ts",
+    "selfcheck:session-token": "tsx lib/session-token.selfcheck.ts",
+    "selfcheck:database-health": "tsx lib/database-health.selfcheck.ts",
+    "selfcheck:product-hardening": "tsx src/server/product-hardening.selfcheck.ts",
+    "selfcheck:product-ui": "tsx lib/product-ui.selfcheck.ts"
   },
   "dependencies": {
     "@divan/app-settings": "workspace:*",

@@ -807,3 +807,7 @@
 - Reclaim success log only when `reclaimed > 0` — pre-existing; README documents the positive reclaim case; zero-reclaim boot still silent
 - No behavioral selfcheck for `stale` → reclaim → clear path — Story 11.1 used source gate + manual DoD; expand worker/integration coverage later
 - `reenqueuePendingRecalculationIfNeeded` stale branch not separately source-locked — list SQL gate covers reclaim list only; tighten if reverse/correct replay regresses
+
+- source_spec: `spec-product-usability-hardening.md`
+  summary: Replace provisional population configuration and approve retrieval/projection ceilings before production cutover.
+  evidence: Default development bulk policy caps subjects before query matching, so an exact code outside the capped population cannot be discovered; unrestricted test hooks are confined to the isolated integration process. This authorization policy requires deployment-owner approval rather than an implicit widening in a UI fix.

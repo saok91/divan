@@ -336,7 +336,8 @@ async function main() {
       sensitive: true,
     });
 
-    // sys.admin typically has no org:selfcheck membership → deny
+    // Explicitly test absent membership. Later operations/settings seeds may
+    // legitimately bind sys.admin to this demo scope, so do not assume seed state.
     const sys = await db.internalAccount.findUnique({
       where: { username: "sys.admin" },
     });
@@ -349,8 +350,8 @@ async function main() {
           context: {
             accountId: sysSession.accountId,
             coarseRole: sysSession.coarseRole,
-            organizationalScopeIds: sysSession.organizationalScopeIds,
-            organizationalScopeCodes: sysSession.organizationalScopeCodes,
+            organizationalScopeIds: [],
+            organizationalScopeCodes: [],
           },
           permission: "demo.selfcheck.read",
           dataCategory: "demo.non_hr",
@@ -370,7 +371,19 @@ async function main() {
       objectIds: ["person:a1"],
       populationChannel: "audit",
     });
-    assert.equal(reauth.allowed, true);
+    assert.equal(reauth.allowed, false, "Caller-provided scopes cannot replace current DB bindings");
+    const liveScopeReauth = await reauthorizeForQueuedOrArtifactWork({
+      accountId: hrOp.id,
+      asOfDate: "2024-06-01",
+      actorScopeCodes: ["org:selfcheck"],
+      objectIds: ["person:a1"],
+      populationChannel: "audit",
+      populationRegistry: {
+        subjects: [{id: "person:a1", scopeCodes: ["org:selfcheck"]}],
+        relationships: [], crossTimeGrants: [], facts: [],
+      },
+    });
+    assert.equal(liveScopeReauth.allowed, true);
 
     const reauthDeny = await reauthorizeForQueuedOrArtifactWork({
       accountId: hrOp.id,

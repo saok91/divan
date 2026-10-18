@@ -400,69 +400,32 @@ export function GovernedDataTable<T>({
   const accountId = session?.user?.accountId ?? "anon";
   const sessionReady = sessionStatus !== "loading";
 
-  const [prefs, setPrefs] = React.useState<TablePreferences>(() => ({
-    density: defaultDensity,
-    hiddenColumnIds: [],
+  const prefsKey = `${accountId}:${preferencesKey ?? ""}`;
+  const [localPrefsState, setLocalPrefs] = React.useState<{key: string; value: TablePreferences; override: boolean}>(() => ({
+    key: prefsKey, value: { density: defaultDensity, hiddenColumnIds: [] }, override: false,
   }));
-  const prefsRef = React.useRef(prefs);
-  prefsRef.current = prefs;
-  const [prefsHydrated, setPrefsHydrated] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!preferencesKey) {
-      setPrefs({
-        density: defaultDensity,
-        hiddenColumnIds: [],
-      });
-      setPrefsHydrated(true);
-      return;
-    }
-    // Wait for session resolution so we do not read/write the anon bucket first.
-    if (!sessionReady) return;
-    // Wait for a real column set so sanitize does not wipe stored hides.
-    if (columns.length === 0) return;
-
-    const stored = readTablePreferences(accountId, preferencesKey);
-    setPrefs({
-      density: stored?.density ?? defaultDensity,
-      hiddenColumnIds: sanitizeHiddenColumnIds(
-        stored?.hiddenColumnIds ?? [],
-        columns,
-      ),
-    });
-    setPrefsHydrated(true);
-    // Hydrate once per account/table key; column set changes sanitize via effect below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountId, preferencesKey, defaultDensity, sessionReady, columns.length]);
-
-  React.useEffect(() => {
-    if (!prefsHydrated) return;
-    setPrefs((prev) => {
-      const sanitized = sanitizeHiddenColumnIds(prev.hiddenColumnIds, columns);
-      if (
-        sanitized.length === prev.hiddenColumnIds.length &&
-        sanitized.every((id, i) => id === prev.hiddenColumnIds[i])
-      ) {
-        return prev;
-      }
-      const next = { ...prev, hiddenColumnIds: sanitized };
-      if (preferencesKey && sessionReady) {
-        writeTablePreferences(accountId, preferencesKey, next);
-      }
-      return next;
-    });
-  }, [columns, prefsHydrated, preferencesKey, accountId, sessionReady]);
-
-  const persistPrefs = React.useCallback(
-    (patch: Partial<TablePreferences>) => {
-      const next = { ...prefsRef.current, ...patch };
-      setPrefs(next);
-      if (preferencesKey && sessionReady) {
-        writeTablePreferences(accountId, preferencesKey, next);
-      }
-    },
-    [accountId, preferencesKey, sessionReady],
-  );
+  const localPrefs = localPrefsState.key === prefsKey ? localPrefsState.value : { density: defaultDensity, hiddenColumnIds: [] };
+  const subscribePrefs = React.useCallback((notify: () => void) => {
+    window.addEventListener("storage", notify);
+    window.addEventListener("divan-table-preferences", notify);
+    return () => {
+      window.removeEventListener("storage", notify);
+      window.removeEventListener("divan-table-preferences", notify);
+    };
+  }, []);
+  const readPrefs = React.useCallback(() =>
+    preferencesKey && sessionReady
+      ? JSON.stringify(readTablePreferences(accountId, preferencesKey)) : "null",
+    [preferencesKey, sessionReady, accountId]);
+  const storedPrefs = React.useSyncExternalStore(subscribePrefs, readPrefs, () => "null");
+  const rawPrefs = localPrefsState.key === prefsKey && localPrefsState.override
+    ? localPrefs : (JSON.parse(storedPrefs) as TablePreferences | null) ?? localPrefs;
+  const prefs = { ...rawPrefs, hiddenColumnIds: sanitizeHiddenColumnIds(rawPrefs.hiddenColumnIds, columns) };
+  const persistPrefs = (patch: Partial<TablePreferences>) => {
+    const next = { ...prefs, ...patch };
+    const persisted = Boolean(preferencesKey && sessionReady && writeTablePreferences(accountId, preferencesKey, next));
+    setLocalPrefs({ key: prefsKey, value: next, override: !persisted });
+  };
 
   const hiddenColumnIds = prefs.hiddenColumnIds;
   const density = prefs.density;
@@ -734,11 +697,6 @@ export function GovernedDataTable<T>({
                         disabled={loading}
                         title={
                           loading ? operationalCopy.tableChromeLoading : undefined
-                        }
-                        aria-description={
-                          loading
-                            ? operationalCopy.tableChromeLoading
-                            : undefined
                         }
                         onClick={() => toggleSort(column.id)}
                       >

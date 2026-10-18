@@ -103,12 +103,14 @@ export function MigrationReconciliationWorkspace({
     React.useState<DispositionDraft | null>(null);
   const accountSearch = React.useMemo(() => createAccountSearch(), []);
 
-  React.useEffect(() => {
+  const [previousBatchId, setPreviousBatchId] = React.useState(batchId);
+  if (batchId !== previousBatchId) {
+    setPreviousBatchId(batchId);
     setSelectedRunId(null);
     setControlDraft("");
     setDispositionDraft(null);
     setError(null);
-  }, [batchId]);
+  }
 
   const listQuery = api.migration.listReconciliationRuns.useQuery(
     { batchId },

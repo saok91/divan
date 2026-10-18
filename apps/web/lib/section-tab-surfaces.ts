@@ -217,7 +217,9 @@ export function activeTabForPath(
   );
 }
 
-export function defaultTabHref(surface: SectionTabSurface): string {
+export function defaultTabHref(surface: SectionTabSurface, searchParams?: URLSearchParams): string {
   const tab = surface.tabs.find((t) => t.id === surface.defaultTabId);
-  return tab?.href ?? surface.tabs[0]!.href;
+  const href = tab?.href ?? surface.tabs[0]!.href;
+  const query = searchParams?.toString();
+  return `${href}${query ? `?${query}` : ""}`;
 }

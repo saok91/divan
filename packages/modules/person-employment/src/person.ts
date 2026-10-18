@@ -541,7 +541,7 @@ export async function listPersonsForScopedSearch(
   return rows.map(mapPerson);
 }
 
-function blockedOp(_name: string): never {
+function blockedOp(): never {
   throw new PersonIdentityError(
     "BLOCKED_IDENTITY_OPERATION",
     MSG_BLOCKED_IDENTITY_OPERATION_FA,
@@ -554,7 +554,8 @@ export function correctPersonnelCode(
   _newCode: string,
   _ctx: PersonActorCtx,
 ): never {
-  return blockedOp("correctPersonnelCode");
+  void [_personId, _newCode, _ctx];
+  return blockedOp();
 }
 
 /** Fail-closed until AR-DATA / AR-MIGRATION. */
@@ -563,7 +564,8 @@ export function mergePersons(
   _targetId: string,
   _ctx: PersonActorCtx,
 ): never {
-  return blockedOp("mergePersons");
+  void [_sourceId, _targetId, _ctx];
+  return blockedOp();
 }
 
 /** Fail-closed until AR-DATA / AR-MIGRATION. */
@@ -571,7 +573,8 @@ export function splitPerson(
   _personId: string,
   _ctx: PersonActorCtx,
 ): never {
-  return blockedOp("splitPerson");
+  void [_personId, _ctx];
+  return blockedOp();
 }
 
 /** Fail-closed until AR-DATA / AR-MIGRATION. */
@@ -579,7 +582,8 @@ export function matchReturn(
   _personId: string,
   _ctx: PersonActorCtx,
 ): never {
-  return blockedOp("matchReturn");
+  void [_personId, _ctx];
+  return blockedOp();
 }
 
 /**

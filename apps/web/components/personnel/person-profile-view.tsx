@@ -1,5 +1,6 @@
 "use client";
 
+import { collaborationTypeLabel } from "@/lib/collaboration-type";
 import * as React from "react";
 import Link from "next/link";
 
@@ -15,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "next-auth/react";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
+import { formatJalaliDisplayFromGregorian } from "@/lib/jalali";
+import { eventTypeLabelFa } from "@/lib/personnel-event-timeline";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +40,7 @@ const VIEW_SEMANTICS_LABEL_FA: Record<
 };
 
 const PROFILE_LOAD_ERROR_FA = "بارگذاری پروفایل ممکن نشد. دوباره تلاش کنید.";
+const collaborationLabel = collaborationTypeLabel;
 
 type PersonProfileViewProps = {
   personId: string;
@@ -309,7 +313,7 @@ export function PersonProfileView({
                 {VIEW_SEMANTICS_LABEL_FA[state.viewSemantics]}
               </span>
               <span className="text-muted-foreground" dir="ltr">
-                {toPersianDigits(state.asOf)}
+                {formatJalaliDisplayFromGregorian(state.asOf)}
               </span>
             </p>
           </div>
@@ -373,7 +377,7 @@ export function PersonProfileView({
                 key={row.personFieldKey}
                 label={row.labelFa}
                 value={
-                  row.personFieldKey === "birthDate" ||
+                  row.personFieldKey === "birthDate" ? formatJalaliDisplayFromGregorian(row.value) :
                   row.personFieldKey === "personnelCode" ||
                   row.personFieldKey === "mobilePhone" ||
                   row.personFieldKey === "nationalId"
@@ -400,13 +404,13 @@ export function PersonProfileView({
           <div className="space-y-2">
             <FieldRow
               label="تاریخ شروع"
-              value={toPersianDigits(state.employment.startDate)}
+              value={formatJalaliDisplayFromGregorian(state.employment.startDate)}
               dir="ltr"
             />
             {state.employment.collaborationType ? (
               <FieldRow
                 label="نوع همکاری"
-                value={state.employment.collaborationType}
+                value={collaborationLabel(state.employment.collaborationType)}
               />
             ) : null}
             {teamId ? (
@@ -453,7 +457,7 @@ export function PersonProfileView({
               />
               <FieldRow
                 label="تاریخ شروع"
-                value={toPersianDigits(primary.startDate)}
+                value={formatJalaliDisplayFromGregorian(primary.startDate)}
                 dir="ltr"
               />
             </div>
@@ -513,7 +517,7 @@ export function PersonProfileView({
                 ) : null}
                 <FieldRow
                   label="تاریخ شروع"
-                  value={toPersianDigits(sec.startDate)}
+                  value={formatJalaliDisplayFromGregorian(sec.startDate)}
                   dir="ltr"
                 />
               </li>
@@ -559,7 +563,7 @@ export function PersonProfileView({
             state.contractual.contractEndDateExclusive ? (
               <FieldRow
                 label={contractEndMeta.labelFa}
-                value={toPersianDigits(
+                value={formatJalaliDisplayFromGregorian(
                   state.contractual.contractEndDateExclusive,
                 )}
                 sensitivity={contractEndMeta.sensitivity}
@@ -571,7 +575,7 @@ export function PersonProfileView({
             state.contractual.collaborationType ? (
               <FieldRow
                 label={contractCollabMeta.labelFa}
-                value={state.contractual.collaborationType}
+                value={collaborationLabel(state.contractual.collaborationType)}
                 sensitivity={contractCollabMeta.sensitivity}
               />
             ) : null}
@@ -588,11 +592,11 @@ export function PersonProfileView({
                 className="flex flex-wrap items-center gap-2 text-body"
               >
                 <StatusBadge status="Scheduled" />
-                <span dir="ltr" className="font-mono text-sm">
-                  {row.eventType}
+                <span className="text-body">
+                  {eventTypeLabelFa(row.eventType)}
                 </span>
                 <span className="text-muted-foreground" dir="ltr">
-                  {toPersianDigits(row.effectiveDate)}
+                  {formatJalaliDisplayFromGregorian(row.effectiveDate)}
                 </span>
               </li>
             ))}
@@ -619,11 +623,11 @@ export function PersonProfileView({
               <li key={row.id} className="space-y-1 text-body">
                 <FieldRow
                   label="بازه"
-                  value={`${toPersianDigits(row.startDate)} — ${toPersianDigits(row.endDateExclusive)}`}
+                  value={`${formatJalaliDisplayFromGregorian(row.startDate)} — ${formatJalaliDisplayFromGregorian(row.endDateExclusive)}`}
                   dir="ltr"
                 />
                 {row.collaborationType ? (
-                  <FieldRow label="نوع همکاری" value={row.collaborationType} />
+                  <FieldRow label="نوع همکاری" value={collaborationLabel(row.collaborationType)} />
                 ) : null}
                 {row.terminationReason ? (
                   <FieldRow label="دلیل خاتمه" value={row.terminationReason} />

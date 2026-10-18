@@ -27,6 +27,8 @@ import { operationalCopy } from "@/lib/operational-copy";
 
 export type TrpcContext = {
   session: SessionContext | null;
+  /** Server-verified identity from auth(); never supplied by procedure input. */
+  authenticatedAccountId?: string;
   /** Login-time fingerprint from JWT — null when anonymous. */
   priorAuthzBindingFingerprint: string | null;
 };
@@ -123,8 +125,9 @@ const t = initTRPC
 export const createTRPCRouter = t.router;
 export const publicProcedure = t.procedure;
 
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
-  if (!ctx.session) {
+const authenticatedProcedure = t.procedure.use(({ ctx, next }) => {
+  const accountId = ctx.authenticatedAccountId ?? ctx.session?.accountId;
+  if (!accountId) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "برای دسترسی باید وارد شوید.",
@@ -132,10 +135,18 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   }
   return next({
     ctx: {
-      session: ctx.session,
+      authenticatedAccountId: accountId,
       priorAuthzBindingFingerprint: ctx.priorAuthzBindingFingerprint,
     },
   });
+});
+
+export const protectedProcedure = authenticatedProcedure.use(async ({ ctx, next }) => {
+  const session = await getSessionContext(ctx.authenticatedAccountId);
+  if (!session) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: operationalCopy.inactiveAccount });
+  }
+  return next({ ctx: { session } });
 });
 
 let envelopePool: Pool | null = null;
@@ -177,7 +188,7 @@ function throwAuthzChanged(): never {
  * audit-envelope authorize → handler.
  * Coarse JWT claims alone never authorize governed data.
  */
-export const governedProcedure = protectedProcedure.use(
+export const governedProcedure = authenticatedProcedure.use(
   async ({ ctx, next, meta, getRawInput }) => {
     if (meta?.devOnly && process.env.NODE_ENV === "production") {
       throw new TRPCError({ code: "NOT_FOUND" });
@@ -194,7 +205,7 @@ export const governedProcedure = protectedProcedure.use(
       });
     }
 
-    const fresh = await getSessionContext(ctx.session.accountId);
+    const fresh = await getSessionContext(ctx.authenticatedAccountId);
     if (!fresh) {
       throw new TRPCError({
         code: "UNAUTHORIZED",

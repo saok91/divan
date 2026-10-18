@@ -14,7 +14,6 @@ import { getPersonDb } from "./db";
 import { normalizeDigitsForMatch, toLatinDigits } from "./digits";
 import {
   JobRefError,
-  MSG_BLOCKED_JOB_REF_OPERATION_FA,
   MSG_DEACTIVATION_BLOCKED_DEPENDENCIES_FA,
   MSG_DUPLICATE_JOB_REF_CODE_FA,
   MSG_DUPLICATE_JOB_REF_RANK_FA,
@@ -33,7 +32,6 @@ import {
   assertValidJobRefInterval,
   isJobRefActiveAsOf,
   type JobRefConcept,
-  type JobRefInterval,
 } from "./job-reference-invariants";
 import { requireNonEmpty } from "./normalize";
 

@@ -794,7 +794,7 @@ export const migrationRouter = createTRPCRouter({
       resolveAuthorizeFromInput: resolveAuthorizeFromStagingBatchId,
     })
     .input(stagingIdSchema)
-    .query(async ({ ctx, input }): Promise<MigrationStagingResponse> => {
+    .query(async ({ input }): Promise<MigrationStagingResponse> => {
       try {
         const population = await resolvePersonnelPopulationRegistry();
         const batch = await getStagingBatch(getMigrationPool(), input.batchId);

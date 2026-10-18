@@ -7,6 +7,7 @@ import { Panel } from "@/components/layout/panel-section";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { operationalCopy } from "@/lib/operational-copy";
 import { toPersianDigits } from "@/lib/persian-digits";
+import { formatJalaliDateTimeFromIso } from "@/lib/jalali";
 import { cn } from "@/lib/utils";
 
 export type DashboardMetricCardProps = {
@@ -96,7 +97,7 @@ export function DashboardMetricCard({
       <p className="text-caption text-muted-foreground">
         آخرین محاسبه:{" "}
         <span className="text-tabular tabular-nums" dir="ltr">
-          {toPersianDigits(lastCalculatedAt)}
+          {formatJalaliDateTimeFromIso(lastCalculatedAt)}
         </span>
       </p>
     ) : null;

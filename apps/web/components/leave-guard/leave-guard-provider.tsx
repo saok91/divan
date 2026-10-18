@@ -51,9 +51,9 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
   const busyRef = React.useRef(false);
   const historyTrapArmed = React.useRef(false);
   const allowNextPopRef = React.useRef(false);
-  /** Latest map for event handlers — updated during render (not effect) to avoid one-frame staleness. */
+  /** Latest committed map for event handlers, before browser input can run. */
   const registrationsLive = React.useRef(registrations);
-  registrationsLive.current = registrations;
+  React.useLayoutEffect(() => { registrationsLive.current = registrations; }, [registrations]);
 
   const upsert = React.useCallback((entry: LeaveGuardRegistration) => {
     setRegistrations((prev) => {
@@ -109,10 +109,19 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
     });
   }, []);
 
+  const navigatePush = React.useCallback((href: string) => {
+    // Reuse the duplicate history entry so clean-state cleanup cannot cancel
+    // an approved navigation with a concurrent history.back().
+    const replaceTrap = historyTrapArmed.current;
+    historyTrapArmed.current = false;
+    if (replaceTrap) router.replace(href);
+    else router.push(href);
+  }, [router]);
+
   const proceedNavigation = React.useCallback(
     (current: PendingNavigation) => {
       if (current.mode === "push" && current.href) {
-        router.push(current.href);
+        navigatePush(current.href);
         return;
       }
       if (current.mode === "history-back") {
@@ -122,7 +131,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
         window.history.go(-2);
       }
     },
-    [router],
+    [navigatePush],
   );
 
   const focusLeaveDialog = React.useCallback(() => {
@@ -144,10 +153,10 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
         setPending(null);
         setSaveBlockedReason(null);
       }
-      router.push(href);
+      navigatePush(href);
       return Promise.resolve(true);
     },
-    [router],
+    [navigatePush],
   );
 
   const requestNavigation = React.useCallback(
@@ -161,7 +170,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
       });
 
       if (decision.kind === "navigate-clean") {
-        router.push(href);
+        navigatePush(href);
         return Promise.resolve(true);
       }
 
@@ -183,7 +192,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
         openPending({ href, mode: "push", resolve });
       });
     },
-    [clearPendingAndNavigate, focusLeaveDialog, openPending, router],
+    [clearPendingAndNavigate, focusLeaveDialog, openPending, navigatePush],
   );
 
   const resolvePending = React.useCallback(
@@ -279,12 +288,15 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
       window.history.pushState({ __divanLeaveGuard: true }, "");
       historyTrapArmed.current = true;
     }
+  }, [isAnyDirty]);
 
+  React.useEffect(() => {
     const onPopState = () => {
       if (allowNextPopRef.current) {
         allowNextPopRef.current = false;
         return;
       }
+      if (![...registrationsLive.current.values()].some((entry) => entry.isDirty)) return;
       // Re-arm trap so Stay keeps the user on this page (same URL pushState).
       window.history.pushState({ __divanLeaveGuard: true }, "");
       historyTrapArmed.current = true;
@@ -302,7 +314,7 @@ export function LeaveGuardProvider({ children }: LeaveGuardProviderProps) {
     return () => {
       window.removeEventListener("popstate", onPopState);
     };
-  }, [isAnyDirty, openPending]);
+  }, [openPending]);
 
   const value = React.useMemo<LeaveGuardContextValue>(
     () => ({

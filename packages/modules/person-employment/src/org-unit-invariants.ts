@@ -135,6 +135,8 @@ export function assertChildWithinParent(
   parent: OrgInterval,
   _asOf?: string,
 ): void {
+  // Containment covers the full interval regardless of the viewing date.
+  void _asOf;
   if (child.startDate < parent.startDate) {
     throw new OrgUnitError(
       "CHILD_OUTSIDE_PARENT_VALIDITY",

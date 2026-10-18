@@ -138,28 +138,14 @@ export function PlatformStatusProvider({
   const [blockingStaleLocal, setBlockingStale] = React.useState(
     initial?.blockingStale ?? DEFAULT_STATUS.blockingStale,
   );
-  const [stalePendingUntil, setStalePendingUntil] = React.useState(
+  const [stalePendingUntilLocal, setStalePendingUntil] = React.useState(
     initial?.stalePendingUntil ?? DEFAULT_STATUS.stalePendingUntil,
   );
   const [affectedPersonCountLocal, setAffectedPersonCount] = React.useState(
     initial?.affectedPersonCount ?? DEFAULT_STATUS.affectedPersonCount,
   );
 
-  React.useEffect(() => {
-    if (serverStalePendingUntil) {
-      setStalePendingUntil(serverStalePendingUntil);
-    }
-  }, [serverStalePendingUntil]);
-
-  React.useEffect(() => {
-    if (serverAffectedPersonCount === null) {
-      setAffectedPersonCount(null);
-      return;
-    }
-    if (typeof serverAffectedPersonCount === "number") {
-      setAffectedPersonCount(serverAffectedPersonCount);
-    }
-  }, [serverAffectedPersonCount]);
+  const stalePendingUntil = serverStalePendingUntil ?? stalePendingUntilLocal;
 
   const recalculationPending =
     serverRecalcPending || recalculationPendingLocal;

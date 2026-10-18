@@ -152,10 +152,11 @@ function loadCa(ca: string): string | Buffer {
  * Escape LDAP filter special characters per RFC 4515.
  */
 export function escapeLdapFilterValue(value: string): string {
-  return value.replace(/[\0*()\\\u0000]/g, (ch) => {
-    const code = ch.charCodeAt(0);
-    return `\\${code.toString(16).padStart(2, "0")}`;
-  });
+  return Array.from(value, (ch) =>
+    ["\0", "*", "(", ")", "\\"].includes(ch)
+      ? `\\${ch.charCodeAt(0).toString(16).padStart(2, "0")}`
+      : ch,
+  ).join("");
 }
 
 export function buildUserFilter(template: string, username: string): string {

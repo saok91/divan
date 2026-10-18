@@ -1135,7 +1135,6 @@ export async function classifyConflicts(
       try {
         const {
           assertCompensationFieldsEnabled,
-          CompensationError,
         } = await import("@divan/compensation-facts");
         const gateFields: Record<string, unknown> =
           draft.eventType === "CompensationChanged"

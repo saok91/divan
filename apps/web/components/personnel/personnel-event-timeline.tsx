@@ -82,10 +82,17 @@ function prefersReducedMotion(): boolean {
 export function PersonnelEventTimeline({
   personId,
   focusEventId,
+  showCorrectionCta,
+}: PersonnelEventTimelineProps) {
+  return <PersonnelEventTimelineContent key={`${personId}:${focusEventId ?? ""}`} personId={personId} focusEventId={focusEventId} showCorrectionCta={showCorrectionCta} />;
+}
+
+function PersonnelEventTimelineContent({
+  personId,
+  focusEventId,
   showCorrectionCta = true,
 }: PersonnelEventTimelineProps) {
   const [limit, setLimit] = React.useState(TIMELINE_PAGE_SIZE);
-  const [focusMissing, setFocusMissing] = React.useState(false);
   const focusAttemptedRef = React.useRef(false);
 
   const correctionCta = showCorrectionCta ? (
@@ -114,17 +121,23 @@ export function PersonnelEventTimeline({
   const focusPresent =
     Boolean(focusEventId) && rows.some((r) => r.event.id === focusEventId);
 
-  React.useEffect(() => {
-    focusAttemptedRef.current = false;
-    setFocusMissing(false);
-  }, [focusEventId, personId]);
+  const canExtendForFocus = Boolean(focusEventId) && !focusPresent &&
+    !timelineQuery.isPending && !timelineQuery.isError &&
+    !timelineQuery.isFetching && rows.length >= limit && limit < TIMELINE_MAX_LIMIT;
+  const focusMissing = Boolean(focusEventId) && !focusPresent &&
+    !timelineQuery.isPending && !timelineQuery.isError && !timelineQuery.isFetching &&
+    !canExtendForFocus;
+
+  // Adjust this component's query key before rendering an incomplete deep-link result.
+  if (canExtendForFocus) {
+    setLimit(Math.min(limit + TIMELINE_PAGE_SIZE, TIMELINE_MAX_LIMIT));
+  }
 
   React.useEffect(() => {
     if (!focusEventId || timelineQuery.isPending || timelineQuery.isError) {
       return;
     }
     if (focusPresent) {
-      setFocusMissing(false);
       if (focusAttemptedRef.current) return;
       const el = document.getElementById(`event-${focusEventId}`);
       // Do not latch until the row is in the DOM — first paint can race the effect.
@@ -140,15 +153,6 @@ export function PersonnelEventTimeline({
       return;
     }
 
-    const hitPageCeiling = rows.length >= limit;
-    const canLoadMore = hitPageCeiling && limit < TIMELINE_MAX_LIMIT;
-    if (canLoadMore && !timelineQuery.isFetching) {
-      setLimit((prev) => Math.min(prev + TIMELINE_PAGE_SIZE, TIMELINE_MAX_LIMIT));
-      return;
-    }
-    if (!timelineQuery.isFetching) {
-      setFocusMissing(true);
-    }
   }, [
     focusEventId,
     focusPresent,

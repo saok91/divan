@@ -66,8 +66,8 @@ export function writeTablePreferences(
   accountId: string,
   preferencesKey: string,
   prefs: TablePreferences,
-): void {
-  if (typeof window === "undefined") return;
+): boolean {
+  if (typeof window === "undefined") return false;
   try {
     window.sessionStorage.setItem(
       tablePreferencesStorageKey(accountId, preferencesKey),
@@ -76,7 +76,10 @@ export function writeTablePreferences(
         hiddenColumnIds: prefs.hiddenColumnIds,
       }),
     );
+    window.dispatchEvent(new Event("divan-table-preferences"));
+    return true;
   } catch {
-    // fail open — preference not persisted
+    // Keep the caller's in-memory preferences when persistence fails.
+    return false;
   }
 }

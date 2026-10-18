@@ -19,6 +19,10 @@ const config = [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ["packages/**/*.mjs"],
+    languageOptions: { globals: { process: "readonly", console: "readonly" } },
+  },
+  {
     files: ["packages/**/*.{ts,tsx}", "workers/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {

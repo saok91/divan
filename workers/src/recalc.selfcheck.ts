@@ -16,7 +16,6 @@ import {
   markRecalculationPending,
   setRecalcEnqueue,
 } from "@divan/person-employment";
-import { PgBoss } from "pg-boss";
 
 import { WORKERS_STUB, startWorkers } from "./index";
 

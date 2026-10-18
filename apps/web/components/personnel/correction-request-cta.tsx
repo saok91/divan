@@ -21,11 +21,11 @@ export function CorrectionRequestCta({
   size = "sm",
 }: CorrectionRequestCtaProps) {
   const leaveGuard = useLeaveGuardOptional();
-  const capsQuery = api.correctionCase.capabilities.useQuery();
+  const capsQuery = api.correctionCase.capabilities.useQuery(undefined, { retry: false });
 
   const canOpen = capsQuery.data?.write === true;
   const capsLoading = capsQuery.isLoading;
-  const capsFailed = capsQuery.isError;
+  const capsFailed = capsQuery.isError && capsQuery.error.data?.code !== "FORBIDDEN";
 
   function navigateCorrection() {
     const href = `/correction-cases?person=${encodeURIComponent(personId)}&open=1`;

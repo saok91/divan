@@ -19,6 +19,9 @@ import {
   type RecalcJobPayload,
 } from "@divan/person-employment";
 import { PgBoss } from "pg-boss";
+import { config as loadEnv } from "dotenv";
+import { fileURLToPath } from "node:url";
+import { startRecoveryLoop } from "./recovery-loop";
 
 /** Kept for tests that need to assert stub mode was the pre-4.4 default. */
 export const WORKERS_STUB = false as const;
@@ -47,10 +50,12 @@ async function sendRecalcJob(
 export async function reclaimPendingRecalculations(
   boss: PgBoss,
   db: Pool,
+  options?: { afterPersonId?: string; onEnqueued?: (personId: string) => void },
 ): Promise<number> {
-  const pending = await listPendingRecalculationJobs(db);
+  const pending = await listPendingRecalculationJobs(db, options?.afterPersonId);
   for (const payload of pending) {
     await sendRecalcJob(boss, payload);
+    options?.onEnqueued?.(payload.personId);
   }
   return pending.length;
 }
@@ -67,58 +72,78 @@ export async function startWorkers(
 
   const boss = new PgBoss(connectionString);
   boss.on("error", (err) => {
-    console.error("[workers] pg-boss error", err);
-  });
-
-  await boss.start();
-  await boss.createQueue(TEMPORAL_RECALCULATE_QUEUE, {
-    policy: "singleton",
+    console.error("[workers] pg-boss error", err.name);
   });
 
   const pool = createPgPool(connectionString);
+  let stopRecovery: (() => Promise<void>) | undefined;
+  let afterPersonId: string | undefined;
+  try {
+    await boss.start();
+    await boss.createQueue(TEMPORAL_RECALCULATE_QUEUE, {
+      policy: "singleton",
+    });
 
-  setRecalcEnqueue(async (payload: RecalcJobPayload) => {
-    await sendRecalcJob(boss, payload);
-  });
+    setRecalcEnqueue(async (payload: RecalcJobPayload) => {
+      await sendRecalcJob(boss, payload);
+    });
 
-  const reclaimed = await reclaimPendingRecalculations(boss, pool);
-  if (reclaimed > 0) {
-    console.log(
-      `[workers] reclaimed ${reclaimed} pending/failed/stale recalc job(s)`,
-    );
-  }
-
-  await boss.work<RecalcJobPayload>(
-    TEMPORAL_RECALCULATE_QUEUE,
-    async (jobs) => {
-      for (const job of jobs) {
-        const data = job.data;
-        if (
-          !data?.personId ||
-          !data.fromEffectiveDate ||
-          data.generation == null
-        ) {
-          throw new Error(
-            `invalid temporal.recalculate payload job=${job.id}`,
-          );
+    await boss.work<RecalcJobPayload>(
+      TEMPORAL_RECALCULATE_QUEUE,
+      async (jobs) => {
+        for (const job of jobs) {
+          const data = job.data;
+          if (
+            !data?.personId ||
+            !data.fromEffectiveDate ||
+            data.generation == null
+          ) {
+            throw new Error(
+              `invalid temporal.recalculate payload job=${job.id}`,
+            );
+          }
+          await runHistoricalRecalculation(pool, data);
         }
-        await runHistoricalRecalculation(pool, data);
-      }
-    },
-  );
+      },
+    );
 
-  return {
-    boss,
-    stop: async () => {
-      setRecalcEnqueue(null);
-      await boss.stop({ graceful: true, timeout: 10_000 });
-      await pool.end();
-    },
-  };
+    stopRecovery = startRecoveryLoop(async () => {
+      // Keyset cursor prevents a batch of permanently failing rows starving others.
+      const reclaimed = await reclaimPendingRecalculations(boss, pool, {
+        afterPersonId,
+        onEnqueued: (personId) => { afterPersonId = personId; },
+      });
+      if (reclaimed < 100) afterPersonId = undefined;
+      if (reclaimed > 0) console.log(`[workers] reclaimed ${reclaimed} pending/failed/stale recalc job(s)`);
+    }, { onError: () => console.error("[workers] recovery failed; durable rows will be retried") });
+    let shutdown: Promise<void> | undefined;
+    return {
+      boss,
+      stop: () => {
+        shutdown ??= (async () => {
+          setRecalcEnqueue(null);
+          await stopRecovery?.();
+          try {
+            await boss.stop({ graceful: true, timeout: 10_000 });
+          } finally {
+            await pool.end();
+          }
+        })();
+        return shutdown;
+      },
+    };
+  } catch (error) {
+    await stopRecovery?.();
+    setRecalcEnqueue(null);
+    await boss.stop({ graceful: false }).catch(() => undefined);
+    await pool.end().catch(() => undefined);
+    throw error;
+  }
 }
 
 /** CLI entry when run as main module. */
 export async function main(): Promise<void> {
+  loadEnv({ path: fileURLToPath(new URL("../../.env", import.meta.url)), quiet: true });
   const handle = await startWorkers();
   console.log(
     `[workers] listening on queue ${TEMPORAL_RECALCULATE_QUEUE} (stub=${WORKERS_STUB})`,

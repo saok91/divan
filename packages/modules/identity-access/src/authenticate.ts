@@ -404,6 +404,7 @@ export async function getActiveCoarseRoleByUsername(
  * Server-side revoke / JWT stale-role after demote deferred (see deferred-work.md).
  */
 export async function signOut(_accountId?: string): Promise<void> {
+  void _accountId;
   // no-op — Auth.js JWT clear is apps/web; module revoke hook deferred
 }
 

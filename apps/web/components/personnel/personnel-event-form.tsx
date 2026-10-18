@@ -34,6 +34,7 @@ import {
   useLeaveGuardRegistration,
 } from "@/components/leave-guard";
 import { PersonRecalcSubjectChrome } from "@/components/personnel/person-recalc-subject-chrome";
+import { CollaborationTypeInput } from "@/components/personnel/collaboration-type-input";
 import {
   employmentIdForPrimaryAssignment,
   entityId,
@@ -225,7 +226,7 @@ export function PersonnelEventForm({
   const [employment, setEmployment] = React.useState<EntityPickerValue>(null);
   const [primaryAssignment, setPrimaryAssignment] =
     React.useState<EntityPickerValue>(null);
-  const [eventType, setEventType] = React.useState("ScaffoldChangeRecorded");
+  const [eventType, setEventType] = React.useState("EmploymentStarted");
   const [effectiveDate, setEffectiveDate] = React.useState("");
   const [collaborationType, setCollaborationType] = React.useState("employee");
   const [team, setTeam] = React.useState<EntityPickerValue>(null);
@@ -299,8 +300,10 @@ export function PersonnelEventForm({
   const inboundHydrateGenRef = React.useRef(0);
   const personRef = React.useRef(person);
   const primaryAssignmentRef = React.useRef(primaryAssignment);
-  personRef.current = person;
-  primaryAssignmentRef.current = primaryAssignment;
+  React.useLayoutEffect(() => {
+    personRef.current = person;
+    primaryAssignmentRef.current = primaryAssignment;
+  }, [person, primaryAssignment]);
 
   const employmentCascade = useEntityPickerCascade(person, "فرد", {
     value: employment,
@@ -368,7 +371,7 @@ export function PersonnelEventForm({
         syncingEmploymentFromPa.current = false;
       })();
     },
-    [person?.id, primaryAssignmentCascade, employmentCascade],
+    [person, primaryAssignmentCascade, employmentCascade],
   );
 
   const onLadderChange = React.useCallback(
@@ -417,7 +420,7 @@ export function PersonnelEventForm({
     person: null,
     employment: null,
     primaryAssignment: null,
-    eventType: "ScaffoldChangeRecorded",
+    eventType: "EmploymentStarted",
     effectiveDate: "",
     collaborationType: "employee",
     team: null,
@@ -481,7 +484,7 @@ export function PersonnelEventForm({
       setDraftId(snap.draftId);
       setVersion(snap.version);
     },
-    [employmentCascade.alignParentId, primaryAssignmentCascade.alignParentId, gradeCascade.alignParentId],
+    [employmentCascade, primaryAssignmentCascade, gradeCascade],
   );
 
   // Prefill: host passes `initialPersonId` from ?person=; dirty inbound uses leave-guard first.
@@ -952,6 +955,13 @@ export function PersonnelEventForm({
     }
   }, [
     person,
+    personId,
+    employmentId,
+    teamId,
+    organizationalRoleId,
+    jobTitleId,
+    ladderId,
+    gradeId,
     employment,
     primaryAssignment,
     eventType,
@@ -1423,15 +1433,13 @@ export function PersonnelEventForm({
         {isStartReturnType(eventType) ? (
           <FormSection title="واقعیت‌های حداقل شروع/بازگشت">
             <FormField label="نوع همکاری" htmlFor={`${formId}-collab`} required>
-              <Input
+              <CollaborationTypeInput
                 value={collaborationType}
-                onChange={(e) => {
-                  setCollaborationType(e.target.value);
+                onValueChange={(value) => {
+                  setCollaborationType(value);
                   setDirty(true);
                 }}
                 required
-                dir="ltr"
-                autoComplete="off"
               />
             </FormField>
             <div className="flex flex-wrap gap-2">
@@ -2111,14 +2119,12 @@ export function PersonnelEventForm({
                 ) : null}
                 {showCompField("contract.collaboration_type") ? (
                   <FormField label="نوع همکاری" htmlFor={`${formId}-auto-field-8`}>
-                    <Input
+                    <CollaborationTypeInput
                       value={collaborationType}
-                      onChange={(e) => {
-                        setCollaborationType(e.target.value);
+                      onValueChange={(value) => {
+                        setCollaborationType(value);
                         setDirty(true);
                       }}
-                      dir="ltr"
-                      autoComplete="off"
                     />
                   </FormField>
                 ) : null}

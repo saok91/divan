@@ -20,6 +20,7 @@ import type {
 
 const DEFAULT_DEBOUNCE_MS = 200;
 const EMPTY_COPY_FA = "نتیجه‌ای یافت نشد.";
+const ERROR_COPY_FA = "دریافت نتایج ناموفق بود؛ دوباره جست‌وجو کنید.";
 const LOADING_COPY_FA = "در حال جستجو…";
 
 export type EntityPickerProps = {
@@ -98,7 +99,7 @@ export function EntityPicker({
   const [activeIndex, setActiveIndex] = React.useState(-1);
   const [loading, setLoading] = React.useState(false);
   const [liveMessage, setLiveMessage] = React.useState("");
-  const [focusInputAfterClear, setFocusInputAfterClear] = React.useState(false);
+  const focusInputAfterClear = React.useRef(false);
   const searchGen = React.useRef(0);
   const resolvedEmptyCopy = emptyCopyFa ?? EMPTY_COPY_FA;
 
@@ -127,7 +128,7 @@ export function EntityPicker({
         if (gen !== searchGen.current) return;
         setOptions([]);
         setActiveIndex(-1);
-        setLiveMessage(EMPTY_COPY_FA);
+        setLiveMessage(ERROR_COPY_FA);
       } finally {
         if (gen === searchGen.current) setLoading(false);
       }
@@ -135,34 +136,29 @@ export function EntityPicker({
     [search, resolvedEmptyCopy],
   );
 
-  React.useEffect(() => {
+  const [wasDisabled, setWasDisabled] = React.useState(disabled);
+  if (disabled !== wasDisabled) {
+    setWasDisabled(disabled);
     if (disabled) {
-      setOptions([]);
-      setQuery("");
-      setOpen(false);
-      setActiveIndex(-1);
-      setLiveMessage("");
-      setLoading(false);
-      searchGen.current += 1;
-      return;
+      setOptions([]); setQuery(""); setOpen(false); setActiveIndex(-1);
+      setLiveMessage(""); setLoading(false);
     }
-  }, [disabled]);
+  }
 
   React.useEffect(() => {
     if (!open || disabled || value) return;
-    setLoading(true);
     const t = window.setTimeout(() => {
       void runSearch(query.trim());
     }, debounceMs);
-    return () => window.clearTimeout(t);
+    return () => { window.clearTimeout(t); searchGen.current += 1; };
   }, [query, open, disabled, value, debounceMs, runSearch]);
 
   React.useEffect(() => {
-    if (!value && focusInputAfterClear) {
+    if (!value && focusInputAfterClear.current) {
       inputRef.current?.focus();
-      setFocusInputAfterClear(false);
+      focusInputAfterClear.current = false;
     }
-  }, [value, focusInputAfterClear]);
+  }, [value]);
 
   const selectOption = (opt: EntityPickerOption) => {
     searchGen.current += 1;
@@ -185,7 +181,7 @@ export function EntityPicker({
     setActiveIndex(-1);
     setLiveMessage("");
     setLoading(false);
-    setFocusInputAfterClear(true);
+    focusInputAfterClear.current = true;
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -347,7 +343,7 @@ export function EntityPicker({
           sideOffset={4}
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
-          className="w-[var(--radix-popover-trigger-width)] min-w-[16rem] overflow-hidden rounded-sm border border-control-border bg-popover p-0 text-popover-foreground shadow-[0_6px_18px_rgba(5,16,97,0.13)]"
+          className="w-[var(--radix-popover-trigger-width)] min-w-[16rem] overflow-y-auto rounded-sm border border-control-border bg-popover p-0 text-popover-foreground shadow-[0_6px_18px_rgba(5,16,97,0.13)]"
         >
           {scopeNoteFa ? (
             <div className="border-b border-hairline px-3 py-1.5 text-caption text-text-secondary">

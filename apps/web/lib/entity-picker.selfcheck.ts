@@ -98,8 +98,8 @@ assert.match(
 );
 assert.match(
   pickerSrc,
-  /catch \{[\s\S]*?setLiveMessage\(EMPTY_COPY_FA\)/,
-  "EntityPicker catch path must not reuse expected-empty override",
+  /catch \{[\s\S]*?setLiveMessage\(ERROR_COPY_FA\)/,
+  "EntityPicker failures must be distinct from successful empty search results",
 );
 assert.match(
   pickerSrc,

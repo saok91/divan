@@ -23,6 +23,10 @@ export function downloadBase64File(
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  document.body.append(a);
+  try { a.click(); } finally {
+    a.remove();
+    // Keep the URL alive while the browser starts consuming the download.
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }
 }
